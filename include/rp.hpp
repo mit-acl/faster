@@ -8,6 +8,7 @@
 #include "sensor_msgs/LaserScan.h"
 #include "geometry_msgs/PoseStamped.h"
 #include "geometry_msgs/PointStamped.h"
+#include "geometry_msgs/PoseArray.h"
 #include "geometry_msgs/TwistStamped.h"
 #include "geometry_msgs/Vector3Stamped.h"
 #include "tf/transform_datatypes.h"
@@ -27,11 +28,12 @@ class REACT
 public:
 	REACT();
 
-	ros::Publisher partitioned_scan_pub, goal_pub;
+	ros::Publisher partitioned_scan_pub, pub_clean_scan, goal_pub, int_goal_pub;
 
 	void scanCB(const sensor_msgs::LaserScan& msg);
 	void stateCB(const acl_system::ViconState& msg);
 	void partition_scan(const sensor_msgs::LaserScan& msg);
+	void vis_better_scan(const sensor_msgs::LaserScan& msg);
 
 	// ROS timed functions
 	void sendGoal(const ros::TimerEvent&);
@@ -39,13 +41,15 @@ public:
 private:
 
 	double inf; // Infinity definition
-	double thresh ;
+	double thresh;
+	double yaw;
+	bool debug;
 
 	std::ostringstream errorMsg, warnMsg;
 
 	tf::Vector3 pose;
-	tf::Quaternion att;
 	geometry_msgs::PointStamped goal;
+	geometry_msgs::PoseArray goal_points;
  	sensor_msgs::LaserScan partitioned_scan;
 
 	//## Logging and Debugging Functions
