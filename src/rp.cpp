@@ -3,6 +3,15 @@
 REACT::REACT(){
 
 	pose.setZero();
+
+	// Should be read as param
+	thresh = 0.5; 
+	goal.header.stamp = ros::Time::now();
+	goal.header.frame_id = "vicon";
+	goal.point.x =  0;
+	goal.point.y = -5;
+	goal.point.z = 0;
+
 	inf = std::numeric_limits<double>::max();
 
 	ROS_INFO("Initialized.");
@@ -22,24 +31,55 @@ void REACT::stateCB(const acl_system::ViconState& msg)
 	// if (msg.has_twist) velCallback(msg.twist);
 }
 
+void REACT::sendGoal(const ros::TimerEvent& e)
+{
+	goal_pub.publish(goal);
+}
+
 void REACT::scanCB(const sensor_msgs::LaserScan& msg)
  {
-
- 	std::cout << "Received scan" << std::endl;
-
- 	screenPrint();
-
-    // for (int i=min_idx; i < max_idx; i++){
-    // 	double r = rangeCheck(i-min_idx);
-    	
-    // 	if (msg.ranges[i] > 0.8*r){
-    // 		msg_filtered.ranges[i] = inf;
-    // 		points_removed++;
-    // 	}
-    // }
-	
-    // filtered_scan_pub.publish(msg_filtered);
+ 	partition_scan(msg);
+ 	find_free_space();
  }
+
+
+void REACT::partition_scan(const sensor_msgs::LaserScan& msg){
+	std::cout << "Received scan" << std::endl;
+
+ 	partitioned_scan = msg;
+
+ 	double num_samples = (msg.angle_max - msg.angle_min) / msg.angle_increment;
+
+ 	// screenPrint();
+
+ 	int j = 0;
+
+    for (int i=0; i < num_samples; i++){
+    	
+    	if (std::abs(msg.ranges[i+1]-msg.ranges[i]) < thresh){
+    		partitioned_scan.ranges[i] = inf;
+    	}
+    	else{
+    		if (isinf(msg.ranges[i])){
+    			partitioned_scan.ranges[i] = msg.ranges[i+1];
+    		}
+    		else {
+    			partitioned_scan.ranges[i] = msg.ranges[i];
+    		}
+    	}
+
+    }
+
+    partitioned_scan.ranges[0] = 0.99*msg.range_max;
+    partitioned_scan.ranges[num_samples] = 0.99*msg.range_max;
+	
+    partitioned_scan_pub.publish(partitioned_scan);
+}
+
+void REACT::find_free_space()
+{
+
+}
 
 
 void REACT::screenPrint()
