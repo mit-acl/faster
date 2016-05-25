@@ -12,6 +12,7 @@
 #include "geometry_msgs/TwistStamped.h"
 #include "geometry_msgs/Vector3Stamped.h"
 #include "tf/transform_datatypes.h"
+#include "nav_msgs/Path.h"
 
 // custom messages
 #include "acl_system/ViconState.h"
@@ -49,7 +50,8 @@ private:
 
 	tf::Vector3 pose;
 	geometry_msgs::PointStamped goal;
-	geometry_msgs::PoseArray goal_points;
+	// geometry_msgs::PoseArray goal_points;
+	nav_msgs::Path goal_points;
  	sensor_msgs::LaserScan partitioned_scan;
 
 	//## Logging and Debugging Functions

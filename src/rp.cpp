@@ -63,7 +63,8 @@ void REACT::vis_better_scan(const sensor_msgs::LaserScan& msg)
 void REACT::partition_scan(const sensor_msgs::LaserScan& msg){
 	std::cout << "Received scan" << std::endl;
 
-	geometry_msgs::PoseArray goal_points;
+	// geometry_msgs::PoseArray goal_points;
+	nav_msgs::Path goal_points;
 
 	goal_points.header.stamp = ros::Time::now();
 	goal_points.header.frame_id = "vicon";
@@ -83,26 +84,21 @@ void REACT::partition_scan(const sensor_msgs::LaserScan& msg){
  	sensor_msgs::LaserScan filtered_scan;
 
  	filtered_scan = msg;
+ 	filtered_scan.range_max = 1.1*msg.range_max;
 
- 	geometry_msgs::Pose temp;
+ 	geometry_msgs::PoseStamped temp;
 
     for (int i=0; i < num_samples; i++){
     	if (isinf(filtered_scan.ranges[i]) || isnan(filtered_scan.ranges[i])){
-    		filtered_scan.ranges[i] = 0.99*filtered_scan.range_max;
+    		filtered_scan.ranges[i] = msg.range_max;
     	}
 
     	if (isinf(filtered_scan.ranges[i+1]) || isnan(filtered_scan.ranges[i+1])){
-    		filtered_scan.ranges[i+1] = 0.99*filtered_scan.range_max;
+    		filtered_scan.ranges[i+1] = msg.range_max;
     	}
 
     	if (std::abs(filtered_scan.ranges[i+1]-filtered_scan.ranges[i]) < thresh){
-    		// Do nothing
-    		if (isinf(filtered_scan.ranges[i]) || isnan(filtered_scan.ranges[i])){
-    			sum += filtered_scan.range_max;
-    		}
-    		else{
-    			sum += filtered_scan.ranges[i];
-    		}
+    			sum += filtered_scan.ranges[i+1];    		
     		// std::cout << sum << std::endl;
     		// std::cout << filtered_scan.ranges[i] << std::endl;
     	}
@@ -114,11 +110,11 @@ void REACT::partition_scan(const sensor_msgs::LaserScan& msg){
     		r = sum/(i-j+1);
     		std::cout << "i: " << i << " sum: " << sum << " r: " << r << std::endl;
     		angle = filtered_scan.angle_min + filtered_scan.angle_increment*(i+j)/2 + yaw;
-    		temp.position.x = r*cos(angle);
-    		temp.position.y = r*sin(angle);
-    		temp.position.z = 0;
+    		temp.pose.position.x = r*cos(angle);
+    		temp.pose.position.y = r*sin(angle);
+    		temp.pose.position.z = 0;
     		goal_points.poses.push_back(temp);
-    		sum = 0;
+    		sum = filtered_scan.ranges[i];
     		j = i;
     	}
     	
