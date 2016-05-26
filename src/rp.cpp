@@ -104,7 +104,7 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
 	int j = (int) ((angle_2_goal - msg.angle_min)/msg.angle_increment);
 	int delta = (int) (angle_check/msg.angle_increment) ;
 
-	std::cout << "j: " <<  j << std::endl;
+	// std::cout << "j: " <<  j << std::endl;
 	for (int i=j-delta; i < j+delta; i++)
 	{
 		if(isinf(msg.ranges[i]) || isnan(msg.ranges[i])){
@@ -176,17 +176,19 @@ void REACT::partition_scan(const sensor_msgs::LaserScan& msg){
     			sum += filtered_scan.ranges[i+1];  
     	}
     	else{
-    		r = sum/(i-j);
-    		// std::cout << "i: " << i << " sum: " << sum << " r: " << r << std::endl;
-    		angle = filtered_scan.angle_min + filtered_scan.angle_increment*(i+j)/2 + yaw;
-    		temp.pose.position.x = r*cos(angle);
-    		temp.pose.position.y = r*sin(angle);
-    		temp.pose.position.z = 0;
-    		temp.header.seq = num_of_partitions;
-    		goal_points.poses.push_back(temp);
-    		num_of_partitions+=1;
-    		sum = 0;
-    		j = i+1;
+    		if (i!=j){
+	    		r = sum/(i-j);
+	    		// std::cout << "i: " << i << " j: " << j << " sum: " << sum << " r: " << r << std::endl;
+	    		angle = filtered_scan.angle_min + filtered_scan.angle_increment*(i+j)/2 + yaw;
+	    		temp.pose.position.x = r*cos(angle) + pose.getX();
+	    		temp.pose.position.y = r*sin(angle) + pose.getY();
+	    		temp.pose.position.z = 0;
+	    		temp.header.seq = num_of_partitions;
+	    		goal_points.poses.push_back(temp);
+	    		num_of_partitions+=1;
+	    		sum = 0;
+	    		j = i+1;
+    		}
     	}
     	
   //   	if (std::abs(msg.ranges[i+1]-msg.ranges[i]) < thresh){
