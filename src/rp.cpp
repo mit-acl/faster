@@ -94,7 +94,7 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
 	// Distance to goal
 	dist_2_goal = sqrt( pow(goal.point.x-pose.getX(),2) + pow(goal.point.y-pose.getY(),2));
 	// Angle to goal in body frame
-	angle_2_goal = atan2 ( goal.point.y - pose.getY(), goal.point.x - pose.getX() ) - yaw; 
+	angle_2_goal = atan2( goal.point.y - pose.getY(), goal.point.x - pose.getX() ) - yaw; 
 	std::cout << "Distance: " << dist_2_goal << " Angle: " << angle_2_goal << std::endl;
 
 	collision_counter = 0;
@@ -148,17 +148,18 @@ void REACT::partition_scan(const sensor_msgs::LaserScan& msg){
 
 	goal_points.poses.clear();
 
- 	partitioned_scan = msg;
- 	partitioned_scan.range_max = 6;
-
  	double num_samples = (msg.angle_max - msg.angle_min) / msg.angle_increment + 1;
 
  	// screenPrint();
 
  	int j = 0;
  	double sum = 0;
- 	double r = 0;
- 	double angle = 0;
+
+ 	std::vector<double> r;
+ 	std::vector<double> r_temp;
+ 	std::vector<double> angle;
+ 	std::vector<double> angle_temp;
+ 
  	num_of_partitions = 0;
 
  	sensor_msgs::LaserScan filtered_scan;
@@ -181,41 +182,38 @@ void REACT::partition_scan(const sensor_msgs::LaserScan& msg){
     			sum += filtered_scan.ranges[i+1];  
     	}
     	else{
-    		if ((i-j)>20){
-	    		r = sum/(i-j);
+    		if ((i-j)>5){
+
+    			// if (sum/(i-j) > *std::max_element(r.begin(),r.end())) r.clear();
+
+	    		r_temp.push_back(sum/(i-j));
 	    		// std::cout << "i: " << i << " j: " << j << " sum: " << sum << " r: " << r << std::endl;
-	    		angle = filtered_scan.angle_min + filtered_scan.angle_increment*(i+j)/2 + yaw;
-	    		temp.pose.position.x = r*cos(angle) + pose.getX();
-	    		temp.pose.position.y = r*sin(angle) + pose.getY();
-	    		temp.pose.position.z = 0;
-	    		temp.header.seq = num_of_partitions;
-	    		goal_points.poses.push_back(temp);
-	    		num_of_partitions+=1;
+	    		angle_temp.push_back(filtered_scan.angle_min + filtered_scan.angle_increment*(i+j)/2 + yaw);
 	    		sum = 0;
 	    		j = i+1;
     		}
-    	}
-    	
-  //   	if (std::abs(msg.ranges[i+1]-msg.ranges[i]) < thresh){
-  //   		partitioned_scan.ranges[i] = inf;
-  //   	}
-  //   	else{
-  //   		if (isinf(msg.ranges[i])){
-  //   			partitioned_scan.ranges[i] = msg.ranges[i+1];
-  //   		}
-  //   		else {
-  //   			partitioned_scan.ranges[i] = msg.ranges[i];
-  //   		}
-
-	 //    if (isinf(partitioned_scan.ranges[0])){
-	 // 	   partitioned_scan.ranges[0] = msg.range_max;
-		// }
-		// if (isinf(partitioned_scan.ranges[num_samples])){
-	 //    	partitioned_scan.ranges[num_samples] = msg.range_max;
-		// }
-	 //    partitioned_scan_pub.publish(partitioned_scan);
-		
+    	}		
 	}
+
+	double r_max = *std::max_element(r_temp.begin(),r_temp.end());
+
+	for (int i = 0; i < r_temp.size(); i++){
+		if (r_temp[i] > 0.95*r_max){
+			r.push_back(r_temp[i]);
+			angle.push_back(angle_temp[i]);
+		}
+	}
+	
+	for(int i = 0; i < r.size(); i++)
+	{
+		temp.pose.position.x = r[i]*cos(angle[i]) + pose.getX();
+		temp.pose.position.y = r[i]*sin(angle[i]) + pose.getY();
+		temp.pose.position.z = 0;
+		temp.header.seq = num_of_partitions;
+		goal_points.poses.push_back(temp);
+		num_of_partitions+=1;
+	}
+
 	int_goal_pub.publish(goal_points);
 	std::cout << "Latency: " << ros::Time::now().toSec() - msg_received << std::endl;
 }

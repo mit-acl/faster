@@ -53,11 +53,9 @@ private:
 	geometry_msgs::PointStamped goal, new_goal;
 	// geometry_msgs::PoseArray goal_points;
 	nav_msgs::Path goal_points;
- 	sensor_msgs::LaserScan partitioned_scan;
 
 	//## Logging and Debugging Functions
 	void screenPrint();
-	void paritionScan();
 	void find_inter_goal();
 	
 };
