@@ -7,7 +7,7 @@ REACT::REACT(){
 	// Should be read as param
 	thresh = 0.5; 
 	debug = 1;
-	angle_check = 5*3.14159/180; // deg
+	angle_check = 20*3.14159/180; // deg
 	goal.header.stamp = ros::Time::now();
 	goal.header.frame_id = "vicon";
 	goal.point.x =  0;
@@ -68,7 +68,7 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
  		double r_i = sqrt(pow(pose.getX() - goal_points.poses[i].pose.position.x, 2) + pow( pose.getY() - goal_points.poses[i].pose.position.y, 2));
  		double angle_i = atan2 ( goal_points.poses[i].pose.position.y - pose.getY(), goal_points.poses[i].pose.position.x - pose.getX() ) - yaw;
  		angle_diff  =  angle_i  - angle_2_goal;
- 		cost_i = pow(angle_diff,2) + pow(1/r_i,2);
+ 		cost_i = pow(angle_diff,2) + pow(1/r_i,4);
 
  		std::cout << "i: " << i << " cost_i: " << cost_i << std::endl;
  		std::cout << "r_i: " << r_i << " angle_i: " << angle_i << " angle_diff: " << angle_diff << std::endl;
@@ -97,6 +97,8 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
 	angle_2_goal = atan2 ( goal.point.y - pose.getY(), goal.point.x - pose.getX() ) - yaw; 
 	std::cout << "Distance: " << dist_2_goal << " Angle: " << angle_2_goal << std::endl;
 
+	collision_counter = 0;
+
 	double num_samples = (msg.angle_max - msg.angle_min) / msg.angle_increment + 1;
 	double sum = 0;
 	double temp_range = 0;
@@ -104,7 +106,8 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
 	int j = (int) ((angle_2_goal - msg.angle_min)/msg.angle_increment);
 	int delta = (int) (angle_check/msg.angle_increment) ;
 
-	// std::cout << "j: " <<  j << std::endl;
+	std::cout << "j: " <<  j << std::endl;
+	std::cout << "delta: " << delta << std::endl;
 	for (int i=j-delta; i < j+delta; i++)
 	{
 		if(isinf(msg.ranges[i]) || isnan(msg.ranges[i])){
@@ -115,14 +118,16 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
     	}
     	// std::cout << temp_range << std::endl;
 		sum += temp_range;
+		if (dist_2_goal > temp_range) collision_counter+=1;
 	}
 
 	double r = sum/(2*delta);
 
 
 	std::cout << "r: " << r <<std::endl;
+	std::cout << "collision counter: " << collision_counter << std::endl;
 
-	if (r > dist_2_goal){
+	if (r > dist_2_goal && collision_counter < 10){
 		can_reach_goal = true;
 	}
 	else{
@@ -176,7 +181,7 @@ void REACT::partition_scan(const sensor_msgs::LaserScan& msg){
     			sum += filtered_scan.ranges[i+1];  
     	}
     	else{
-    		if (i!=j){
+    		if ((i-j)>20){
 	    		r = sum/(i-j);
 	    		// std::cout << "i: " << i << " j: " << j << " sum: " << sum << " r: " << r << std::endl;
 	    		angle = filtered_scan.angle_min + filtered_scan.angle_increment*(i+j)/2 + yaw;
