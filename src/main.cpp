@@ -23,6 +23,7 @@ int main(int argc, char **argv)
 	rp.partitioned_scan_pub = n.advertise<sensor_msgs::LaserScan>("partitioned_scan", 1);
 	rp.pub_clean_scan = n.advertise<sensor_msgs::LaserScan>("clean_scan", 1);
 	rp.goal_pub = n.advertise<geometry_msgs::PointStamped>("goal", 1);
+	rp.new_goal_pub = n.advertise<geometry_msgs::PointStamped>("new_goal", 1);
 	// rp.int_goal_pub = n.advertise<geometry_msgs::PoseArray>("int_goal", 1);
 	rp.int_goal_pub = n.advertise<nav_msgs::Path>("int_goal", 1);
 

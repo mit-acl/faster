@@ -29,12 +29,13 @@ class REACT
 public:
 	REACT();
 
-	ros::Publisher partitioned_scan_pub, pub_clean_scan, goal_pub, int_goal_pub;
+	ros::Publisher partitioned_scan_pub, pub_clean_scan, goal_pub, new_goal_pub, int_goal_pub;
 
 	void scanCB(const sensor_msgs::LaserScan& msg);
 	void stateCB(const acl_system::ViconState& msg);
 	void partition_scan(const sensor_msgs::LaserScan& msg);
 	void vis_better_scan(const sensor_msgs::LaserScan& msg);
+	void check_goal(const sensor_msgs::LaserScan& msg);
 
 	// ROS timed functions
 	void sendGoal(const ros::TimerEvent&);
@@ -42,23 +43,22 @@ public:
 private:
 
 	double inf; // Infinity definition
-	double thresh;
-	double yaw;
-	bool debug;
-	int down_sample;
+	double thresh, yaw, dist_2_goal, angle_2_goal, angle_check, msg_received, cost, cost_i, angle_diff;
+	bool debug, can_reach_goal;
+	int down_sample, num_of_partitions, goal_index;
 
 	std::ostringstream errorMsg, warnMsg;
 
 	tf::Vector3 pose;
-	geometry_msgs::PointStamped goal;
+	geometry_msgs::PointStamped goal, new_goal;
 	// geometry_msgs::PoseArray goal_points;
 	nav_msgs::Path goal_points;
  	sensor_msgs::LaserScan partitioned_scan;
 
 	//## Logging and Debugging Functions
 	void screenPrint();
-	void find_free_space();
 	void paritionScan();
+	void find_inter_goal();
 	
 };
 
