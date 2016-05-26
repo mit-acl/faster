@@ -101,9 +101,10 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
 	double sum = 0;
 	double temp_range = 0;
 
-	int j = (int) (angle_2_goal - msg.angle_min)/msg.angle_increment;
-	int delta = (int) ( angle_check/msg.angle_increment) ;
+	int j = (int) ((angle_2_goal - msg.angle_min)/msg.angle_increment);
+	int delta = (int) (angle_check/msg.angle_increment) ;
 
+	std::cout << "j: " <<  j << std::endl;
 	for (int i=j-delta; i < j+delta; i++)
 	{
 		if(isinf(msg.ranges[i]) || isnan(msg.ranges[i])){
