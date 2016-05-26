@@ -45,6 +45,7 @@ private:
 	double thresh;
 	double yaw;
 	bool debug;
+	int down_sample;
 
 	std::ostringstream errorMsg, warnMsg;
 
