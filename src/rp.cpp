@@ -5,7 +5,7 @@ REACT::REACT(){
 	pose.setZero();
 
 	// Should be read as param
-	thresh = 0.75; 
+	thresh = 0.5; 
 	debug = 1;
 	angle_check = 40*3.14159/180; // deg
 	safe_distance = 2;
@@ -14,7 +14,7 @@ REACT::REACT(){
 	goal.header.frame_id = "vicon";
 	goal.point.x =  0;
 	goal.point.y = -5;
-	goal.point.z = 0;
+	goal.point.z = 0.5;
 
 	num_of_partitions = 0;
 	can_reach_goal = false;
@@ -70,7 +70,9 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
  		double r_i = sqrt(pow(pose.getX() - goal_points.poses[i].pose.position.x, 2) + pow( pose.getY() - goal_points.poses[i].pose.position.y, 2));
  		double angle_i = atan2 ( goal_points.poses[i].pose.position.y - pose.getY(), goal_points.poses[i].pose.position.x - pose.getX() ) - yaw;
  		angle_diff  =  angle_i  - angle_2_goal;
- 		cost_i = pow(angle_diff,2) + pow(1/r_i,4);
+ 		// cost_i = pow(angle_diff,2) + pow(1/r_i,4);
+ 		cost_i = pow(angle_diff,2) ;
+
 
  		std::cout << "i: " << i << " cost_i: " << cost_i << std::endl;
  		std::cout << "r_i: " << r_i << " angle_i: " << angle_i << " angle_diff: " << angle_diff << std::endl;
@@ -84,7 +86,7 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
  	new_goal.header.frame_id = "vicon";
  	new_goal.point.x = goal_points.poses[goal_index].pose.position.x;
  	new_goal.point.y = goal_points.poses[goal_index].pose.position.y;
- 	new_goal.point.z = pose.getZ();
+ 	new_goal.point.z = goal.point.z;
 
  	new_goal_pub.publish(new_goal);
 
@@ -111,6 +113,7 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
 
 	std::cout << "j: " <<  j << std::endl;
 	std::cout << "delta: " << delta << std::endl;
+
 	for (int i=j-delta; i < j+delta; i++)
 	{
 		if(isinf(msg.ranges[i]) || isnan(msg.ranges[i])){
@@ -185,7 +188,7 @@ void REACT::partition_scan(const sensor_msgs::LaserScan& msg){
     			sum += filtered_scan.ranges[i+1];  
     	}
     	else{
-    		if ((i-j)>20){
+    		if ((i-j)>10){
 
     			// if (sum/(i-j) > *std::max_element(r.begin(),r.end())) r.clear();
 
@@ -211,7 +214,7 @@ void REACT::partition_scan(const sensor_msgs::LaserScan& msg){
 	{
 		temp.pose.position.x = r[i]*cos(angle[i]) + pose.getX();
 		temp.pose.position.y = r[i]*sin(angle[i]) + pose.getY();
-		temp.pose.position.z = pose.getZ();
+		temp.pose.position.z = goal.point.z;
 		temp.header.seq = num_of_partitions;
 		goal_points.poses.push_back(temp);
 		num_of_partitions+=1;
