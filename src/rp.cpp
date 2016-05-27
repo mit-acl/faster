@@ -8,6 +8,8 @@ REACT::REACT(){
 	thresh = 0.5; 
 	debug = 1;
 	angle_check = 20*3.14159/180; // deg
+	safe_distance = 2;
+
 	goal.header.stamp = ros::Time::now();
 	goal.header.frame_id = "vicon";
 	goal.point.x =  0;
@@ -198,7 +200,7 @@ void REACT::partition_scan(const sensor_msgs::LaserScan& msg){
 	double r_max = *std::max_element(r_temp.begin(),r_temp.end());
 
 	for (int i = 0; i < r_temp.size(); i++){
-		if (r_temp[i] > 0.95*r_max){
+		if (r_temp[i] > safe_distance){
 			r.push_back(r_temp[i]);
 			angle.push_back(angle_temp[i]);
 		}
