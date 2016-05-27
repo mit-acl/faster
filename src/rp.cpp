@@ -5,9 +5,9 @@ REACT::REACT(){
 	pose.setZero();
 
 	// Should be read as param
-	thresh = 0.5; 
+	thresh = 0.75; 
 	debug = 1;
-	angle_check = 20*3.14159/180; // deg
+	angle_check = 40*3.14159/180; // deg
 	safe_distance = 2;
 
 	goal.header.stamp = ros::Time::now();
@@ -84,6 +84,7 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
  	new_goal.header.frame_id = "vicon";
  	new_goal.point.x = goal_points.poses[goal_index].pose.position.x;
  	new_goal.point.y = goal_points.poses[goal_index].pose.position.y;
+ 	new_goal.point.z = pose.getZ();
 
  	new_goal_pub.publish(new_goal);
 
@@ -184,7 +185,7 @@ void REACT::partition_scan(const sensor_msgs::LaserScan& msg){
     			sum += filtered_scan.ranges[i+1];  
     	}
     	else{
-    		if ((i-j)>5){
+    		if ((i-j)>20){
 
     			// if (sum/(i-j) > *std::max_element(r.begin(),r.end())) r.clear();
 
@@ -210,7 +211,7 @@ void REACT::partition_scan(const sensor_msgs::LaserScan& msg){
 	{
 		temp.pose.position.x = r[i]*cos(angle[i]) + pose.getX();
 		temp.pose.position.y = r[i]*sin(angle[i]) + pose.getY();
-		temp.pose.position.z = 0;
+		temp.pose.position.z = pose.getZ();
 		temp.header.seq = num_of_partitions;
 		goal_points.poses.push_back(temp);
 		num_of_partitions+=1;
