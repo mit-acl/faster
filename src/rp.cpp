@@ -74,8 +74,8 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
  		cost_i = pow(angle_diff,2) ;
 
 
- 		std::cout << "i: " << i << " cost_i: " << cost_i << std::endl;
- 		std::cout << "r_i: " << r_i << " angle_i: " << angle_i << " angle_diff: " << angle_diff << std::endl;
+ 		// std::cout << "i: " << i << " cost_i: " << cost_i << std::endl;
+ 		// std::cout << "r_i: " << r_i << " angle_i: " << angle_i << " angle_diff: " << angle_diff << std::endl;
 
  		if (cost_i < cost){
  			cost = cost_i;
@@ -111,8 +111,8 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
 	int j = (int) ((angle_2_goal - msg.angle_min)/msg.angle_increment);
 	int delta = (int) (angle_check/msg.angle_increment) ;
 
-	std::cout << "j: " <<  j << std::endl;
-	std::cout << "delta: " << delta << std::endl;
+	// std::cout << "j: " <<  j << std::endl;
+	// std::cout << "delta: " << delta << std::endl;
 
 	for (int i=j-delta; i < j+delta; i++)
 	{
