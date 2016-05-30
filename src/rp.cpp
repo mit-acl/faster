@@ -196,13 +196,13 @@ void REACT::partition_scan(const sensor_msgs::LaserScan& msg){
 	    		r_temp.push_back(sum/(i-j));
 	    		// std::cout << "i: " << i << " j: " << j << " sum: " << sum << " r: " << r << std::endl;
 	    		angle_temp.push_back(filtered_scan.angle_min + filtered_scan.angle_increment*(i+j)/2 + yaw);
-	    		sum = 0;
-	    		j = i+1;
+	    		
     		}
+
+    		sum = 0;
+    		j = i+1;
     	}		
 	}
-
-	double r_max = *std::max_element(r_temp.begin(),r_temp.end());
 
 	for (int i = 0; i < r_temp.size(); i++){
 		if (r_temp[i] > safe_distance){
