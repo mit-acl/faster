@@ -7,8 +7,9 @@ REACT::REACT(){
 	// Should be read as param
 	thresh = 0.5; 
 	debug = 1;
-	angle_check = 40*3.14159/180; // deg
+	angle_check = 40*PI/180; // deg
 	safe_distance = 2;
+	buffer = 0.3;
 
 	goal.header.stamp = ros::Time::now();
 	goal.header.frame_id = "vicon";
@@ -17,7 +18,10 @@ REACT::REACT(){
 	goal.point.z = 0.5;
 
 	num_of_partitions = 0;
+	collision_counter_corridor = 0;
+	collision_counter = 0;
 	can_reach_goal = false;
+	corridor_free = false;
 	inf = std::numeric_limits<double>::max();
 
 	ROS_INFO("Initialized.");
@@ -63,37 +67,7 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
  	
  }
 
- void REACT::find_inter_goal(){
- 	// Re-initialize cost
- 	cost = inf;
- 	for (int i=0; i < num_of_partitions ; i++){
- 		double r_i = sqrt(pow(pose.getX() - goal_points.poses[i].pose.position.x, 2) + pow( pose.getY() - goal_points.poses[i].pose.position.y, 2));
- 		double angle_i = atan2 ( goal_points.poses[i].pose.position.y - pose.getY(), goal_points.poses[i].pose.position.x - pose.getX() ) - yaw;
- 		angle_diff  =  angle_i  - angle_2_goal;
- 		// cost_i = pow(angle_diff,2) + pow(1/r_i,4);
- 		cost_i = pow(angle_diff,2) ;
-
-
- 		// std::cout << "i: " << i << " cost_i: " << cost_i << std::endl;
- 		// std::cout << "r_i: " << r_i << " angle_i: " << angle_i << " angle_diff: " << angle_diff << std::endl;
-
- 		if (cost_i < cost){
- 			cost = cost_i;
- 			goal_index = i;
- 		}
- 	}
- 	new_goal.header.stamp = ros::Time::now();
- 	new_goal.header.frame_id = "vicon";
- 	new_goal.point.x = goal_points.poses[goal_index].pose.position.x;
- 	new_goal.point.y = goal_points.poses[goal_index].pose.position.y;
- 	new_goal.point.z = goal.point.z;
-
- 	new_goal_pub.publish(new_goal);
-
-	std::cout << "Latency: " << ros::Time::now().toSec() - msg_received << std::endl;
- }
-
- void REACT::check_goal(const sensor_msgs::LaserScan& msg)
+void REACT::check_goal(const sensor_msgs::LaserScan& msg)
 {
 	std::cout << "Received scan" << std::endl;
 
@@ -105,12 +79,16 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
 
 	collision_counter = 0;
 
-	double num_samples = (msg.angle_max - msg.angle_min) / msg.angle_increment + 1;
+	angle_max = msg.angle_max;
+	angle_min = msg.angle_min;
+	angle_increment = msg.angle_increment;
+
+	num_samples = (angle_max - angle_min) / angle_increment + 1;
 	double sum = 0;
 	double temp_range = 0;
 
-	int j = (int) ((angle_2_goal - msg.angle_min)/msg.angle_increment);
-	int delta = (int) (angle_check/msg.angle_increment) ;
+	int j = (int) ((angle_2_goal - angle_min)/angle_increment);
+	int delta = (int) (angle_check/angle_increment) ;
 
 	// std::cout << "j: " <<  j << std::endl;
 	// std::cout << "delta: " << delta << std::endl;
@@ -145,6 +123,100 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
 }
 
 
+void REACT::find_inter_goal(){
+ 	// Re-initialize cost
+ 	std::vector<double> cost_v;
+ 	std::vector<double> angles;
+ 	std::vector<double> ranges;
+
+ 	corridor_free = false;
+
+ 	for (int i=0; i < num_of_partitions ; i++){
+ 		double r_i = sqrt(pow(pose.getX() - goal_points.poses[i].pose.position.x, 2) + pow( pose.getY() - goal_points.poses[i].pose.position.y, 2));
+ 		double angle_i = atan2 ( goal_points.poses[i].pose.position.y - pose.getY(), goal_points.poses[i].pose.position.x - pose.getX() ) - yaw;
+ 		angle_diff  =  angle_i  - angle_2_goal;
+ 		cost_i = pow(angle_diff,2) ;
+
+
+ 		// std::cout << "i: " << i << " cost_i: " << cost_i << std::endl;
+ 		// std::cout << "r_i: " << r_i << " angle_i: " << angle_i << " angle_diff: " << angle_diff << std::endl;
+
+ 		cost_v.push_back(cost_i);
+ 		angles.push_back(angle_i);
+ 		ranges.push_back(r_i);
+
+ 		// if (cost_i < cost){
+ 		// 	cost = cost_i;
+ 		// 	goal_index = i;
+ 		// }
+ 	}
+
+ 	// min_cost = *std::min_element(cost_v.begin(),cost_v.end());
+ 	// goal_index = std::min_element(cost_v.begin(),cost_v.end()) - cost_v.begin();
+
+ 	// Collision check
+ 	while (!corridor_free){
+ 		collision_counter_corridor = 0;
+ 		min_cost = *std::min_element(cost_v.begin(),cost_v.end());
+ 		goal_index = std::min_element(cost_v.begin(),cost_v.end()) - cost_v.begin();
+
+ 		double current_part_angle = angles[goal_index];
+ 		double current_part_range = ranges[goal_index];
+
+		int j = (int) ((current_part_angle - angle_min)/angle_increment);
+		int delta = (int) (PI/2/angle_increment) ;
+
+		// Check we're within scan bounds
+		if (j-delta < 0){
+			delta = 0;
+		}
+		else if (j+delta > num_samples){
+			delta = num_samples-j;
+		}
+
+		// r and theta used to check predicted ranges
+		double r_temp ;
+		double theta = 0 ;
+
+		// Check scan ccw
+		for (int i=j-delta; i < j+delta; i++){
+			r_temp = std::abs(buffer/std::cos(theta));
+
+			r_temp = std::min(r_temp,current_part_range);
+
+			if (r_temp > filtered_scan.ranges[i]) collision_counter_corridor+=1;
+
+			if (collision_counter_corridor>5) break;
+
+			theta+=angle_increment;		
+
+		}
+
+		if (collision_counter_corridor<5) corridor_free=true; 
+
+ 		// Erase current elements from cost vector
+ 		if (!corridor_free){
+ 			cost_v.erase(cost_v.begin()+goal_index);
+ 			if(cost_v.empty()){
+ 				std::cout << "Need to stop!!!!!!" << std::endl;
+ 			}
+ 		}
+ 	}
+
+ 	std::cout << "min_cost: " << min_cost << " goal index: " << goal_index << std::endl;
+
+ 	new_goal.header.stamp = ros::Time::now();
+ 	new_goal.header.frame_id = "vicon";
+ 	new_goal.point.x = goal_points.poses[goal_index].pose.position.x;
+ 	new_goal.point.y = goal_points.poses[goal_index].pose.position.y;
+ 	new_goal.point.z = goal.point.z;
+
+ 	new_goal_pub.publish(new_goal);
+
+	std::cout << "Latency: " << ros::Time::now().toSec() - msg_received << std::endl;
+ }
+
+
 void REACT::partition_scan(const sensor_msgs::LaserScan& msg){
 	std::cout << "Partioning scan" << std::endl;
 
@@ -154,8 +226,6 @@ void REACT::partition_scan(const sensor_msgs::LaserScan& msg){
 	goal_points.header.frame_id = "vicon";
 
 	goal_points.poses.clear();
-
- 	double num_samples = (msg.angle_max - msg.angle_min) / msg.angle_increment + 1;
 
  	// screenPrint();
 
@@ -168,8 +238,6 @@ void REACT::partition_scan(const sensor_msgs::LaserScan& msg){
  	std::vector<double> angle_temp;
  
  	num_of_partitions = 0;
-
- 	sensor_msgs::LaserScan filtered_scan;
 
  	filtered_scan = msg;
  	filtered_scan.range_max = 1.1*msg.range_max;
@@ -224,6 +292,7 @@ void REACT::partition_scan(const sensor_msgs::LaserScan& msg){
 	int_goal_pub.publish(goal_points);
 }
 
+
 void REACT::vis_better_scan(const sensor_msgs::LaserScan& msg)
  {
  	sensor_msgs::LaserScan clean_scan;
@@ -237,6 +306,7 @@ void REACT::vis_better_scan(const sensor_msgs::LaserScan& msg)
     }
     pub_clean_scan.publish(clean_scan);
  }
+
 
 void REACT::screenPrint()
 {

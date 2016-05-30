@@ -2,6 +2,7 @@
 #define RP_HPP_
 
 #define SCREEN_PRINT_RATE	0.5
+#define PI 3.14159
 
 // ROS includes
 #include "ros/ros.h"
@@ -23,6 +24,7 @@
 #include <math.h>
 #include <vector>
 #include <algorithm>
+#include <queue>
 
 class REACT
 {
@@ -43,14 +45,16 @@ public:
 private:
 
 	double inf; // Infinity definition
-	double thresh, yaw, dist_2_goal, angle_2_goal, angle_check, msg_received, cost, cost_i, angle_diff, safe_distance;
-	bool debug, can_reach_goal;
-	int down_sample, num_of_partitions, goal_index, collision_counter;
+	double thresh, yaw, dist_2_goal, angle_2_goal, angle_check, msg_received, cost, cost_i, angle_diff, safe_distance, min_cost, buffer;
+	double num_samples, angle_max, angle_min, angle_increment;
+	bool debug, can_reach_goal, corridor_free;
+	int down_sample, num_of_partitions, goal_index, collision_counter, collision_counter_corridor;
 
 	std::ostringstream errorMsg, warnMsg;
 
 	tf::Vector3 pose;
 	geometry_msgs::PointStamped goal, new_goal;
+	sensor_msgs::LaserScan filtered_scan;
 	// geometry_msgs::PoseArray goal_points;
 	nav_msgs::Path goal_points;
 
