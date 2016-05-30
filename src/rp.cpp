@@ -9,7 +9,7 @@ REACT::REACT(){
 	debug = 1;
 	angle_check = 40*PI/180; // deg
 	safe_distance = 2;
-	buffer = 0.3;
+	buffer = 0.4;
 
 	goal.header.stamp = ros::Time::now();
 	goal.header.frame_id = "vicon";
@@ -134,11 +134,11 @@ void REACT::find_inter_goal(){
  	for (int i=0; i < num_of_partitions ; i++){
  		double r_i = sqrt(pow(pose.getX() - goal_points.poses[i].pose.position.x, 2) + pow( pose.getY() - goal_points.poses[i].pose.position.y, 2));
  		double angle_i = atan2 ( goal_points.poses[i].pose.position.y - pose.getY(), goal_points.poses[i].pose.position.x - pose.getX() ) - yaw;
- 		angle_diff  =  angle_i  - angle_2_goal;
+ 		angle_diff  =  std::abs(angle_i)  - angle_2_goal;
  		cost_i = pow(angle_diff,2) ;
 
 
- 		// std::cout << "i: " << i << " cost_i: " << cost_i << std::endl;
+ 		std::cout << "i: " << i << " cost_i: " << cost_i << std::endl;
  		// std::cout << "r_i: " << r_i << " angle_i: " << angle_i << " angle_diff: " << angle_diff << std::endl;
 
  		cost_v.push_back(cost_i);
@@ -168,11 +168,13 @@ void REACT::find_inter_goal(){
 
 		// Check we're within scan bounds
 		if (j-delta < 0){
-			delta = 0;
+			delta = j;
 		}
 		else if (j+delta > num_samples){
 			delta = num_samples-j;
 		}
+
+		std::cout << "j: " << j << " delta: " << delta << " goal index: " << goal_index << std::endl;
 
 		// r and theta used to check predicted ranges
 		double r_temp ;
@@ -182,25 +184,37 @@ void REACT::find_inter_goal(){
 		for (int i=j-delta; i < j+delta; i++){
 			r_temp = std::abs(buffer/std::cos(theta));
 
-			r_temp = std::min(r_temp,current_part_range);
+			r_temp = std::min(r_temp,0.99*current_part_range);
 
-			if (r_temp > filtered_scan.ranges[i]) collision_counter_corridor+=1;
+			if (r_temp > filtered_scan.ranges[i]){
+				// std::cout << filtered_scan.ranges[i] << std::endl;
+				// std::cout << r_temp << std::endl;
+				// std::cout << theta << std::endl;
+				collision_counter_corridor+=1;
+			}
 
-			if (collision_counter_corridor>5) break;
+			if (collision_counter_corridor>10) break;
 
 			theta+=angle_increment;		
 
 		}
 
-		if (collision_counter_corridor<5) corridor_free=true; 
+		if (collision_counter_corridor<10) corridor_free=true; 
+
+		std::cout << "corridor collision counter: " << collision_counter_corridor << std::endl;
+
 
  		// Erase current elements from cost vector
  		if (!corridor_free){
  			cost_v.erase(cost_v.begin()+goal_index);
+ 			angles.erase(angles.begin()+goal_index);
+ 			ranges.erase(ranges.begin()+goal_index);
+
  			if(cost_v.empty()){
  				std::cout << "Need to stop!!!!!!" << std::endl;
  			}
  		}
+		std::cout << "cost size: " << cost_v.size() << std::endl;
  	}
 
  	std::cout << "min_cost: " << min_cost << " goal index: " << goal_index << std::endl;
