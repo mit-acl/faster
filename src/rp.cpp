@@ -184,7 +184,7 @@ void REACT::find_inter_goal(){
 		for (int i=j-delta; i < j+delta; i++){
 			r_temp = std::abs(buffer/std::cos(theta));
 
-			r_temp = std::min(r_temp,0.99*current_part_range);
+			r_temp = std::min(r_temp,safe_distance);
 
 			if (r_temp > filtered_scan.ranges[i]){
 				// std::cout << filtered_scan.ranges[i] << std::endl;
@@ -212,6 +212,7 @@ void REACT::find_inter_goal(){
 
  			if(cost_v.empty()){
  				std::cout << "Need to stop!!!!!!" << std::endl;
+ 				break;
  			}
  		}
 		std::cout << "cost size: " << cost_v.size() << std::endl;
