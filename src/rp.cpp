@@ -90,6 +90,7 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
 
  	new_goal_pub.publish(new_goal);
 
+	std::cout << "Latency: " << ros::Time::now().toSec() - msg_received << std::endl;
  }
 
  void REACT::check_goal(const sensor_msgs::LaserScan& msg)
@@ -221,7 +222,6 @@ void REACT::partition_scan(const sensor_msgs::LaserScan& msg){
 	}
 
 	int_goal_pub.publish(goal_points);
-	std::cout << "Latency: " << ros::Time::now().toSec() - msg_received << std::endl;
 }
 
 void REACT::vis_better_scan(const sensor_msgs::LaserScan& msg)
