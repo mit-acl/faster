@@ -268,7 +268,7 @@ void REACT::partition_scan(const sensor_msgs::LaserScan& msg){
     		filtered_scan.ranges[i+1] = msg.range_max;
     	}
 
-    	if (std::abs(filtered_scan.ranges[i+1]-filtered_scan.ranges[i]) < thresh){
+    	if (std::abs(filtered_scan.ranges[i+1]-filtered_scan.ranges[j]) < thresh){
     			sum += filtered_scan.ranges[i+1];  
     	}
     	else{
