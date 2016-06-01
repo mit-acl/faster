@@ -6,7 +6,7 @@ int main(int argc, char **argv)
 	
 	ros::init(argc, argv, "reactive_planner", ros::init_options::NoSigintHandler);
 
-	ros::NodeHandle n;
+	ros::NodeHandle n("~");
 
 	REACT rp;
 
