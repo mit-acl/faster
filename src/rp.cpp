@@ -134,7 +134,7 @@ void REACT::find_inter_goal(){
  	for (int i=0; i < num_of_partitions ; i++){
  		double r_i = sqrt(pow(pose.getX() - goal_points.poses[i].pose.position.x, 2) + pow( pose.getY() - goal_points.poses[i].pose.position.y, 2));
  		double angle_i = atan2 ( goal_points.poses[i].pose.position.y - pose.getY(), goal_points.poses[i].pose.position.x - pose.getX() ) - yaw;
- 		angle_diff  =  std::abs(angle_i)  - angle_2_goal;
+ 		angle_diff  =  std::abs(angle_i)  - std::abs(angle_2_goal);
  		cost_i = pow(angle_diff,2) ;
 
 
