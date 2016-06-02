@@ -1,0 +1,11 @@
+# Params for REACT planner
+thresh: 0.5       # Distance used to cluster scan (m)
+debug: true
+angle_check: 0.7  # +-40deg check
+safe_distance: 2  # Smallest distance before obstacle is no longer viable segment
+buffer: 0.4       # 0.5 width of quad for collision checking
+
+# (x,y,z) goal
+goal_x: 0
+goal_y: -5
+goal_z: 0.5

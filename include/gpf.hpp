@@ -43,6 +43,7 @@ private:
 	double points_removed;
 	double nx, ny, nz;
 	double angle1, angle2;
+	double ground_range;
 
 	tf::Quaternion att;
 

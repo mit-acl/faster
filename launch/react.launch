@@ -4,6 +4,9 @@
 	<arg name="filter" default="false"/>
 
 	<node ns="$(arg quadrotor)" name="reactive_planner" pkg="acl_planning" type="reactive_planner" output="screen" clear_params="true">
+
+		<rosparam file="$(find acl_planning)/param/react.yaml" command="load"/>
+
 		<remap from="~vicon" to="state_estimate"/>
 		<remap from="~partitioned_scan" to="partitioned_scan"/>
 		<remap from="~clean_scan" to="clean_scan"/>
@@ -16,6 +19,9 @@
 	</node>
 
 	<node if="$(arg filter)" ns="$(arg quadrotor)" name="scan_filter" pkg="acl_planning" type="gpf" output="screen" clear_params="true">
+
+		<param name="ground_range" type="double" value="3.0"/>
+
 		<remap from="~vicon" to="state_estimate"/>
 		<remap from="~scan" to="scan"/>
 		<remap from="~filtered_scan" to="filtered_scan"/>	

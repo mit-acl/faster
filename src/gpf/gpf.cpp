@@ -17,6 +17,11 @@ FilterGP::FilterGP(){
 
 	att.setRPY(0.0, 0.0, 0.0);
 
+	ros::param::get("~ground_range",ground_range);
+	if(ground_range==-1){
+		ground_range = inf;
+	}
+
 }
 
 // Get POSE messages from estimator
@@ -55,7 +60,7 @@ void FilterGP::scanCB(const sensor_msgs::LaserScan& msg)
     	double r = rangeCheck(i-min_idx);
     	
     	if (msg.ranges[i] > 0.8*r){
-    		msg_filtered.ranges[i] = inf;
+    		msg_filtered.ranges[i] = ground_range;
     		points_removed++;
     	}
     }

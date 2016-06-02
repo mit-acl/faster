@@ -5,17 +5,18 @@ REACT::REACT(){
 	pose.setZero();
 
 	// Should be read as param
-	thresh = 0.5; 
-	debug = 1;
-	angle_check = 40*PI/180; // deg
-	safe_distance = 2;
-	buffer = 0.4;
+	ros::param::get("~thresh",thresh);
+	ros::param::get("~debug",debug);
+	ros::param::get("~angle_check",angle_check);
+	ros::param::get("~safe_distance",safe_distance);
+	ros::param::get("~buffer",buffer);
 
 	goal.header.stamp = ros::Time::now();
 	goal.header.frame_id = "vicon";
-	goal.point.x =  0;
-	goal.point.y = -5;
-	goal.point.z = 0.5;
+
+	ros::param::get("~goal_x",goal.point.x);
+	ros::param::get("~goal_y",goal.point.y);
+	ros::param::get("~goal_z",goal.point.z);
 
 	num_of_partitions = 0;
 	collision_counter_corridor = 0;
