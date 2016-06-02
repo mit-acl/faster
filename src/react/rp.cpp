@@ -204,7 +204,7 @@ void REACT::find_inter_goal(){
 				collision_counter_corridor+=1;
 			}
 
-			if (collision_counter_corridor>10) break;
+			if (collision_counter_corridor>9) break;
 
 			theta+=angle_increment;		
 
