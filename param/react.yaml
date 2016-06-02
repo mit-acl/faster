@@ -1,5 +1,5 @@
 # Params for REACT planner
-thresh: 0.5       # Distance used to cluster scan (m)
+thresh: 0.3       # Distance used to cluster scan (m)
 debug: true
 angle_check: 0.7  # +-40deg check
 safe_distance: 2  # Smallest distance before obstacle is no longer viable segment

@@ -132,6 +132,8 @@ void REACT::find_inter_goal(){
 
  	corridor_free = false;
 
+	std::priority_queue<double, std::vector<double>, std::greater<double> > cost_queue;
+
  	for (int i=0; i < num_of_partitions ; i++){
  		double r_i = sqrt(pow(pose.getX() - goal_points.poses[i].pose.position.x, 2) + pow( pose.getY() - goal_points.poses[i].pose.position.y, 2));
  		double angle_i = atan2 ( goal_points.poses[i].pose.position.y - pose.getY(), goal_points.poses[i].pose.position.x - pose.getX() ) - yaw;
@@ -142,6 +144,7 @@ void REACT::find_inter_goal(){
  		std::cout << "i: " << i << " cost_i: " << cost_i << std::endl;
  		// std::cout << "r_i: " << r_i << " angle_i: " << angle_i << " angle_diff: " << angle_diff << std::endl;
 
+ 		cost_queue.push(cost_i);
  		cost_v.push_back(cost_i);
  		angles.push_back(angle_i);
  		ranges.push_back(r_i);
@@ -155,11 +158,18 @@ void REACT::find_inter_goal(){
  	// min_cost = *std::min_element(cost_v.begin(),cost_v.end());
  	// goal_index = std::min_element(cost_v.begin(),cost_v.end()) - cost_v.begin();
 
+ 	int goal_counter = 0;
  	// Collision check
  	while (!corridor_free){
  		collision_counter_corridor = 0;
- 		min_cost = *std::min_element(cost_v.begin(),cost_v.end());
- 		goal_index = std::min_element(cost_v.begin(),cost_v.end()) - cost_v.begin();
+ 		// min_cost = *std::min_element(cost_v.begin(),cost_v.end());
+ 		// goal_index = std::min_element(cost_v.begin(),cost_v.end()) - cost_v.begin();
+
+ 		min_cost = cost_queue.top();
+
+ 		std::vector<double>::iterator it;
+ 		it = std::find(cost_v.begin(),cost_v.end(),min_cost);
+ 		goal_index = it - cost_v.begin();
 
  		double current_part_angle = angles[goal_index];
  		double current_part_range = ranges[goal_index];
@@ -175,7 +185,7 @@ void REACT::find_inter_goal(){
 			delta = num_samples-j;
 		}
 
-		std::cout << "j: " << j << " delta: " << delta << " goal index: " << goal_index << std::endl;
+		std::cout << "j: " << j << " delta: " << delta << " goal index: " << goal_index  << " goal_counter: " << goal_counter <<  std::endl;
 
 		// r and theta used to check predicted ranges
 		double r_temp ;
@@ -207,9 +217,12 @@ void REACT::find_inter_goal(){
 
  		// Erase current elements from cost vector
  		if (!corridor_free){
- 			cost_v.erase(cost_v.begin()+goal_index);
- 			angles.erase(angles.begin()+goal_index);
- 			ranges.erase(ranges.begin()+goal_index);
+ 			cost_queue.pop();
+ 			// cost_v.erase(cost_v.begin()+goal_index);
+ 			// angles.erase(angles.begin()+goal_index);
+ 			// ranges.erase(ranges.begin()+goal_index);
+
+ 			goal_counter+=1;
 
  			if(cost_v.empty()){
  				std::cout << "Need to stop!!!!!!" << std::endl;
@@ -219,7 +232,7 @@ void REACT::find_inter_goal(){
 		std::cout << "cost size: " << cost_v.size() << std::endl;
  	}
 
- 	std::cout << "min_cost: " << min_cost << " goal index: " << goal_index << std::endl;
+ 	std::cout << "min_cost: " << min_cost << " goal index: " << goal_index <<  std::endl;
 
  	new_goal.header.stamp = ros::Time::now();
  	new_goal.header.frame_id = "vicon";
