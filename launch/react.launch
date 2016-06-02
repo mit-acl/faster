@@ -1,7 +1,7 @@
 <launch>
 
 	<arg name="quadrotor"/>
-	<arg name="filter" default="false"/>
+	<arg name="filter"/>
 
 	<node ns="$(arg quadrotor)" name="reactive_planner" pkg="acl_planning" type="reactive_planner" output="screen" clear_params="true">
 
