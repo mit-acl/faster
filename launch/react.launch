@@ -18,7 +18,7 @@
 
 	</node>
 
-	<node if="$(arg filter)" ns="$(arg quadrotor)" name="scan_filter" pkg="acl_planning" type="gpf_2" output="screen" clear_params="true">
+	<node if="$(arg filter)" ns="$(arg quadrotor)" name="scan_filter" pkg="acl_planning" type="gpf" output="screen" clear_params="true">
 
 		<param name="ground_range" type="double" value="4"/>
 
