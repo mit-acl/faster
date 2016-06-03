@@ -41,3 +41,7 @@ target_link_libraries(reactive_planner ${catkin_LIBRARIES})
 add_executable(gpf src/gpf/main.cpp src/gpf/gpf.cpp)
 add_dependencies(gpf ${catkin_EXPORTED_TARGETS})
 target_link_libraries(gpf ${catkin_LIBRARIES})
+
+add_executable(gpf_2 src/gpf/main_2.cpp src/gpf/gpf_2.cpp)
+add_dependencies(gpf_2 ${catkin_EXPORTED_TARGETS})
+target_link_libraries(gpf_2 ${catkin_LIBRARIES})
