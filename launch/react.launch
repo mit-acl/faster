@@ -13,6 +13,7 @@
 		<remap from="~global_goal" to="global_goal"/>
 		<remap from="~new_global_goal" to="new_global_goal"/>
 		<remap from="~int_goal" to="int_goal"/>	
+		<remap from="~last_global_goal" to="last_global_goal"/>
 		<remap unless="$(arg filter)" from="~scan" to="scan"/>	
 		<remap if="$(arg filter)" from="~scan" to="filtered_scan"/>
 

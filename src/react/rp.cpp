@@ -14,9 +14,17 @@ REACT::REACT(){
 	goal.header.stamp = ros::Time::now();
 	goal.header.frame_id = "vicon";
 
+	last_goal.header.stamp = ros::Time::now();
+	last_goal.header.frame_id = "vicon";
+	last_goal.point.x = 0;
+	last_goal.point.y = 0;
+	last_goal.point.z = 0;
+
 	ros::param::get("~goal_x",goal.point.x);
 	ros::param::get("~goal_y",goal.point.y);
 	ros::param::get("~goal_z",goal.point.z);
+
+	num_of_points = 2;
 
 	num_of_partitions = 0;
 	collision_counter_corridor = 0;
@@ -219,10 +227,6 @@ void REACT::find_inter_goal(){
  		// Erase current elements from cost vector
  		if (!corridor_free){
  			cost_queue.pop();
- 			// cost_v.erase(cost_v.begin()+goal_index);
- 			// angles.erase(angles.begin()+goal_index);
- 			// ranges.erase(ranges.begin()+goal_index);
-
  			goal_counter+=1;
 
  			if(cost_v.empty()){
@@ -242,6 +246,11 @@ void REACT::find_inter_goal(){
  	new_goal.point.z = goal.point.z;
 
  	new_goal_pub.publish(new_goal);
+ 	last_goal_pub.publish(last_goal);
+
+ 	last_goal.header.stamp = ros::Time::now();
+ 	last_goal.header.frame_id = "vicon";
+ 	last_goal.point = new_goal.point;
 
 	std::cout << "Latency: " << ros::Time::now().toSec() - msg_received << std::endl;
  }
@@ -288,13 +297,12 @@ void REACT::partition_scan(const sensor_msgs::LaserScan& msg){
     	}
     	else{
     		if ((i-j)>10){
-
-    			// if (sum/(i-j) > *std::max_element(r.begin(),r.end())) r.clear();
-
-	    		r_temp.push_back(sum/(i-j));
-	    		// std::cout << "i: " << i << " j: " << j << " sum: " << sum << " r: " << r << std::endl;
-	    		angle_temp.push_back(filtered_scan.angle_min + filtered_scan.angle_increment*(i+j)/2 + yaw);
-	    		
+    			// Number of points 
+    			for (int k=0; k<num_of_points+1;k++){
+    				r_temp.push_back(sum/(i-j));
+		    		// std::cout << "i: " << i << " j: " << j << " sum: " << sum << " r: " << r << std::endl; 
+		    		angle_temp.push_back(filtered_scan.angle_min + filtered_scan.angle_increment*(i+j)/2 + (k-1)*filtered_scan.angle_increment*(i-j)/(2*num_of_points) + yaw);
+    			}
     		}
 
     		sum = 0;

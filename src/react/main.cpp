@@ -26,6 +26,7 @@ int main(int argc, char **argv)
 	rp.new_goal_pub = n.advertise<geometry_msgs::PointStamped>("new_global_goal", 1);
 	// rp.int_goal_pub = n.advertise<geometry_msgs::PoseArray>("int_goal", 1);
 	rp.int_goal_pub = n.advertise<nav_msgs::Path>("int_goal", 1);
+	rp.last_goal_pub = n.advertise<geometry_msgs::PointStamped>("last_global_goal",1);
 
 
 
