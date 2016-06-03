@@ -140,6 +140,9 @@ void REACT::find_inter_goal(){
  		angle_diff  =  std::abs(angle_i)  - std::abs(angle_2_goal);
  		cost_i = pow(angle_diff,2) ;
 
+ 		// if(i < 2){
+ 		// 	std::cout <<  goal_points.poses[i].pose.position.x << " " <<  goal_points.poses[i].pose.position.y << std::endl;
+ 		// }
 
  		std::cout << "i: " << i << " cost_i: " << cost_i << std::endl;
  		// std::cout << "r_i: " << r_i << " angle_i: " << angle_i << " angle_diff: " << angle_diff << std::endl;
@@ -149,21 +152,12 @@ void REACT::find_inter_goal(){
  		angles.push_back(angle_i);
  		ranges.push_back(r_i);
 
- 		// if (cost_i < cost){
- 		// 	cost = cost_i;
- 		// 	goal_index = i;
- 		// }
  	}
-
- 	// min_cost = *std::min_element(cost_v.begin(),cost_v.end());
- 	// goal_index = std::min_element(cost_v.begin(),cost_v.end()) - cost_v.begin();
 
  	int goal_counter = 0;
  	// Collision check
  	while (!corridor_free){
  		collision_counter_corridor = 0;
- 		// min_cost = *std::min_element(cost_v.begin(),cost_v.end());
- 		// goal_index = std::min_element(cost_v.begin(),cost_v.end()) - cost_v.begin();
 
  		min_cost = cost_queue.top();
 
@@ -176,28 +170,35 @@ void REACT::find_inter_goal(){
 
 		int j = (int) ((current_part_angle - angle_min)/angle_increment);
 		int delta = (int) (PI/2/angle_increment) ;
+		int delta_1 = (int) (PI/2/angle_increment);
+		int delta_2 = (int) (PI/2/angle_increment);
 
 		// Check we're within scan bounds
 		if (j-delta < 0){
-			delta = j;
+			delta_1 = j;
 		}
 		else if (j+delta > num_samples){
-			delta = num_samples-j;
+			delta_2 = num_samples-j;
 		}
 
 		std::cout << "j: " << j << " delta: " << delta << " goal index: " << goal_index  << " goal_counter: " << goal_counter <<  std::endl;
 
+		std::cout << "range: " << current_part_range << std::endl;
 		// r and theta used to check predicted ranges
 		double r_temp ;
-		double theta = 0 ;
+		double theta = angle_increment*(delta-delta_1) ;
+		// double theta = 0;
+
+		std::cout << "delta_1: " << delta_1 << " delta_2: " << delta_2 << std::endl;
 
 		// Check scan ccw
-		for (int i=j-delta; i < j+delta; i++){
+		for (int i=j-delta_1; i < j+delta_2; i++){
 			r_temp = std::abs(buffer/std::cos(theta));
 
 			r_temp = std::min(r_temp,safe_distance);
 
 			if (r_temp > filtered_scan.ranges[i]){
+				// std::cout << i << std::endl;
 				// std::cout << filtered_scan.ranges[i] << std::endl;
 				// std::cout << r_temp << std::endl;
 				// std::cout << theta << std::endl;
