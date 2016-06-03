@@ -70,8 +70,6 @@ void FilterGP::scanCB(const sensor_msgs::LaserScan& msg)
 
 			scan_points.poses.push_back(temp);
 
-			// std::cout << n_world.getZ() << std::endl;
-
 			if (n_world.getZ() < 0.1){
 	    		msg_filtered.ranges[i] = ground_range;
 	    		points_removed++;
