@@ -18,6 +18,7 @@ int main(int argc, char **argv)
 
 
 	fgp.filtered_scan_pub = n.advertise<sensor_msgs::LaserScan>("filtered_scan", 1);
+	fgp.point_array_pub = n.advertise<nav_msgs::Path>("points",1);
 
 
 	// run the code
