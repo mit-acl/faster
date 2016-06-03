@@ -20,7 +20,7 @@
 
 	<node if="$(arg filter)" ns="$(arg quadrotor)" name="scan_filter" pkg="acl_planning" type="gpf" output="screen" clear_params="true">
 
-		<param name="ground_range" type="double" value="3.0"/>
+		<param name="ground_range" type="double" value="-1"/>
 
 		<remap from="~vicon" to="state_estimate"/>
 		<remap from="~scan" to="scan"/>

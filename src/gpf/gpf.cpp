@@ -58,8 +58,7 @@ void FilterGP::scanCB(const sensor_msgs::LaserScan& msg)
 
     for (int i=min_idx; i < max_idx; i++){
     	double r = rangeCheck(i-min_idx);
-    	
-    	if (msg.ranges[i] > 0.8*r){
+    	if (msg.ranges[i] > 0.8*r && msg.ranges[i] < 1.2*r){
     		msg_filtered.ranges[i] = ground_range;
     		points_removed++;
     	}
