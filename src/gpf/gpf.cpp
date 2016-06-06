@@ -12,9 +12,21 @@ FilterGP::FilterGP(){
 	q.setRPY(0.0, 0.0, 0.0);
 
 	ros::param::get("~ground_range",ground_range);
+	ros::param::get("~filter_thresh",filter_thresh);
+
 	if(ground_range==-1){
 		ground_range = inf;
 	}
+
+	// listener.waitForTransform("/vicon", "/laser", ros::Time::now(), ros::Duration(1));
+ //    listener.lookupTransform("/vicon", "/laser", ros::Time::now(), trans);
+ //        //Do something
+
+ //    pose = trans.getOrigin();
+ //    q = trans.getRotation();
+
+	ROS_INFO("Ground plane filter initialized.");
+
 
 }
 
@@ -22,15 +34,25 @@ FilterGP::FilterGP(){
 void FilterGP::stateCB(const acl_system::ViconState& msg)
 {
 	// TODO time check.
-	if (msg.has_pose) {
-		pose = msg.pose.position;	
-		tf::quaternionMsgToTF(msg.pose.orientation,q);
-	} 
+	// if (msg.has_pose) {
+	// 	pose = msg.pose.position;	
+	// 	tf::quaternionMsgToTF(msg.pose.orientation,q);
+	// } 
 	// if (msg.has_twist) velCallback(msg.twist);
 }
 
 void FilterGP::scanCB(const sensor_msgs::LaserScan& msg)
  {
+
+ 	// std::cout << ros::Time() << std::endl;
+ 	// std::cout << ros::Duration(1) << std::endl;
+    listener.waitForTransform("/vicon", "/laser", ros::Time::now(), ros::Duration(1));
+    listener.lookupTransform("/vicon", "/laser", ros::Time::now(), trans);
+        //Do something
+
+    pose = trans.getOrigin();
+    q = trans.getRotation();
+
 
  	sensor_msgs::LaserScan msg_filtered;
 
@@ -62,7 +84,7 @@ void FilterGP::scanCB(const sensor_msgs::LaserScan& msg)
 			tf::Quaternion n_body_q = tf::Quaternion(x, y, z, 0.0);
 			tf::Quaternion n_wolrd_q = q*n_body_q*q.inverse();
 
-			tf::Vector3 n_world =  tf::Vector3(n_wolrd_q.getX()+pose.x,n_wolrd_q.getY()+pose.y,n_wolrd_q.getZ()+pose.z);
+			tf::Vector3 n_world =  tf::Vector3(n_wolrd_q.getX()+pose.getX(),n_wolrd_q.getY()+pose.getY(),n_wolrd_q.getZ()+pose.getZ());
 
 			temp.pose.position.x = n_world.getX();
 			temp.pose.position.y = n_world.getY();
@@ -70,7 +92,7 @@ void FilterGP::scanCB(const sensor_msgs::LaserScan& msg)
 
 			scan_points.poses.push_back(temp);
 
-			if (n_world.getZ() < 0.1){
+			if (n_world.getZ() < filter_thresh){
 	    		msg_filtered.ranges[i] = ground_range;
 	    		points_removed++;
 	    	}

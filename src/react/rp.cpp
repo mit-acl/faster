@@ -33,7 +33,7 @@ REACT::REACT(){
 	corridor_free = false;
 	inf = std::numeric_limits<double>::max();
 
-	ROS_INFO("Initialized.");
+	ROS_INFO("Planner initialized.");
 
 }
 
@@ -167,6 +167,14 @@ void REACT::find_inter_goal(){
  	while (!corridor_free){
  		collision_counter_corridor = 0;
 
+ 		// Collision scan for debug
+ 		sensor_msgs::LaserScan collision_scan;
+ 		collision_scan.header.stamp = ros::Time::now();
+ 		collision_scan.header.frame_id = "laser";
+ 		collision_scan.range_min = 0.01;
+ 		collision_scan.range_max = 1.1*safe_distance;
+ 		collision_scan.angle_increment = angle_increment; 
+
  		min_cost = cost_queue.top();
 
  		std::vector<double>::iterator it;
@@ -189,6 +197,9 @@ void REACT::find_inter_goal(){
 			delta_2 = num_samples-j;
 		}
 
+		collision_scan.angle_min = angle_min + angle_increment*(j-delta_1);
+		collision_scan.angle_max = angle_min + angle_increment*(j+delta_2);
+
 		std::cout << "j: " << j << " delta: " << delta << " goal index: " << goal_index  << " goal_counter: " << goal_counter <<  std::endl;
 
 		std::cout << "range: " << current_part_range << std::endl;
@@ -205,6 +216,8 @@ void REACT::find_inter_goal(){
 
 			r_temp = std::min(r_temp,safe_distance);
 
+			collision_scan.ranges.push_back(r_temp);
+
 			if (r_temp > filtered_scan.ranges[i]){
 				// std::cout << i << std::endl;
 				// std::cout << filtered_scan.ranges[i] << std::endl;
@@ -213,13 +226,18 @@ void REACT::find_inter_goal(){
 				collision_counter_corridor+=1;
 			}
 
-			if (collision_counter_corridor>9) break;
+			// if (collision_counter_corridor>9) break;
 
 			theta+=angle_increment;		
 
 		}
 
-		if (collision_counter_corridor<10) corridor_free=true; 
+		if (collision_counter_corridor<10) 
+		{
+			corridor_free=true; 
+ 			corridor_scan_pub.publish(collision_scan);
+ 		}
+
 
 		std::cout << "corridor collision counter: " << collision_counter_corridor << std::endl;
 
@@ -335,6 +353,7 @@ void REACT::vis_better_scan(const sensor_msgs::LaserScan& msg)
  {
  	sensor_msgs::LaserScan clean_scan;
  	clean_scan = msg;
+ 	clean_scan.header.frame_id = "laser";
  	clean_scan.range_max = 1.1*msg.range_max;
  	double num_samples = (msg.angle_max - msg.angle_min) / msg.angle_increment + 1;
     for (int i=0; i < num_samples; i++){

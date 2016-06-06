@@ -31,7 +31,7 @@ class REACT
 public:
 	REACT();
 
-	ros::Publisher partitioned_scan_pub, pub_clean_scan, goal_pub, new_goal_pub, int_goal_pub, last_goal_pub;
+	ros::Publisher partitioned_scan_pub, pub_clean_scan, goal_pub, new_goal_pub, int_goal_pub, last_goal_pub, corridor_scan_pub;
 
 	void scanCB(const sensor_msgs::LaserScan& msg);
 	void stateCB(const acl_system::ViconState& msg);

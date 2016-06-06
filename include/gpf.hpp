@@ -15,6 +15,7 @@
 #include "geometry_msgs/TwistStamped.h"
 #include "geometry_msgs/Vector3Stamped.h"
 #include "nav_msgs/Path.h"
+#include "tf/transform_listener.h"
 
 // custom messages
 #include "acl_system/ViconState.h"
@@ -43,10 +44,13 @@ private:
 	double inf;
 	double points_removed;
 	double x, y, z;
-	double ground_range;
+	double ground_range, filter_thresh;
 
 	nav_msgs::Path scan_points;
-	geometry_msgs::Point pose;
+	tf::Vector3 pose;
+
+	tf::TransformListener listener;
+ 	tf::StampedTransform trans;
 
 	tf::Quaternion q;
 
