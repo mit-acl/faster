@@ -22,6 +22,7 @@
 	<node if="$(arg filter)" ns="$(arg quadrotor)" name="scan_filter" pkg="acl_planning" type="gpf" output="screen" clear_params="true">
 
 		<param name="ground_range" type="double" value="4"/>
+		<param name="filter_thresh" type="double" value="0.05"/>
 
 		<remap from="~vicon" to="state_estimate"/>
 		<remap from="~scan" to="scan"/>

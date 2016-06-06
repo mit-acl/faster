@@ -34,11 +34,14 @@ FilterGP::FilterGP(){
 void FilterGP::stateCB(const acl_system::ViconState& msg)
 {
 	// TODO time check.
-	// if (msg.has_pose) {
-	// 	pose = msg.pose.position;	
-	// 	tf::quaternionMsgToTF(msg.pose.orientation,q);
-	// } 
-	// if (msg.has_twist) velCallback(msg.twist);
+	if (msg.has_pose) {
+		geometry_msgs::Vector3 position;
+		position.x = msg.pose.position.x;
+		position.y = msg.pose.position.y;
+		position.z = msg.pose.position.z;
+		tf::vector3MsgToTF(position,pose);	
+		tf::quaternionMsgToTF(msg.pose.orientation,q);
+	} 
 }
 
 void FilterGP::scanCB(const sensor_msgs::LaserScan& msg)
@@ -46,12 +49,15 @@ void FilterGP::scanCB(const sensor_msgs::LaserScan& msg)
 
  	// std::cout << ros::Time() << std::endl;
  	// std::cout << ros::Duration(1) << std::endl;
-    listener.waitForTransform("/vicon", "/laser", ros::Time::now(), ros::Duration(1));
-    listener.lookupTransform("/vicon", "/laser", ros::Time::now(), trans);
-        //Do something
+ 	// double then = ros::Time::now().toSec();
+  //   listener.waitForTransform("/vicon", "/laser", ros::Time::now(), ros::Duration(1));
+  //   listener.lookupTransform("/vicon", "/laser", ros::Time::now(), trans);
 
-    pose = trans.getOrigin();
-    q = trans.getRotation();
+  //   std::cout << "Tranform latency: " << ros::Time::now().toSec() - then << std::endl;
+  //       //Do something
+
+  //   pose = trans.getOrigin();
+  //   q = trans.getRotation();
 
 
  	sensor_msgs::LaserScan msg_filtered;
@@ -80,7 +86,7 @@ void FilterGP::scanCB(const sensor_msgs::LaserScan& msg)
 
 			x = msg.ranges[i]*std::cos(ang_min + increment*i);
 			y = msg.ranges[i]*std::sin(ang_min + increment*i);
-			z = 0;
+			z = 0.1;
 			tf::Quaternion n_body_q = tf::Quaternion(x, y, z, 0.0);
 			tf::Quaternion n_wolrd_q = q*n_body_q*q.inverse();
 
