@@ -15,7 +15,6 @@
 #include "geometry_msgs/TwistStamped.h"
 #include "geometry_msgs/Vector3Stamped.h"
 #include "nav_msgs/Path.h"
-#include "tf/transform_listener.h"
 
 // custom messages
 #include "acl_system/ViconState.h"
@@ -24,6 +23,7 @@
 #include <math.h>
 #include <vector>
 #include <algorithm>
+#include <numeric>
 
 class FilterGP
 {
@@ -49,12 +49,12 @@ private:
 	nav_msgs::Path scan_points;
 	tf::Vector3 pose;
 
-	tf::TransformListener listener;
- 	tf::StampedTransform trans;
-
 	tf::Quaternion q;
 
 	std::ostringstream errorMsg, warnMsg;
+
+	std::vector<double> new_goal_vec;
+	std::vector<double> last_goal_vec;
 
 	//## Logging and Debugging Functions
 	void screenPrint();

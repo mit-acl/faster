@@ -47,6 +47,7 @@ private:
 	double inf; // Infinity definition
 	double thresh, yaw, dist_2_goal, angle_2_goal, angle_check, msg_received, cost, cost_i, angle_diff, safe_distance, min_cost, buffer;
 	double num_samples, angle_max, angle_min, angle_increment;
+	double angle_diff_last;
 	bool debug, can_reach_goal, corridor_free;
 	int down_sample, num_of_partitions, goal_index, collision_counter, collision_counter_corridor, num_of_points;
 

@@ -14,15 +14,15 @@ REACT::REACT(){
 	goal.header.stamp = ros::Time::now();
 	goal.header.frame_id = "vicon";
 
-	last_goal.header.stamp = ros::Time::now();
-	last_goal.header.frame_id = "vicon";
-	last_goal.point.x = 0;
-	last_goal.point.y = 0;
-	last_goal.point.z = 0;
-
 	ros::param::get("~goal_x",goal.point.x);
 	ros::param::get("~goal_y",goal.point.y);
 	ros::param::get("~goal_z",goal.point.z);
+
+	last_goal.header.stamp = ros::Time::now();
+	last_goal.header.frame_id = "vicon";
+	last_goal.point.x = goal.point.x;
+	last_goal.point.y = goal.point.y;
+	last_goal.point.z = goal.point.z;
 
 	num_of_points = 2;
 
@@ -143,23 +143,31 @@ void REACT::find_inter_goal(){
 	std::priority_queue<double, std::vector<double>, std::greater<double> > cost_queue;
 
  	for (int i=0; i < num_of_partitions ; i++){
+
+ 		last_goal_v.setX(last_goal.point.x - pose.getX());
+	 	last_goal_v.setY(last_goal.point.y - pose.getY());
+	 	last_goal_v.setZ(last_goal.point.z - pose.getZ());
+
+ 		next_goal_v.setX(goal_points.poses[i].pose.position.x - pose.getX());
+ 		next_goal_v.setY(goal_points.poses[i].pose.position.y - pose.getY());
+ 		next_goal_v.setZ(goal_points.poses[i].pose.position.z - pose.getZ());
+
+
  		double r_i = sqrt(pow(pose.getX() - goal_points.poses[i].pose.position.x, 2) + pow( pose.getY() - goal_points.poses[i].pose.position.y, 2));
  		double angle_i = atan2 ( goal_points.poses[i].pose.position.y - pose.getY(), goal_points.poses[i].pose.position.x - pose.getX() ) - yaw;
  		angle_diff  =  std::abs(angle_i)  - std::abs(angle_2_goal);
- 		cost_i = pow(angle_diff,2) ;
 
- 		// if(i < 2){
- 		// 	std::cout <<  goal_points.poses[i].pose.position.x << " " <<  goal_points.poses[i].pose.position.y << std::endl;
- 		// }
+ 		angle_diff_last = next_goal_v.angle(last_goal_v);
+
+ 		cost_i = pow(angle_diff,2) + pow(angle_diff_last,2);
 
  		std::cout << "i: " << i << " cost_i: " << cost_i << std::endl;
- 		// std::cout << "r_i: " << r_i << " angle_i: " << angle_i << " angle_diff: " << angle_diff << std::endl;
+ 		std::cout << "r_i: " << r_i << " angle_i: " << angle_i << " angle_diff: " << angle_diff << " angle_diff_last: " << angle_diff_last << std::endl;
 
  		cost_queue.push(cost_i);
  		cost_v.push_back(cost_i);
  		angles.push_back(angle_i);
  		ranges.push_back(r_i);
-
  	}
 
  	int goal_counter = 0;
@@ -219,14 +227,10 @@ void REACT::find_inter_goal(){
 			collision_scan.ranges.push_back(r_temp);
 
 			if (r_temp > filtered_scan.ranges[i]){
-				// std::cout << i << std::endl;
-				// std::cout << filtered_scan.ranges[i] << std::endl;
-				// std::cout << r_temp << std::endl;
-				// std::cout << theta << std::endl;
 				collision_counter_corridor+=1;
 			}
 
-			// if (collision_counter_corridor>9) break;
+			if (collision_counter_corridor>9) break;
 
 			theta+=angle_increment;		
 
@@ -332,19 +336,16 @@ void REACT::partition_scan(const sensor_msgs::LaserScan& msg){
 		if (r_temp[i] > safe_distance){
 			r.push_back(r_temp[i]);
 			angle.push_back(angle_temp[i]);
+
+			temp.pose.position.x = r[num_of_partitions]*cos(angle[num_of_partitions]) + pose.getX();
+			temp.pose.position.y = r[num_of_partitions]*sin(angle[num_of_partitions]) + pose.getY();
+			temp.pose.position.z = goal.point.z;
+			temp.header.seq = num_of_partitions;
+			goal_points.poses.push_back(temp);
+			num_of_partitions+=1;
 		}
 	}
 	
-	for(int i = 0; i < r.size(); i++)
-	{
-		temp.pose.position.x = r[i]*cos(angle[i]) + pose.getX();
-		temp.pose.position.y = r[i]*sin(angle[i]) + pose.getY();
-		temp.pose.position.z = goal.point.z;
-		temp.header.seq = num_of_partitions;
-		goal_points.poses.push_back(temp);
-		num_of_partitions+=1;
-	}
-
 	int_goal_pub.publish(goal_points);
 }
 

@@ -7,5 +7,5 @@ buffer: 0.2       # 0.5 width of quad for collision checking
 
 # (x,y,z) goal
 goal_x: 0
-goal_y: -5
+goal_y: -5.5
 goal_z: 0.5
