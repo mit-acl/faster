@@ -99,9 +99,6 @@ void REACT::check_goal(const sensor_msgs::LaserScan& msg)
 	int j = (int) ((angle_2_goal - angle_min)/angle_increment);
 	int delta = (int) (angle_check/angle_increment) ;
 
-	// std::cout << "j: " <<  j << std::endl;
-	// std::cout << "delta: " << delta << std::endl;
-
 	for (int i=j-delta; i < j+delta; i++)
 	{
 		if(isinf(msg.ranges[i]) || isnan(msg.ranges[i])){
@@ -110,7 +107,6 @@ void REACT::check_goal(const sensor_msgs::LaserScan& msg)
     	else{
     		temp_range = msg.ranges[i];
     	}
-    	// std::cout << temp_range << std::endl;
 		sum += temp_range;
 		if (dist_2_goal > temp_range) collision_counter+=1;
 	}
@@ -251,7 +247,7 @@ void REACT::find_inter_goal(){
  			cost_queue.pop();
  			goal_counter+=1;
 
- 			if(cost_v.empty()){
+ 			if(cost_queue.empty()){
  				std::cout << "Need to stop!!!!!!" << std::endl;
  				break;
  			}
