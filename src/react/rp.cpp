@@ -25,6 +25,7 @@ REACT::REACT(){
 	last_goal.point.z = goal.point.z;
 
 	num_of_points = 2;
+	angle_seg_inc = 10*PI/180;
 
 	num_of_partitions = 0;
 	collision_counter_corridor = 0;
@@ -319,12 +320,33 @@ void REACT::partition_scan(const sensor_msgs::LaserScan& msg){
     	}
     	else{
     		if ((i-j)>10){
-    			// Number of points 
-    			for (int k=0; k<num_of_points+1;k++){
+
+    			// Convert angle segment incerement to index
+    			double angle_2_index = angle_seg_inc/angle_increment;
+
+    			// Probably a better way to do this...
+    			if (double((i-j))/(3*angle_2_index) < 1) num_of_points = 1;
+    			if (double((i-j))/(3*angle_2_index) > 1) num_of_points = 3;
+    			if (double((i-j))/(5*angle_2_index) > 1) num_of_points = 5;
+    			if (double((i-j))/(7*angle_2_index) > 1) num_of_points = 7;
+    			if (double((i-j))/(9*angle_2_index) > 1) num_of_points = 9;
+    			if (double((i-j))/(11*angle_2_index) > 1) num_of_points = 11;
+
+    			for (int k=0; k < num_of_points; k++){
     				r_temp.push_back(sum/(i-j));
-		    		// std::cout << "i: " << i << " j: " << j << " sum: " << sum << " r: " << r << std::endl; 
-		    		angle_temp.push_back(filtered_scan.angle_min + filtered_scan.angle_increment*(i+j)/2 + (k-1)*filtered_scan.angle_increment*(i-j)/(2*num_of_points) + yaw);
+		    		angle_temp.push_back(filtered_scan.angle_min + filtered_scan.angle_increment*((i+j)/2 + (k-(num_of_points-1)/2)*angle_2_index) + yaw);
     			}
+
+
+    			// Old way
+    			// num_of_points = 2;
+
+    			// // Number of points 
+    			// for (int k=0; k<num_of_points+1;k++){
+    			// 	r_temp.push_back(sum/(i-j));
+		    	// 	// std::cout << "i: " << i << " j: " << j << " sum: " << sum << " r: " << r << std::endl; 
+		    	// 	angle_temp.push_back(filtered_scan.angle_min + filtered_scan.angle_increment*(i+j)/2 + (k-1)*filtered_scan.angle_increment*(i-j)/(2*num_of_points) + yaw);
+    			// }
     		}
 
     		sum = 0;
