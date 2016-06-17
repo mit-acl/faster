@@ -138,15 +138,19 @@ void REACT::find_inter_goal(){
 
 	std::priority_queue<double, std::vector<double>, std::greater<double> > cost_queue;
 
- 	for (int i=0; i < num_of_partitions ; i++){
+	last_goal_v.setX(last_goal.point.x - pose.getX());
+ 	last_goal_v.setY(last_goal.point.y - pose.getY());
+ 	last_goal_v.setZ(last_goal.point.z - pose.getZ());
 
- 		last_goal_v.setX(last_goal.point.x - pose.getX());
-	 	last_goal_v.setY(last_goal.point.y - pose.getY());
-	 	last_goal_v.setZ(last_goal.point.z - pose.getZ());
+ 	last_goal_v.normalize();
+
+ 	for (int i=0; i < num_of_partitions ; i++){
 
  		next_goal_v.setX(goal_points.poses[i].pose.position.x - pose.getX());
  		next_goal_v.setY(goal_points.poses[i].pose.position.y - pose.getY());
  		next_goal_v.setZ(goal_points.poses[i].pose.position.z - pose.getZ());
+
+ 		next_goal_v.normalize();
 
 
  		double r_i = sqrt(pow(pose.getX() - goal_points.poses[i].pose.position.x, 2) + pow( pose.getY() - goal_points.poses[i].pose.position.y, 2));
