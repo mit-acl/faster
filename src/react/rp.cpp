@@ -194,9 +194,9 @@ void REACT::find_inter_goal(){
  		double current_part_range = ranges[goal_index];
 
 		int j = (int) ((current_part_angle - angle_min)/angle_increment);
-		int delta = (int) (PI/2/angle_increment) ;
-		int delta_1 = (int) (PI/2/angle_increment);
-		int delta_2 = (int) (PI/2/angle_increment);
+		int delta = (int) (PI/4/angle_increment) ;
+		int delta_1 = (int) (PI/4/angle_increment);
+		int delta_2 = (int) (PI/4/angle_increment);
 
 		// Check we're within scan bounds
 		if (j-delta < 0){
@@ -214,7 +214,7 @@ void REACT::find_inter_goal(){
 		std::cout << "range: " << current_part_range << std::endl;
 		// r and theta used to check predicted ranges
 		double r_temp ;
-		double theta = angle_increment*(delta-delta_1) ;
+		double theta = angle_increment*(delta-delta_1) + PI/4;
 		// double theta = 0;
 
 		std::cout << "delta_1: " << delta_1 << " delta_2: " << delta_2 << std::endl;
