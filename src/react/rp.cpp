@@ -160,7 +160,7 @@ void REACT::find_inter_goal(){
 
  		angle_diff_last = next_goal_v.angle(last_goal_v);
 
- 		cost_i = pow(angle_diff,2) + pow(angle_diff_last,2);
+ 		cost_i = pow(angle_diff,2) + pow(angle_diff_last,2) + pow(1/r_i,2);
 
  		std::cout << "i: " << i << " cost_i: " << cost_i << std::endl;
  		std::cout << "r_i: " << r_i << " angle_i: " << angle_i << " angle_diff: " << angle_diff << " angle_diff_last: " << angle_diff_last << std::endl;
