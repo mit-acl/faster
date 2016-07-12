@@ -20,6 +20,8 @@ REACT::REACT(){
 
 	ros::param::get("cntrl/spinup_time",spinup_time_);
 
+	ros::param::get("~heading",heading_);
+
 	last_goal_.header.stamp = ros::Time::now();
 	last_goal_.header.frame_id = "vicon";
 	last_goal_.point.x = goal_.point.x;
@@ -41,6 +43,10 @@ REACT::REACT(){
 
 	ROS_INFO("Planner initialized.");
 
+}
+
+void REACT::global_goalCB(const geometry_msgs::PointStamped& msg){
+	goal_ = msg;
 }
 
 void REACT::stateCB(const acl_system::ViconState& msg)
@@ -65,12 +71,16 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 		}
 	}
 
-	if (quad_status_== state_.LAND){
-		land();
-		if (quad_goal_.pos.z == -0.1){
-			quad_status_ = state_.NOT_FLYING;
-			quad_goal_.cut_power = true;
+	else if (quad_status_== state_.LAND){
+			land();
+			if (quad_goal_.pos.z == -0.1){
+				quad_status_ = state_.NOT_FLYING;
+				quad_goal_.cut_power = true;
+			}
 		}
+
+	else if (quad_status_ == state_.GO){
+		// Call planner
 	}
 
 	quad_goal_.header.stamp = ros::Time::now();
@@ -122,9 +132,31 @@ void REACT::eventCB(const acl_system::QuadFlightEvent& msg)
 
 	}
 	// Emergency kill
-	else if (msg.mode == msg.ESTOP && quad_status_ != state_.NOT_FLYING){
+	else if (msg.mode == msg.KILL && quad_status_ != state_.NOT_FLYING){
 		quad_status_ = state_.NOT_FLYING;
 		quad_goal_.cut_power = true;
+		ROS_ERROR("Killing");
+	}
+	// Landing
+	else if (msg.mode == msg.LAND && quad_status_ == state_.FLYING){
+		quad_status_ = state_.LAND;
+		ROS_INFO("Landing");
+	}
+	// Initializing
+	else if (msg.mode == msg.INIT && quad_status_ == state_.FLYING){
+		quad_goal_.yaw = heading_;
+		ROS_INFO("Initialized");
+	}
+	// GO!!!!
+	else if (msg.mode == msg.START && quad_status_ == state_.FLYING){
+		quad_status_ = state_.GO;
+		ROS_INFO("Starting");
+		// Set speed to desired speed
+	}
+	// STOP!!!
+	else if (msg.mode == msg.ESTOP && quad_status_ == state_.GO){
+		ROS_WARN("Stopping");
+		// Stay in go command but set speed to zero
 	}
 
 

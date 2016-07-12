@@ -37,6 +37,8 @@ public:
 
 	void scanCB(const sensor_msgs::LaserScan& msg);
 	void stateCB(const acl_system::ViconState& msg);
+	void global_goalCB(const geometry_msgs::PointStamped& msg);
+
 	void partition_scan(const sensor_msgs::LaserScan& msg);
 	void vis_better_scan(const sensor_msgs::LaserScan& msg);
 	void check_goal(const sensor_msgs::LaserScan& msg);
@@ -55,7 +57,7 @@ private:
 	bool debug_, can_reach_goal_, corridor_free_;
 	int down_sample_, num_of_partitions_, goal_index_, collision_counter_, collision_counter_corridor_;
 
-	double spinup_time_;
+	double spinup_time_, heading_;
 	int quad_status_;
 	acl_system::QuadState state_;
 	acl_system::QuadFlightEvent quad_event_;

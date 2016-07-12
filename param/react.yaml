@@ -9,3 +9,5 @@ buffer: 0.35       # 0.5 width of quad for collision checking
 goal_x: 0
 goal_y: -5.5
 goal_z: 0.5
+
+heading: 0
