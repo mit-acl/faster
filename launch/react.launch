@@ -9,6 +9,10 @@
 		<rosparam file="$(find acl_planning)/param/react.yaml" command="load"/>
 
 		<remap from="~vicon" to="state_estimate"/>
+		<remap from="~goal" to="goal" />
+		<remap from="~event" to="event" />
+
+
 		<remap from="~partitioned_scan" to="partitioned_scan"/>
 		<remap from="~clean_scan" to="clean_scan"/>
 		<remap from="~global_goal" to="global_goal"/>
