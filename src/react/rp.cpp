@@ -28,6 +28,9 @@ REACT::REACT(){
 	last_goal_.point.y = goal_.point.y;
 	last_goal_.point.z = goal_.point.z;
 
+	j_max_ = 30;
+	a_max_ = 5;
+
 	angle_seg_inc_ = 10*PI/180;
 
 	num_of_partitions_ = 0;
@@ -163,7 +166,39 @@ void REACT::eventCB(const acl_system::QuadFlightEvent& msg)
 }
 
 
+void REACT::find_times(std::vector<double>& t, std::vector<double>& x0, std::vector<double> x, double vf){
+	double j = copysign(j_max_,vf-x[1]);
+	double vfp = x[1] + pow(x[2],2)/(2*j);
 
+	if (std::abs(vfp-vf) < 0.05){
+		j = -j;
+		t[0] = -x[2]/j;
+		t[1] = 0;
+		t[2] = 0;
+		x0[0] = 0;
+		x0[1] = x[1];
+		v0[2] = x[2];
+		x0[3] = j;
+	}
+	else{
+		double t1 = -x[2]/j + std::sqrt(0.5*pow(x[2],2) - j*(x0[1]-vf))/j;
+		double t2 = -x[2]/j - std::sqrt(0.5*pow(x[2],2) - j*(x0[1]-vf))/j;
+
+		t1 = std::max(t1,t2);
+
+		// Check to see if we'll saturate
+		double a1f = x[2] + j_max_*t1;
+
+		if (std::abs(a1f) > a_max_){
+			// Do this
+		}
+		else{
+			t[0] = t1;
+			t[1] = 0;
+			t[2] = (x[2]+j*t1)/j;
+		}
+	}
+}
 
 
 
