@@ -48,6 +48,11 @@ public:
 	// ROS timed functions
 	void sendGoal(const ros::TimerEvent&);
 
+	// Make these private after testing
+	void saturate(double &var, double min, double max);
+	void find_times(std::vector<double>& t, std::vector<double>& x0, std::vector<double>& v0, std::vector<double>& a0, double& j, std::vector<double> x, double vf);
+	
+
 private:
 
 	double inf_; // Infinity definition
@@ -57,7 +62,7 @@ private:
 	bool debug_, can_reach_goal_, corridor_free_;
 	int down_sample_, num_of_partitions_, goal_index_, collision_counter_, collision_counter_corridor_;
 
-	double spinup_time_, heading_, j_max_, a_max_;
+	double spinup_time_, heading_, j_max_, a_max_, jx_, jy_, t0_;
 	int quad_status_;
 	acl_system::QuadState state_;
 	acl_system::QuadFlightEvent quad_event_;
@@ -77,15 +82,14 @@ private:
 	std::vector<double> t_x_{std::vector<double>(3,0)};
 	std::vector<double> t_y_{std::vector<double>(3,0)}; 
 
-	std::vector<double> x0_{std::vector<double>(4,0)};
-	std::vector<double> y0_{std::vector<double>(4,0)}; 
+	std::vector<double> x0_{std::vector<double>(3,0)};
+	std::vector<double> y0_{std::vector<double>(3,0)}; 
 
-	std::vector<double> vx0_{std::vector<double>(4,0)};
-	std::vector<double> vy0_{std::vector<double>(4,0)}; 
+	std::vector<double> vx0_{std::vector<double>(3,0)};
+	std::vector<double> vy0_{std::vector<double>(3,0)}; 
 
-	std::vector<double> ax0_{std::vector<double>(4,0)};
-	std::vector<double> ay0_{std::vector<double>(4,0)}; 
-
+	std::vector<double> ax0_{std::vector<double>(3,0)};
+	std::vector<double> ay0_{std::vector<double>(3,0)}; 
 
 
 
@@ -93,8 +97,6 @@ private:
 	void screenPrint();
 	void find_inter_goal();
 
-	void saturate(double &var, double min, double max);
-	void find_times(std::vector<double>& t, std::vector<double>& x0, std::vector<double> x, double vf);
 	void takeoff();
 	void land();
 	

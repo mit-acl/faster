@@ -28,8 +28,9 @@ REACT::REACT(){
 	last_goal_.point.y = goal_.point.y;
 	last_goal_.point.z = goal_.point.z;
 
+	// Should be params
 	j_max_ = 30;
-	a_max_ = 5;
+	a_max_ = 20;
 
 	angle_seg_inc_ = 10*PI/180;
 
@@ -165,26 +166,48 @@ void REACT::eventCB(const acl_system::QuadFlightEvent& msg)
 
 }
 
+void REACT::find_times(std::vector<double>& t, std::vector<double>& x0, std::vector<double>& v0, std::vector<double>& a0, double& j, std::vector<double> x, double vf){
+	double j_temp = copysign(j_max_,vf-x[1]);
+	double vfp = x[1] + pow(x[2],2)/(2*j_temp);
 
-void REACT::find_times(std::vector<double>& t, std::vector<double>& x0, std::vector<double> x, double vf){
-	double j = copysign(j_max_,vf-x[1]);
-	double vfp = x[1] + pow(x[2],2)/(2*j);
+	std::cout << "j_temp: " << j_temp << std::endl;
 
 	if (std::abs(vfp-vf) < 0.05){
-		j = -j;
+		j = -j_temp;
 		t[0] = -x[2]/j;
 		t[1] = 0;
 		t[2] = 0;
-		x0[0] = 0;
-		x0[1] = x[1];
-		v0[2] = x[2];
-		x0[3] = j;
+
+		x0[0] = x[0];
+		// No 2nd and 3rd stage
+		x0[1] = 0;
+		x0[2] = 0;
+
+
+		v0[0] = x[1];
+		// No 2nd and 3rd stage
+		v0[1] = 0;
+		v0[2] = 0;
+
+		a0[0] = x[2];
+		// No 2nd and 3rd stage
+		a0[1] = 0;
+		a0[2] = 0;
 	}
+
 	else{
+		j = j_temp;
 		double t1 = -x[2]/j + std::sqrt(0.5*pow(x[2],2) - j*(x0[1]-vf))/j;
 		double t2 = -x[2]/j - std::sqrt(0.5*pow(x[2],2) - j*(x0[1]-vf))/j;
 
+		std::cout << "Here" << std::endl;
+		std::cout << t1 << std::endl;
+		std::cout << t2 << std::endl;
+
 		t1 = std::max(t1,t2);
+
+		std::cout << t1 << std::endl;
+
 
 		// Check to see if we'll saturate
 		double a1f = x[2] + j_max_*t1;
@@ -194,10 +217,24 @@ void REACT::find_times(std::vector<double>& t, std::vector<double>& x0, std::vec
 		}
 		else{
 			t[0] = t1;
-			t[1] = 0;
-			t[2] = (x[2]+j*t1)/j;
+			t[1] = t[0]; // No second phase
+			t[2] = (x[2]+j*t1)/j + t[1];
+
+			a0[0] = x[2];
+			a0[1] = 0; // No second phase
+			a0[2] = a0[0] + j*t[0];
+
+			v0[0] = x[1];
+			v0[1] = 0; // No second phase
+			v0[2] = v0[0] + a0[0]*t[0] + 0.5*j*pow(t[0],2);			
+
+			x0[0] = x[0];
+			x0[1] = 0; // No second phase
+			x0[2] = x0[0] + v0[0]*t[0] + 0.5*a0[0]*pow(t[0],2) + 1./6*j*pow(t[0],3);
 		}
 	}
+
+	t0_ = ros::Time::now().toSec();
 }
 
 
