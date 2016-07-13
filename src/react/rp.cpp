@@ -30,7 +30,7 @@ REACT::REACT(){
 
 	// Should be params
 	j_max_ = 30;
-	a_max_ = 20;
+	a_max_ = 5;
 
 	angle_seg_inc_ = 10*PI/180;
 
@@ -84,7 +84,8 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 		}
 
 	else if (quad_status_ == state_.GO){
-		// Call planner
+		t_ = ros::Time::now().toSec() - std::max(tx0_, ty0_);
+		eval_trajectory(quad_goal_,t_);
 	}
 
 	quad_goal_.header.stamp = ros::Time::now();
@@ -166,79 +167,158 @@ void REACT::eventCB(const acl_system::QuadFlightEvent& msg)
 
 }
 
-void REACT::find_times(std::vector<double>& t, std::vector<double>& x0, std::vector<double>& v0, std::vector<double>& a0, double& j, std::vector<double> x, double vf){
+void REACT::find_times(std::vector<double>& t, std::vector<double>& x0, std::vector<double>& v0, std::vector<double>& a0, std::vector<double>& j, double& t0, std::vector<double> x, double vf){
 	double j_temp = copysign(j_max_,vf-x[1]);
 	double vfp = x[1] + pow(x[2],2)/(2*j_temp);
 
-	std::cout << "j_temp: " << j_temp << std::endl;
-
 	if (std::abs(vfp-vf) < 0.05){
-		j = -j_temp;
-		t[0] = -x[2]/j;
+		j[0] = -j_temp;
+		// No 2nd and 3rd stage
+		j[1] = 0;
+		j[2] = 0;
+
+		t[0] = -x[2]/j[0];
+		// No 2nd and 3rd stage
 		t[1] = 0;
 		t[2] = 0;
-
-		x0[0] = x[0];
-		// No 2nd and 3rd stage
-		x0[1] = 0;
-		x0[2] = 0;
-
 
 		v0[0] = x[1];
 		// No 2nd and 3rd stage
 		v0[1] = 0;
 		v0[2] = 0;
+		v0[3] = vf;
+
+		x0[0] = x[0];
+		// No 2nd and 3rd stage
+		x0[1] = 0;
+		x0[2] = 0;
+		x0[3] = x0[1] + v0[0]*t[0];
 
 		a0[0] = x[2];
 		// No 2nd and 3rd stage
 		a0[1] = 0;
 		a0[2] = 0;
+		a0[3] = 0;
 	}
 
 	else{
-		j = j_temp;
-		double t1 = -x[2]/j + std::sqrt(0.5*pow(x[2],2) - j*(x0[1]-vf))/j;
-		double t2 = -x[2]/j - std::sqrt(0.5*pow(x[2],2) - j*(x0[1]-vf))/j;
+		j[0] = j_temp;
+		j[1] = 0;
+		j[2] = -j_temp;
 
-		std::cout << "Here" << std::endl;
-		std::cout << t1 << std::endl;
-		std::cout << t2 << std::endl;
+		double t1 = -x[2]/j_temp + std::sqrt(0.5*pow(x[2],2) - j_temp*(x0[1]-vf))/j_temp;
+		double t2 = -x[2]/j_temp - std::sqrt(0.5*pow(x[2],2) - j_temp*(x0[1]-vf))/j_temp;
 
 		t1 = std::max(t1,t2);
-
-		std::cout << t1 << std::endl;
-
 
 		// Check to see if we'll saturate
 		double a1f = x[2] + j_max_*t1;
 
 		if (std::abs(a1f) > a_max_){
-			// Do this
+			double am = copysign(a_max_,j_temp);
+			t[0] = (am-x[2])/j[0];
+			t[2] = -am/j[2];
+
+			a0[0] = x[2];
+			a0[1] = a0[0] + j[0]*t[0];
+			a0[2] = am;
+			a0[3] = 0;
+
+			v0[0] = x[1];
+			v0[1] = v0[1] + a0[0]*t[0] + 0.5*j[0]*pow(t[0],2);	
+			v0[2] = vf - am*t[2] - 0.5*j[2]*pow(t[0],2);
+			v0[3] = vf;
+
+			t[1] = (v0[2]-v0[1])/am;			
+
+			x0[0] = x[0];
+			x0[1] = x0[0] + v0[0]*t[0] + 0.5*a0[0]*pow(t[0],2) + 1./6*j[0]*pow(t[0],3);
+			x0[2] = x0[1] + v0[1]*t[1] + 0.5*am*pow(t[1],2) ;
+			x0[3] = x0[2] + v0[2]*t[2] + 0.5*am*pow(t[2],2) + 1./6*j[2]*pow(t[2],3);
+
 		}
 		else{
+			j[0] = j_temp;
+			j[1] = 0; // No second phase
+			j[2] = -j_temp;
+
 			t[0] = t1;
-			t[1] = t[0]; // No second phase
-			t[2] = (x[2]+j*t1)/j + t[1];
+			t[1] = 0; // No second phase
+			t[2] = -(x[2]+j[0]*t1)/j[2];
 
 			a0[0] = x[2];
 			a0[1] = 0; // No second phase
-			a0[2] = a0[0] + j*t[0];
+			a0[2] = a0[0] + j[0]*t[0];
+			a0[3] = 0;
 
 			v0[0] = x[1];
 			v0[1] = 0; // No second phase
-			v0[2] = v0[0] + a0[0]*t[0] + 0.5*j*pow(t[0],2);			
+			v0[2] = v0[0] + a0[0]*t[0] + 0.5*j[0]*pow(t[0],2);
+			v0[3] = vf;		
 
 			x0[0] = x[0];
 			x0[1] = 0; // No second phase
-			x0[2] = x0[0] + v0[0]*t[0] + 0.5*a0[0]*pow(t[0],2) + 1./6*j*pow(t[0],3);
+			x0[2] = x0[0] + v0[0]*t[0] + 0.5*a0[0]*pow(t[0],2) + 1./6*j[0]*pow(t[0],3);
+			x0[3] = x0[2] + v0[2]*t[2] + 0.5*a0[2]*pow(t[2],2) + 1./6*j[2]*pow(t[2],3);
+
 		}
 	}
 
-	t0_ = ros::Time::now().toSec();
+	// Is this the right spot to do this?
+	t0 = ros::Time::now().toSec();
 }
 
 
+void REACT::eval_trajectory(acl_system::QuadGoal& goal, double t){
+	std::cout << "Switching times 1: " << t_x_[0] << std::endl;
+	std::cout << "Switching times 2: " << t_x_[1] << std::endl;
+	std::cout << "Switching times 3: " << t_x_[2] << std::endl<< std::endl;
+	// Eval x trajectory
+	int k = 0;
+	if (t < t_x_[0]){
+		k = 0;
+	}
+	else if (t < t_x_[0]+t_x_[1]){
+		t -= t_x_[0];
+		k = 1;
+	}
+	else if (t < t_x_[0]+t_x_[1]+t_x_[2]){
+		t -= (t_x_[0]+t_x_[1]);
+		k = 2;
+	}
+	else{
+		t -= (t_x_[0]+t_x_[1]+t_x_[2]);
+		k = 3;
+	}
 
+	std::cout << "k: " << k << std::endl;
+
+	goal.pos.x = x0_[k] + vx0_[k]*t + 0.5*ax0_[k]*pow(t,2) + 1.0/6.0*jx_[k]*pow(t,3);
+	goal.vel.x = vx0_[k] + ax0_[k]*t + 0.5*jx_[k]*pow(t,2);
+	goal.accel.x = ax0_[k] + jx_[k]*t;
+
+	// Eval y trajectory
+	k = 0;
+	if (t < t_y_[0]){
+		k = 0;
+	}
+	else if (t < t_y_[0]+t_y_[1]){
+		t -= t_y_[0];
+		k = 1;
+	}
+	else if (t < t_y_[0]+t_y_[1]+t_y_[2]){
+		t -= (t_y_[0]+t_y_[1]);
+		k = 2;
+	}
+	else{
+		t -= (t_y_[0]+t_y_[1]+t_y_[2]);
+		k = 3;
+	}
+
+	goal.pos.y = y0_[k] + vy0_[k]*t + 0.5*ay0_[k]*pow(t,2) + 1.0/6.0*jy_[k]*pow(t,3);
+	goal.vel.y = vy0_[k] + ay0_[k]*t + 0.5*jy_[k]*pow(t,2);
+	goal.accel.y = ay0_[k] + jy_[k]*t;
+}
 
 
 

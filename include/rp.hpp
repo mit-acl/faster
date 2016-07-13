@@ -50,7 +50,8 @@ public:
 
 	// Make these private after testing
 	void saturate(double &var, double min, double max);
-	void find_times(std::vector<double>& t, std::vector<double>& x0, std::vector<double>& v0, std::vector<double>& a0, double& j, std::vector<double> x, double vf);
+	void find_times(std::vector<double>& t, std::vector<double>& x0, std::vector<double>& v0, std::vector<double>& a0, std::vector<double>& j, double& t0, std::vector<double> x, double vf);
+	void eval_trajectory(acl_system::QuadGoal& goal, double t);
 	
 
 private:
@@ -62,7 +63,7 @@ private:
 	bool debug_, can_reach_goal_, corridor_free_;
 	int down_sample_, num_of_partitions_, goal_index_, collision_counter_, collision_counter_corridor_;
 
-	double spinup_time_, heading_, j_max_, a_max_, jx_, jy_, t0_;
+	double spinup_time_, heading_, j_max_, a_max_, tx0_, ty0_, t_;
 	int quad_status_;
 	acl_system::QuadState state_;
 	acl_system::QuadFlightEvent quad_event_;
@@ -82,14 +83,18 @@ private:
 	std::vector<double> t_x_{std::vector<double>(3,0)};
 	std::vector<double> t_y_{std::vector<double>(3,0)}; 
 
-	std::vector<double> x0_{std::vector<double>(3,0)};
-	std::vector<double> y0_{std::vector<double>(3,0)}; 
+	std::vector<double> x0_{std::vector<double>(4,0)};
+	std::vector<double> y0_{std::vector<double>(4,0)}; 
 
-	std::vector<double> vx0_{std::vector<double>(3,0)};
-	std::vector<double> vy0_{std::vector<double>(3,0)}; 
+	std::vector<double> vx0_{std::vector<double>(4,0)};
+	std::vector<double> vy0_{std::vector<double>(4,0)}; 
 
-	std::vector<double> ax0_{std::vector<double>(3,0)};
-	std::vector<double> ay0_{std::vector<double>(3,0)}; 
+	std::vector<double> ax0_{std::vector<double>(4,0)};
+	std::vector<double> ay0_{std::vector<double>(4,0)}; 
+
+	// Note the last entry is always zero
+	std::vector<double> jx_{std::vector<double>(4,0)};
+	std::vector<double> jy_{std::vector<double>(4,0)};
 
 
 
