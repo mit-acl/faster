@@ -64,7 +64,7 @@ int main(int argc, char **argv)
 	double t = 1;
 
 	then = ros::Time::now().toSec();
-	rp.eval_trajectory(goal,t);
+	rp.eval_trajectory(goal,t_x,t_x,t);
 	now = ros::Time::now().toSec();
 
 	std::cout << "Function eval time [ms]: " << 1000*(now - then) << std::endl << std::endl;

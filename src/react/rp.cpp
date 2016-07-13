@@ -85,7 +85,7 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 
 	else if (quad_status_ == state_.GO){
 		t_ = ros::Time::now().toSec() - std::max(tx0_, ty0_);
-		eval_trajectory(quad_goal_,t_);
+		eval_trajectory(quad_goal_,t_x_,t_y_,t_);
 	}
 
 	quad_goal_.header.stamp = ros::Time::now();
@@ -269,51 +269,51 @@ void REACT::find_times(std::vector<double>& t, std::vector<double>& x0, std::vec
 }
 
 
-void REACT::eval_trajectory(acl_system::QuadGoal& goal, double t){
-	std::cout << "Switching times 1: " << t_x_[0] << std::endl;
-	std::cout << "Switching times 2: " << t_x_[1] << std::endl;
-	std::cout << "Switching times 3: " << t_x_[2] << std::endl<< std::endl;
+void REACT::eval_trajectory(acl_system::QuadGoal& goal, std::vector<double> t_x, std::vector<double> t_y, double t){
+	// std::cout << "Switching times 1: " << t_x[0] << std::endl;
+	// std::cout << "Switching times 2: " << t_x[1] << std::endl;
+	// std::cout << "Switching times 3: " << t_x[2] << std::endl<< std::endl;
 	// Eval x trajectory
 	int k = 0;
-	if (t < t_x_[0]){
+	if (t < t_x[0]){
 		k = 0;
 	}
-	else if (t < t_x_[0]+t_x_[1]){
-		t -= t_x_[0];
+	else if (t < t_x[0]+t_x[1]){
+		t -= t_x[0];
 		k = 1;
 	}
-	else if (t < t_x_[0]+t_x_[1]+t_x_[2]){
-		t -= (t_x_[0]+t_x_[1]);
+	else if (t < t_x[0]+t_x[1]+t_x[2]){
+		t -= (t_x[0]+t_x[1]);
 		k = 2;
 	}
 	else{
-		t -= (t_x_[0]+t_x_[1]+t_x_[2]);
+		t -= (t_x[0]+t_x[1]+t_x[2]);
 		k = 3;
 	}
 
-	std::cout << "k: " << k << std::endl;
+	// Eval y trajectory
+	int l = 0;
+	if (t < t_y[0]){
+		l = 0;
+	}
+	else if (t < t_y[0]+t_y[1]){
+		t -= t_y[0];
+		l = 1;
+	}
+	else if (t < t_y[0]+t_y[1]+t_y[2]){
+		t -= (t_y[0]+t_y[1]);
+		l = 2;
+	}
+	else{
+		t -= (t_y[0]+t_y[1]+t_y[2]);
+		l = 3;
+	}
+
+	// std::cout << "k: " << k << std::endl;
 
 	goal.pos.x = x0_[k] + vx0_[k]*t + 0.5*ax0_[k]*pow(t,2) + 1.0/6.0*jx_[k]*pow(t,3);
 	goal.vel.x = vx0_[k] + ax0_[k]*t + 0.5*jx_[k]*pow(t,2);
 	goal.accel.x = ax0_[k] + jx_[k]*t;
-
-	// Eval y trajectory
-	k = 0;
-	if (t < t_y_[0]){
-		k = 0;
-	}
-	else if (t < t_y_[0]+t_y_[1]){
-		t -= t_y_[0];
-		k = 1;
-	}
-	else if (t < t_y_[0]+t_y_[1]+t_y_[2]){
-		t -= (t_y_[0]+t_y_[1]);
-		k = 2;
-	}
-	else{
-		t -= (t_y_[0]+t_y_[1]+t_y_[2]);
-		k = 3;
-	}
 
 	goal.pos.y = y0_[k] + vy0_[k]*t + 0.5*ay0_[k]*pow(t,2) + 1.0/6.0*jy_[k]*pow(t,3);
 	goal.vel.y = vy0_[k] + ay0_[k]*t + 0.5*jy_[k]*pow(t,2);

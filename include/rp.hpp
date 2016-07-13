@@ -51,7 +51,7 @@ public:
 	// Make these private after testing
 	void saturate(double &var, double min, double max);
 	void find_times(std::vector<double>& t, std::vector<double>& x0, std::vector<double>& v0, std::vector<double>& a0, std::vector<double>& j, double& t0, std::vector<double> x, double vf);
-	void eval_trajectory(acl_system::QuadGoal& goal, double t);
+	void eval_trajectory(acl_system::QuadGoal& goal, std::vector<double> t_x, std::vector<double> t_y, double t);
 	
 
 private:
@@ -95,8 +95,6 @@ private:
 	// Note the last entry is always zero
 	std::vector<double> jx_{std::vector<double>(4,0)};
 	std::vector<double> jy_{std::vector<double>(4,0)};
-
-
 
 	//## Logging and Debugging Functions
 	void screenPrint();
