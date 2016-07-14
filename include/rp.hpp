@@ -15,6 +15,8 @@
 #include "tf/transform_datatypes.h"
 #include "nav_msgs/Path.h"
 
+#include <Eigen/Dense>
+
 // custom messages
 #include "acl_system/ViconState.h"
 #include "acl_system/QuadGoal.h"
@@ -50,8 +52,8 @@ public:
 
 	// Make these private after testing
 	void saturate(double &var, double min, double max);
-	void find_times(std::vector<double>& t, std::vector<double>& x0, std::vector<double>& v0, std::vector<double>& a0, std::vector<double>& j, double& t0, std::vector<double> x, double vf);
-	void eval_trajectory(acl_system::QuadGoal& goal, std::vector<double> t_x, std::vector<double> t_y, double t);
+	void find_times(std::vector<double>& t, Eigen::Matrix4d& X0_, std::vector<double> x, double vf);
+	void eval_trajectory(acl_system::QuadGoal& goal, Eigen::Matrix4d X0, Eigen::Matrix4d Y0, std::vector<double> t_x, std::vector<double> t_y, double t);
 	
 
 private:
@@ -84,17 +86,13 @@ private:
 	std::vector<double> t_y_{std::vector<double>(3,0)}; 
 
 	std::vector<double> x0_{std::vector<double>(4,0)};
-	std::vector<double> y0_{std::vector<double>(4,0)}; 
-
-	std::vector<double> vx0_{std::vector<double>(4,0)};
-	std::vector<double> vy0_{std::vector<double>(4,0)}; 
-
-	std::vector<double> ax0_{std::vector<double>(4,0)};
-	std::vector<double> ay0_{std::vector<double>(4,0)}; 
-
+	std::vector<double> v0_{std::vector<double>(4,0)};
+	std::vector<double> a0_{std::vector<double>(4,0)};
 	// Note the last entry is always zero
-	std::vector<double> jx_{std::vector<double>(4,0)};
-	std::vector<double> jy_{std::vector<double>(4,0)};
+	std::vector<double> j_{std::vector<double>(4,0)};
+
+	Eigen::Matrix4d X0_;
+	Eigen::Matrix4d Y0_;
 
 	//## Logging and Debugging Functions
 	void screenPrint();
