@@ -12,6 +12,14 @@ int main(int argc, char **argv)
 
 	Eigen::Matrix4d X0;
 
+	Eigen::MatrixXd scan;
+
+
+	// std::vector<float> v {std::vector<float>(3,0)};
+	// std::cout << Eigen::Map<Eigen::MatrixXd, 0, Eigen::InnerStride<1>>(v) << std::endl;
+
+	// m(10,10) = 0;
+
 	// std::cout << m.rows() << " " << m.cols() << std::endl;	
 
 
@@ -86,9 +94,29 @@ int main(int argc, char **argv)
 	std::cout << "vx goal: " << goal.vel.x << " vy goal: " << goal.vel.y << std::endl;
 	std::cout << "ax goal: " << goal.accel.x << " ay goal: " << goal.accel.y << std::endl << std::endl;
 
-	std::cout << "Total latency [ms]: " << diff2 + diff << std::endl << std::endl;
+	
+	sensor_msgs::LaserScan test_scan;
+
+	// Standard angle increment
+	test_scan.angle_increment = 0.00628;
+	test_scan.angle_max = 2;
+	test_scan.angle_min = -2;
+
+	for (int i=0;i<636;i++){
+		test_scan.ranges.push_back(5);
+	}
 
 
+	then = clock();
+	rp.scan2Eig(test_scan,scan);
+	now = clock();
+
+	double diff3 = 1000*((float)(now-then))/CLOCKS_PER_SEC;
+
+	std::cout << "Function eval time [ms]: " << diff3 << std::endl << std::endl;
+
+
+	std::cout << "Total latency [ms]: " << diff3 + diff2 + diff << std::endl << std::endl;
 
 	return 0;
 }

@@ -54,7 +54,7 @@ public:
 	void saturate(double &var, double min, double max);
 	void find_times(std::vector<double>& t, Eigen::Matrix4d& X0_, std::vector<double> x, double vf);
 	void eval_trajectory(acl_system::QuadGoal& goal, Eigen::Matrix4d X0, Eigen::Matrix4d Y0, std::vector<double> t_x, std::vector<double> t_y, double t);
-	
+	void scan2Eig(const sensor_msgs::LaserScan msg, Eigen::MatrixXd scan);
 
 private:
 
@@ -65,7 +65,7 @@ private:
 	bool debug_, can_reach_goal_, corridor_free_;
 	int down_sample_, num_of_partitions_, goal_index_, collision_counter_, collision_counter_corridor_;
 
-	double spinup_time_, heading_, j_max_, a_max_, tx0_, ty0_, t_;
+	double spinup_time_, heading_, j_max_, a_max_, t0_, t_;
 	int quad_status_;
 	acl_system::QuadState state_;
 	acl_system::QuadFlightEvent quad_event_;
@@ -95,7 +95,6 @@ private:
 	Eigen::Matrix4d Y0_;
 
 	//## Logging and Debugging Functions
-	void screenPrint();
 	void find_inter_goal();
 
 	void takeoff();

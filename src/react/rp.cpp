@@ -84,7 +84,7 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 		}
 
 	else if (quad_status_ == state_.GO){
-		t_ = ros::Time::now().toSec() - std::max(tx0_, ty0_);
+		t_ = ros::Time::now().toSec() - t0_;
 		eval_trajectory(quad_goal_,X0_,Y0_,t_x_,t_y_,t_);
 	}
 
@@ -272,9 +272,6 @@ void REACT::find_times(std::vector<double>& t, Eigen::Matrix4d& X0, std::vector<
 
 
 void REACT::eval_trajectory(acl_system::QuadGoal& goal, Eigen::Matrix4d X0, Eigen::Matrix4d Y0, std::vector<double> t_x, std::vector<double> t_y, double t){
-	// std::cout << "Switching times 1: " << t_x[0] << std::endl;
-	// std::cout << "Switching times 2: " << t_x[1] << std::endl;
-	// std::cout << "Switching times 3: " << t_x[2] << std::endl<< std::endl;
 	// Eval x trajectory
 	int k = 0;
 	if (t < t_x[0]){
@@ -342,6 +339,24 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
  	}
  	
  }
+
+// We might not need this...
+ void REACT::scan2Eig(const sensor_msgs::LaserScan msg, Eigen::MatrixXd scan){
+ 	angle_max_ = msg.angle_max;
+	angle_min_ = msg.angle_min;
+	angle_increment_ = msg.angle_increment;
+
+	num_samples_ = (int) std::floor((angle_max_ - angle_min_) / angle_increment_ );
+
+	scan.resize(2,num_samples_);
+
+	// Seems really inefficient
+	for (int i=0;i<num_samples_;i++){
+		scan(0,i) = angle_min_ + i*angle_increment_;
+		scan(1,i) = msg.ranges[i];
+	}
+}
+ 
 
 void REACT::check_goal(const sensor_msgs::LaserScan& msg)
 {
@@ -641,30 +656,6 @@ void REACT::vis_better_scan(const sensor_msgs::LaserScan& msg)
     }
     pub_clean_scan.publish(clean_scan);
  }
-
-
-void REACT::screenPrint()
-{
-	if (not errorMsg.str().empty())
-		ROS_ERROR_STREAM_THROTTLE(SCREEN_PRINT_RATE, errorMsg.str());
-
-	if (not warnMsg.str().empty())
-		ROS_WARN_STREAM_THROTTLE(SCREEN_PRINT_RATE, warnMsg.str());
-
-	std::ostringstream msg;
-	msg.setf(std::ios::fixed); // give all the doubles the same precision
-	msg.setf(std::ios::showpos); // show +/- signs always
-	msg << std::setprecision(4) << std::endl; // set precision to 4 decimal places
-
-	// double r, p, y;
-	// tf::Matrix3x3(att).getRPY(r, p, y);
-	// msg << "Height:           " << alt << std::endl;
-	// msg << "Points Removed:   " << points_removed << std::endl;
-	// msg << "Attitude:	  r: " << r << "  p: " << p << "  y: " << y << std::endl;
-
-	ROS_INFO_STREAM_THROTTLE(SCREEN_PRINT_RATE, msg.str());
-	// Print at 1/0.5 Hz = 2 Hz
-}
 
 void REACT::saturate(double &var, double min, double max){
 	if (var < min){
