@@ -52,10 +52,12 @@ public:
 
 	// Make these private after testing
 	void saturate(double &var, double min, double max);
-	void find_times(std::vector<double>& t, Eigen::Matrix4d& X0_, std::vector<double> x, double vf);
-	void eval_trajectory(acl_system::QuadGoal& goal, Eigen::Matrix4d X0, Eigen::Matrix4d Y0, std::vector<double> t_x, std::vector<double> t_y, double t);
-	void scan2Eig(const sensor_msgs::LaserScan msg, Eigen::MatrixXd scan);
-
+	void find_times(std::vector<double>& t, Eigen::Matrix4d& X0, Eigen::Vector3d x, double vf);
+	void eval_trajectory(Eigen::MatrixXd& Xc, Eigen::Matrix4d X0, Eigen::Matrix4d Y0, std::vector<double> t_x, std::vector<double> t_y, double t);
+	void scan2Eig(const sensor_msgs::LaserScan msg, Eigen::MatrixXd& scan);
+	void collision_check2(Eigen::MatrixXd X, std::vector<double> scan, Eigen::Vector3d goal, double buff, double v, bool& can_reach_goal);
+	void scan2Vec(const sensor_msgs::LaserScan msg, std::vector<double>& scan);
+	void collision_check(Eigen::MatrixXd X, Eigen::MatrixXd scan, Eigen::Vector3d goal, double buff, double v, bool& can_reach_goal);
 private:
 
 	double inf_; // Infinity definition
@@ -65,7 +67,7 @@ private:
 	bool debug_, can_reach_goal_, corridor_free_;
 	int down_sample_, num_of_partitions_, goal_index_, collision_counter_, collision_counter_corridor_;
 
-	double spinup_time_, heading_, j_max_, a_max_, t0_, t_;
+	double spinup_time_, heading_, j_max_, a_max_, t0_;
 	int quad_status_;
 	acl_system::QuadState state_;
 	acl_system::QuadFlightEvent quad_event_;
@@ -79,6 +81,8 @@ private:
 	// geometry_msgs::PoseArray goal_points;
 	nav_msgs::Path goal_points_;
 
+	// // // // //
+
 	acl_system::QuadGoal quad_goal_;
 
 	// Weird initialization
@@ -91,8 +95,19 @@ private:
 	// Note the last entry is always zero
 	std::vector<double> j_{std::vector<double>(4,0)};
 
-	Eigen::Matrix4d X0_;
+	Eigen::Matrix4d X0_; // [x0; v0; a0; j0]
 	Eigen::Matrix4d Y0_;
+	Eigen::Matrix4d X_;
+
+	Eigen::MatrixXd Xc_; 
+
+	Eigen::Vector3d x_;
+	Eigen::Vector3d y_;
+
+	double vfx_, vfy_, t_, dt_, T_, r_, theta_, d_theta_, d_min_, tx_, ty_;
+	double theta_1_, theta_2_;
+	int index1_, index2_ ;
+	double max_angle_, min_angle_, d_angle_;
 
 	//## Logging and Debugging Functions
 	void find_inter_goal();

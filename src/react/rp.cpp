@@ -85,7 +85,9 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 
 	else if (quad_status_ == state_.GO){
 		t_ = ros::Time::now().toSec() - t0_;
-		eval_trajectory(quad_goal_,X0_,Y0_,t_x_,t_y_,t_);
+
+		// Need to convert to quad_goal_!!!
+		eval_trajectory(Xc_,X0_,Y0_,t_x_,t_y_,t_);
 	}
 
 	quad_goal_.header.stamp = ros::Time::now();
@@ -167,9 +169,9 @@ void REACT::eventCB(const acl_system::QuadFlightEvent& msg)
 
 }
 
-void REACT::find_times(std::vector<double>& t, Eigen::Matrix4d& X0, std::vector<double> x, double vf){
-	double j_temp = copysign(j_max_,vf-x[1]);
-	double vfp = x[1] + pow(x[2],2)/(2*j_temp);
+void REACT::find_times(std::vector<double>& t, Eigen::Matrix4d& X0, Eigen::Vector3d x, double vf){
+	double j_temp = copysign(j_max_,vf-x(1));
+	double vfp = x(1) + pow(x(2),2)/(2*j_temp);
 
 	if (std::abs(vfp-vf) < 0.05){
 		j_[0] = -j_temp;
@@ -177,24 +179,24 @@ void REACT::find_times(std::vector<double>& t, Eigen::Matrix4d& X0, std::vector<
 		j_[1] = 0;
 		j_[2] = 0;
 
-		t[0] = -x[2]/j_[0];
+		t[0] = -x(2)/j_[0];
 		// No 2nd and 3rd stage
 		t[1] = 0;
 		t[2] = 0;
 
-		v0_[0] = x[1];
+		v0_[0] = x(1);
 		// No 2nd and 3rd stage
 		v0_[1] = 0;
 		v0_[2] = 0;
 		v0_[3] = vf;
 
-		x0_[0] = x[0];
+		x0_[0] = x(0);
 		// No 2nd and 3rd stage
 		x0_[1] = 0;
 		x0_[2] = 0;
 		x0_[3] = x0_[1] + v0_[0]*t[0];
 
-		a0_[0] = x[2];
+		a0_[0] = x(2);
 		// No 2nd and 3rd stage
 		a0_[1] = 0;
 		a0_[2] = 0;
@@ -206,63 +208,67 @@ void REACT::find_times(std::vector<double>& t, Eigen::Matrix4d& X0, std::vector<
 		j_[1] = 0;
 		j_[2] = -j_temp;
 
-		double t1 = -x[2]/j_temp + std::sqrt(0.5*pow(x[2],2) - j_temp*(x0_[1]-vf))/j_temp;
-		double t2 = -x[2]/j_temp - std::sqrt(0.5*pow(x[2],2) - j_temp*(x0_[1]-vf))/j_temp;
+		double t1 = -x(2)/j_temp + std::sqrt(0.5*pow(x(2),2) - j_temp*(x(1)-vf))/j_temp;
+		double t2 = -x(2)/j_temp - std::sqrt(0.5*pow(x(2),2) - j_temp*(x(1)-vf))/j_temp;
 
 		t1 = std::max(t1,t2);
 
 		// Check to see if we'll saturate
-		double a1f = x[2] + j_max_*t1;
+		double a1f = x(2) + j_max_*t1;
 
 		if (std::abs(a1f) > a_max_){
 			double am = copysign(a_max_,j_temp);
-			t[0] = (am-x[2])/j_[0];
+			t[0] = (am-x(2))/j_[0];
 			t[2] = -am/j_[2];
 
-			a0_[0] = x[2];
+			a0_[0] = x(2);
 			a0_[1] = a0_[0] + j_[0]*t[0];
 			a0_[2] = am;
 			a0_[3] = 0;
 
-			v0_[0] = x[1];
-			v0_[1] = v0_[1] + a0_[0]*t[0] + 0.5*j_[0]*pow(t[0],2);	
+			v0_[0] = x(1);
+			v0_[1] = v0_[0] + a0_[0]*t[0] + 0.5*j_[0]*pow(t[0],2);	
 			v0_[2] = vf - am*t[2] - 0.5*j_[2]*pow(t[0],2);
 			v0_[3] = vf;
 
-			t[1] = (v0_[2]-v0_[1])/am;			
+			t[1] = (v0_[2]-v0_[1])/am;		
 
-			x0_[0] = x[0];
+			x0_[0] = x(0);
 			x0_[1] = x0_[0] + v0_[0]*t[0] + 0.5*a0_[0]*pow(t[0],2) + 1./6*j_[0]*pow(t[0],3);
 			x0_[2] = x0_[1] + v0_[1]*t[1] + 0.5*am*pow(t[1],2) ;
 			x0_[3] = x0_[2] + v0_[2]*t[2] + 0.5*am*pow(t[2],2) + 1./6*j_[2]*pow(t[2],3);
 
 		}
 		else{
+
+			std::cout << t1 << std::endl;
 			j_[0] = j_temp;
 			j_[1] = 0; // No second phase
 			j_[2] = -j_temp;
 
 			t[0] = t1;
 			t[1] = 0; // No second phase
-			t[2] = -(x[2]+j_[0]*t1)/j_[2];
+			t[2] = -(x(2)+j_[0]*t1)/j_[2];
 
-			a0_[0] = x[2];
+			a0_[0] = x(2);
 			a0_[1] = 0; // No second phase
 			a0_[2] = a0_[0] + j_[0]*t[0];
 			a0_[3] = 0;
 
-			v0_[0] = x[1];
+			v0_[0] = x(1);
 			v0_[1] = 0; // No second phase
 			v0_[2] = v0_[0] + a0_[0]*t[0] + 0.5*j_[0]*pow(t[0],2);
 			v0_[3] = vf;		
 
-			x0_[0] = x[0];
+			x0_[0] = x(0);
 			x0_[1] = 0; // No second phase
 			x0_[2] = x0_[0] + v0_[0]*t[0] + 0.5*a0_[0]*pow(t[0],2) + 1./6*j_[0]*pow(t[0],3);
 			x0_[3] = x0_[2] + v0_[2]*t[2] + 0.5*a0_[2]*pow(t[2],2) + 1./6*j_[2]*pow(t[2],3);
 
 		}
 	}
+
+	// std::cout << v0_[1] << std::endl;
 
 	X0.row(0) << x0_[0],x0_[1],x0_[2],x0_[3];
 	X0.row(1) << v0_[0],v0_[1],v0_[2],v0_[3];
@@ -271,50 +277,52 @@ void REACT::find_times(std::vector<double>& t, Eigen::Matrix4d& X0, std::vector<
 }
 
 
-void REACT::eval_trajectory(acl_system::QuadGoal& goal, Eigen::Matrix4d X0, Eigen::Matrix4d Y0, std::vector<double> t_x, std::vector<double> t_y, double t){
+void REACT::eval_trajectory(Eigen::MatrixXd& Xc, Eigen::Matrix4d X0, Eigen::Matrix4d Y0, std::vector<double> t_x, std::vector<double> t_y, double t){
 	// Eval x trajectory
 	int k = 0;
 	if (t < t_x[0]){
 		k = 0;
+		tx_ = t;
 	}
 	else if (t < t_x[0]+t_x[1]){
-		t -= t_x[0];
+		tx_ = t - t_x[0];
 		k = 1;
 	}
 	else if (t < t_x[0]+t_x[1]+t_x[2]){
-		t -= (t_x[0]+t_x[1]);
+		tx_ = t - (t_x[0]+t_x[1]);
 		k = 2;
 	}
 	else{
-		t -= (t_x[0]+t_x[1]+t_x[2]);
+		tx_ = t - (t_x[0]+t_x[1]+t_x[2]);
 		k = 3;
 	}
 
 	// Eval y trajectory
 	int l = 0;
 	if (t < t_y[0]){
+		ty_ = t;
 		l = 0;
 	}
 	else if (t < t_y[0]+t_y[1]){
-		t -= t_y[0];
+		ty_ = t - t_y[0];
 		l = 1;
 	}
 	else if (t < t_y[0]+t_y[1]+t_y[2]){
-		t -= (t_y[0]+t_y[1]);
+		ty_ = t - (t_y[0]+t_y[1]);
 		l = 2;
 	}
 	else{
-		t -= (t_y[0]+t_y[1]+t_y[2]);
+		ty_ = t - (t_y[0]+t_y[1]+t_y[2]);
 		l = 3;
 	}
 
-	goal.pos.x = X0(0,k) + X0(1,k)*t + 0.5*X0(2,k)*pow(t,2) + 1.0/6.0*X0(3,k)*pow(t,3);
-	goal.vel.x = X0(1,k) + X0(2,k)*t + 0.5*X0(3,k)*pow(t,2);
-	goal.accel.x = X0(2,k) + X0(3,k)*t;
+	Xc(0,0) = X0(0,k) + X0(1,k)*tx_ + 0.5*X0(2,k)*pow(tx_,2) + 1.0/6.0*X0(3,k)*pow(tx_,3);
+	Xc(1,0) = 			X0(1,k)   +     X0(2,k)*tx_        +     0.5*X0(3,k)*pow(tx_,2);
+	Xc(2,0) = 					        X0(2,k)          +         X0(3,k)*tx_;
 
-	goal.pos.y = Y0(0,l) + Y0(1,l)*t + 0.5*Y0(2,l)*pow(t,2) + 1.0/6.0*Y0(3,l)*pow(t,3);
-	goal.vel.y = Y0(1,l) + Y0(2,l)*t + 0.5*Y0(3,l)*pow(t,2);
-	goal.accel.y = Y0(2,l) + Y0(3,l)*t;
+	Xc(0,1) = Y0(0,l) + Y0(1,l)*ty_ + 0.5*Y0(2,l)*pow(ty_,2) + 1.0/6.0*Y0(3,l)*pow(ty_,3);
+	Xc(1,1) = Y0(1,l) + Y0(2,l)*ty_ + 0.5*Y0(3,l)*pow(ty_,2);
+	Xc(2,1) = Y0(2,l) + Y0(3,l)*ty_;
 }
 
 
@@ -341,7 +349,7 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
  }
 
 // We might not need this...
- void REACT::scan2Eig(const sensor_msgs::LaserScan msg, Eigen::MatrixXd scan){
+ void REACT::scan2Eig(const sensor_msgs::LaserScan msg, Eigen::MatrixXd& scan ){
  	angle_max_ = msg.angle_max;
 	angle_min_ = msg.angle_min;
 	angle_increment_ = msg.angle_increment;
@@ -356,7 +364,175 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
 		scan(1,i) = msg.ranges[i];
 	}
 }
+
+ void REACT::scan2Vec(const sensor_msgs::LaserScan msg, std::vector<double>& scan){
+ 	angle_max_ = msg.angle_max;
+	angle_min_ = msg.angle_min;
+	angle_increment_ = msg.angle_increment;
+
+	num_samples_ = (int) std::floor((angle_max_ - angle_min_) / angle_increment_ );
+
+	// scan.push_back(msg.ranges);
+
+	// Seems really inefficient
+	for (int i=0;i<num_samples_;i++){
+		scan.push_back(msg.ranges[i]);
+	}
+}
+
+void REACT::collision_check(Eigen::MatrixXd X, Eigen::MatrixXd scan, Eigen::Vector3d goal, double buff, double v, bool& can_reach_goal){
+	// Find angle to goal
+
+	angle_2_goal_ = atan2( goal(1) - X(0,1), goal(0) - X(0,0));
+	vfx_ = v*cos(angle_2_goal_);
+	vfy_ = v*sin(angle_2_goal_);
+
+	x_ << X.col(0);
+	y_ << X.col(1);
+
+	find_times(t_x_, X0_, x_, vfx_);
+	find_times(t_y_, Y0_, y_, vfy_);
+
+	t_ = 0;
+	dt_ = 0.01;
+	collision_counter_ = 0;
+	T_ = 1;
+
+	int num = (int) T_/dt_;
+
+	max_angle_ = scan.row(0).maxCoeff();
+	min_angle_ = scan.row(0).minCoeff();
+	d_angle_ = scan(0,1)-scan(0,0);
+
+
+	Xc_ = X;
+
+	for(int i=0; i<num; i++){
+		eval_trajectory(Xc_,X0_,Y0_,t_x_,t_y_,t_);
+
+		// These need to be in body frame
+		r_ = sqrt(pow(Xc_(0,0)-X(0,0),2) + pow(Xc_(0,1)-X(0,1),2));
+		theta_ = atan2(Xc_(0,1)-X(0,1),Xc_(0,0)-X(0,0)) - heading_;
+
+		if (r_ > 2*buff){
+			d_theta_ = sin(buff/r_);
+		}
+		else{
+			d_theta_ = PI/2;
+		}
+
+		theta_1_ = theta_ - d_theta_;
+		theta_2_ = theta_ + d_theta_;
+
+
+		// Make sure they're in bounds
+		saturate(theta_1_,min_angle_, max_angle_);
+		saturate(theta_2_,min_angle_, max_angle_);
+
+		index1_ = (int) std::floor((theta_1_ - min_angle_)/d_angle_);
+		index2_ = (int) std::floor((theta_2_ - min_angle_)/d_angle_);
+
+
+		d_min_ = scan.block(1,index1_,1,index2_-index1_).minCoeff();
+
+		if (r_ > d_min_){
+			collision_counter_++;
+		}
+
+		t_+=dt_;
+
+		if (collision_counter_ > 9){
+			break;
+		}
+	}
+
+	if (collision_counter_ < 9) {
+		can_reach_goal = true;
+	}
+	else {
+		can_reach_goal = false;
+	}
+}
+
+// Use this one
+void REACT::collision_check2(Eigen::MatrixXd X, std::vector<double> scan, Eigen::Vector3d goal, double buff, double v, bool& can_reach_goal){
+	// Find angle to goal
+
+	angle_2_goal_ = atan2( goal(1) - X(0,1), goal(0) - X(0,0));
+	vfx_ = v*cos(angle_2_goal_);
+	vfy_ = v*sin(angle_2_goal_);
+
+	x_ << X.col(0);
+	y_ << X.col(1);
+
+	find_times(t_x_, X0_, x_, vfx_);
+	find_times(t_y_, Y0_, y_, vfy_);
+
+	t_ = 0;
+	dt_ = 0.01;
+	collision_counter_ = 0;
+	T_ = 1;
+
+	int num = (int) T_/dt_;
+
+
+	// These should not be hard-coded
+	max_angle_ = 2;
+	min_angle_ = -2;
+	d_angle_ = 0.00628;
+
+	Xc_ = X;
+
+	for(int i=0; i<num; i++){
+		eval_trajectory(Xc_,X0_,Y0_,t_x_,t_y_,t_);
+
+		// These need to be in body frame
+		r_ = sqrt(pow(Xc_(0,0)-X(0,0),2) + pow(Xc_(0,1)-X(0,1),2));
+		theta_ = atan2(Xc_(0,1)-X(0,1),Xc_(0,0)-X(0,0)) - heading_;
+
+		if (r_ > buff){
+			d_theta_ = sin(buff/r_);
+		}
+		else{
+			d_theta_ = PI/2;
+		}
+
+		theta_1_ = theta_ - d_theta_;
+		theta_2_ = theta_ + d_theta_;
+
+		// Make sure they're in bounds
+		saturate(theta_1_,min_angle_, max_angle_);
+		saturate(theta_2_,min_angle_, max_angle_);
+
+		index1_ = (int) std::floor((theta_1_ - min_angle_)/d_angle_);
+		index2_ = (int) std::floor((theta_2_ - min_angle_)/d_angle_)-10;
+
+		// Find min distance in this angle range
+		d_min_ = *std::min_element(scan.begin()+index1_,scan.begin()+index2_);
+
+		if (r_ > d_min_){
+			collision_counter_++;
+		}
+
+		if (collision_counter_ > 9){
+			break;
+		}
+
+		t_+=dt_;
+	}
+
+	if (collision_counter_ < 9) {
+		can_reach_goal = true;
+	}
+	else {
+		can_reach_goal = false;
+	}
+}
  
+
+
+
+ // ####### Old code #######
 
 void REACT::check_goal(const sensor_msgs::LaserScan& msg)
 {
@@ -409,6 +585,87 @@ void REACT::check_goal(const sensor_msgs::LaserScan& msg)
 	std::cout << "Can reach goal: " << can_reach_goal_ << std::endl;
 }
 
+
+void REACT::partition_scan(const sensor_msgs::LaserScan& msg){
+	std::cout << "Partioning scan" << std::endl;
+
+	// geometry_msgs::PoseArray goal_points;
+
+	goal_points_.header.stamp = ros::Time::now();
+	goal_points_.header.frame_id = "vicon";
+
+	goal_points_.poses.clear();
+
+ 	// screenPrint();
+
+ 	int j = 0;
+ 	double sum = 0;
+
+ 	std::vector<double> r;
+ 	std::vector<double> r_temp;
+ 	std::vector<double> angle;
+ 	std::vector<double> angle_temp;
+ 
+ 	num_of_partitions_ = 0;
+
+ 	filtered_scan_ = msg;
+ 	filtered_scan_.range_max = 1.1*msg.range_max;
+
+ 	geometry_msgs::PoseStamped temp;
+
+    for (int i=0; i < num_samples_; i++){
+    	if (isinf(filtered_scan_.ranges[i]) || isnan(filtered_scan_.ranges[i]) ){
+    		filtered_scan_.ranges[i] = msg.range_max;
+    	}
+
+    	if (isinf(filtered_scan_.ranges[i+1]) || isnan(filtered_scan_.ranges[i+1])){
+    		filtered_scan_.ranges[i+1] = msg.range_max;
+    	}
+
+    	if (std::abs(filtered_scan_.ranges[i+1]-filtered_scan_.ranges[j]) < thresh_){
+    			sum += filtered_scan_.ranges[i+1];  
+    	}
+    	else{
+    		if ((i-j)>10){
+
+    			// Convert angle segment incerement to index
+    			double angle_2_index = angle_seg_inc_/angle_increment_;
+
+    			// Probably a better way to do this...
+    			if (double((i-j))/(3*angle_2_index) < 1) num_of_partitions_ = 1;
+    			if (double((i-j))/(3*angle_2_index) > 1) num_of_partitions_ = 3;
+    			if (double((i-j))/(5*angle_2_index) > 1) num_of_partitions_ = 5;
+    			if (double((i-j))/(7*angle_2_index) > 1) num_of_partitions_ = 7;
+    			if (double((i-j))/(9*angle_2_index) > 1) num_of_partitions_ = 9;
+    			if (double((i-j))/(11*angle_2_index) > 1) num_of_partitions_ = 11;
+
+    			for (int k=0; k < num_of_partitions_; k++){
+    				r_temp.push_back(sum/(i-j));
+		    		angle_temp.push_back(filtered_scan_.angle_min + filtered_scan_.angle_increment*((i+j)/2 + (k-(num_of_partitions_-1)/2)*angle_2_index) + yaw_);
+    			}
+    		}
+
+    			sum = 0;
+    			j = i+1;   			
+		}
+	}
+
+	for (int i = 0; i < r_temp.size(); i++){
+		if (r_temp[i] > safe_distance_){
+			r.push_back(r_temp[i]);
+			angle.push_back(angle_temp[i]);
+
+			temp.pose.position.x = r[num_of_partitions_]*cos(angle[num_of_partitions_]) + pose_.getX();
+			temp.pose.position.y = r[num_of_partitions_]*sin(angle[num_of_partitions_]) + pose_.getY();
+			temp.pose.position.z = goal_.point.z;
+			temp.header.seq = num_of_partitions_;
+			goal_points_.poses.push_back(temp);
+			num_of_partitions_+=1;
+		}
+	}
+	
+	int_goal_pub.publish(goal_points_);
+}
 
 void REACT::find_inter_goal(){
  	// Re-initialize cost
@@ -559,87 +816,6 @@ void REACT::find_inter_goal(){
 	std::cout << "Latency: " << ros::Time::now().toSec() - msg_received_ << std::endl;
  }
 
-
-void REACT::partition_scan(const sensor_msgs::LaserScan& msg){
-	std::cout << "Partioning scan" << std::endl;
-
-	// geometry_msgs::PoseArray goal_points;
-
-	goal_points_.header.stamp = ros::Time::now();
-	goal_points_.header.frame_id = "vicon";
-
-	goal_points_.poses.clear();
-
- 	// screenPrint();
-
- 	int j = 0;
- 	double sum = 0;
-
- 	std::vector<double> r;
- 	std::vector<double> r_temp;
- 	std::vector<double> angle;
- 	std::vector<double> angle_temp;
- 
- 	num_of_partitions_ = 0;
-
- 	filtered_scan_ = msg;
- 	filtered_scan_.range_max = 1.1*msg.range_max;
-
- 	geometry_msgs::PoseStamped temp;
-
-    for (int i=0; i < num_samples_; i++){
-    	if (isinf(filtered_scan_.ranges[i]) || isnan(filtered_scan_.ranges[i]) ){
-    		filtered_scan_.ranges[i] = msg.range_max;
-    	}
-
-    	if (isinf(filtered_scan_.ranges[i+1]) || isnan(filtered_scan_.ranges[i+1])){
-    		filtered_scan_.ranges[i+1] = msg.range_max;
-    	}
-
-    	if (std::abs(filtered_scan_.ranges[i+1]-filtered_scan_.ranges[j]) < thresh_){
-    			sum += filtered_scan_.ranges[i+1];  
-    	}
-    	else{
-    		if ((i-j)>10){
-
-    			// Convert angle segment incerement to index
-    			double angle_2_index = angle_seg_inc_/angle_increment_;
-
-    			// Probably a better way to do this...
-    			if (double((i-j))/(3*angle_2_index) < 1) num_of_partitions_ = 1;
-    			if (double((i-j))/(3*angle_2_index) > 1) num_of_partitions_ = 3;
-    			if (double((i-j))/(5*angle_2_index) > 1) num_of_partitions_ = 5;
-    			if (double((i-j))/(7*angle_2_index) > 1) num_of_partitions_ = 7;
-    			if (double((i-j))/(9*angle_2_index) > 1) num_of_partitions_ = 9;
-    			if (double((i-j))/(11*angle_2_index) > 1) num_of_partitions_ = 11;
-
-    			for (int k=0; k < num_of_partitions_; k++){
-    				r_temp.push_back(sum/(i-j));
-		    		angle_temp.push_back(filtered_scan_.angle_min + filtered_scan_.angle_increment*((i+j)/2 + (k-(num_of_partitions_-1)/2)*angle_2_index) + yaw_);
-    			}
-    		}
-
-    			sum = 0;
-    			j = i+1;   			
-		}
-	}
-
-	for (int i = 0; i < r_temp.size(); i++){
-		if (r_temp[i] > safe_distance_){
-			r.push_back(r_temp[i]);
-			angle.push_back(angle_temp[i]);
-
-			temp.pose.position.x = r[num_of_partitions_]*cos(angle[num_of_partitions_]) + pose_.getX();
-			temp.pose.position.y = r[num_of_partitions_]*sin(angle[num_of_partitions_]) + pose_.getY();
-			temp.pose.position.z = goal_.point.z;
-			temp.header.seq = num_of_partitions_;
-			goal_points_.poses.push_back(temp);
-			num_of_partitions_+=1;
-		}
-	}
-	
-	int_goal_pub.publish(goal_points_);
-}
 
 
 void REACT::vis_better_scan(const sensor_msgs::LaserScan& msg)
