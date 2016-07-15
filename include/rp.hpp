@@ -51,13 +51,14 @@ public:
 	void sendGoal(const ros::TimerEvent&);
 
 	// Make these private after testing
-	void partition_scan(Eigen::MatrixXd scan, Eigen::MatrixXd& Goals,int& partition);
+	void sort_clusters(Eigen::Vector3d last_goal, Eigen::MatrixXd Goals, Eigen::MatrixXd Sorted_Goals);
+
+	void partition_scan(Eigen::MatrixXd scan, Eigen::MatrixXd& Goals,int& partition, Eigen::Vector3d pose);
 	void saturate(double &var, double min, double max);
 	void find_times(std::vector<double>& t, Eigen::Matrix4d& X0, Eigen::Vector3d x, double vf);
 	void eval_trajectory(Eigen::MatrixXd& Xc, Eigen::Matrix4d X0, Eigen::Matrix4d Y0, std::vector<double> t_x, std::vector<double> t_y, double t);
-	void scan2Eig(const sensor_msgs::LaserScan msg, Eigen::MatrixXd& scan);
 	void collision_check2(Eigen::MatrixXd X, std::vector<double> scan, Eigen::Vector3d goal, double buff, double v, bool& can_reach_goal);
-	void scan2Vec(const sensor_msgs::LaserScan msg, std::vector<double>& scan);
+	void convert_scan(const sensor_msgs::LaserScan msg, Eigen::MatrixXd& scanE , std::vector<double>& scanV );
 	void collision_check(Eigen::MatrixXd X, Eigen::MatrixXd scan, Eigen::Vector3d goal, double buff, double v, bool& can_reach_goal);
 private:
 
@@ -76,8 +77,6 @@ private:
 
 	std::ostringstream errorMsg, warnMsg;
 
-	tf::Vector3 pose_, next_goal_v_, last_goal_v_;
-	geometry_msgs::PointStamped goal_, new_goal_, last_goal_;
 	sensor_msgs::LaserScan filtered_scan_;
 	// geometry_msgs::PoseArray goal_points;
 	nav_msgs::Path goal_points_;
@@ -96,22 +95,34 @@ private:
 	// Note the last entry is always zero
 	std::vector<double> j_{std::vector<double>(4,0)};
 
+	std::vector<double> scanV_;
+
+	std::priority_queue<double, std::vector<double>, std::greater<double> > cost_queue_;
+
+
 	Eigen::Matrix4d X0_; // [x0; v0; a0; j0]
 	Eigen::Matrix4d Y0_;
 	Eigen::Matrix4d X_;
 
 	Eigen::MatrixXd Xc_; 
+	Eigen::MatrixXd scanE_;
+	Eigen::MatrixXd Goals_;
+	Eigen::MatrixXd Sorted_Goals_;
 
 	Eigen::Vector3d x_;
 	Eigen::Vector3d y_;
+	Eigen::Vector3d goal_;
+	Eigen::Vector3d last_goal_;
+	Eigen::Vector3d pose_;
+
+
 
 	double vfx_, vfy_, t_, dt_, T_, r_, theta_, d_theta_, d_min_, tx_, ty_;
 	double theta_1_, theta_2_;
-	int index1_, index2_ ;
+	int index1_, index2_, partition_ ;
 	double max_angle_, min_angle_, d_angle_;
 
 	//## Logging and Debugging Functions
-	void find_inter_goal();
 
 	void takeoff();
 	void land();

@@ -2,7 +2,6 @@
 
 REACT::REACT(){
 
-	pose_.setZero();
 
 	// Should be read as param
 	ros::param::get("~thresh",thresh_);
@@ -11,22 +10,17 @@ REACT::REACT(){
 	ros::param::get("~safe_distance",safe_distance_);
 	ros::param::get("~buffer",buffer_);
 
-	goal_.header.stamp = ros::Time::now();
-	goal_.header.frame_id = "vicon";
+	last_goal_ = Eigen::Vector3d::Zero();
+	pose_= Eigen::Vector3d::Zero();
+	goal_ = Eigen::Vector3d::Zero();
 
-	ros::param::get("~goal_x",goal_.point.x);
-	ros::param::get("~goal_y",goal_.point.y);
-	ros::param::get("~goal_z",goal_.point.z);
+	ros::param::get("~goal_x",goal_(0));
+	ros::param::get("~goal_y",goal_(1));
+	ros::param::get("~goal_z",goal_(2));
 
 	ros::param::get("cntrl/spinup_time",spinup_time_);
 
 	ros::param::get("~heading",heading_);
-
-	last_goal_.header.stamp = ros::Time::now();
-	last_goal_.header.frame_id = "vicon";
-	last_goal_.point.x = goal_.point.x;
-	last_goal_.point.y = goal_.point.y;
-	last_goal_.point.z = goal_.point.z;
 
 	// Should be params
 	j_max_ = 30;
@@ -50,16 +44,19 @@ REACT::REACT(){
 }
 
 void REACT::global_goalCB(const geometry_msgs::PointStamped& msg){
-	goal_ = msg;
+	goal_(0) = msg.point.x;
+	goal_(1) = msg.point.y;
+	goal_(2) = msg.point.z;
+
 }
 
 void REACT::stateCB(const acl_system::ViconState& msg)
 {
 	// TODO time check.
 	if (msg.has_pose) {
-		pose_.setX(msg.pose.position.x);
-		pose_.setY(msg.pose.position.y);
-		pose_.setZ(msg.pose.position.z);	
+		pose_(0) = msg.pose.position.x;
+		pose_(1) = msg.pose.position.y;
+		pose_(2) = msg.pose.position.z;
 
 		yaw_ = tf::getYaw(msg.pose.orientation);
 	} 
@@ -70,7 +67,7 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 {
 	if (quad_status_== state_.TAKEOFF){
 		takeoff();
-		if (quad_goal_.pos.z == goal_.point.z){
+		if (quad_goal_.pos.z == goal_(2)){
 			quad_status_ = state_.FLYING;
 		}
 	}
@@ -98,18 +95,18 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 
 void REACT::takeoff(){
 	quad_goal_.pos.z+=0.003;
-	saturate(quad_goal_.pos.z,-0.1,goal_.point.z);
+	saturate(quad_goal_.pos.z,-0.1,goal_(2));
 }
 
 
 void REACT::land(){
 	if (quad_goal_.pos.z > 0.4){
 		quad_goal_.pos.z-=0.003;
-		saturate(quad_goal_.pos.z,-0.1,goal_.point.z);
+		saturate(quad_goal_.pos.z,-0.1,goal_(2));
 	}
 	else{
 		quad_goal_.pos.z-=0.001;
-		saturate(quad_goal_.pos.z,-0.1,goal_.point.z);
+		saturate(quad_goal_.pos.z,-0.1,goal_(2));
 	}
 }
 
@@ -124,9 +121,9 @@ void REACT::eventCB(const acl_system::QuadFlightEvent& msg)
 
 
 		quad_status_ = state_.TAKEOFF; 
-		quad_goal_.pos.x = pose_.getX();
-		quad_goal_.pos.y = pose_.getY();
-		quad_goal_.pos.z = pose_.getZ();
+		quad_goal_.pos.x = pose_(0);
+		quad_goal_.pos.y = pose_(1);
+		quad_goal_.pos.z = pose_(2);
 
 		quad_goal_.vel.x = 0;
 		quad_goal_.vel.y = 0;
@@ -240,8 +237,6 @@ void REACT::find_times(std::vector<double>& t, Eigen::Matrix4d& X0, Eigen::Vecto
 
 		}
 		else{
-
-			std::cout << t1 << std::endl;
 			j_[0] = j_temp;
 			j_[1] = 0; // No second phase
 			j_[2] = -j_temp;
@@ -264,11 +259,8 @@ void REACT::find_times(std::vector<double>& t, Eigen::Matrix4d& X0, Eigen::Vecto
 			x0_[1] = 0; // No second phase
 			x0_[2] = x0_[0] + v0_[0]*t[0] + 0.5*a0_[0]*pow(t[0],2) + 1./6*j_[0]*pow(t[0],3);
 			x0_[3] = x0_[2] + v0_[2]*t[2] + 0.5*a0_[2]*pow(t[2],2) + 1./6*j_[2]*pow(t[2],3);
-
 		}
 	}
-
-	// std::cout << v0_[1] << std::endl;
 
 	X0.row(0) << x0_[0],x0_[1],x0_[2],x0_[3];
 	X0.row(1) << v0_[0],v0_[1],v0_[2],v0_[3];
@@ -329,6 +321,11 @@ void REACT::eval_trajectory(Eigen::MatrixXd& Xc, Eigen::Matrix4d X0, Eigen::Matr
 
 void REACT::scanCB(const sensor_msgs::LaserScan& msg)
  {
+ 	msg_received_ = ros::Time::now().toSec();
+ 	convert_scan(msg, scanE_, scanV_);
+ 	partition_scan(scanE_, Goals_, partition_, pose_);
+ 	// sort clusters
+
  	// if (debug_){
  	// 	vis_better_scan(msg);
  	// }
@@ -349,36 +346,23 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
  }
 
 // We might not need this...
- void REACT::scan2Eig(const sensor_msgs::LaserScan msg, Eigen::MatrixXd& scan ){
+ void REACT::convert_scan(const sensor_msgs::LaserScan msg, Eigen::MatrixXd& scanE , std::vector<double>& scanV ){
  	angle_max_ = msg.angle_max;
 	angle_min_ = msg.angle_min;
 	angle_increment_ = msg.angle_increment;
 
 	num_samples_ = (int) std::floor((angle_max_ - angle_min_) / angle_increment_ );
 
-	scan.resize(2,num_samples_);
+	scanE.resize(2,num_samples_);
 
 	// Seems really inefficient
 	for (int i=0;i<num_samples_;i++){
-		scan(0,i) = angle_min_ + i*angle_increment_;
-		scan(1,i) = msg.ranges[i];
+		scanE(0,i) = angle_min_ + i*angle_increment_;
+		scanE(1,i) = msg.ranges[i];
+		scanV.push_back(msg.ranges[i]);
 	}
 }
 
- void REACT::scan2Vec(const sensor_msgs::LaserScan msg, std::vector<double>& scan){
- 	angle_max_ = msg.angle_max;
-	angle_min_ = msg.angle_min;
-	angle_increment_ = msg.angle_increment;
-
-	num_samples_ = (int) std::floor((angle_max_ - angle_min_) / angle_increment_ );
-
-	// scan.push_back(msg.ranges);
-
-	// Seems really inefficient
-	for (int i=0;i<num_samples_;i++){
-		scan.push_back(msg.ranges[i]);
-	}
-}
 
 void REACT::collision_check(Eigen::MatrixXd X, Eigen::MatrixXd scan, Eigen::Vector3d goal, double buff, double v, bool& can_reach_goal){
 	// Find angle to goal
@@ -468,12 +452,13 @@ void REACT::collision_check2(Eigen::MatrixXd X, std::vector<double> scan, Eigen:
 	find_times(t_y_, Y0_, y_, vfy_);
 
 	t_ = 0;
-	dt_ = 0.01;
+	dt_ = 0.1;
 	collision_counter_ = 0;
 	double t1 = t_x_[0] + t_x_[1] + t_x_[2];
 	double t2 = t_y_[0] + t_y_[1] + t_y_[2];
 
-	T_ = std::max(t1,t2);
+	// T_ = std::max(t1,t2);
+	T_ = 1;
 
 	int num = (int) T_/dt_;
 
@@ -484,6 +469,12 @@ void REACT::collision_check2(Eigen::MatrixXd X, std::vector<double> scan, Eigen:
 	d_angle_ = 0.00628;
 
 	Xc_ = X;
+
+	// // Find closest obstacle to me
+	// d_min_ = *std::min_element(scan.begin(),scan.begin());
+	// std::cout << "closest obstacle: " << d_min_ << std::endl;
+
+	// No need to do collision checking until 
 
 	for(int i=0; i<num; i++){
 		eval_trajectory(Xc_,X0_,Y0_,t_x_,t_y_,t_);
@@ -497,6 +488,8 @@ void REACT::collision_check2(Eigen::MatrixXd X, std::vector<double> scan, Eigen:
 		}
 		else{
 			d_theta_ = PI/2;
+			// Buffer is bigger dimension, check against that
+			r_ = buff;
 		}
 
 		theta_1_ = theta_ - d_theta_;
@@ -508,8 +501,6 @@ void REACT::collision_check2(Eigen::MatrixXd X, std::vector<double> scan, Eigen:
 
 		index1_ = (int) std::floor((theta_1_ - min_angle_)/d_angle_);
 		index2_ = (int) std::floor((theta_2_ - min_angle_)/d_angle_);
-
-		
 
 		// Find min distance in this angle range
 		d_min_ = *std::min_element(scan.begin()+index1_,scan.begin()+index2_);
@@ -525,33 +516,6 @@ void REACT::collision_check2(Eigen::MatrixXd X, std::vector<double> scan, Eigen:
 		t_+=dt_;
 	}
 
-	// // Check last point
-	angle_2_goal_ = atan2( goal(1) - X(0,1), goal(0) - X(0,0)) - heading_;
-	double angle_at_xf = atan2( Xc_(0,1) - X(0,1), Xc_(0,0) - X(0,0)) - heading_;
-
-	r_ = sqrt(pow(Xc_(0,0)-goal(0),2) + pow(Xc_(0,1)-goal(1),2));
-
-	theta_1_ = std::min(angle_at_xf, angle_2_goal_);
-	theta_2_ = std::max(angle_at_xf, angle_2_goal_);
-
-	// Make sure they're in bounds
-	saturate(theta_1_,min_angle_, max_angle_);
-	saturate(theta_2_,min_angle_, max_angle_);
-
-	index1_ = (int) std::floor((theta_1_ - min_angle_)/d_angle_);
-	index2_ = (int) std::floor((theta_2_ - min_angle_)/d_angle_);
-
-	for (int i=index1_; i < index2_; i++){
-
-	}
-
-	// d_min_ = *std::min_element(scan.begin()+index1_,scan.begin()+index2_);
-
-
-	// if (r_ > d_min_){
-	// 	collision_counter_+=9;
-	// }
-
 	if (collision_counter_ < 9) {
 		can_reach_goal = true;
 	}
@@ -560,7 +524,7 @@ void REACT::collision_check2(Eigen::MatrixXd X, std::vector<double> scan, Eigen:
 	}
 }
  
-void REACT::partition_scan(Eigen::MatrixXd scan, Eigen::MatrixXd& Goals, int& partition){
+void REACT::partition_scan(Eigen::MatrixXd scan, Eigen::MatrixXd& Goals, int& partition, Eigen::Vector3d pose){
  	int j = 0;
  	double sum = 0;
  	double angle_2_index;
@@ -606,7 +570,7 @@ void REACT::partition_scan(Eigen::MatrixXd scan, Eigen::MatrixXd& Goals, int& pa
 		}
 	}
 
-	Goals = Eigen::MatrixXd::Zero(r_temp.size(),3);
+	Goals = Eigen::MatrixXd::Zero(r_temp.size(),5);
 	int count = 0;
 
 	for (int i = 0; i < r_temp.size(); i++){
@@ -614,9 +578,11 @@ void REACT::partition_scan(Eigen::MatrixXd scan, Eigen::MatrixXd& Goals, int& pa
 			r.push_back(r_temp[i]);
 			angle.push_back(angle_temp[i]);
 
-			Goals(count,0) = r[i]*cos(angle[i]) + pose_.getX();
-			Goals(count,1) = r[i]*sin(angle[i]) + pose_.getY();
-			Goals(count,2) = goal_.point.z;
+			Goals(count,0) = r[i]*cos(angle[i]) + pose(0);
+			Goals(count,1) = r[i]*sin(angle[i]) + pose(1);
+			Goals(count,2) = goal_(3);
+			Goals(count,3) = r[i];
+			Goals(count,4) = angle[i];
 
 			count++;
 		}
@@ -626,289 +592,139 @@ void REACT::partition_scan(Eigen::MatrixXd scan, Eigen::MatrixXd& Goals, int& pa
 }
 
 
- // ####### Old code #######
 
-// void REACT::check_goal(const sensor_msgs::LaserScan& msg)
-// {
-// 	std::cout << "Received scan" << std::endl;
+void REACT::sort_clusters(Eigen::Vector3d last_goal, Eigen::MatrixXd Goals, Eigen::MatrixXd Sorted_Goals){
 
-// 	// Distance to goal
-// 	dist_2_goal_ = sqrt( pow(goal_.point.x-pose_.getX(),2) + pow(goal_.point.y-pose_.getY(),2));
-// 	// Angle to goal in body frame
-// 	angle_2_goal_ = atan2( goal_.point.y - pose_.getY(), goal_.point.x - pose_.getX() ) - yaw_; 
-// 	std::cout << "Distance: " << dist_2_goal_ << " Angle: " << angle_2_goal_ << std::endl;
+ 	// Re-initialize
+	cost_queue_ = std::priority_queue<double, std::vector<double>, std::greater<double> > ();
+	Sorted_Goals = Eigen::MatrixXd::Zero(Goals.rows()+1,Goals.cols()+1);
 
-// 	collision_counter_ = 0;
 
-// 	angle_max_ = msg.angle_max;
-// 	angle_min_ = msg.angle_min;
-// 	angle_increment_ = msg.angle_increment;
-
-// 	num_samples_ = (angle_max_ - angle_min_) / angle_increment_ + 1;
-// 	double sum = 0;
-// 	double temp_range = 0;
-
-// 	int j = (int) ((angle_2_goal_ - angle_min_)/angle_increment_);
-// 	int delta = (int) (angle_check_/angle_increment_) ;
+	// last_goal_v_.setX(last_goal_.point.x - pose_.getX());
+ // 	last_goal_v_.setY(last_goal_.point.y - pose_.getY());
+ // 	last_goal_v_.setZ(last_goal_.point.z - pose_.getZ());
 
-// 	for (int i=j-delta; i < j+delta; i++)
-// 	{
-// 		if(isinf(msg.ranges[i]) || isnan(msg.ranges[i])){
-//     		temp_range = msg.range_max;
-//     	}
-//     	else{
-//     		temp_range = msg.ranges[i];
-//     	}
-// 		sum += temp_range;
-// 		if (dist_2_goal_ > temp_range) collision_counter_+=1;
-// 	}
-
-// 	double r = sum/(2*delta);
-
-
-// 	std::cout << "r: " << r <<std::endl;
-// 	std::cout << "collision counter: " << collision_counter_ << std::endl;
-
-// 	if (r > dist_2_goal_ && collision_counter_ < 10){
-// 		can_reach_goal_ = true;
-// 	}
-// 	else{
-// 		can_reach_goal_ = false;
-// 	}
-
-// 	std::cout << "Can reach goal: " << can_reach_goal_ << std::endl;
-// }
-
-
-// void REACT::partition_scan(const sensor_msgs::LaserScan& msg){
-// 	std::cout << "Partioning scan" << std::endl;
-
-// 	// geometry_msgs::PoseArray goal_points;
-
-// 	goal_points_.header.stamp = ros::Time::now();
-// 	goal_points_.header.frame_id = "vicon";
+ // 	last_goal_v_.normalize();
 
-// 	goal_points_.poses.clear();
+ // 	for (int i=0; i < num_of_partitions_ ; i++){
 
-//  	// screenPrint();
+ // 		next_goal_v_.setX(goal_points_.poses[i].pose.position.x - pose_.getX());
+ // 		next_goal_v_.setY(goal_points_.poses[i].pose.position.y - pose_.getY());
+ // 		next_goal_v_.setZ(goal_points_.poses[i].pose.position.z - pose_.getZ());
 
-//  	int j = 0;
-//  	double sum = 0;
+ // 		next_goal_v_.normalize();
 
-//  	std::vector<double> r;
-//  	std::vector<double> r_temp;
-//  	std::vector<double> angle;
-//  	std::vector<double> angle_temp;
- 
-//  	num_of_partitions_ = 0;
 
-//  	filtered_scan_ = msg;
-//  	filtered_scan_.range_max = 1.1*msg.range_max;
+ // 		double r_i = sqrt(pow(pose_.getX() - goal_points_.poses[i].pose.position.x, 2) + pow( pose_.getY() - goal_points_.poses[i].pose.position.y, 2));
+ // 		double angle_i = atan2 ( goal_points_.poses[i].pose.position.y - pose_.getY(), goal_points_.poses[i].pose.position.x - pose_.getX() ) - yaw_;
+ // 		angle_diff_  =  std::abs(angle_i)  - std::abs(angle_2_goal_ );
 
-//  	geometry_msgs::PoseStamped temp;
+ // 		angle_diff_last_ = next_goal_v_.angle(last_goal_v_);
 
-//     for (int i=0; i < num_samples_; i++){
-//     	if (isinf(filtered_scan_.ranges[i]) || isnan(filtered_scan_.ranges[i]) ){
-//     		filtered_scan_.ranges[i] = msg.range_max;
-//     	}
+ // 		cost_i_ = pow(angle_diff_,2) + pow(angle_diff_last_,2) + pow(1/r_i,2);
 
-//     	if (isinf(filtered_scan_.ranges[i+1]) || isnan(filtered_scan_.ranges[i+1])){
-//     		filtered_scan_.ranges[i+1] = msg.range_max;
-//     	}
-
-//     	if (std::abs(filtered_scan_.ranges[i+1]-filtered_scan_.ranges[j]) < thresh_){
-//     			sum += filtered_scan_.ranges[i+1];  
-//     	}
-//     	else{
-//     		if ((i-j)>10){
+ // 		// std::cout << "i: " << i << " cost_i_: " << cost_i_ << std::endl;
+ // 		// std::cout << "r_i: " << r_i << " angle_i: " << angle_i << " angle_diff: " << angle_diff << " angle_diff_last_: " << angle_diff_last_ << std::endl;
 
-//     			// Convert angle segment incerement to index
-//     			double angle_2_index = angle_seg_inc_/angle_increment_;
+ // 		cost_queue.push(cost_i_);
+ // 		cost_v.push_back(cost_i_);
+ // 		angles.push_back(angle_i);
+ // 		ranges.push_back(r_i);
+ // 	}
 
-//     			// Probably a better way to do this...
-//     			if (double((i-j))/(3*angle_2_index) < 1) num_of_partitions_ = 1;
-//     			if (double((i-j))/(3*angle_2_index) > 1) num_of_partitions_ = 3;
-//     			if (double((i-j))/(5*angle_2_index) > 1) num_of_partitions_ = 5;
-//     			if (double((i-j))/(7*angle_2_index) > 1) num_of_partitions_ = 7;
-//     			if (double((i-j))/(9*angle_2_index) > 1) num_of_partitions_ = 9;
-//     			if (double((i-j))/(11*angle_2_index) > 1) num_of_partitions_ = 11;
-
-//     			for (int k=0; k < num_of_partitions_; k++){
-//     				r_temp.push_back(sum/(i-j));
-// 		    		angle_temp.push_back(filtered_scan_.angle_min + filtered_scan_.angle_increment*((i+j)/2 + (k-(num_of_partitions_-1)/2)*angle_2_index) + yaw_);
-//     			}
-//     		}
-
-//     			sum = 0;
-//     			j = i+1;   			
-// 		}
-// 	}
-
-// 	for (int i = 0; i < r_temp.size(); i++){
-// 		if (r_temp[i] > safe_distance_){
-// 			r.push_back(r_temp[i]);
-// 			angle.push_back(angle_temp[i]);
-
-// 			temp.pose.position.x = r[num_of_partitions_]*cos(angle[num_of_partitions_]) + pose_.getX();
-// 			temp.pose.position.y = r[num_of_partitions_]*sin(angle[num_of_partitions_]) + pose_.getY();
-// 			temp.pose.position.z = goal_.point.z;
-// 			temp.header.seq = num_of_partitions_;
-// 			goal_points_.poses.push_back(temp);
-// 			num_of_partitions_+=1;
-// 		}
-// 	}
-	
-// 	int_goal_pub.publish(goal_points_);
-// }
-
-// void REACT::find_inter_goal(){
-//  	// Re-initialize cost
-//  	std::vector<double> cost_v;
-//  	std::vector<double> angles;
-//  	std::vector<double> ranges;
+ // 	int goal_counter = 0;
 
-//  	corridor_free_ = false;
 
-// 	std::priority_queue<double, std::vector<double>, std::greater<double> > cost_queue;
+ 	// Collision check
+ 	// while (!corridor_free_){
+ 	// 	collision_counter_corridor_ = 0;
 
-// 	last_goal_v_.setX(last_goal_.point.x - pose_.getX());
-//  	last_goal_v_.setY(last_goal_.point.y - pose_.getY());
-//  	last_goal_v_.setZ(last_goal_.point.z - pose_.getZ());
+ 	// 	// Collision scan for debug
+ 	// 	sensor_msgs::LaserScan collision_scan;
+ 	// 	collision_scan.header.stamp = ros::Time::now();
+ 	// 	collision_scan.header.frame_id = "laser";
+ 	// 	collision_scan.range_min = 0.01;
+ 	// 	collision_scan.range_max = 1.1*safe_distance_;
+ 	// 	collision_scan.angle_increment = angle_increment_; 
 
-//  	last_goal_v_.normalize();
+ 	// 	min_cost_ = cost_queue.top();
 
-//  	for (int i=0; i < num_of_partitions_ ; i++){
+ 	// 	std::vector<double>::iterator it;
+ 	// 	it = std::find(cost_v.begin(),cost_v.end(),min_cost_);
+ 	// 	goal_index_ = it - cost_v.begin();
 
-//  		next_goal_v_.setX(goal_points_.poses[i].pose.position.x - pose_.getX());
-//  		next_goal_v_.setY(goal_points_.poses[i].pose.position.y - pose_.getY());
-//  		next_goal_v_.setZ(goal_points_.poses[i].pose.position.z - pose_.getZ());
+ 	// 	double current_part_angle = angles[goal_index_];
+ 	// 	double current_part_range = ranges[goal_index_];
 
-//  		next_goal_v_.normalize();
+		// int j = (int) ((current_part_angle - angle_min_)/angle_increment_);
+		// int delta = (int) (PI/4/angle_increment_) ;
+		// int delta_1 = (int) (PI/4/angle_increment_);
+		// int delta_2 = (int) (PI/4/angle_increment_);
 
+		// // Check we're within scan bounds
+		// if (j-delta < 0){
+		// 	delta_1 = j;
+		// }
+		// else if (j+delta > num_samples_){
+		// 	delta_2 = num_samples_-j;
+		// }
 
-//  		double r_i = sqrt(pow(pose_.getX() - goal_points_.poses[i].pose.position.x, 2) + pow( pose_.getY() - goal_points_.poses[i].pose.position.y, 2));
-//  		double angle_i = atan2 ( goal_points_.poses[i].pose.position.y - pose_.getY(), goal_points_.poses[i].pose.position.x - pose_.getX() ) - yaw_;
-//  		angle_diff_  =  std::abs(angle_i)  - std::abs(angle_2_goal_ );
+		// collision_scan.angle_min = angle_min_ + angle_increment_*(j-delta_1);
+		// collision_scan.angle_max = angle_min_ + angle_increment_*(j+delta_2);
 
-//  		angle_diff_last_ = next_goal_v_.angle(last_goal_v_);
+		// std::cout << "j: " << j << " delta: " << delta << " goal index: " << goal_index_  << " goal_counter: " << goal_counter <<  std::endl;
 
-//  		cost_i_ = pow(angle_diff_,2) + pow(angle_diff_last_,2) + pow(1/r_i,2);
+		// std::cout << "range: " << current_part_range << std::endl;
+		// // r and theta used to check predicted ranges
+		// double r_temp ;
+		// double theta = angle_increment_*(delta-delta_1) + PI/4;
+		// // double theta = 0;
 
-//  		// std::cout << "i: " << i << " cost_i_: " << cost_i_ << std::endl;
-//  		// std::cout << "r_i: " << r_i << " angle_i: " << angle_i << " angle_diff: " << angle_diff << " angle_diff_last_: " << angle_diff_last_ << std::endl;
+		// std::cout << "delta_1: " << delta_1 << " delta_2: " << delta_2 << std::endl;
 
-//  		cost_queue.push(cost_i_);
-//  		cost_v.push_back(cost_i_);
-//  		angles.push_back(angle_i);
-//  		ranges.push_back(r_i);
-//  	}
+		// // Check scan ccw
+		// for (int i=j-delta_1; i < j+delta_2; i++){
+		// 	r_temp = std::abs(buffer_/std::cos(theta));
 
-//  	int goal_counter = 0;
-//  	// Collision check
-//  	while (!corridor_free_){
-//  		collision_counter_corridor_ = 0;
+		// 	r_temp = std::min(r_temp,safe_distance_);
 
-//  		// Collision scan for debug
-//  		sensor_msgs::LaserScan collision_scan;
-//  		collision_scan.header.stamp = ros::Time::now();
-//  		collision_scan.header.frame_id = "laser";
-//  		collision_scan.range_min = 0.01;
-//  		collision_scan.range_max = 1.1*safe_distance_;
-//  		collision_scan.angle_increment = angle_increment_; 
+		// 	collision_scan.ranges.push_back(r_temp);
 
-//  		min_cost_ = cost_queue.top();
+		// 	if (r_temp > filtered_scan_.ranges[i]){
+		// 		collision_counter_corridor_+=1;
+		// 	}
 
-//  		std::vector<double>::iterator it;
-//  		it = std::find(cost_v.begin(),cost_v.end(),min_cost_);
-//  		goal_index_ = it - cost_v.begin();
+		// 	if (collision_counter_corridor_>9) break;
 
-//  		double current_part_angle = angles[goal_index_];
-//  		double current_part_range = ranges[goal_index_];
+		// 	theta+=angle_increment_;		
 
-// 		int j = (int) ((current_part_angle - angle_min_)/angle_increment_);
-// 		int delta = (int) (PI/4/angle_increment_) ;
-// 		int delta_1 = (int) (PI/4/angle_increment_);
-// 		int delta_2 = (int) (PI/4/angle_increment_);
+		// }
 
-// 		// Check we're within scan bounds
-// 		if (j-delta < 0){
-// 			delta_1 = j;
-// 		}
-// 		else if (j+delta > num_samples_){
-// 			delta_2 = num_samples_-j;
-// 		}
+		// if (collision_counter_corridor_<10) 
+		// {
+		// 	corridor_free_=true; 
+ 	// 		corridor_scan_pub.publish(collision_scan);
+ 	// 	}
 
-// 		collision_scan.angle_min = angle_min_ + angle_increment_*(j-delta_1);
-// 		collision_scan.angle_max = angle_min_ + angle_increment_*(j+delta_2);
 
-// 		std::cout << "j: " << j << " delta: " << delta << " goal index: " << goal_index_  << " goal_counter: " << goal_counter <<  std::endl;
+		// std::cout << "corridor collision counter: " << collision_counter_corridor_ << std::endl;
 
-// 		std::cout << "range: " << current_part_range << std::endl;
-// 		// r and theta used to check predicted ranges
-// 		double r_temp ;
-// 		double theta = angle_increment_*(delta-delta_1) + PI/4;
-// 		// double theta = 0;
 
-// 		std::cout << "delta_1: " << delta_1 << " delta_2: " << delta_2 << std::endl;
+ 	// 	// Erase current elements from cost vector
+ 	// 	if (!corridor_free_){
+ 	// 		cost_queue.pop();
+ 	// 		goal_counter+=1;
 
-// 		// Check scan ccw
-// 		for (int i=j-delta_1; i < j+delta_2; i++){
-// 			r_temp = std::abs(buffer_/std::cos(theta));
+ 	// 		if(cost_queue.empty()){
+ 	// 			std::cout << "Need to stop!!!!!!" << std::endl;
+ 	// 			break;
+ 	// 		}
+ 	// 	}
+		// std::cout << "cost size: " << cost_v.size() << std::endl;
+ 	// }
 
-// 			r_temp = std::min(r_temp,safe_distance_);
-
-// 			collision_scan.ranges.push_back(r_temp);
-
-// 			if (r_temp > filtered_scan_.ranges[i]){
-// 				collision_counter_corridor_+=1;
-// 			}
-
-// 			if (collision_counter_corridor_>9) break;
-
-// 			theta+=angle_increment_;		
-
-// 		}
-
-// 		if (collision_counter_corridor_<10) 
-// 		{
-// 			corridor_free_=true; 
-//  			corridor_scan_pub.publish(collision_scan);
-//  		}
-
-
-// 		std::cout << "corridor collision counter: " << collision_counter_corridor_ << std::endl;
-
-
-//  		// Erase current elements from cost vector
-//  		if (!corridor_free_){
-//  			cost_queue.pop();
-//  			goal_counter+=1;
-
-//  			if(cost_queue.empty()){
-//  				std::cout << "Need to stop!!!!!!" << std::endl;
-//  				break;
-//  			}
-//  		}
-// 		std::cout << "cost size: " << cost_v.size() << std::endl;
-//  	}
-
-//  	std::cout << "min_cost_: " << min_cost_ << " goal index: " << goal_index_ <<  std::endl;
-
-//  	new_goal_.header.stamp = ros::Time::now();
-//  	new_goal_.header.frame_id = "vicon";
-//  	new_goal_.point.x = goal_points_.poses[goal_index_].pose.position.x;
-//  	new_goal_.point.y = goal_points_.poses[goal_index_].pose.position.y;
-//  	new_goal_.point.z = goal_.point.z;
-
-//  	new_goal_pub.publish(new_goal_);
-//  	last_goal_pub.publish(last_goal_);
-
-//  	last_goal_.header.stamp = ros::Time::now();
-//  	last_goal_.header.frame_id = "vicon";
-//  	last_goal_.point = new_goal_.point;
-
-// 	std::cout << "Latency: " << ros::Time::now().toSec() - msg_received_ << std::endl;
-//  }
+ 	// std::cout << "min_cost_: " << min_cost_ << " goal index: " << goal_index_ <<  std::endl;
+ }
 
 
 

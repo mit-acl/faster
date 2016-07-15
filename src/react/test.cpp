@@ -35,6 +35,8 @@ int main(int argc, char **argv)
 
 	Eigen::Vector3d x = Eigen::Vector3d::Zero();
 
+	Eigen::Vector3d pose = Eigen::Vector3d::Zero();
+
 	double j = 30;
 	double vf = 1;
 	double t0 = 0;
@@ -126,8 +128,10 @@ int main(int argc, char **argv)
 		}
 	}
 
+	std::vector<double> scan2;
+
 	then = clock();
-	rp.scan2Eig(test_scan,scan);
+	rp.convert_scan(test_scan,scan,scan2);
 	now = clock();
 
 	double diff3 = 1000*((float)(now-then))/CLOCKS_PER_SEC;
@@ -140,9 +144,6 @@ int main(int argc, char **argv)
 	double buff = 0.5;
 	double v = 2;
 	bool can_reach_goal;
-
-	std::vector<double> scan2;
-	rp.scan2Vec(test_scan, scan2);
 
 	then = clock();
 	for (int i=0; i<500; i++){
@@ -230,7 +231,7 @@ int main(int argc, char **argv)
 
 	then = clock();
 	for (int i=0;i<500;i++){
-		rp.partition_scan(scan,Goals,part);
+		rp.partition_scan(scan,Goals,part,pose);
 	}
 	now = clock();
 
@@ -240,7 +241,7 @@ int main(int argc, char **argv)
 
 	std::cout << "Num of partitions: " << part << std::endl << std::endl;
 
-
+	std::cout << "Cluster: " << Goals << std::endl;
 
 	  ros::Publisher chatter_pub = n.advertise<nav_msgs::Path>("traj", 1);
 
