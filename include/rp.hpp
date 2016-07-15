@@ -41,7 +41,7 @@ public:
 	void stateCB(const acl_system::ViconState& msg);
 	void global_goalCB(const geometry_msgs::PointStamped& msg);
 
-	void partition_scan(const sensor_msgs::LaserScan& msg);
+	// void partition_scan(const sensor_msgs::LaserScan& msg);
 	void vis_better_scan(const sensor_msgs::LaserScan& msg);
 	void check_goal(const sensor_msgs::LaserScan& msg);
 
@@ -51,6 +51,7 @@ public:
 	void sendGoal(const ros::TimerEvent&);
 
 	// Make these private after testing
+	void partition_scan(Eigen::MatrixXd scan, Eigen::MatrixXd& Goals,int& partition);
 	void saturate(double &var, double min, double max);
 	void find_times(std::vector<double>& t, Eigen::Matrix4d& X0, Eigen::Vector3d x, double vf);
 	void eval_trajectory(Eigen::MatrixXd& Xc, Eigen::Matrix4d X0, Eigen::Matrix4d Y0, std::vector<double> t_x, std::vector<double> t_y, double t);

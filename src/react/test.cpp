@@ -112,18 +112,17 @@ int main(int argc, char **argv)
 
 	for (int i=0;i<636;i++){
 		if (i > 636/2){
-			test_scan.ranges.push_back(2);
+			test_scan.ranges.push_back(4);
 		}
-		else if (i==636/2){
-			test_scan.ranges.push_back(1);
-		}
-		else if (i==636){
-			test_scan.ranges.push_back(.2);
-		}
+		// else if (i==636/2){
+		// 	test_scan.ranges.push_back(1);
+		// }
+		// else if (i==636){
+		// 	test_scan.ranges.push_back(.2);
+		// }
 		else
 			{
 			test_scan.ranges.push_back(5);
-
 		}
 	}
 
@@ -171,9 +170,6 @@ int main(int argc, char **argv)
 	nav_msgs::Path path;
 	path.header.frame_id = "vicon";
 
-	double T = 1;
-	double dt = 0.01;
-	int num = (int) T/dt;
 
 	std::vector<double> t_x_{std::vector<double>(3,0)};
 	std::vector<double> t_y_{std::vector<double>(3,0)};
@@ -205,12 +201,16 @@ int main(int argc, char **argv)
 	rp.find_times(t_x_, X0_, x_, vfx_);
 	rp.find_times(t_y_, Y0_, y_, vfy_);
 
-	std::cout << "Switching times 1: " << t_x_[0] << std::endl;
-	std::cout << "Switching times 2: " << t_x_[1] << std::endl;
-	std::cout << "Switching times 3: " << t_x_[2] << std::endl<< std::endl;
+	// std::cout << "Switching times 1: " << t_x_[0] << std::endl;
+	// std::cout << "Switching times 2: " << t_x_[1] << std::endl;
+	// std::cout << "Switching times 3: " << t_x_[2] << std::endl<< std::endl;
 
-	std::cout << "X0_: " << X0_ << std::endl;
-	std::cout << "Y0_: " << Y0_ << std::endl;
+	// std::cout << "X0_: " << X0_ << std::endl;
+	// std::cout << "Y0_: " << Y0_ << std::endl;
+
+	double T = std::max(t_x_[0] + t_x_[1] + t_x_[2],t_y_[0] + t_y_[1] + t_y_[2]);
+	double dt = 0.01;
+	int num = (int) ceil(T/dt);
 
 	double t_ = 0;
 	geometry_msgs::PoseStamped temp;
@@ -223,20 +223,39 @@ int main(int argc, char **argv)
 		path.poses.push_back(temp);
 	}
 
-  ros::Publisher chatter_pub = n.advertise<nav_msgs::Path>("traj", 1);
-
-  ros::Rate loop_rate(10);
 
 
-  while (ros::ok())
-  {
+	Eigen::MatrixXd Goals ;
+	int part = 0;
 
-    chatter_pub.publish(path);
+	then = clock();
+	for (int i=0;i<500;i++){
+		rp.partition_scan(scan,Goals,part);
+	}
+	now = clock();
 
-    ros::spinOnce();
+	double diff5 = 1000*((float)(now-then))/CLOCKS_PER_SEC/500;
 
-    loop_rate.sleep();
-  }
+	std::cout << "Partition scan eval time [ms]: " << diff5 << std::endl << std::endl;
+
+	std::cout << "Num of partitions: " << part << std::endl << std::endl;
+
+
+
+	  ros::Publisher chatter_pub = n.advertise<nav_msgs::Path>("traj", 1);
+
+	  ros::Rate loop_rate(10);
+
+
+	  while (ros::ok())
+	  {
+
+	    chatter_pub.publish(path);
+
+	    ros::spinOnce();
+
+	    loop_rate.sleep();
+	  }
 
 
 
