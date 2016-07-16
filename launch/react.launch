@@ -11,15 +11,13 @@
 		<remap from="~vicon" to="state_estimate"/>
 		<remap from="~goal" to="goal" />
 		<remap from="~event" to="event" />
+		<remap from="~global_goal" to="global_goal" />
 
 
-		<remap from="~partitioned_scan" to="partitioned_scan"/>
 		<remap from="~clean_scan" to="clean_scan"/>
-		<remap from="~global_goal" to="global_goal"/>
 		<remap from="~new_global_goal" to="new_global_goal"/>
 		<remap from="~int_goal" to="int_goal"/>	
 		<remap from="~last_global_goal" to="last_global_goal"/>
-		<remap from="~corridor_scan" to="corridor_scan"/>
 		<remap unless="$(arg filter)" from="~scan" to="scan"/>	
 		<remap if="$(arg filter)" from="~scan" to="filtered_scan"/>
 

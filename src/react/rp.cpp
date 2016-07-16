@@ -28,7 +28,7 @@ REACT::REACT(){
 
 	angle_seg_inc_ = 10*PI/180;
 
-	num_of_partitions_ = 0;
+	num_of_clusters_ = 0;
 	collision_counter_corridor_ = 0;
 	collision_counter_ = 0;
 	can_reach_goal_ = false;
@@ -329,12 +329,43 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
  	sort_clusters(Sorted_Goals_, last_goal_, Goals_, pose_, goal_);
  	// Pick cluster
 
- 	
+ 	std::cout << "Latency: " << ros::Time::now().toSec() - msg_received_ << std::endl;
+
+ 	if(debug_){
+ 		convert2ROS(Goals_);
+ 		pubROS();
+ 	}
  	
  }
 
+ void REACT::convert2ROS(Eigen::MatrixXd Goals){
+ 	goal_points_ros_.header.stamp = ros::Time::now();
+ 	goal_points_ros_.header.frame_id = "world";
+
+ 	for (int i=0; i < Goals.cols(); i++){
+ 		temp_goal_point_ros_.position.x = Goals(i,0);
+ 		temp_goal_point_ros_.position.y = Goals(i,1);
+ 		temp_goal_point_ros_.position.z = Goals(i,2);
+
+ 		temp_goal_point_ros_.orientation.w = cos(Goals(i,4)/2 + yaw_) ;
+ 		temp_goal_point_ros_.orientation.z = sin(Goals(i,4)/2 + yaw_);
+
+
+ 		goal_points_ros_.poses.push_back(temp_goal_point_ros_);
+	}
+ }
+
+void REACT::pubROS(){
+	int_goal_pub.publish(goal_points_ros_);
+}
+
+
+ void  REACT::pick_cluster( Eigen::MatrixXd Sorted_Goals, Eigen::Vector3d& local_goal, Eigen::MatrixXd Xc){
+ 	// Iterate through and pick cluster based on collision check
+ }
+
 // We might not need this...
- void REACT::convert_scan(const sensor_msgs::LaserScan msg, Eigen::MatrixXd& scanE , std::vector<double>& scanV ){
+ void REACT::convert_scan(sensor_msgs::LaserScan msg, Eigen::MatrixXd& scanE , std::vector<double>& scanV ){
  	angle_max_ = msg.angle_max;
 	angle_min_ = msg.angle_min;
 	angle_increment_ = msg.angle_increment;
@@ -533,7 +564,7 @@ void REACT::partition_scan(Eigen::MatrixXd scan, Eigen::MatrixXd& Goals, int& pa
  	d_angle_ = scan(0,1)-scan(0,0);
 
  	num_samples_ = scan.cols(); 
- 	num_of_partitions_ = 0;
+ 	num_of_clusters_ = 0;
 
  	// Clean up logic
     for (int i=0; i < num_samples_-1; i++){
@@ -548,16 +579,18 @@ void REACT::partition_scan(Eigen::MatrixXd scan, Eigen::MatrixXd& Goals, int& pa
     			angle_2_index = angle_seg_inc_/angle_increment_;
 
     			// Probably a better way to do this...
-    			if (double((i-j))/(3*angle_2_index) < 1) num_of_partitions_ = 1;
-    			if (double((i-j))/(3*angle_2_index) > 1) num_of_partitions_ = 3;
-    			if (double((i-j))/(5*angle_2_index) > 1) num_of_partitions_ = 5;
-    			if (double((i-j))/(7*angle_2_index) > 1) num_of_partitions_ = 7;
-    			if (double((i-j))/(9*angle_2_index) > 1) num_of_partitions_ = 9;
-    			if (double((i-j))/(11*angle_2_index) > 1) num_of_partitions_ = 11;
+    			// Numbers slightly arbitrary
+    			if (double((i-j))/(3*angle_2_index) < 1) num_of_clusters_ = 2;
+    			if (double((i-j))/(3*angle_2_index) > 1) num_of_clusters_ = 3;
+    			if (double((i-j))/(5*angle_2_index) > 1) num_of_clusters_ = 5;
+    			if (double((i-j))/(7*angle_2_index) > 1) num_of_clusters_ = 7;
+    			if (double((i-j))/(9*angle_2_index) > 1) num_of_clusters_ = 9;
+    			if (double((i-j))/(11*angle_2_index) > 1) num_of_clusters_ = 11;
 
-    			for (int k=0; k < num_of_partitions_; k++){
+    			for (int k=0; k < num_of_clusters_; k++){
     				r_temp.push_back(sum/(i-j));
-		    		angle_temp.push_back(min_angle_ + d_angle_*((i+j)/2 + (k-(num_of_partitions_-1)/2)*angle_2_index) + heading_);
+
+    				angle_temp.push_back(min_angle_ + heading_ + d_angle_*(j + k*(i-j)/(num_of_clusters_-1)));
     			}
     		}
     			sum = 0;
@@ -601,9 +634,9 @@ void REACT::sort_clusters(Eigen::MatrixXd& Sorted_Goals, Eigen::Vector3d last_go
 	r_goal_ = (goal - pose).norm();
 	angle_2_goal_ = atan2( goal(1) -pose(1), goal(0) - pose(0)) - yaw_;
 
-	num_of_partitions_ = Goals.rows();
+	num_of_clusters_ = Goals.rows();
 
- 	for (int i=0; i < num_of_partitions_ ; i++){
+ 	for (int i=0; i < num_of_clusters_ ; i++){
 
  		next_goal_V_ = Goals.block(i,0,1,3).transpose() - pose;
 
@@ -627,7 +660,7 @@ void REACT::sort_clusters(Eigen::MatrixXd& Sorted_Goals, Eigen::Vector3d last_go
  	// There should be a better way to do this
  	Sorted_Goals.row(0) << goal(0), goal(1), goal(2), r_goal_, angle_2_goal_, 0; 
 
- 	for (int i=0; i < num_of_partitions_ ; i++){
+ 	for (int i=0; i < num_of_clusters_ ; i++){
 
 	 	min_cost_ = cost_queue_.top();
 

@@ -35,7 +35,7 @@ class REACT
 public:
 	REACT();
 
-	ros::Publisher partitioned_scan_pub, pub_clean_scan, goal_pub, new_goal_pub, int_goal_pub, last_goal_pub, corridor_scan_pub, quad_goal_pub;;
+	ros::Publisher goal_pub, new_goal_pub, int_goal_pub, last_goal_pub, quad_goal_pub, pub_clean_scan;
 
 	void scanCB(const sensor_msgs::LaserScan& msg);
 	void stateCB(const acl_system::ViconState& msg);
@@ -43,22 +43,27 @@ public:
 
 	// void partition_scan(const sensor_msgs::LaserScan& msg);
 	void vis_better_scan(const sensor_msgs::LaserScan& msg);
-	void check_goal(const sensor_msgs::LaserScan& msg);
 
 	void eventCB(const acl_system::QuadFlightEvent& msg);
 
 	// ROS timed functions
 	void sendGoal(const ros::TimerEvent&);
 
+	void convert2ROS(Eigen::MatrixXd Goals);
+	void pubROS();
+
 	// Make these private after testing
 	void sort_clusters(Eigen::MatrixXd& Sorted_Goals, Eigen::Vector3d last_goal, Eigen::MatrixXd Goals,  Eigen::Vector3d pose, Eigen::Vector3d goal);
 	void partition_scan(Eigen::MatrixXd scan, Eigen::MatrixXd& Goals,int& partition, Eigen::Vector3d pose, Eigen::Vector3d goal);
-	void saturate(double &var, double min, double max);
 	void find_times(std::vector<double>& t, Eigen::Matrix4d& X0, Eigen::Vector3d x, double vf);
 	void eval_trajectory(Eigen::MatrixXd& Xc, Eigen::Matrix4d X0, Eigen::Matrix4d Y0, std::vector<double> t_x, std::vector<double> t_y, double t);
 	void collision_check2(Eigen::MatrixXd X, std::vector<double> scan, Eigen::Vector3d goal, double buff, double v, bool& can_reach_goal);
-	void convert_scan(const sensor_msgs::LaserScan msg, Eigen::MatrixXd& scanE , std::vector<double>& scanV );
+	void convert_scan(sensor_msgs::LaserScan msg, Eigen::MatrixXd& scanE , std::vector<double>& scanV );
 	void collision_check(Eigen::MatrixXd X, Eigen::MatrixXd scan, Eigen::Vector3d goal, double buff, double v, bool& can_reach_goal);
+	void pick_cluster( Eigen::MatrixXd Sorted_Goals_, Eigen::Vector3d& local_goal_, Eigen::MatrixXd Xc);
+	void saturate(double &var, double min, double max);
+	
+
 private:
 
 	double inf_; // Infinity definition
@@ -66,7 +71,7 @@ private:
 	double num_samples_, angle_max_, angle_min_, angle_increment_;
 	double angle_diff_last_, angle_seg_inc_;
 	bool debug_, can_reach_goal_, corridor_free_;
-	int down_sample_, num_of_partitions_, goal_index_, collision_counter_, collision_counter_corridor_;
+	int down_sample_, num_of_clusters_, goal_index_, collision_counter_, collision_counter_corridor_;
 
 	double spinup_time_, heading_, j_max_, a_max_, t0_;
 	int quad_status_;
@@ -76,9 +81,9 @@ private:
 
 	std::ostringstream errorMsg, warnMsg;
 
-	sensor_msgs::LaserScan filtered_scan_;
-	// geometry_msgs::PoseArray goal_points;
-	nav_msgs::Path goal_points_;
+	geometry_msgs::PoseArray goal_points_ros_ ;
+	geometry_msgs::Pose temp_goal_point_ros_;
+
 
 	// // // // //
 
@@ -113,6 +118,7 @@ private:
 	Eigen::Vector3d x_;
 	Eigen::Vector3d y_;
 	Eigen::Vector3d goal_;
+	Eigen::Vector3d local_goal_;
 	Eigen::Vector3d last_goal_;
 	Eigen::Vector3d last_goal_V_;
 	Eigen::Vector3d next_goal_V_;
