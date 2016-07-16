@@ -28,7 +28,6 @@ int main(int argc, char **argv)
 
 
 	rp.pub_clean_scan = n.advertise<sensor_msgs::LaserScan>("clean_scan", 1);
-	// rp.goal_pub = n.advertise<geometry_msgs::PointStamped>("global_goal", 1);
 	rp.new_goal_pub = n.advertise<geometry_msgs::PointStamped>("new_global_goal", 1);
 	rp.int_goal_pub = n.advertise<geometry_msgs::PoseArray>("int_goal", 1);
 	rp.last_goal_pub = n.advertise<geometry_msgs::PointStamped>("last_global_goal",1);
