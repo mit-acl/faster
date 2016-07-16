@@ -136,7 +136,7 @@ int main(int argc, char **argv)
 
 	double diff3 = 1000*((float)(now-then))/CLOCKS_PER_SEC;
 
-	std::cout << "Function eval time [ms]: " << diff3 << std::endl << std::endl;
+	std::cout << "Convert scan eval time [ms]: " << diff3 << std::endl << std::endl;
 
 	Eigen::MatrixXd X = Eigen::MatrixXd::Zero(3,2);
 	Eigen::Vector3d goal ;
@@ -231,7 +231,7 @@ int main(int argc, char **argv)
 
 	then = clock();
 	for (int i=0;i<500;i++){
-		rp.partition_scan(scan,Goals,part,pose);
+		rp.partition_scan(scan,Goals,part,pose,goal);
 	}
 	now = clock();
 
@@ -241,22 +241,41 @@ int main(int argc, char **argv)
 
 	std::cout << "Num of partitions: " << part << std::endl << std::endl;
 
-	std::cout << "Cluster: " << Goals << std::endl;
+	std::cout << "Clusters: " << Goals << std::endl;
 
-	  ros::Publisher chatter_pub = n.advertise<nav_msgs::Path>("traj", 1);
+	Eigen::MatrixXd Sorted_Goals ;
+	Eigen::Vector3d last_goal;
+	last_goal << goal;
 
-	  ros::Rate loop_rate(10);
+	then = clock();
+	for (int i=0;i<500;i++){
+		rp.sort_clusters(Sorted_Goals,last_goal, Goals, pose, goal);
+	}
+	now = clock();
+
+	double diff6 = 1000*((float)(now-then))/CLOCKS_PER_SEC/500;
+
+	std::cout << "Cluster sort eval time [ms]: " << diff6 << std::endl << std::endl;
+
+	std::cout << "Sorted clusters: " << Sorted_Goals << std::endl;
 
 
-	  while (ros::ok())
-	  {
 
-	    chatter_pub.publish(path);
 
-	    ros::spinOnce();
+	ros::Publisher chatter_pub = n.advertise<nav_msgs::Path>("traj", 1);
 
-	    loop_rate.sleep();
-	  }
+	ros::Rate loop_rate(10);
+
+
+	while (ros::ok())
+	{
+
+		chatter_pub.publish(path);
+
+		ros::spinOnce();
+
+		loop_rate.sleep();
+	}
 
 
 

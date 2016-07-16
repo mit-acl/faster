@@ -323,25 +323,13 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
  {
  	msg_received_ = ros::Time::now().toSec();
  	convert_scan(msg, scanE_, scanV_);
- 	partition_scan(scanE_, Goals_, partition_, pose_);
- 	// sort clusters
+ 	// Cluster
+ 	partition_scan(scanE_, Goals_, partition_, pose_, goal_);
+ 	// Sort clusters
+ 	sort_clusters(Sorted_Goals_, last_goal_, Goals_, pose_, goal_);
+ 	// Pick cluster
 
- 	// if (debug_){
- 	// 	vis_better_scan(msg);
- 	// }
- 	// msg_received_ = ros::Time::now().toSec();
- 	// check_goal(msg);
- 	// if (!can_reach_goal_){
- 	// 	partition_scan(msg);
- 	// 	find_inter_goal();
- 	// }
- 	// else{
- 	// 	new_goal_.header.stamp = ros::Time::now();
-	 // 	new_goal_.header.frame_id = "vicon";
-	 // 	new_goal_.point.x = goal_.point.x;
-	 // 	new_goal_.point.y = goal_.point.y;
-	 // 	new_goal_pub.publish(new_goal_);
- 	// }
+ 	
  	
  }
 
@@ -357,9 +345,16 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
 
 	// Seems really inefficient
 	for (int i=0;i<num_samples_;i++){
-		scanE(0,i) = angle_min_ + i*angle_increment_;
-		scanE(1,i) = msg.ranges[i];
-		scanV.push_back(msg.ranges[i]);
+		if (!isinf(msg.ranges[i]) && !isnan(msg.ranges[i])){
+			scanE(0,i) = angle_min_ + i*angle_increment_;
+			scanE(1,i) = msg.ranges[i];
+			scanV.push_back(msg.ranges[i]);
+		}
+		else{
+			scanE(0,i) = angle_min_ + i*angle_increment_;
+			scanE(1,i) = msg.range_max;
+			scanV.push_back(msg.range_max);
+		}
 	}
 }
 
@@ -524,7 +519,7 @@ void REACT::collision_check2(Eigen::MatrixXd X, std::vector<double> scan, Eigen:
 	}
 }
  
-void REACT::partition_scan(Eigen::MatrixXd scan, Eigen::MatrixXd& Goals, int& partition, Eigen::Vector3d pose){
+void REACT::partition_scan(Eigen::MatrixXd scan, Eigen::MatrixXd& Goals, int& partition, Eigen::Vector3d pose, Eigen::Vector3d goal){
  	int j = 0;
  	double sum = 0;
  	double angle_2_index;
@@ -573,6 +568,7 @@ void REACT::partition_scan(Eigen::MatrixXd scan, Eigen::MatrixXd& Goals, int& pa
 	Goals = Eigen::MatrixXd::Zero(r_temp.size(),5);
 	int count = 0;
 
+	// This is wrong, i >= count
 	for (int i = 0; i < r_temp.size(); i++){
 		if (r_temp[i] > safe_distance_){
 			r.push_back(r_temp[i]);
@@ -580,10 +576,9 @@ void REACT::partition_scan(Eigen::MatrixXd scan, Eigen::MatrixXd& Goals, int& pa
 
 			Goals(count,0) = r[i]*cos(angle[i]) + pose(0);
 			Goals(count,1) = r[i]*sin(angle[i]) + pose(1);
-			Goals(count,2) = goal_(3);
+			Goals(count,2) = goal(2);
 			Goals(count,3) = r[i];
 			Goals(count,4) = angle[i];
-
 			count++;
 		}
 	}
@@ -593,137 +588,56 @@ void REACT::partition_scan(Eigen::MatrixXd scan, Eigen::MatrixXd& Goals, int& pa
 
 
 
-void REACT::sort_clusters(Eigen::Vector3d last_goal, Eigen::MatrixXd Goals, Eigen::MatrixXd Sorted_Goals){
+void REACT::sort_clusters(Eigen::MatrixXd& Sorted_Goals, Eigen::Vector3d last_goal, Eigen::MatrixXd Goals,  Eigen::Vector3d pose, Eigen::Vector3d goal){
 
  	// Re-initialize
 	cost_queue_ = std::priority_queue<double, std::vector<double>, std::greater<double> > ();
 	Sorted_Goals = Eigen::MatrixXd::Zero(Goals.rows()+1,Goals.cols()+1);
+	cost_v_.clear();
 
+	last_goal_V_ = last_goal - pose;
+	last_goal_V_ = last_goal_V_/last_goal_V_.norm();
 
-	// last_goal_v_.setX(last_goal_.point.x - pose_.getX());
- // 	last_goal_v_.setY(last_goal_.point.y - pose_.getY());
- // 	last_goal_v_.setZ(last_goal_.point.z - pose_.getZ());
+	r_goal_ = (goal - pose).norm();
+	angle_2_goal_ = atan2( goal(1) -pose(1), goal(0) - pose(0)) - yaw_;
 
- // 	last_goal_v_.normalize();
+	num_of_partitions_ = Goals.rows();
 
- // 	for (int i=0; i < num_of_partitions_ ; i++){
+ 	for (int i=0; i < num_of_partitions_ ; i++){
 
- // 		next_goal_v_.setX(goal_points_.poses[i].pose.position.x - pose_.getX());
- // 		next_goal_v_.setY(goal_points_.poses[i].pose.position.y - pose_.getY());
- // 		next_goal_v_.setZ(goal_points_.poses[i].pose.position.z - pose_.getZ());
+ 		next_goal_V_ = Goals.block(i,0,1,3).transpose() - pose;
 
- // 		next_goal_v_.normalize();
+ 		r_i_ = next_goal_V_.norm();
+ 		angle_i_ = atan2 ( Goals(i,1) - pose(1), Goals(i,0) - pose(0) ) - yaw_;
+ 		
+ 		angle_diff_  =  std::abs(angle_i_)  - std::abs(angle_2_goal_ );
 
+ 		// Normalize
+		next_goal_V_ = next_goal_V_/next_goal_V_.norm();
 
- // 		double r_i = sqrt(pow(pose_.getX() - goal_points_.poses[i].pose.position.x, 2) + pow( pose_.getY() - goal_points_.poses[i].pose.position.y, 2));
- // 		double angle_i = atan2 ( goal_points_.poses[i].pose.position.y - pose_.getY(), goal_points_.poses[i].pose.position.x - pose_.getX() ) - yaw_;
- // 		angle_diff_  =  std::abs(angle_i)  - std::abs(angle_2_goal_ );
+ 		angle_diff_last_ = next_goal_V_.dot(last_goal_V_);
 
- // 		angle_diff_last_ = next_goal_v_.angle(last_goal_v_);
+ 		cost_i_ = pow(angle_diff_,2) + pow(angle_diff_last_,2) + pow(1/r_i_,2);
 
- // 		cost_i_ = pow(angle_diff_,2) + pow(angle_diff_last_,2) + pow(1/r_i,2);
+ 		cost_queue_.push(cost_i_);
+ 		cost_v_.push_back(cost_i_);
 
- // 		// std::cout << "i: " << i << " cost_i_: " << cost_i_ << std::endl;
- // 		// std::cout << "r_i: " << r_i << " angle_i: " << angle_i << " angle_diff: " << angle_diff << " angle_diff_last_: " << angle_diff_last_ << std::endl;
+ 	}
 
- // 		cost_queue.push(cost_i_);
- // 		cost_v.push_back(cost_i_);
- // 		angles.push_back(angle_i);
- // 		ranges.push_back(r_i);
- // 	}
+ 	// There should be a better way to do this
+ 	Sorted_Goals.row(0) << goal(0), goal(1), goal(2), r_goal_, angle_2_goal_, 0; 
 
- // 	int goal_counter = 0;
+ 	for (int i=0; i < num_of_partitions_ ; i++){
 
+	 	min_cost_ = cost_queue_.top();
 
- 	// Collision check
- 	// while (!corridor_free_){
- 	// 	collision_counter_corridor_ = 0;
+		it_ = std::find(cost_v_.begin(),cost_v_.end(),min_cost_);
+		goal_index_ = it_ - cost_v_.begin();
 
- 	// 	// Collision scan for debug
- 	// 	sensor_msgs::LaserScan collision_scan;
- 	// 	collision_scan.header.stamp = ros::Time::now();
- 	// 	collision_scan.header.frame_id = "laser";
- 	// 	collision_scan.range_min = 0.01;
- 	// 	collision_scan.range_max = 1.1*safe_distance_;
- 	// 	collision_scan.angle_increment = angle_increment_; 
+		Sorted_Goals.row(i+1) << Goals.row(goal_index_), min_cost_;
 
- 	// 	min_cost_ = cost_queue.top();
-
- 	// 	std::vector<double>::iterator it;
- 	// 	it = std::find(cost_v.begin(),cost_v.end(),min_cost_);
- 	// 	goal_index_ = it - cost_v.begin();
-
- 	// 	double current_part_angle = angles[goal_index_];
- 	// 	double current_part_range = ranges[goal_index_];
-
-		// int j = (int) ((current_part_angle - angle_min_)/angle_increment_);
-		// int delta = (int) (PI/4/angle_increment_) ;
-		// int delta_1 = (int) (PI/4/angle_increment_);
-		// int delta_2 = (int) (PI/4/angle_increment_);
-
-		// // Check we're within scan bounds
-		// if (j-delta < 0){
-		// 	delta_1 = j;
-		// }
-		// else if (j+delta > num_samples_){
-		// 	delta_2 = num_samples_-j;
-		// }
-
-		// collision_scan.angle_min = angle_min_ + angle_increment_*(j-delta_1);
-		// collision_scan.angle_max = angle_min_ + angle_increment_*(j+delta_2);
-
-		// std::cout << "j: " << j << " delta: " << delta << " goal index: " << goal_index_  << " goal_counter: " << goal_counter <<  std::endl;
-
-		// std::cout << "range: " << current_part_range << std::endl;
-		// // r and theta used to check predicted ranges
-		// double r_temp ;
-		// double theta = angle_increment_*(delta-delta_1) + PI/4;
-		// // double theta = 0;
-
-		// std::cout << "delta_1: " << delta_1 << " delta_2: " << delta_2 << std::endl;
-
-		// // Check scan ccw
-		// for (int i=j-delta_1; i < j+delta_2; i++){
-		// 	r_temp = std::abs(buffer_/std::cos(theta));
-
-		// 	r_temp = std::min(r_temp,safe_distance_);
-
-		// 	collision_scan.ranges.push_back(r_temp);
-
-		// 	if (r_temp > filtered_scan_.ranges[i]){
-		// 		collision_counter_corridor_+=1;
-		// 	}
-
-		// 	if (collision_counter_corridor_>9) break;
-
-		// 	theta+=angle_increment_;		
-
-		// }
-
-		// if (collision_counter_corridor_<10) 
-		// {
-		// 	corridor_free_=true; 
- 	// 		corridor_scan_pub.publish(collision_scan);
- 	// 	}
-
-
-		// std::cout << "corridor collision counter: " << collision_counter_corridor_ << std::endl;
-
-
- 	// 	// Erase current elements from cost vector
- 	// 	if (!corridor_free_){
- 	// 		cost_queue.pop();
- 	// 		goal_counter+=1;
-
- 	// 		if(cost_queue.empty()){
- 	// 			std::cout << "Need to stop!!!!!!" << std::endl;
- 	// 			break;
- 	// 		}
- 	// 	}
-		// std::cout << "cost size: " << cost_v.size() << std::endl;
- 	// }
-
- 	// std::cout << "min_cost_: " << min_cost_ << " goal index: " << goal_index_ <<  std::endl;
+		cost_queue_.pop();
+	}
  }
 
 

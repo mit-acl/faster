@@ -51,9 +51,8 @@ public:
 	void sendGoal(const ros::TimerEvent&);
 
 	// Make these private after testing
-	void sort_clusters(Eigen::Vector3d last_goal, Eigen::MatrixXd Goals, Eigen::MatrixXd Sorted_Goals);
-
-	void partition_scan(Eigen::MatrixXd scan, Eigen::MatrixXd& Goals,int& partition, Eigen::Vector3d pose);
+	void sort_clusters(Eigen::MatrixXd& Sorted_Goals, Eigen::Vector3d last_goal, Eigen::MatrixXd Goals,  Eigen::Vector3d pose, Eigen::Vector3d goal);
+	void partition_scan(Eigen::MatrixXd scan, Eigen::MatrixXd& Goals,int& partition, Eigen::Vector3d pose, Eigen::Vector3d goal);
 	void saturate(double &var, double min, double max);
 	void find_times(std::vector<double>& t, Eigen::Matrix4d& X0, Eigen::Vector3d x, double vf);
 	void eval_trajectory(Eigen::MatrixXd& Xc, Eigen::Matrix4d X0, Eigen::Matrix4d Y0, std::vector<double> t_x, std::vector<double> t_y, double t);
@@ -96,6 +95,8 @@ private:
 	std::vector<double> j_{std::vector<double>(4,0)};
 
 	std::vector<double> scanV_;
+	std::vector<double> cost_v_;
+	std::vector<double>::iterator it_;
 
 	std::priority_queue<double, std::vector<double>, std::greater<double> > cost_queue_;
 
@@ -113,6 +114,8 @@ private:
 	Eigen::Vector3d y_;
 	Eigen::Vector3d goal_;
 	Eigen::Vector3d last_goal_;
+	Eigen::Vector3d last_goal_V_;
+	Eigen::Vector3d next_goal_V_;
 	Eigen::Vector3d pose_;
 
 
@@ -121,6 +124,8 @@ private:
 	double theta_1_, theta_2_;
 	int index1_, index2_, partition_ ;
 	double max_angle_, min_angle_, d_angle_;
+
+	double r_i_, angle_i_, r_goal_;
 
 	//## Logging and Debugging Functions
 
