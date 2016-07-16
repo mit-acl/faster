@@ -329,7 +329,7 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
  	sort_clusters(Sorted_Goals_, last_goal_, Goals_, pose_, goal_);
  	// Pick cluster
 
- 	std::cout << "Latency: " << ros::Time::now().toSec() - msg_received_ << std::endl;
+ 	std::cout << "Latency [ms]: " << 1000*(ros::Time::now().toSec() - msg_received_) << std::endl;
 
  	if(debug_){
  		convert2ROS(Goals_);
@@ -339,17 +339,17 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
  }
 
  void REACT::convert2ROS(Eigen::MatrixXd Goals){
+ 	goal_points_ros_.poses.clear();
  	goal_points_ros_.header.stamp = ros::Time::now();
- 	goal_points_ros_.header.frame_id = "world";
+ 	goal_points_ros_.header.frame_id = "vicon";
 
- 	for (int i=0; i < Goals.cols(); i++){
+ 	for (int i=0; i < Goals.rows(); i++){
  		temp_goal_point_ros_.position.x = Goals(i,0);
  		temp_goal_point_ros_.position.y = Goals(i,1);
  		temp_goal_point_ros_.position.z = Goals(i,2);
 
- 		temp_goal_point_ros_.orientation.w = cos(Goals(i,4)/2 + yaw_) ;
- 		temp_goal_point_ros_.orientation.z = sin(Goals(i,4)/2 + yaw_);
-
+ 		temp_goal_point_ros_.orientation.w = cos(Goals(i,4)/2) ;
+ 		temp_goal_point_ros_.orientation.z = sin(Goals(i,4)/2);
 
  		goal_points_ros_.poses.push_back(temp_goal_point_ros_);
 	}
@@ -568,11 +568,7 @@ void REACT::partition_scan(Eigen::MatrixXd scan, Eigen::MatrixXd& Goals, int& pa
 
  	// Clean up logic
     for (int i=0; i < num_samples_-1; i++){
-    	if (std::abs(scan(1,i+1)-scan(1,j)) < 0.5 && i!=num_samples_-2){
-    			sum += scan(1,i+1);  
-    	}
-    	else if ((std::abs(scan(1,i+1)-scan(1,j)) > 0.5) || i==num_samples_-2){
-
+		if ((std::abs(scan(1,i+1)-scan(1,i)) > thresh_) || i==num_samples_-2){
     		if ((i-j)>10){
 
     			// Convert angle segment incerement to index
@@ -587,14 +583,14 @@ void REACT::partition_scan(Eigen::MatrixXd scan, Eigen::MatrixXd& Goals, int& pa
     			if (double((i-j))/(9*angle_2_index) > 1) num_of_clusters_ = 9;
     			if (double((i-j))/(11*angle_2_index) > 1) num_of_clusters_ = 11;
 
-    			for (int k=0; k < num_of_clusters_; k++){
-    				r_temp.push_back(sum/(i-j));
 
-    				angle_temp.push_back(min_angle_ + heading_ + d_angle_*(j + k*(i-j)/(num_of_clusters_-1)));
+    			for (int k=0; k < num_of_clusters_; k++){
+    				// Just cluster based on 
+    				r_temp.push_back(scan(1, j + k*(i-j)/(num_of_clusters_-1)));
+    				angle_temp.push_back(min_angle_ + yaw_ + d_angle_*(j + k*(i-j)/(num_of_clusters_-1)));
     			}
     		}
-    			sum = 0;
-    			j = i+1;   			
+			j = i+1;   			
 		}
 	}
 
@@ -603,17 +599,15 @@ void REACT::partition_scan(Eigen::MatrixXd scan, Eigen::MatrixXd& Goals, int& pa
 
 	// This is wrong, i >= count
 	for (int i = 0; i < r_temp.size(); i++){
-		if (r_temp[i] > safe_distance_){
-			r.push_back(r_temp[i]);
-			angle.push_back(angle_temp[i]);
+		r.push_back(r_temp[i]);
+		angle.push_back(angle_temp[i]);
 
-			Goals(count,0) = r[i]*cos(angle[i]) + pose(0);
-			Goals(count,1) = r[i]*sin(angle[i]) + pose(1);
-			Goals(count,2) = goal(2);
-			Goals(count,3) = r[i];
-			Goals(count,4) = angle[i];
-			count++;
-		}
+		Goals(count,0) = r[i]*cos(angle[i]) + pose(0);
+		Goals(count,1) = r[i]*sin(angle[i]) + pose(1);
+		Goals(count,2) = goal_(2);
+		Goals(count,3) = r[i];
+		Goals(count,4) = angle[i];
+		count++;
 	}
 
 	partition = r_temp.size();
