@@ -84,7 +84,7 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 		t_ = ros::Time::now().toSec() - t0_;
 
 		// Need to convert to quad_goal_!!!
-		eval_trajectory(Xc_,X0_,Y0_,t_x_,t_y_,t_);
+		eval_trajectory(X_switch_,Y_switch_,t_x_,t_y_,t_,Xc_);
 	}
 
 	quad_goal_.header.stamp = ros::Time::now();
@@ -166,110 +166,110 @@ void REACT::eventCB(const acl_system::QuadFlightEvent& msg)
 
 }
 
-void REACT::find_times(std::vector<double>& t, Eigen::Matrix4d& X0, Eigen::Vector3d x, double vf){
-	double j_temp = copysign(j_max_,vf-x(1));
-	double vfp = x(1) + pow(x(2),2)/(2*j_temp);
+void REACT::find_times( Eigen::Vector3d x0, double vf, std::vector<double>& t, Eigen::Matrix4d&  X_switch){
+	double j_temp = copysign(j_max_,vf-x0(1));
+	double vfp = x0(1) + pow(x0(2),2)/(2*j_temp);
 
 	if (std::abs(vfp-vf) < 0.05){
-		j_[0] = -j_temp;
+		j_V_[0] = -j_temp;
 		// No 2nd and 3rd stage
-		j_[1] = 0;
-		j_[2] = 0;
+		j_V_[1] = 0;
+		j_V_[2] = 0;
 
-		t[0] = -x(2)/j_[0];
+		t[0] = -x0(2)/j_V_[0];
 		// No 2nd and 3rd stage
 		t[1] = 0;
 		t[2] = 0;
 
-		v0_[0] = x(1);
+		v0_V_[0] = x0(1);
 		// No 2nd and 3rd stage
-		v0_[1] = 0;
-		v0_[2] = 0;
-		v0_[3] = vf;
+		v0_V_[1] = 0;
+		v0_V_[2] = 0;
+		v0_V_[3] = vf;
 
-		x0_[0] = x(0);
+		x0_V_[0] = x0(0);
 		// No 2nd and 3rd stage
-		x0_[1] = 0;
-		x0_[2] = 0;
-		x0_[3] = x0_[1] + v0_[0]*t[0];
+		x0_V_[1] = 0;
+		x0_V_[2] = 0;
+		x0_V_[3] = x0_V_[1] + v0_V_[0]*t[0];
 
-		a0_[0] = x(2);
+		a0_V_[0] = x0(2);
 		// No 2nd and 3rd stage
-		a0_[1] = 0;
-		a0_[2] = 0;
-		a0_[3] = 0;
+		a0_V_[1] = 0;
+		a0_V_[2] = 0;
+		a0_V_[3] = 0;
 	}
 
 	else{
-		j_[0] = j_temp;
-		j_[1] = 0;
-		j_[2] = -j_temp;
+		j_V_[0] = j_temp;
+		j_V_[1] = 0;
+		j_V_[2] = -j_temp;
 
-		double t1 = -x(2)/j_temp + std::sqrt(0.5*pow(x(2),2) - j_temp*(x(1)-vf))/j_temp;
-		double t2 = -x(2)/j_temp - std::sqrt(0.5*pow(x(2),2) - j_temp*(x(1)-vf))/j_temp;
+		double t1 = -x0(2)/j_temp + std::sqrt(0.5*pow(x0(2),2) - j_temp*(x0(1)-vf))/j_temp;
+		double t2 = -x0(2)/j_temp - std::sqrt(0.5*pow(x0(2),2) - j_temp*(x0(1)-vf))/j_temp;
 
 		t1 = std::max(t1,t2);
 
 		// Check to see if we'll saturate
-		double a1f = x(2) + j_max_*t1;
+		double a1f = x0(2) + j_max_*t1;
 
 		if (std::abs(a1f) > a_max_){
 			double am = copysign(a_max_,j_temp);
-			t[0] = (am-x(2))/j_[0];
-			t[2] = -am/j_[2];
+			t[0] = (am-x0(2))/j_V_[0];
+			t[2] = -am/j_V_[2];
 
-			a0_[0] = x(2);
-			a0_[1] = a0_[0] + j_[0]*t[0];
-			a0_[2] = am;
-			a0_[3] = 0;
+			a0_V_[0] = x0(2);
+			a0_V_[1] = a0_V_[0] + j_V_[0]*t[0];
+			a0_V_[2] = am;
+			a0_V_[3] = 0;
 
-			v0_[0] = x(1);
-			v0_[1] = v0_[0] + a0_[0]*t[0] + 0.5*j_[0]*pow(t[0],2);	
-			v0_[2] = vf - am*t[2] - 0.5*j_[2]*pow(t[0],2);
-			v0_[3] = vf;
+			v0_V_[0] = x0(1);
+			v0_V_[1] = v0_V_[0] + a0_V_[0]*t[0] + 0.5*j_V_[0]*pow(t[0],2);	
+			v0_V_[2] = vf - am*t[2] - 0.5*j_V_[2]*pow(t[0],2);
+			v0_V_[3] = vf;
 
-			t[1] = (v0_[2]-v0_[1])/am;		
+			t[1] = (v0_V_[2]-v0_V_[1])/am;		
 
-			x0_[0] = x(0);
-			x0_[1] = x0_[0] + v0_[0]*t[0] + 0.5*a0_[0]*pow(t[0],2) + 1./6*j_[0]*pow(t[0],3);
-			x0_[2] = x0_[1] + v0_[1]*t[1] + 0.5*am*pow(t[1],2) ;
-			x0_[3] = x0_[2] + v0_[2]*t[2] + 0.5*am*pow(t[2],2) + 1./6*j_[2]*pow(t[2],3);
+			x0_V_[0] = x0(0);
+			x0_V_[1] = x0_V_[0] + v0_V_[0]*t[0] + 0.5*a0_V_[0]*pow(t[0],2) + 1./6*j_V_[0]*pow(t[0],3);
+			x0_V_[2] = x0_V_[1] + v0_V_[1]*t[1] + 0.5*am*pow(t[1],2) ;
+			x0_V_[3] = x0_V_[2] + v0_V_[2]*t[2] + 0.5*am*pow(t[2],2) + 1./6*j_V_[2]*pow(t[2],3);
 
 		}
 		else{
-			j_[0] = j_temp;
-			j_[1] = 0; // No second phase
-			j_[2] = -j_temp;
+			j_V_[0] = j_temp;
+			j_V_[1] = 0; // No second phase
+			j_V_[2] = -j_temp;
 
 			t[0] = t1;
 			t[1] = 0; // No second phase
-			t[2] = -(x(2)+j_[0]*t1)/j_[2];
+			t[2] = -(x0(2)+j_V_[0]*t1)/j_V_[2];
 
-			a0_[0] = x(2);
-			a0_[1] = 0; // No second phase
-			a0_[2] = a0_[0] + j_[0]*t[0];
-			a0_[3] = 0;
+			a0_V_[0] = x0(2);
+			a0_V_[1] = 0; // No second phase
+			a0_V_[2] = a0_V_[0] + j_V_[0]*t[0];
+			a0_V_[3] = 0;
 
-			v0_[0] = x(1);
-			v0_[1] = 0; // No second phase
-			v0_[2] = v0_[0] + a0_[0]*t[0] + 0.5*j_[0]*pow(t[0],2);
-			v0_[3] = vf;		
+			v0_V_[0] = x0(1);
+			v0_V_[1] = 0; // No second phase
+			v0_V_[2] = v0_V_[0] + a0_V_[0]*t[0] + 0.5*j_V_[0]*pow(t[0],2);
+			v0_V_[3] = vf;		
 
-			x0_[0] = x(0);
-			x0_[1] = 0; // No second phase
-			x0_[2] = x0_[0] + v0_[0]*t[0] + 0.5*a0_[0]*pow(t[0],2) + 1./6*j_[0]*pow(t[0],3);
-			x0_[3] = x0_[2] + v0_[2]*t[2] + 0.5*a0_[2]*pow(t[2],2) + 1./6*j_[2]*pow(t[2],3);
+			x0_V_[0] = x0(0);
+			x0_V_[1] = 0; // No second phase
+			x0_V_[2] = x0_V_[0] + v0_V_[0]*t[0] + 0.5*a0_V_[0]*pow(t[0],2) + 1./6*j_V_[0]*pow(t[0],3);
+			x0_V_[3] = x0_V_[2] + v0_V_[2]*t[2] + 0.5*a0_V_[2]*pow(t[2],2) + 1./6*j_V_[2]*pow(t[2],3);
 		}
 	}
 
-	X0.row(0) << x0_[0],x0_[1],x0_[2],x0_[3];
-	X0.row(1) << v0_[0],v0_[1],v0_[2],v0_[3];
-	X0.row(2) << a0_[0],a0_[1],a0_[2],a0_[3];
-	X0.row(3) << j_[0],j_[1],j_[2],j_[3];
+	X_switch.row(0) << x0_V_[0],x0_V_[1],x0_V_[2],x0_V_[3];
+	X_switch.row(1) << v0_V_[0],v0_V_[1],v0_V_[2],v0_V_[3];
+	X_switch.row(2) << a0_V_[0],a0_V_[1],a0_V_[2],a0_V_[3];
+	X_switch.row(3) << j_V_[0],j_V_[1],j_V_[2],j_V_[3];
 }
 
 
-void REACT::eval_trajectory(Eigen::MatrixXd& Xc, Eigen::Matrix4d X0, Eigen::Matrix4d Y0, std::vector<double> t_x, std::vector<double> t_y, double t){
+void REACT::eval_trajectory(Eigen::Matrix4d X_switch, Eigen::Matrix4d Y_switch_, std::vector<double> t_x, std::vector<double> t_y, double t, Eigen::MatrixXd& Xc){
 	// Eval x trajectory
 	int k = 0;
 	if (t < t_x[0]){
@@ -308,13 +308,13 @@ void REACT::eval_trajectory(Eigen::MatrixXd& Xc, Eigen::Matrix4d X0, Eigen::Matr
 		l = 3;
 	}
 
-	Xc(0,0) = X0(0,k) + X0(1,k)*tx_ + 0.5*X0(2,k)*pow(tx_,2) + 1.0/6.0*X0(3,k)*pow(tx_,3);
-	Xc(1,0) = 			X0(1,k)   +     X0(2,k)*tx_        +     0.5*X0(3,k)*pow(tx_,2);
-	Xc(2,0) = 					        X0(2,k)          +         X0(3,k)*tx_;
+	Xc(0,0) = X_switch(0,k) + X_switch(1,k)*tx_ + 0.5*X_switch(2,k)*pow(tx_,2) + 1.0/6.0*X_switch(3,k)*pow(tx_,3);
+	Xc(1,0) = 			X_switch(1,k)   +     X_switch(2,k)*tx_        +     0.5*X_switch(3,k)*pow(tx_,2);
+	Xc(2,0) = 					        X_switch(2,k)          +         X_switch(3,k)*tx_;
 
-	Xc(0,1) = Y0(0,l) + Y0(1,l)*ty_ + 0.5*Y0(2,l)*pow(ty_,2) + 1.0/6.0*Y0(3,l)*pow(ty_,3);
-	Xc(1,1) = Y0(1,l) + Y0(2,l)*ty_ + 0.5*Y0(3,l)*pow(ty_,2);
-	Xc(2,1) = Y0(2,l) + Y0(3,l)*ty_;
+	Xc(0,1) = Y_switch_(0,l) + Y_switch_(1,l)*ty_ + 0.5*Y_switch_(2,l)*pow(ty_,2) + 1.0/6.0*Y_switch_(3,l)*pow(ty_,3);
+	Xc(1,1) = Y_switch_(1,l) + Y_switch_(2,l)*ty_ + 0.5*Y_switch_(3,l)*pow(ty_,2);
+	Xc(2,1) = Y_switch_(2,l) + Y_switch_(3,l)*ty_;
 }
 
 
@@ -324,9 +324,9 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
  	msg_received_ = ros::Time::now().toSec();
  	convert_scan(msg, scanE_, scanV_);
  	// Cluster
- 	partition_scan(scanE_, Goals_, partition_, pose_, goal_);
+ 	partition_scan(scanE_, pose_, goal_, Goals_, partition_);
  	// Sort clusters
- 	sort_clusters(Sorted_Goals_, last_goal_, Goals_, pose_, goal_);
+ 	sort_clusters( last_goal_, Goals_, pose_, goal_, Sorted_Goals_);
  	// Pick cluster
 
  	std::cout << "Latency [ms]: " << 1000*(ros::Time::now().toSec() - msg_received_) << std::endl;
@@ -364,6 +364,7 @@ void REACT::pubROS(){
  	// Iterate through and pick cluster based on collision check
  }
 
+
 // We might not need this...
  void REACT::convert_scan(sensor_msgs::LaserScan msg, Eigen::MatrixXd& scanE , std::vector<double>& scanV ){
  	angle_max_ = msg.angle_max;
@@ -397,11 +398,11 @@ void REACT::collision_check(Eigen::MatrixXd X, Eigen::MatrixXd scan, Eigen::Vect
 	vfx_ = v*cos(angle_2_goal_);
 	vfy_ = v*sin(angle_2_goal_);
 
-	x_ << X.col(0);
-	y_ << X.col(1);
+	x0_ << X.col(0);
+	y0_ << X.col(1);
 
-	find_times(t_x_, X0_, x_, vfx_);
-	find_times(t_y_, Y0_, y_, vfy_);
+	find_times(x0_, vfx_, t_x_, X_switch_);
+	find_times(y0_, vfy_, t_y_, Y_switch_);
 
 	t_ = 0;
 	dt_ = 0.01;
@@ -417,7 +418,7 @@ void REACT::collision_check(Eigen::MatrixXd X, Eigen::MatrixXd scan, Eigen::Vect
 	Xc_ = X;
 
 	for(int i=0; i<num; i++){
-		eval_trajectory(Xc_,X0_,Y0_,t_x_,t_y_,t_);
+		eval_trajectory(X_switch_,Y_switch_,t_x_,t_y_,t_,Xc_);
 
 		// These need to be in body frame
 		r_ = sqrt(pow(Xc_(0,0)-X(0,0),2) + pow(Xc_(0,1)-X(0,1),2));
@@ -463,6 +464,11 @@ void REACT::collision_check(Eigen::MatrixXd X, Eigen::MatrixXd scan, Eigen::Vect
 	}
 }
 
+// void REACT::collision_check3(Eigen::Vector3d goal, Eigen::Vectorxd ranges, double buff, double v, bool& can_reach_goal){
+
+
+// }
+
 // Use this one
 void REACT::collision_check2(Eigen::MatrixXd X, std::vector<double> scan, Eigen::Vector3d goal, double buff, double v, bool& can_reach_goal){
 	// Find angle to goal
@@ -471,11 +477,11 @@ void REACT::collision_check2(Eigen::MatrixXd X, std::vector<double> scan, Eigen:
 	vfx_ = v*cos(angle_2_goal_);
 	vfy_ = v*sin(angle_2_goal_);
 
-	x_ << X.col(0);
-	y_ << X.col(1);
+	x0_ << X.col(0);
+	y0_ << X.col(1);
 
-	find_times(t_x_, X0_, x_, vfx_);
-	find_times(t_y_, Y0_, y_, vfy_);
+	find_times(x0_, vfx_, t_x_, X_switch_);
+	find_times(y0_, vfy_, t_y_, Y_switch_);
 
 	t_ = 0;
 	dt_ = 0.1;
@@ -503,7 +509,7 @@ void REACT::collision_check2(Eigen::MatrixXd X, std::vector<double> scan, Eigen:
 	// No need to do collision checking until 
 
 	for(int i=0; i<num; i++){
-		eval_trajectory(Xc_,X0_,Y0_,t_x_,t_y_,t_);
+		eval_trajectory(X_switch_,Y_switch_,t_x_,t_y_,t_,Xc_);
 
 		// These need to be in body frame
 		r_ = sqrt(pow(Xc_(0,0)-X(0,0),2) + pow(Xc_(0,1)-X(0,1),2));
@@ -550,7 +556,7 @@ void REACT::collision_check2(Eigen::MatrixXd X, std::vector<double> scan, Eigen:
 	}
 }
  
-void REACT::partition_scan(Eigen::MatrixXd scan, Eigen::MatrixXd& Goals, int& partition, Eigen::Vector3d pose, Eigen::Vector3d goal){
+void REACT::partition_scan(Eigen::MatrixXd scan, Eigen::Vector3d pose, Eigen::Vector3d goal, Eigen::MatrixXd& Goals, int& partition){
  	int j = 0;
  	double sum = 0;
  	double angle_2_index;
@@ -615,7 +621,7 @@ void REACT::partition_scan(Eigen::MatrixXd scan, Eigen::MatrixXd& Goals, int& pa
 
 
 
-void REACT::sort_clusters(Eigen::MatrixXd& Sorted_Goals, Eigen::Vector3d last_goal, Eigen::MatrixXd Goals,  Eigen::Vector3d pose, Eigen::Vector3d goal){
+void REACT::sort_clusters( Eigen::Vector3d last_goal, Eigen::MatrixXd Goals,  Eigen::Vector3d pose, Eigen::Vector3d goal, Eigen::MatrixXd& Sorted_Goals){
 
  	// Re-initialize
 	cost_queue_ = std::priority_queue<double, std::vector<double>, std::greater<double> > ();

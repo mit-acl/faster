@@ -50,7 +50,7 @@ int main(int argc, char **argv)
 	double diff;
 	then = clock();
 	for (int i=0; i<500; i++){
-		rp.find_times(t_x,X0,x,vf);
+		rp.find_times(x,vf,t_x,X0);
 	}
 	now = clock();
 
@@ -88,7 +88,7 @@ int main(int argc, char **argv)
 
 	then = clock();
 	for (int i=0; i<500; i++){
-	rp.eval_trajectory(Xc,X0,X0,t_x,t_x,t);
+	rp.eval_trajectory(X0,X0,t_x,t_x,t,Xc);
 	}
 	now = clock();
 
@@ -199,9 +199,8 @@ int main(int argc, char **argv)
 	Xc_(1,1) = 0;
 	Xc_(2,1) = 0;
 
-	rp.find_times(t_x_, X0_, x_, vfx_);
-	rp.find_times(t_y_, Y0_, y_, vfy_);
-
+	rp.find_times(x_, vfx_,t_x_, X0_);
+	rp.find_times(y_, vfy_, t_y_, Y0_);
 	// std::cout << "Switching times 1: " << t_x_[0] << std::endl;
 	// std::cout << "Switching times 2: " << t_x_[1] << std::endl;
 	// std::cout << "Switching times 3: " << t_x_[2] << std::endl<< std::endl;
@@ -217,7 +216,7 @@ int main(int argc, char **argv)
 	geometry_msgs::PoseStamped temp;
 
 	for(int i=0; i<num; i++){
-		rp.eval_trajectory(Xc_,X0_,Y0_,t_x_,t_y_,t_);
+		rp.eval_trajectory(X0_,Y0_,t_x_,t_y_,t_,Xc_);
 		temp.pose.position.x = Xc_(0,0);
 		temp.pose.position.y = Xc_(0,1);
 		t_+=dt;
@@ -231,7 +230,7 @@ int main(int argc, char **argv)
 
 	then = clock();
 	for (int i=0;i<500;i++){
-		rp.partition_scan(scan,Goals,part,pose,goal);
+		rp.partition_scan(scan,pose,goal,Goals,part);
 	}
 	now = clock();
 
@@ -249,7 +248,7 @@ int main(int argc, char **argv)
 
 	then = clock();
 	for (int i=0;i<500;i++){
-		rp.sort_clusters(Sorted_Goals,last_goal, Goals, pose, goal);
+		rp.sort_clusters(last_goal, Goals, pose, goal, Sorted_Goals);
 	}
 	now = clock();
 
