@@ -57,9 +57,11 @@ public:
 	void partition_scan(Eigen::MatrixXd scan, Eigen::Vector3d pose, Eigen::Vector3d goal, Eigen::MatrixXd& Goals, int& partition);
 	void find_times( Eigen::Vector3d x0, double vf, std::vector<double>& t, Eigen::Matrix4d&  X_switch);
 	void eval_trajectory(Eigen::Matrix4d X0, Eigen::Matrix4d Y0, std::vector<double> t_x, std::vector<double> t_y, double t, Eigen::MatrixXd& Xc);
-	void collision_check2(Eigen::MatrixXd X, std::vector<double> scan, Eigen::Vector3d goal, double buff, double v, bool& can_reach_goal);
 	void convert_scan(sensor_msgs::LaserScan msg, Eigen::MatrixXd& scanE , std::vector<double>& scanV );
 	void collision_check(Eigen::MatrixXd X, Eigen::MatrixXd scan, Eigen::Vector3d goal, double buff, double v, bool& can_reach_goal);
+	void collision_check2(Eigen::MatrixXd X, std::vector<double> scan, Eigen::Vector3d goal, double buff, double v,  bool& can_reach_goal);
+	void collision_check3(Eigen::MatrixXd X, Eigen::MatrixXd Sorted_Goals, int goal_counter_, double buff, double v, int partition , double& tf, bool& can_reach_goal);
+
 	void pick_cluster( Eigen::MatrixXd Sorted_Goals_, Eigen::Vector3d& local_goal_, Eigen::MatrixXd Xc);
 	void saturate(double &var, double min, double max);
 	
@@ -70,7 +72,6 @@ private:
 	double thresh_, yaw_, dist_2_goal_, angle_2_goal_, angle_check_, msg_received_, cost_, cost_i_, angle_diff_, safe_distance_, min_cost_, buffer_;
 	double num_samples_, angle_max_, angle_min_, angle_increment_;
 	double angle_diff_last_, angle_seg_inc_;
-	bool debug_, can_reach_goal_, corridor_free_;
 	int down_sample_, num_of_clusters_, goal_index_, collision_counter_, collision_counter_corridor_;
 
 	double spinup_time_, heading_, j_max_, a_max_, t0_;
@@ -114,6 +115,7 @@ private:
 	Eigen::MatrixXd scanE_;
 	Eigen::MatrixXd Goals_;
 	Eigen::MatrixXd Sorted_Goals_;
+	Eigen::MatrixXd X_prop_;
 
 	Eigen::Vector3d x0_;
 	Eigen::Vector3d y0_;
@@ -124,14 +126,19 @@ private:
 	Eigen::Vector3d next_goal_V_;
 	Eigen::Vector3d pose_;
 
+	Eigen::VectorXd ranges_;	
+
 
 
 	double vfx_, vfy_, t_, dt_, T_, r_, theta_, d_theta_, d_min_, tx_, ty_;
 	double theta_1_, theta_2_;
-	int index1_, index2_, partition_ ;
+	int index1_, index2_, partition_, min_d_ind ;
 	double max_angle_, min_angle_, d_angle_;
 
 	double r_i_, angle_i_, r_goal_;
+
+	bool debug_, can_reach_goal_, collision_detected_;
+
 
 	//## Logging and Debugging Functions
 

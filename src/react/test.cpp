@@ -21,6 +21,16 @@ int main(int argc, char **argv)
 
 	// std::cout << m.rows() << " " << m.cols() << std::endl;	
 
+	Eigen::Vector4f v2;
+	int pos = 0;
+	double d;
+
+	v2 <<  5, 2, 3, 1 ;
+
+	d = v2.minCoeff(&pos);
+
+	std::cout << d << "\n" << "pos=" <<  pos << "\n";
+
 
 	double a = 10;
 	std::cout << "Original val: " << a << std::endl;
@@ -88,7 +98,7 @@ int main(int argc, char **argv)
 
 	then = clock();
 	for (int i=0; i<500; i++){
-	rp.eval_trajectory(X0,X0,t_x,t_x,t,Xc);
+		rp.eval_trajectory(X0,X0,t_x,t_x,t,Xc);
 	}
 	now = clock();
 
@@ -96,9 +106,9 @@ int main(int argc, char **argv)
 
 	std::cout << "Function eval time [ms]: " << diff2 << std::endl << std::endl;
 
-	std::cout << "x goal: " << Xc(0,0) << " y goal: " << Xc(0,1) << std::endl;
-	std::cout << "vx goal: " << Xc(1,0) << " vy goal: " << Xc(1,1) << std::endl;
-	std::cout << "ax goal: " << Xc(2,0) << " ay goal: " << Xc(2,1) << std::endl << std::endl;
+	// std::cout << "x goal: " << Xc(0,0) << " y goal: " << Xc(0,1) << std::endl;
+	// std::cout << "vx goal: " << Xc(1,0) << " vy goal: " << Xc(1,1) << std::endl;
+	// std::cout << "ax goal: " << Xc(2,0) << " ay goal: " << Xc(2,1) << std::endl << std::endl;
 
 	
 
@@ -139,8 +149,9 @@ int main(int argc, char **argv)
 	std::cout << "Convert scan eval time [ms]: " << diff3 << std::endl << std::endl;
 
 	Eigen::MatrixXd X = Eigen::MatrixXd::Zero(3,2);
+
 	Eigen::Vector3d goal ;
-	goal << 3, 0, 0.5;
+	goal << 10, 0, 0.5;
 	double buff = 0.5;
 	double v = 2;
 	bool can_reach_goal;
@@ -168,6 +179,71 @@ int main(int argc, char **argv)
 	std::cout << "Can reach goal: " << can_reach_goal << std::endl;
 
 
+	
+	// std::cout << "Switching times 1: " << t_x_[0] << std::endl;
+	// std::cout << "Switching times 2: " << t_x_[1] << std::endl;
+	// std::cout << "Switching times 3: " << t_x_[2] << std::endl<< std::endl;
+
+	// std::cout << "X0_: " << X0_ << std::endl;
+	// std::cout << "Y0_: " << Y0_ << std::endl;
+	
+	Eigen::MatrixXd Goals ;
+	int part = 0;
+
+	then = clock();
+	for (int i=0;i<500;i++){
+		rp.partition_scan(scan,pose,goal,Goals,part);
+	}
+	now = clock();
+
+	double diff5 = 1000*((float)(now-then))/CLOCKS_PER_SEC/500;
+
+	std::cout << "Partition scan eval time [ms]: " << diff5 << std::endl << std::endl;
+
+	std::cout << "Num of partitions: " << part << std::endl << std::endl;
+
+	// std::cout << "Clusters: " << Goals << std::endl;
+
+	Eigen::MatrixXd Sorted_Goals ;
+	Eigen::Vector3d last_goal;
+	last_goal << goal;
+
+	then = clock();
+	for (int i=0;i<500;i++){
+		rp.sort_clusters(last_goal, Goals, pose, goal, Sorted_Goals);
+	}
+	now = clock();
+
+	double diff6 = 1000*((float)(now-then))/CLOCKS_PER_SEC/500;
+
+	std::cout << "Cluster sort eval time [ms]: " << diff6 << std::endl << std::endl;
+
+	// std::cout << "Sorted clusters: " << Sorted_Goals << std::endl;
+
+
+
+	int goal_counter = 0;
+	double tf;
+
+	then = clock();
+	for (int i=0; i<500; i++){
+		rp.collision_check3(X, Sorted_Goals,  goal_counter, buff, v, part, tf, can_reach_goal);
+	}	
+	now = clock();
+
+	diff4 = 1000*((float)(now-then))/CLOCKS_PER_SEC/500;
+
+	std::cout << "Collision check 3 eval time [ms]: " << diff4 << std::endl << std::endl;
+
+	std::cout << "Can reach goal: " << can_reach_goal << std::endl;
+
+
+	double dt = 0.01;
+	int num = (int) ceil(tf/dt);
+
+	double t_ = 0;
+	geometry_msgs::PoseStamped temp;
+
 	nav_msgs::Path path;
 	path.header.frame_id = "vicon";
 
@@ -179,8 +255,8 @@ int main(int argc, char **argv)
 	Eigen::Vector3d y_;
 
 	v = 2;
-	double vfx_ = v*cos(3.14159/4);
-	double vfy_ = v*sin(3.14159/4);
+	double vfx_ = v*cos(0);
+	double vfy_ = v*sin(0);
 
 	x_ << X.col(0);
 	y_ << X.col(1);
@@ -201,19 +277,6 @@ int main(int argc, char **argv)
 
 	rp.find_times(x_, vfx_,t_x_, X0_);
 	rp.find_times(y_, vfy_, t_y_, Y0_);
-	// std::cout << "Switching times 1: " << t_x_[0] << std::endl;
-	// std::cout << "Switching times 2: " << t_x_[1] << std::endl;
-	// std::cout << "Switching times 3: " << t_x_[2] << std::endl<< std::endl;
-
-	// std::cout << "X0_: " << X0_ << std::endl;
-	// std::cout << "Y0_: " << Y0_ << std::endl;
-
-	double T = std::max(t_x_[0] + t_x_[1] + t_x_[2],t_y_[0] + t_y_[1] + t_y_[2]);
-	double dt = 0.01;
-	int num = (int) ceil(T/dt);
-
-	double t_ = 0;
-	geometry_msgs::PoseStamped temp;
 
 	for(int i=0; i<num; i++){
 		rp.eval_trajectory(X0_,Y0_,t_x_,t_y_,t_,Xc_);
@@ -222,44 +285,6 @@ int main(int argc, char **argv)
 		t_+=dt;
 		path.poses.push_back(temp);
 	}
-
-
-
-	Eigen::MatrixXd Goals ;
-	int part = 0;
-
-	then = clock();
-	for (int i=0;i<500;i++){
-		rp.partition_scan(scan,pose,goal,Goals,part);
-	}
-	now = clock();
-
-	double diff5 = 1000*((float)(now-then))/CLOCKS_PER_SEC/500;
-
-	std::cout << "Partition scan eval time [ms]: " << diff5 << std::endl << std::endl;
-
-	std::cout << "Num of partitions: " << part << std::endl << std::endl;
-
-	std::cout << "Clusters: " << Goals << std::endl;
-
-	Eigen::MatrixXd Sorted_Goals ;
-	Eigen::Vector3d last_goal;
-	last_goal << goal;
-
-	then = clock();
-	for (int i=0;i<500;i++){
-		rp.sort_clusters(last_goal, Goals, pose, goal, Sorted_Goals);
-	}
-	now = clock();
-
-	double diff6 = 1000*((float)(now-then))/CLOCKS_PER_SEC/500;
-
-	std::cout << "Cluster sort eval time [ms]: " << diff6 << std::endl << std::endl;
-
-	std::cout << "Sorted clusters: " << Sorted_Goals << std::endl;
-
-
-
 
 	ros::Publisher chatter_pub = n.advertise<nav_msgs::Path>("traj", 1);
 

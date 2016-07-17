@@ -32,7 +32,6 @@ REACT::REACT(){
 	collision_counter_corridor_ = 0;
 	collision_counter_ = 0;
 	can_reach_goal_ = false;
-	corridor_free_ = false;
 	inf_ = std::numeric_limits<double>::max();
 
 	quad_status_ = state_.NOT_FLYING;
@@ -464,10 +463,77 @@ void REACT::collision_check(Eigen::MatrixXd X, Eigen::MatrixXd scan, Eigen::Vect
 	}
 }
 
-// void REACT::collision_check3(Eigen::Vector3d goal, Eigen::Vectorxd ranges, double buff, double v, bool& can_reach_goal){
+void REACT::collision_check3(Eigen::MatrixXd X, Eigen::MatrixXd Sorted_Goals, int goal_counter, double buff, double v, int partition, double& tf, bool& can_reach_goal){
+	//Re-intialize
+	can_reach_goal = false;
+	collision_detected_ = false;
+	min_d_ind = 0;
+	ranges_ = Eigen::VectorXd::Zero(Sorted_Goals.cols());
+	ranges_ = Sorted_Goals.col(3);
+	X_prop_ = Eigen::MatrixXd::Zero(3,2);
+	X_prop_ = X;
+
+	angle_2_goal_ = atan2( Sorted_Goals(goal_counter,1) - X(0,1), Sorted_Goals(goal_counter,0) - X(0,0));
+	vfx_ = v*cos(angle_2_goal_);
+	vfy_ = v*sin(angle_2_goal_);
 
 
-// }
+	x0_ << X.col(0);
+	y0_ << X.col(1);
+
+	find_times(x0_, vfx_, t_x_, X_switch_);
+	find_times(y0_, vfy_, t_y_, Y_switch_);
+
+	// Find closest obstacle (aka)
+	d_min_ = ranges_.minCoeff(&min_d_ind);
+
+
+	// If the closest obstacle is the we're heading towards then we're good
+	if (min_d_ind==goal_index_){
+		can_reach_goal = true;
+		std::cout << "can reach on first try!" << std::endl;;
+
+	} 
+	// Something else is closer, need to prop to next time step
+	else{
+		// evaluate at time required to travel d_min/2
+		t_ = d_min_/v/2;
+		while (!collision_detected_){
+
+			// std::cout << "t: " << t_ << std::endl;
+
+			eval_trajectory(X_switch_,Y_switch_,t_x_,t_y_,t_,X_prop_);
+			// Re-calculate ranges based on prop state
+			for(int i=0;i<partition;i++){
+				ranges_(i) = (Sorted_Goals.block(i,0,1,2)-X_prop_.row(0)).norm();
+			}
+
+			// std::cout << "(x,y): " << X_prop_.row(0) << std::endl;
+
+
+			d_min_  = ranges_.minCoeff(&min_d_ind);
+
+			// std::cout << "d_min: " << d_min_ << std::endl;
+
+
+			// Check if the min distance is the current goal
+			if (min_d_ind==goal_index_){
+				can_reach_goal = true;
+			}
+			// Check if the distance is less than our buffer
+			else if (d_min_ < buff){
+				collision_detected_ = true;
+				can_reach_goal = false;
+			}
+			// Neither have happened so propogate again
+			else{
+				t_ += d_min_/v/2;
+			}
+		}
+	}
+	tf = t_;
+	// std::cout << "Tf: " << t_ << std::endl;
+}
 
 // Use this one
 void REACT::collision_check2(Eigen::MatrixXd X, std::vector<double> scan, Eigen::Vector3d goal, double buff, double v, bool& can_reach_goal){
