@@ -19,12 +19,11 @@ REACT::REACT(){
 	ros::param::get("~goal_y",goal_(1));
 	ros::param::get("~goal_z",goal_(2));
 
+	heading_ = atan2(goal_(1),goal_(0));
 	last_goal_ << goal_;
 	local_goal_ << goal_;
 
 	ros::param::get("cntrl/spinup_time",spinup_time_);
-
-	ros::param::get("~heading",heading_);
 	ros::param::get("~speed",v_max_);
 
 
@@ -52,6 +51,7 @@ REACT::REACT(){
 
 void REACT::global_goalCB(const geometry_msgs::PointStamped& msg){
 	goal_ << msg.point.x, msg.point.y, msg.point.z;
+	heading_ = atan2(goal_(1),goal_(0));
 }
 
 void REACT::stateCB(const acl_system::ViconState& msg)
