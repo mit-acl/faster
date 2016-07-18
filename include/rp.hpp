@@ -53,16 +53,17 @@ public:
 	void pubROS();
 
 	// Make these private after testing
+	void get_traj(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, std::vector<double>& t_fx, std::vector<double>& t_fy, Eigen::Matrix4d& Xf_switch, Eigen::Matrix4d& Yf_switch );
 	void sort_clusters( Eigen::Vector3d last_goal, Eigen::MatrixXd Goals,  Eigen::Vector3d pose, Eigen::Vector3d goal, Eigen::MatrixXd& Sorted_Goals);
 	void partition_scan(Eigen::MatrixXd scan, Eigen::Vector3d pose, Eigen::MatrixXd& Goals, int& partition);
 	void find_times( Eigen::Vector3d x0, double vf, std::vector<double>& t, Eigen::Matrix4d&  X_switch);
-	void eval_trajectory(Eigen::Matrix4d X0, Eigen::Matrix4d Y0, std::vector<double> t_x, std::vector<double> t_y, double t, Eigen::MatrixXd& Xc);
+	void eval_trajectory(Eigen::Matrix4d X0, Eigen::Matrix4d Y0, std::vector<double> t_x, std::vector<double> t_y, double t, Eigen::MatrixXd& X);
 	void convert_scan(sensor_msgs::LaserScan msg, Eigen::MatrixXd& scanE , std::vector<double>& scanV );
 	void collision_check(Eigen::MatrixXd X, Eigen::MatrixXd Sorted_Goals, int goal_counter_, double buff, double v, int partition , double& tf, bool& can_reach_goal);
 	void get_vels(Eigen::Vector3d local_goal, Eigen::MatrixXd X, double v, double& vx, double& vy);
-	void pick_cluster( Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, Eigen::Vector3d& local_goal, bool& can_reach_goal);
+	void pick_cluster( Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, Eigen::Vector3d& last_goal, Eigen::Vector3d& local_goal, bool& can_reach_goal);
 	void saturate(double &var, double min, double max);
-	
+	void eigen2quadGoal(Eigen::MatrixXd X, acl_system::QuadGoal& quad_goal);
 
 private:
 
@@ -95,6 +96,9 @@ private:
 	std::vector<double> t_x_{std::vector<double>(3,0)};
 	std::vector<double> t_y_{std::vector<double>(3,0)}; 
 
+	std::vector<double> t_xf_{std::vector<double>(3,0)};
+	std::vector<double> t_yf_{std::vector<double>(3,0)};
+
 	std::vector<double> x0_V_{std::vector<double>(4,0)};
 	std::vector<double> v0_V_{std::vector<double>(4,0)};
 	std::vector<double> a0_V_{std::vector<double>(4,0)};
@@ -110,9 +114,12 @@ private:
 
 	Eigen::Matrix4d X_switch_; // [x0; v0; a0; j0]
 	Eigen::Matrix4d Y_switch_;
-	Eigen::Matrix4d X_;
 
-	Eigen::MatrixXd Xc_; 
+	Eigen::Matrix4d Xf_switch_; // [x0; v0; a0; j0]
+	Eigen::Matrix4d Yf_switch_;
+
+	Eigen::MatrixXd X_; 
+	Eigen::MatrixXd XE_;
 	Eigen::MatrixXd scanE_;
 	Eigen::MatrixXd Goals_;
 	Eigen::MatrixXd Sorted_Goals_;
@@ -133,7 +140,7 @@ private:
 
 
 
-	double vfx_, vfy_, t_, dt_, tf_, r_, theta_, d_theta_, d_min_, tx_, ty_, v_, v_max_;
+	double vfx_, vfy_, t_, tE_, dt_, tf_, r_, theta_, d_theta_, d_min_, tx_, ty_, v_, v_max_;
 	double theta_1_, theta_2_;
 	int index1_, index2_, partition_, min_d_ind, goal_index_;
 	int num_ = 100;
