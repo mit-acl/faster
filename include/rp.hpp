@@ -141,7 +141,7 @@ private:
 
 
 	double vfx_, vfy_, t_, tE_, dt_, tf_, r_, theta_, d_theta_, d_min_, tx_, ty_, v_, v_max_;
-	double theta_1_, theta_2_;
+	double theta_1_, theta_2_, tra_gen_;
 	int index1_, index2_, partition_, min_d_ind, goal_index_;
 	int num_ = 100;
 	double max_angle_, min_angle_, d_angle_;

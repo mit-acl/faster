@@ -20,6 +20,7 @@ REACT::REACT(){
 	ros::param::get("~goal_z",goal_(2));
 
 	last_goal_ << goal_;
+	local_goal_ << goal_;
 
 	ros::param::get("cntrl/spinup_time",spinup_time_);
 
@@ -180,12 +181,10 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
  	convert_scan(msg, scanE_, scanV_);
  	// Cluster
  	partition_scan(scanE_, pose_, Goals_, partition_);
+
  	// Sort clusters
  	sort_clusters(last_goal_, Goals_, pose_, goal_, Sorted_Goals_);
  	// Pick cluster
-
- 	std::cout << Sorted_Goals_ << std::endl;
-
  	pick_cluster(Sorted_Goals_, X_, last_goal_, local_goal_, can_reach_goal_);
 
  	if (!can_reach_goal_){
@@ -199,7 +198,9 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
 
  	t0_ = ros::Time::now().toSec();
 
- 	std::cout << "Latency [ms]: " << 1000*(ros::Time::now().toSec() - msg_received_) << std::endl;
+ 	tra_gen_ = ros::Time::now().toSec();
+
+ 	std::cout << "Latency [ms]: " << 1000*( tra_gen_ - msg_received_) << std::endl;
 
  	if(debug_){
  		convert2ROS(Goals_);
@@ -207,49 +208,6 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
  	}
  	
  }
-
-void REACT::convert2ROS(Eigen::MatrixXd Goals){
-
- 	// Cluster
- 	goal_points_ros_.poses.clear();
- 	goal_points_ros_.header.stamp = ros::Time::now();
- 	goal_points_ros_.header.frame_id = "vicon";
-
- 	for (int i=0; i < Goals.rows(); i++){
- 		temp_goal_point_ros_.position.x = Goals(i,0);
- 		temp_goal_point_ros_.position.y = Goals(i,1);
- 		temp_goal_point_ros_.position.z = Goals(i,2);
-
- 		temp_goal_point_ros_.orientation.w = cos(Goals(i,4)/2) ;
- 		temp_goal_point_ros_.orientation.z = sin(Goals(i,4)/2);
-
- 		goal_points_ros_.poses.push_back(temp_goal_point_ros_);
-	}
-
-	// Trajectory
-	traj_ros_.poses.clear();
-	traj_ros_.header.stamp = ros::Time::now();
-	traj_ros_.header.frame_id = "vicon";
-
-	dt_ = tf_/num_;
-	t_ = 0;
-	XE_ = X_;
-	for(int i=0; i<num_; i++){
-		eval_trajectory(X_switch_,Y_switch_,t_x_,t_y_,t_,XE_);
-		temp_path_point_ros_.pose.position.x = XE_(0,0);
-		temp_path_point_ros_.pose.position.y = XE_(0,1);
-		t_+=dt_;
-		traj_ros_.poses.push_back(temp_path_point_ros_);
-	}
-
-
- }
-
-void REACT::pubROS(){
-	int_goal_pub.publish(goal_points_ros_);
-	traj_pub.publish(traj_ros_);
-}
-
 
 void  REACT::pick_cluster( Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, Eigen::Vector3d& last_goal, Eigen::Vector3d& local_goal, bool& can_reach_goal){
  	// Iterate through and pick cluster based on collision check
@@ -265,7 +223,6 @@ void  REACT::pick_cluster( Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, Eige
 
  	if(can_reach_goal){
  		goal_index_--;
- 		std::cout << "goal index " << goal_index_ << std::endl;
  		local_goal << Sorted_Goals.block(goal_index_,0,1,3).transpose();
  	}
  	else{
@@ -433,10 +390,7 @@ void REACT::sort_clusters( Eigen::Vector3d last_goal, Eigen::MatrixXd Goals,  Ei
 	last_goal_V_ = last_goal_V_/last_goal_V_.norm();
 
 	r_goal_ = (goal - pose).norm();
-	angle_2_goal_ = atan2( goal(1) -pose(1), goal(0) - pose(0)) - heading_;
-
-	std::cout << angle_2_goal_ << std::endl;
-	std::cout << pose << std::endl;
+	angle_2_goal_ = atan2( goal(1) -pose(1), goal(0) - pose(0)) ;
 
 	num_of_clusters_ = Goals.rows();
 
@@ -445,17 +399,16 @@ void REACT::sort_clusters( Eigen::Vector3d last_goal, Eigen::MatrixXd Goals,  Ei
  		next_goal_V_ = Goals.block(i,0,1,3).transpose() - pose;
 
  		r_i_ = next_goal_V_.norm();
- 		angle_i_ = atan2 ( Goals(i,1) - pose(1), Goals(i,0) - pose(0) ) - heading_;
- 		// std::cout << angle_i_ << std::endl;
+ 		angle_i_ = atan2 ( Goals(i,1) - pose(1), Goals(i,0) - pose(0) );
  		
  		angle_diff_  =  std::abs(angle_i_)  - std::abs(angle_2_goal_ );
 
  		// Normalize
 		next_goal_V_ = next_goal_V_/next_goal_V_.norm();
 
- 		angle_diff_last_ = next_goal_V_.dot(last_goal_V_);
+ 		angle_diff_last_ = acos(next_goal_V_.dot(last_goal_V_));
 
- 		cost_i_ = pow(angle_diff_,2) + 0*pow(angle_diff_last_,2) + pow(1/r_i_,2);
+ 		cost_i_ = pow(angle_diff_,2) + pow(angle_diff_last_,2) + pow(1/r_i_,2);
 
  		cost_queue_.push(cost_i_);
  		cost_v_.push_back(cost_i_);
@@ -706,4 +659,43 @@ void REACT::saturate(double &var, double min, double max){
 	else if (var > max){
 		var = max;
 	}
+}
+
+void REACT::convert2ROS(Eigen::MatrixXd Goals){
+ 	// Cluster
+ 	goal_points_ros_.poses.clear();
+ 	goal_points_ros_.header.stamp = ros::Time::now();
+ 	goal_points_ros_.header.frame_id = "vicon";
+
+ 	for (int i=0; i < Goals.rows(); i++){
+ 		temp_goal_point_ros_.position.x = Goals(i,0);
+ 		temp_goal_point_ros_.position.y = Goals(i,1);
+ 		temp_goal_point_ros_.position.z = Goals(i,2);
+
+ 		temp_goal_point_ros_.orientation.w = cos(Goals(i,4)/2) ;
+ 		temp_goal_point_ros_.orientation.z = sin(Goals(i,4)/2);
+
+ 		goal_points_ros_.poses.push_back(temp_goal_point_ros_);
+	}
+
+	// Trajectory
+	traj_ros_.poses.clear();
+	traj_ros_.header.stamp = ros::Time::now();
+	traj_ros_.header.frame_id = "vicon";
+
+	dt_ = tf_/num_;
+	t_ = 0;
+	XE_ = X_;
+	for(int i=0; i<num_; i++){
+		eval_trajectory(X_switch_,Y_switch_,t_x_,t_y_,t_,XE_);
+		temp_path_point_ros_.pose.position.x = XE_(0,0);
+		temp_path_point_ros_.pose.position.y = XE_(0,1);
+		t_+=dt_;
+		traj_ros_.poses.push_back(temp_path_point_ros_);
+	}
+ }
+
+void REACT::pubROS(){
+	int_goal_pub.publish(goal_points_ros_);
+	traj_pub.publish(traj_ros_);
 }
