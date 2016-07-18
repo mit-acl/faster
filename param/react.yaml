@@ -11,3 +11,5 @@ goal_y: -5.5
 goal_z: 0.5
 
 heading: -1.57
+
+speed: 1

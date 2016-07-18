@@ -35,7 +35,7 @@ class REACT
 public:
 	REACT();
 
-	ros::Publisher goal_pub, new_goal_pub, int_goal_pub, last_goal_pub, quad_goal_pub, pub_clean_scan;
+	ros::Publisher traj_pub, goal_pub, new_goal_pub, int_goal_pub, last_goal_pub, quad_goal_pub, pub_clean_scan;
 
 	void scanCB(const sensor_msgs::LaserScan& msg);
 	void stateCB(const acl_system::ViconState& msg);
@@ -54,15 +54,13 @@ public:
 
 	// Make these private after testing
 	void sort_clusters( Eigen::Vector3d last_goal, Eigen::MatrixXd Goals,  Eigen::Vector3d pose, Eigen::Vector3d goal, Eigen::MatrixXd& Sorted_Goals);
-	void partition_scan(Eigen::MatrixXd scan, Eigen::Vector3d pose, Eigen::Vector3d goal, Eigen::MatrixXd& Goals, int& partition);
+	void partition_scan(Eigen::MatrixXd scan, Eigen::Vector3d pose, Eigen::MatrixXd& Goals, int& partition);
 	void find_times( Eigen::Vector3d x0, double vf, std::vector<double>& t, Eigen::Matrix4d&  X_switch);
 	void eval_trajectory(Eigen::Matrix4d X0, Eigen::Matrix4d Y0, std::vector<double> t_x, std::vector<double> t_y, double t, Eigen::MatrixXd& Xc);
 	void convert_scan(sensor_msgs::LaserScan msg, Eigen::MatrixXd& scanE , std::vector<double>& scanV );
-	void collision_check(Eigen::MatrixXd X, Eigen::MatrixXd scan, Eigen::Vector3d goal, double buff, double v, bool& can_reach_goal);
-	void collision_check2(Eigen::MatrixXd X, std::vector<double> scan, Eigen::Vector3d goal, double buff, double v,  bool& can_reach_goal);
-	void collision_check3(Eigen::MatrixXd X, Eigen::MatrixXd Sorted_Goals, int goal_counter_, double buff, double v, int partition , double& tf, bool& can_reach_goal);
-
-	void pick_cluster( Eigen::MatrixXd Sorted_Goals_, Eigen::Vector3d& local_goal_, Eigen::MatrixXd Xc);
+	void collision_check(Eigen::MatrixXd X, Eigen::MatrixXd Sorted_Goals, int goal_counter_, double buff, double v, int partition , double& tf, bool& can_reach_goal);
+	void get_vels(Eigen::Vector3d local_goal, Eigen::MatrixXd X, double v, double& vx, double& vy);
+	void pick_cluster( Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, Eigen::Vector3d& local_goal, bool& can_reach_goal);
 	void saturate(double &var, double min, double max);
 	
 
@@ -72,23 +70,26 @@ private:
 	double thresh_, yaw_, dist_2_goal_, angle_2_goal_, angle_check_, msg_received_, cost_, cost_i_, angle_diff_, safe_distance_, min_cost_, buffer_;
 	double num_samples_, angle_max_, angle_min_, angle_increment_;
 	double angle_diff_last_, angle_seg_inc_;
-	int down_sample_, num_of_clusters_, goal_index_, collision_counter_, collision_counter_corridor_;
+	int down_sample_, num_of_clusters_, collision_counter_, collision_counter_corridor_;
 
 	double spinup_time_, heading_, j_max_, a_max_, t0_;
 	int quad_status_;
-	acl_system::QuadState state_;
-	acl_system::QuadFlightEvent quad_event_;
-
+	
 
 	std::ostringstream errorMsg, warnMsg;
 
-	geometry_msgs::PoseArray goal_points_ros_ ;
-	geometry_msgs::Pose temp_goal_point_ros_;
-
 
 	// // // // //
+	// Ros var initialization
+	geometry_msgs::PoseArray goal_points_ros_ ;
+	geometry_msgs::Pose temp_goal_point_ros_;
+	geometry_msgs::PoseStamped temp_path_point_ros_;
 
+	nav_msgs::Path traj_ros_;
 	acl_system::QuadGoal quad_goal_;
+	acl_system::QuadState state_;
+	acl_system::QuadFlightEvent quad_event_;
+
 
 	// Weird initialization
 	std::vector<double> t_x_{std::vector<double>(3,0)};
@@ -125,14 +126,17 @@ private:
 	Eigen::Vector3d last_goal_V_;
 	Eigen::Vector3d next_goal_V_;
 	Eigen::Vector3d pose_;
+	Eigen::Vector3d current_local_goal_;
+
 
 	Eigen::VectorXd ranges_;	
 
 
 
-	double vfx_, vfy_, t_, dt_, T_, r_, theta_, d_theta_, d_min_, tx_, ty_;
+	double vfx_, vfy_, t_, dt_, tf_, r_, theta_, d_theta_, d_min_, tx_, ty_, v_, v_max_;
 	double theta_1_, theta_2_;
-	int index1_, index2_, partition_, min_d_ind ;
+	int index1_, index2_, partition_, min_d_ind, goal_index_;
+	int num_ = 100;
 	double max_angle_, min_angle_, d_angle_;
 
 	double r_i_, angle_i_, r_goal_;
