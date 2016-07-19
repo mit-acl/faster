@@ -14,23 +14,6 @@ int main(int argc, char **argv)
 
 	Eigen::Matrix4d X0 = Eigen::Matrix4d::Zero();
 
-	// std::vector<float> v {std::vector<float>(3,0)};
-	// std::cout << Eigen::Map<Eigen::MatrixXd, 0, Eigen::InnerStride<1>>(v) << std::endl;
-
-	// m(10,10) = 0;
-
-	// std::cout << m.rows() << " " << m.cols() << std::endl;	
-
-	Eigen::Vector4f v2;
-	int pos = 0;
-	double d;
-
-	v2 <<  5, 2, 3, 1 ;
-
-	d = v2.minCoeff(&pos);
-
-	std::cout << d << "\n" << "pos=" <<  pos << "\n";
-
 
 	double a = 10;
 	std::cout << "Original val: " << a << std::endl;
@@ -156,43 +139,14 @@ int main(int argc, char **argv)
 	double v = 2;
 	bool can_reach_goal;
 
-	then = clock();
-	for (int i=0; i<500; i++){
-		rp.collision_check(X,scan,goal,buff,v,can_reach_goal);
-	}	
-	now = clock();
-
-	double diff4 = 1000*((float)(now-then))/CLOCKS_PER_SEC/500;
-
-	std::cout << "Collision check 1 eval time [ms]: " << diff4 << std::endl << std::endl;
-
-	then = clock();
-	for (int i=0; i<500; i++){
-		rp.collision_check2(X,scan2,goal,buff,v,can_reach_goal);
-	}	
-	now = clock();
-
-	diff4 = 1000*((float)(now-then))/CLOCKS_PER_SEC/500;
-
-	std::cout << "Collision check 2 eval time [ms]: " << diff4 << std::endl << std::endl;
-
-	std::cout << "Can reach goal: " << can_reach_goal << std::endl;
-
-
 	
-	// std::cout << "Switching times 1: " << t_x_[0] << std::endl;
-	// std::cout << "Switching times 2: " << t_x_[1] << std::endl;
-	// std::cout << "Switching times 3: " << t_x_[2] << std::endl<< std::endl;
-
-	// std::cout << "X0_: " << X0_ << std::endl;
-	// std::cout << "Y0_: " << Y0_ << std::endl;
 	
 	Eigen::MatrixXd Goals ;
 	int part = 0;
 
 	then = clock();
 	for (int i=0;i<500;i++){
-		rp.partition_scan(scan,pose,goal,Goals,part);
+		rp.partition_scan(scan,pose,Goals,part);
 	}
 	now = clock();
 
@@ -222,35 +176,47 @@ int main(int argc, char **argv)
 
 
 
+	// #### Collision check #### 
 	int goal_counter = 0;
 	double tf;
 
 	then = clock();
 	for (int i=0; i<500; i++){
-		rp.collision_check3(X, Sorted_Goals,  goal_counter, buff, v, part, tf, can_reach_goal);
+		rp.collision_check(X, Sorted_Goals,  goal_counter, buff, v, part, tf, can_reach_goal);
 	}	
 	now = clock();
 
-	diff4 = 1000*((float)(now-then))/CLOCKS_PER_SEC/500;
+	double diff4 = 1000*((float)(now-then))/CLOCKS_PER_SEC/500;
 
 	std::cout << "Collision check 3 eval time [ms]: " << diff4 << std::endl << std::endl;
 
 	std::cout << "Can reach goal: " << can_reach_goal << std::endl;
 
 
-	double dt = 0.01;
-	int num = (int) ceil(tf/dt);
+	// #### Scan check #### 
+	// then = clock();
+	// for (int i=0; i<500; i++){
+	// 	rp.scanCB(test_scan);
+	// }	
+	// now = clock();
 
-	double t_ = 0;
-	geometry_msgs::PoseStamped temp;
+	// double diff7 = 1000*((float)(now-then))/CLOCKS_PER_SEC/500;
 
-	nav_msgs::Path path;
-	path.header.frame_id = "vicon";
+	// std::cout << "Scan callback eval time [ms]: " << diff7 << std::endl << std::endl;
 
 
+	// #### Stop check #### 
+	X(1,0) = v;
 	std::vector<double> t_x_{std::vector<double>(3,0)};
 	std::vector<double> t_y_{std::vector<double>(3,0)};
 
+	Eigen::Matrix4d X0_ = Eigen::Matrix4d::Zero();
+	Eigen::Matrix4d Y0_ = Eigen::Matrix4d::Zero();
+
+	rp.get_stop_dist(X, goal, goal, v, t_x_, t_y_,X0_, Y0_);
+
+
+	// #### Replan at top speed
 	Eigen::Vector3d x_;
 	Eigen::Vector3d y_;
 
@@ -261,10 +227,7 @@ int main(int argc, char **argv)
 	x_ << X.col(0);
 	y_ << X.col(1);
 
-	x_(1) = 1;
-
-	Eigen::Matrix4d X0_ = Eigen::Matrix4d::Zero();
-	Eigen::Matrix4d Y0_ = Eigen::Matrix4d::Zero();
+	x_(1) = 2;
 
 	Eigen::MatrixXd Xc_(3,2);
 
@@ -278,28 +241,74 @@ int main(int argc, char **argv)
 	rp.find_times(x_, vfx_,t_x_, X0_);
 	rp.find_times(y_, vfy_, t_y_, Y0_);
 
-	for(int i=0; i<num; i++){
-		rp.eval_trajectory(X0_,Y0_,t_x_,t_y_,t_,Xc_);
-		temp.pose.position.x = Xc_(0,0);
-		temp.pose.position.y = Xc_(0,1);
-		t_+=dt;
-		path.poses.push_back(temp);
-	}
-
-	ros::Publisher chatter_pub = n.advertise<nav_msgs::Path>("traj", 1);
-
-	ros::Rate loop_rate(10);
+	// std::cout << Y0_ << std::endl;
+	// std::cout << X0_ << std::endl;
 
 
-	while (ros::ok())
-	{
+	rp.eval_trajectory(X0_,Y0_,t_x_,t_y_,5,Xc_);
 
-		chatter_pub.publish(path);
+	std::cout << Xc_ << std::endl;
 
-		ros::spinOnce();
 
-		loop_rate.sleep();
-	}
+
+
+
+	// // #### Vis path #### 
+	// double dt = 0.01;
+	// int num = (int) ceil(tf/dt);
+
+	// double t_ = 0;
+	// geometry_msgs::PoseStamped temp;
+
+	// nav_msgs::Path path;
+	// path.header.frame_id = "vicon";
+
+	// Eigen::Vector3d x_;
+	// Eigen::Vector3d y_;
+
+	// v = 2;
+	// double vfx_ = v*cos(0);
+	// double vfy_ = v*sin(0);
+
+	// x_ << X.col(0);
+	// y_ << X.col(1);
+
+	// x_(1) = 1;
+
+	// Eigen::MatrixXd Xc_(3,2);
+
+	// Xc_(0,0) = 0;
+	// Xc_(1,0) = 0;
+	// Xc_(2,0) = 0;
+	// Xc_(0,1) = 0;
+	// Xc_(1,1) = 0;
+	// Xc_(2,1) = 0;
+
+	// rp.find_times(x_, vfx_,t_x_, X0_);
+	// rp.find_times(y_, vfy_, t_y_, Y0_);
+
+	// for(int i=0; i<num; i++){
+	// 	rp.eval_trajectory(X0_,Y0_,t_x_,t_y_,t_,Xc_);
+	// 	temp.pose.position.x = Xc_(0,0);
+	// 	temp.pose.position.y = Xc_(0,1);
+	// 	t_+=dt;
+	// 	path.poses.push_back(temp);
+	// }
+
+	// ros::Publisher chatter_pub = n.advertise<nav_msgs::Path>("traj", 1);
+
+	// ros::Rate loop_rate(10);
+
+
+	// while (ros::ok())
+	// {
+
+	// 	chatter_pub.publish(path);
+
+	// 	ros::spinOnce();
+
+	// 	loop_rate.sleep();
+	// }
 
 
 

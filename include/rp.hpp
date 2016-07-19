@@ -53,6 +53,7 @@ public:
 	void pubROS();
 
 	// Make these private after testing
+	void get_stop_dist(Eigen::MatrixXd X, Eigen::Vector3d local_goal,Eigen::Vector3d goal, double& v, std::vector<double>& t_fx, std::vector<double>& t_fy, Eigen::Matrix4d& Xf_switch, Eigen::Matrix4d& Yf_switch);
 	void get_traj(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, std::vector<double>& t_fx, std::vector<double>& t_fy, Eigen::Matrix4d& Xf_switch, Eigen::Matrix4d& Yf_switch );
 	void sort_clusters( Eigen::Vector3d last_goal, Eigen::MatrixXd Goals,  Eigen::Vector3d pose, Eigen::Vector3d goal, Eigen::MatrixXd& Sorted_Goals);
 	void partition_scan(Eigen::MatrixXd scan, Eigen::Vector3d pose, Eigen::MatrixXd& Goals, int& partition);
@@ -99,6 +100,9 @@ private:
 	std::vector<double> t_xf_{std::vector<double>(3,0)};
 	std::vector<double> t_yf_{std::vector<double>(3,0)};
 
+	std::vector<double> t_x_stop_{std::vector<double>(3,0)};
+	std::vector<double> t_y_stop_{std::vector<double>(3,0)};
+
 	std::vector<double> x0_V_{std::vector<double>(4,0)};
 	std::vector<double> v0_V_{std::vector<double>(4,0)};
 	std::vector<double> a0_V_{std::vector<double>(4,0)};
@@ -118,12 +122,17 @@ private:
 	Eigen::Matrix4d Xf_switch_; // [x0; v0; a0; j0]
 	Eigen::Matrix4d Yf_switch_;
 
+	Eigen::Matrix4d X_switch_stop_ ;
+	Eigen::Matrix4d Y_switch_stop_ ;
+
 	Eigen::MatrixXd X_; 
 	Eigen::MatrixXd XE_;
 	Eigen::MatrixXd scanE_;
 	Eigen::MatrixXd Goals_;
 	Eigen::MatrixXd Sorted_Goals_;
 	Eigen::MatrixXd X_prop_;
+	Eigen::MatrixXd X_stop_;
+
 
 	Eigen::Vector3d x0_;
 	Eigen::Vector3d y0_;
@@ -141,7 +150,7 @@ private:
 
 
 	double vfx_, vfy_, t_, tE_, dt_, tf_, r_, theta_, d_theta_, d_min_, tx_, ty_, v_, v_max_;
-	double theta_1_, theta_2_, tra_gen_;
+	double theta_1_, theta_2_, tra_gen_, t_stop_, d_stop_, d_goal_;
 	int index1_, index2_, partition_, min_d_ind, goal_index_;
 	int num_ = 100;
 	double max_angle_, min_angle_, d_angle_;

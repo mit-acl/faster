@@ -6,7 +6,7 @@ safe_distance: 2  # Smallest distance before obstacle is no longer viable segmen
 buffer: 0.35       # 0.5 width of quad for collision checking
 
 # (x,y,z) goal
-goal_x: 1
+goal_x: 0
 goal_y: -5.5
 goal_z: 0.5
 

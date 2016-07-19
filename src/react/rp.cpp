@@ -14,6 +14,7 @@ REACT::REACT(){
 	pose_= Eigen::Vector3d::Zero();
 	goal_ = Eigen::Vector3d::Zero();
 	X_ = Eigen::MatrixXd::Zero(3,2);
+	X_stop_ = Eigen::MatrixXd::Zero(3,2);
 
 	ros::param::get("~goal_x",goal_(0));
 	ros::param::get("~goal_y",goal_(1));
@@ -71,6 +72,7 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 		takeoff();
 		if (quad_goal_.pos.z == goal_(2)){
 			quad_status_ = state_.FLYING;
+			ROS_INFO("Take-off Complete");
 		}
 	}
 
@@ -79,13 +81,16 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 			if (quad_goal_.pos.z == -0.1){
 				quad_status_ = state_.NOT_FLYING;
 				quad_goal_.cut_power = true;
+				ROS_INFO("Landing Complete");
 			}
 		}
 
 	else if (quad_status_ == state_.GO){
 		tE_ = ros::Time::now().toSec() - t0_;
+		// get_stop_dist(X_,local_goal_,goal_,v_,t_xf_,t_yf_,Xf_switch_,Yf_switch_);
 		eval_trajectory(Xf_switch_,Yf_switch_,t_xf_,t_yf_,tE_,X_);
 		eigen2quadGoal(X_,quad_goal_);
+		quad_goal_.yaw = heading_;
 	}
 
 	quad_goal_.header.stamp = ros::Time::now();
@@ -163,25 +168,13 @@ void REACT::eventCB(const acl_system::QuadFlightEvent& msg)
 	}
 }
 
-void REACT::get_traj(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, std::vector<double>& t_fx, std::vector<double>& t_fy, Eigen::Matrix4d& Xf_switch, Eigen::Matrix4d& Yf_switch ){
-	//Generate new traj
-	get_vels(local_goal,X,v,vfx_,vfy_);
-
-	x0_ << X.col(0);
-	y0_ << X.col(1);
-
-	find_times(x0_, vfx_, t_fx, Xf_switch);
-	find_times(y0_, vfy_, t_fy, Yf_switch);
-}
-
 
 void REACT::scanCB(const sensor_msgs::LaserScan& msg)
  {
- 	msg_received_ = ros::Time::now().toSec();
+ 	msg_received_ = ros::WallTime::now().toSec();
  	convert_scan(msg, scanE_, scanV_);
  	// Cluster
  	partition_scan(scanE_, pose_, Goals_, partition_);
-
  	// Sort clusters
  	sort_clusters(last_goal_, Goals_, pose_, goal_, Sorted_Goals_);
  	// Pick cluster
@@ -196,18 +189,50 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
  	//Generate new traj
 	get_traj(X_,local_goal_,v_,t_xf_,t_yf_,Xf_switch_,Yf_switch_);
 
- 	t0_ = ros::Time::now().toSec();
-
- 	tra_gen_ = ros::Time::now().toSec();
+ 	tra_gen_ = ros::WallTime::now().toSec();
 
  	std::cout << "Latency [ms]: " << 1000*( tra_gen_ - msg_received_) << std::endl;
 
  	if(debug_){
  		convert2ROS(Goals_);
  		pubROS();
- 	}
- 	
- }
+ 	} 	
+}
+
+void REACT::get_traj(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, std::vector<double>& t_fx, std::vector<double>& t_fy, Eigen::Matrix4d& Xf_switch, Eigen::Matrix4d& Yf_switch ){
+	//Generate new traj
+	get_vels(local_goal,X,v,vfx_,vfy_);
+
+	x0_ << X.col(0);
+	y0_ << X.col(1);
+
+	find_times(x0_, vfx_, t_fx, Xf_switch);
+	find_times(y0_, vfy_, t_fy, Yf_switch);
+
+ 	t0_ = ros::Time::now().toSec();
+
+}
+
+void REACT::get_stop_dist(Eigen::MatrixXd X, Eigen::Vector3d local_goal,Eigen::Vector3d goal, double& v, std::vector<double>& t_fx, std::vector<double>& t_fy, Eigen::Matrix4d& Xf_switch, Eigen::Matrix4d& Yf_switch){
+	if (local_goal == goal){
+		get_traj(X,goal,0,t_x_stop_,t_y_stop_,X_switch_stop_,Y_switch_stop_);
+
+		t_stop_ = std::max(std::accumulate(t_x_stop_.begin(), t_x_stop_.end(), 0.0), std::accumulate(t_y_stop_.begin(), t_y_stop_.end(), 0.0));
+
+		eval_trajectory(X_switch_stop_,Y_switch_stop_,t_fx,t_fy,t_stop_,X_stop_);
+		d_stop_ = (X_stop_.block(0,0,1,2) - X.block(0,0,1,2)).norm();
+		d_goal_ = (X_stop_.block(0,0,1,2).transpose() - goal.head(2)).norm();
+
+		if (d_stop_ >= d_goal_){
+			// Need to stop
+			v = 0;
+			t_fx = t_x_stop_;
+			t_fy = t_y_stop_;
+			Xf_switch = X_switch_stop_;
+			Yf_switch = Y_switch_stop_;
+		}
+	}
+}
 
 void  REACT::pick_cluster( Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, Eigen::Vector3d& last_goal, Eigen::Vector3d& local_goal, bool& can_reach_goal){
  	// Iterate through and pick cluster based on collision check
@@ -268,7 +293,7 @@ void REACT::collision_check(Eigen::MatrixXd X, Eigen::MatrixXd Sorted_Goals, int
 	// If the closest obstacle is the goal we're heading towards then we're good
 	if (min_d_ind==goal_index_){
 		can_reach_goal = true;
-		std::cout << "can reach on first try!" << std::endl;;
+		// std::cout << "can reach on first try!" << std::endl;;
 
 	} 
 	// Something else is closer, need to prop to next time step
@@ -432,98 +457,124 @@ void REACT::sort_clusters( Eigen::Vector3d last_goal, Eigen::MatrixXd Goals,  Ei
  }
 
  void REACT::find_times( Eigen::Vector3d x0, double vf, std::vector<double>& t, Eigen::Matrix4d&  X_switch){
-	double j_temp = copysign(j_max_,vf-x0(1));
-	double vfp = x0(1) + pow(x0(2),2)/(2*j_temp);
-
-	if (std::abs(vfp-vf) < 0.05){
-		j_V_[0] = -j_temp;
-		// No 2nd and 3rd stage
-		j_V_[1] = 0;
+ 	if (vf == x0(1)){
+ 		j_V_[0] = 0;
+		j_V_[1] = 0; 
 		j_V_[2] = 0;
 
-		t[0] = -x0(2)/j_V_[0];
-		// No 2nd and 3rd stage
-		t[1] = 0;
+		t[0] = 0;
+		t[1] = 0; 
 		t[2] = 0;
 
-		v0_V_[0] = x0(1);
-		// No 2nd and 3rd stage
-		v0_V_[1] = 0;
-		v0_V_[2] = 0;
-		v0_V_[3] = vf;
-
-		x0_V_[0] = x0(0);
-		// No 2nd and 3rd stage
-		x0_V_[1] = 0;
-		x0_V_[2] = 0;
-		x0_V_[3] = x0_V_[1] + v0_V_[0]*t[0];
-
-		a0_V_[0] = x0(2);
-		// No 2nd and 3rd stage
-		a0_V_[1] = 0;
+		a0_V_[0] = 0;
+		a0_V_[1] = 0; 
 		a0_V_[2] = 0;
-		a0_V_[3] = 0;
-	}
+		a0_V_[3] = x0(2);
 
-	else{
-		j_V_[0] = j_temp;
-		j_V_[1] = 0;
-		j_V_[2] = -j_temp;
+		v0_V_[0] = 0;
+		v0_V_[1] = 0; 
+		v0_V_[2] = 0;
+		v0_V_[3] = x0(1);		
 
-		double t1 = -x0(2)/j_temp + std::sqrt(0.5*pow(x0(2),2) - j_temp*(x0(1)-vf))/j_temp;
-		double t2 = -x0(2)/j_temp - std::sqrt(0.5*pow(x0(2),2) - j_temp*(x0(1)-vf))/j_temp;
+		x0_V_[0] = 0;
+		x0_V_[1] = 0; 
+		x0_V_[2] = 0;
+		x0_V_[3] = x0(0);
+ 	}
+ 	else{
+		double j_temp = copysign(j_max_,vf-x0(1));
+		double vfp = x0(1) + pow(x0(2),2)/(2*j_temp);
 
-		t1 = std::max(t1,t2);
+		if (std::abs(vfp-vf) < 0.05){
+			j_V_[0] = -j_temp;
+			// No 2nd and 3rd stage
+			j_V_[1] = 0;
+			j_V_[2] = 0;
 
-		// Check to see if we'll saturate
-		double a1f = x0(2) + j_max_*t1;
-
-		if (std::abs(a1f) > a_max_){
-			double am = copysign(a_max_,j_temp);
-			t[0] = (am-x0(2))/j_V_[0];
-			t[2] = -am/j_V_[2];
-
-			a0_V_[0] = x0(2);
-			a0_V_[1] = a0_V_[0] + j_V_[0]*t[0];
-			a0_V_[2] = am;
-			a0_V_[3] = 0;
+			t[0] = -x0(2)/j_V_[0];
+			// No 2nd and 3rd stage
+			t[1] = 0;
+			t[2] = 0;
 
 			v0_V_[0] = x0(1);
-			v0_V_[1] = v0_V_[0] + a0_V_[0]*t[0] + 0.5*j_V_[0]*pow(t[0],2);	
-			v0_V_[2] = vf - am*t[2] - 0.5*j_V_[2]*pow(t[0],2);
+			// No 2nd and 3rd stage
+			v0_V_[1] = 0;
+			v0_V_[2] = 0;
 			v0_V_[3] = vf;
 
-			t[1] = (v0_V_[2]-v0_V_[1])/am;		
-
 			x0_V_[0] = x0(0);
-			x0_V_[1] = x0_V_[0] + v0_V_[0]*t[0] + 0.5*a0_V_[0]*pow(t[0],2) + 1./6*j_V_[0]*pow(t[0],3);
-			x0_V_[2] = x0_V_[1] + v0_V_[1]*t[1] + 0.5*am*pow(t[1],2) ;
-			x0_V_[3] = x0_V_[2] + v0_V_[2]*t[2] + 0.5*am*pow(t[2],2) + 1./6*j_V_[2]*pow(t[2],3);
-
-		}
-		else{
-			j_V_[0] = j_temp;
-			j_V_[1] = 0; // No second phase
-			j_V_[2] = -j_temp;
-
-			t[0] = t1;
-			t[1] = 0; // No second phase
-			t[2] = -(x0(2)+j_V_[0]*t1)/j_V_[2];
+			// No 2nd and 3rd stage
+			x0_V_[1] = 0;
+			x0_V_[2] = 0;
+			x0_V_[3] = x0_V_[0] + v0_V_[0]*t[0];
 
 			a0_V_[0] = x0(2);
-			a0_V_[1] = 0; // No second phase
-			a0_V_[2] = a0_V_[0] + j_V_[0]*t[0];
+			// No 2nd and 3rd stage
+			a0_V_[1] = 0;
+			a0_V_[2] = 0;
 			a0_V_[3] = 0;
+		}
 
-			v0_V_[0] = x0(1);
-			v0_V_[1] = 0; // No second phase
-			v0_V_[2] = v0_V_[0] + a0_V_[0]*t[0] + 0.5*j_V_[0]*pow(t[0],2);
-			v0_V_[3] = vf;		
+		else{
+			j_V_[0] = j_temp;
+			j_V_[1] = 0;
+			j_V_[2] = -j_temp;
 
-			x0_V_[0] = x0(0);
-			x0_V_[1] = 0; // No second phase
-			x0_V_[2] = x0_V_[0] + v0_V_[0]*t[0] + 0.5*a0_V_[0]*pow(t[0],2) + 1./6*j_V_[0]*pow(t[0],3);
-			x0_V_[3] = x0_V_[2] + v0_V_[2]*t[2] + 0.5*a0_V_[2]*pow(t[2],2) + 1./6*j_V_[2]*pow(t[2],3);
+			double t1 = -x0(2)/j_temp + std::sqrt(0.5*pow(x0(2),2) - j_temp*(x0(1)-vf))/j_temp;
+			double t2 = -x0(2)/j_temp - std::sqrt(0.5*pow(x0(2),2) - j_temp*(x0(1)-vf))/j_temp;
+
+			t1 = std::max(t1,t2);
+
+			// Check to see if we'll saturate
+			double a1f = x0(2) + j_max_*t1;
+
+			if (std::abs(a1f) > a_max_){
+				double am = copysign(a_max_,j_temp);
+				t[0] = (am-x0(2))/j_V_[0];
+				t[2] = -am/j_V_[2];
+
+				a0_V_[0] = x0(2);
+				a0_V_[1] = a0_V_[0] + j_V_[0]*t[0];
+				a0_V_[2] = am;
+				a0_V_[3] = 0;
+
+				v0_V_[0] = x0(1);
+				v0_V_[1] = v0_V_[0] + a0_V_[0]*t[0] + 0.5*j_V_[0]*pow(t[0],2);	
+				v0_V_[2] = vf - am*t[2] - 0.5*j_V_[2]*pow(t[0],2);
+				v0_V_[3] = vf;
+
+				t[1] = (v0_V_[2]-v0_V_[1])/am;		
+
+				x0_V_[0] = x0(0);
+				x0_V_[1] = x0_V_[0] + v0_V_[0]*t[0] + 0.5*a0_V_[0]*pow(t[0],2) + 1./6*j_V_[0]*pow(t[0],3);
+				x0_V_[2] = x0_V_[1] + v0_V_[1]*t[1] + 0.5*am*pow(t[1],2) ;
+				x0_V_[3] = x0_V_[2] + v0_V_[2]*t[2] + 0.5*am*pow(t[2],2) + 1./6*j_V_[2]*pow(t[2],3);
+
+			}
+			else{
+				j_V_[0] = j_temp;
+				j_V_[1] = 0; // No second phase
+				j_V_[2] = -j_temp;
+
+				t[0] = t1;
+				t[1] = 0; // No second phase
+				t[2] = -(x0(2)+j_V_[0]*t1)/j_V_[2];
+
+				a0_V_[0] = x0(2);
+				a0_V_[1] = 0; // No second phase
+				a0_V_[2] = a0_V_[0] + j_V_[0]*t[0];
+				a0_V_[3] = 0;
+
+				v0_V_[0] = x0(1);
+				v0_V_[1] = 0; // No second phase
+				v0_V_[2] = v0_V_[0] + a0_V_[0]*t[0] + 0.5*j_V_[0]*pow(t[0],2);
+				v0_V_[3] = vf;		
+
+				x0_V_[0] = x0(0);
+				x0_V_[1] = 0; // No second phase
+				x0_V_[2] = x0_V_[0] + v0_V_[0]*t[0] + 0.5*a0_V_[0]*pow(t[0],2) + 1./6*j_V_[0]*pow(t[0],3);
+				x0_V_[3] = x0_V_[2] + v0_V_[2]*t[2] + 0.5*a0_V_[2]*pow(t[2],2) + 1./6*j_V_[2]*pow(t[2],3);
+			}
 		}
 	}
 
@@ -534,7 +585,7 @@ void REACT::sort_clusters( Eigen::Vector3d last_goal, Eigen::MatrixXd Goals,  Ei
 }
 
 
-void REACT::eval_trajectory(Eigen::Matrix4d X_switch, Eigen::Matrix4d Y_switch_, std::vector<double> t_x, std::vector<double> t_y, double t, Eigen::MatrixXd& Xc){
+void REACT::eval_trajectory(Eigen::Matrix4d X_switch, Eigen::Matrix4d Y_switch, std::vector<double> t_x, std::vector<double> t_y, double t, Eigen::MatrixXd& Xc){
 	// Eval x trajectory
 	int k = 0;
 	if (t < t_x[0]){
@@ -577,9 +628,9 @@ void REACT::eval_trajectory(Eigen::Matrix4d X_switch, Eigen::Matrix4d Y_switch_,
 	Xc(1,0) = X_switch(1,k) + X_switch(2,k)*tx_ + 0.5*X_switch(3,k)*pow(tx_,2);
 	Xc(2,0) = X_switch(2,k) + X_switch(3,k)*tx_;
 
-	Xc(0,1) = Y_switch_(0,l) + Y_switch_(1,l)*ty_ + 0.5*Y_switch_(2,l)*pow(ty_,2) + 1.0/6.0*Y_switch_(3,l)*pow(ty_,3);
-	Xc(1,1) = Y_switch_(1,l) + Y_switch_(2,l)*ty_ + 0.5*Y_switch_(3,l)*pow(ty_,2);
-	Xc(2,1) = Y_switch_(2,l) + Y_switch_(3,l)*ty_;
+	Xc(0,1) = Y_switch(0,l) + Y_switch(1,l)*ty_ + 0.5*Y_switch(2,l)*pow(ty_,2) + 1.0/6.0*Y_switch(3,l)*pow(ty_,3);
+	Xc(1,1) = Y_switch(1,l) + Y_switch(2,l)*ty_ + 0.5*Y_switch(3,l)*pow(ty_,2);
+	Xc(2,1) = Y_switch(2,l) + Y_switch(3,l)*ty_;
 }
 
 
