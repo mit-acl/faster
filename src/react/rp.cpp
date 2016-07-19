@@ -67,7 +67,11 @@ void REACT::stateCB(const acl_system::ViconState& msg)
 }
 
 void REACT::sendGoal(const ros::TimerEvent& e)
-{
+{	
+	if ((goal_.head(2)-X_.block(0,0,1,2).transpose()).norm()<0.3){
+		ROS_INFO("Stopping");
+		v_ = 0;
+	}
 	if (quad_status_== state_.TAKEOFF){
 		takeoff();
 		if (quad_goal_.pos.z == goal_(2)){
@@ -86,10 +90,12 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 		}
 
 	else if (quad_status_ == state_.GO){
+		mtx.lock();
 		tE_ = ros::Time::now().toSec() - t0_;
 		// get_stop_dist(X_,local_goal_,goal_,v_,t_xf_,t_yf_,Xf_switch_,Yf_switch_);
 		eval_trajectory(Xf_switch_,Yf_switch_,t_xf_,t_yf_,tE_,X_);
 		eigen2quadGoal(X_,quad_goal_);
+		mtx.unlock();
 		quad_goal_.yaw = heading_;
 	}
 
@@ -187,11 +193,13 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
  	}
 
  	//Generate new traj
+ 	mtx.lock();
 	get_traj(X_,local_goal_,v_,t_xf_,t_yf_,Xf_switch_,Yf_switch_);
+ 	mtx.unlock();
 
  	tra_gen_ = ros::WallTime::now().toSec();
 
- 	std::cout << "Latency [ms]: " << 1000*( tra_gen_ - msg_received_) << std::endl;
+ 	// std::cout << "Latency [ms]: " << 1000*( tra_gen_ - msg_received_) << std::endl;
 
  	if(debug_){
  		convert2ROS(Goals_);
@@ -361,23 +369,22 @@ void REACT::partition_scan(Eigen::MatrixXd scan, Eigen::Vector3d pose, Eigen::Ma
     			if (double((i-j))/(9*angle_2_index) > 1) num_of_clusters_ = 9;
     			if (double((i-j))/(11*angle_2_index) > 1) num_of_clusters_ = 11;
 
+    			bool flag_ = false;
 
     			if (scan(1,i)==scan.row(1).maxCoeff()){
-    				num_of_clusters_--;
-    				for (int k=0; k < num_of_clusters_; k++){
-	    				// Just cluster based on 
-	    				r_temp.push_back(scan(1, j + k*(i-j)/(num_of_clusters_)));
-	    				angle_temp.push_back(min_angle_ + yaw_ + d_angle_*((i+j)/2 + (k-(num_of_clusters_)/2)));
-
-	    			}
+    				 flag_ = true;
     			}
-    			else{
-	    			for (int k=0; k < num_of_clusters_; k++){
+ 
+    			for (int k=0; k < num_of_clusters_; k++){
+    				if (flag_ && (k==0 || k==num_of_clusters_-1)){
+    				}
+    				else{
 	    				// Just cluster based on 
 	    				r_temp.push_back(scan(1, j + k*(i-j)/(num_of_clusters_-1)));
 	    				angle_temp.push_back(min_angle_ + yaw_ + d_angle_*(j + k*(i-j)/(num_of_clusters_-1)));
-	    			}
+    				}
     			}
+
     		}
 			j = i+1;   			
 		}
@@ -485,7 +492,7 @@ void REACT::sort_clusters( Eigen::Vector3d last_goal, Eigen::MatrixXd Goals,  Ei
 		double j_temp = copysign(j_max_,vf-x0(1));
 		double vfp = x0(1) + pow(x0(2),2)/(2*j_temp);
 
-		if (std::abs(vfp-vf) < 0.05){
+		if (std::abs(vfp-vf) < 0.01){
 			j_V_[0] = -j_temp;
 			// No 2nd and 3rd stage
 			j_V_[1] = 0;

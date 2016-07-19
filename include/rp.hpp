@@ -29,6 +29,7 @@
 #include <vector>
 #include <algorithm>
 #include <queue>
+#include <mutex>
 
 class REACT
 {
@@ -79,6 +80,9 @@ private:
 	
 
 	std::ostringstream errorMsg, warnMsg;
+
+	std::mutex mtx;;
+
 
 
 	// // // // //
