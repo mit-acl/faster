@@ -71,14 +71,6 @@ void REACT::stateCB(const acl_system::ViconState& msg)
 void REACT::sendGoal(const ros::TimerEvent& e)
 {	
 
-	if (!stop_){
-		get_stop_dist(X_,local_goal_,goal_,stop_);
-		if (stop_){
-			v_ = 0;
-			gen_new_traj_ = true;
-		}
-	}
-
 	if (gen_new_traj_){
 		gen_new_traj_ = false;
 		mtx.lock();
@@ -105,6 +97,15 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 		}
 
 	else if (quad_status_ == state_.GO){
+			if (!stop_){
+				ROS_INFO("Stop");
+				get_stop_dist(X_,local_goal_,goal_,stop_);
+				if (stop_){
+					v_ = 0;
+					gen_new_traj_ = true;
+				}
+			}
+
 			tE_ = ros::Time::now().toSec() - t0_;
 			mtx.lock();		
 			eval_trajectory(Xf_switch_,Yf_switch_,t_xf_,t_yf_,tE_,X_);
@@ -117,6 +118,7 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 				// We're done
 				ROS_INFO("Flight Complete");
 				quad_status_ = state_.FLYING;
+				stop_ = false;
 			}
 		}
 
