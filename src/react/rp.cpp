@@ -68,10 +68,19 @@ void REACT::stateCB(const acl_system::ViconState& msg)
 
 void REACT::sendGoal(const ros::TimerEvent& e)
 {	
+
 	if ((goal_.head(2)-X_.block(0,0,1,2).transpose()).norm()<0.3){
 		ROS_INFO("Stopping");
 		v_ = 0;
+		gen_new_traj_ = true;
 	}
+
+	if (gen_new_traj_){
+		gen_new_traj_ = false;
+		get_traj(X_,local_goal_,v_,t_xf_,t_yf_,Xf_switch_,Yf_switch_);
+		t0_ = ros::Time::now().toSec();
+	}
+
 	if (quad_status_== state_.TAKEOFF){
 		takeoff();
 		if (quad_goal_.pos.z == goal_(2)){
@@ -155,11 +164,8 @@ void REACT::eventCB(const acl_system::QuadFlightEvent& msg)
 		ROS_INFO("Starting");
 		// Set speed to desired speed
 		v_ = v_max_;
-
-		//Generate new traj
-		get_traj(X_, local_goal_, v_, t_xf_, t_yf_, Xf_switch_, Yf_switch_);
-		
-	 	t0_ = ros::Time::now().toSec();
+		// Generate new traj
+		gen_new_traj_ = true;
 	}
 	// STOP!!!
 	else if (msg.mode == msg.ESTOP && quad_status_ == state_.GO){
@@ -167,10 +173,9 @@ void REACT::eventCB(const acl_system::QuadFlightEvent& msg)
 		// Stay in go command but set speed to zero
 		v_ = 0;
 
-		//Generate new traj
-		get_traj(X_,local_goal_,v_,t_xf_,t_yf_,Xf_switch_,Yf_switch_);
-
-	 	t0_ = ros::Time::now().toSec();
+		// Generate new traj
+		gen_new_traj_ = true;
+		
 	}
 }
 
@@ -192,16 +197,7 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
  		ROS_ERROR("Emergency stop -- no feasible path");
  	}
 
- 	//Generate new traj
-	get_traj(X_,local_goal_,v_,t2_xf_,t2_yf_,X2f_switch_,Y2f_switch_);
-
- 	mtx.lock();
- 	t0_ = ros::Time::now().toSec();
- 	t_xf_ = t2_xf_;
- 	t_yf_ = t2_yf_;
- 	Xf_switch_ = X2f_switch_;
- 	Yf_switch_ = Y2f_switch_;
- 	mtx.unlock();
+ 	gen_new_traj_ = true;
 
  	tra_gen_ = ros::WallTime::now().toSec();
 

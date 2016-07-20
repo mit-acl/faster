@@ -168,7 +168,7 @@ private:
 
 	double r_i_, angle_i_, r_goal_;
 
-	bool debug_, can_reach_goal_, collision_detected_;
+	bool debug_, can_reach_goal_, collision_detected_, gen_new_traj_;
 
 
 	//## Logging and Debugging Functions
