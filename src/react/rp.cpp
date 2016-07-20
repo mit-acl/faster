@@ -766,6 +766,22 @@ void REACT::convert2ROS(Eigen::MatrixXd Goals){
 		t_+=dt_;
 		traj_ros_.poses.push_back(temp_path_point_ros_);
 	}
+
+	ros_new_global_goal_.header.stamp = ros::Time::now();
+	ros_new_global_goal_.header.frame_id = "vicon";
+	ros_new_global_goal_.point.x = local_goal_(0);
+	ros_new_global_goal_.point.y = local_goal_(1);
+	ros_new_global_goal_.point.z = local_goal_(2);
+
+	ros_last_global_goal_.header.stamp = ros::Time::now();
+	ros_last_global_goal_.header.frame_id = "vicon";
+	ros_last_global_goal_.point.x = last_goal_(0);
+	ros_last_global_goal_.point.y = last_goal_(1);
+	ros_last_global_goal_.point.z = last_goal_(2);
+
+	new_goal_pub.publish(ros_new_global_goal_);
+	last_goal_pub.publish(ros_last_global_goal_);
+
  }
 
 void REACT::pubROS(){
