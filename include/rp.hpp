@@ -104,6 +104,10 @@ private:
 	std::vector<double> t_xf_{std::vector<double>(3,0)};
 	std::vector<double> t_yf_{std::vector<double>(3,0)};
 
+	std::vector<double> t2_xf_{std::vector<double>(3,0)};
+	std::vector<double> t2_yf_{std::vector<double>(3,0)};
+
+
 	std::vector<double> t_x_stop_{std::vector<double>(3,0)};
 	std::vector<double> t_y_stop_{std::vector<double>(3,0)};
 
@@ -125,6 +129,9 @@ private:
 
 	Eigen::Matrix4d Xf_switch_; // [x0; v0; a0; j0]
 	Eigen::Matrix4d Yf_switch_;
+
+	Eigen::Matrix4d X2f_switch_; // [x0; v0; a0; j0]
+	Eigen::Matrix4d Y2f_switch_;
 
 	Eigen::Matrix4d X_switch_stop_ ;
 	Eigen::Matrix4d Y_switch_stop_ ;

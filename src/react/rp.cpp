@@ -193,8 +193,14 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
  	}
 
  	//Generate new traj
+	get_traj(X_,local_goal_,v_,t2_xf_,t2_yf_,X2f_switch_,Y2f_switch_);
+
  	mtx.lock();
-	get_traj(X_,local_goal_,v_,t_xf_,t_yf_,Xf_switch_,Yf_switch_);
+ 	t0_ = ros::Time::now().toSec();
+ 	t_xf_ = t2_xf_;
+ 	t_yf_ = t2_yf_;
+ 	Xf_switch_ = X2f_switch_;
+ 	Yf_switch_ = Y2f_switch_;
  	mtx.unlock();
 
  	tra_gen_ = ros::WallTime::now().toSec();
@@ -216,10 +222,8 @@ void REACT::get_traj(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, st
 
 	find_times(x0_, vfx_, t_fx, Xf_switch);
 	find_times(y0_, vfy_, t_fy, Yf_switch);
-
- 	t0_ = ros::Time::now().toSec();
-
 }
+
 
 void REACT::get_stop_dist(Eigen::MatrixXd X, Eigen::Vector3d local_goal,Eigen::Vector3d goal, double& v, std::vector<double>& t_fx, std::vector<double>& t_fy, Eigen::Matrix4d& Xf_switch, Eigen::Matrix4d& Yf_switch){
 	if (local_goal == goal){
