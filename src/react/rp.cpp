@@ -496,11 +496,10 @@ void REACT::sort_clusters( Eigen::Vector3d last_goal, Eigen::MatrixXd Goals,  Ei
  	}
  	else{
 		double j_temp = copysign(j_max_,vf-x0(1));
-		double vfp = x0(1) - pow(x0(2),2)/(2*j_temp);
-
-		// std::cout << "vfp: " << vfp << std::endl;
+		double vfp = x0(1) + pow(x0(2),2)/(2*j_temp);
 
 		if (std::abs(vfp-vf) < 0.05*std::abs(vf)){
+
 			j_V_[0] = -j_temp;
 			// No 2nd and 3rd stage
 			j_V_[1] = 0;
@@ -543,7 +542,7 @@ void REACT::sort_clusters( Eigen::Vector3d last_goal, Eigen::MatrixXd Goals,  Ei
 			// Check to see if we'll saturate
 			double a1f = x0(2) + j_temp*t1;
 
-			if (std::abs(a1f) > a_max_){
+			if (std::abs(a1f) >= a_max_){
 				double am = copysign(a_max_,j_temp);
 				t[0] = (am-x0(2))/j_V_[0];
 				t[2] = -am/j_V_[2];
@@ -555,7 +554,7 @@ void REACT::sort_clusters( Eigen::Vector3d last_goal, Eigen::MatrixXd Goals,  Ei
 
 				v0_V_[0] = x0(1);
 				v0_V_[1] = v0_V_[0] + a0_V_[0]*t[0] + 0.5*j_V_[0]*pow(t[0],2);	
-				v0_V_[2] = vf - am*t[2] - 0.5*j_V_[2]*pow(t[0],2);
+				v0_V_[2] = vf - am*t[2] - 0.5*j_V_[2]*pow(t[2],2);
 				v0_V_[3] = vf;
 
 				t[1] = (v0_V_[2]-v0_V_[1])/am;		
