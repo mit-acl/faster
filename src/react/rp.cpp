@@ -112,6 +112,12 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 
 			eigen2quadGoal(X_,quad_goal_);
 			quad_goal_.yaw = heading_;
+
+			if (X_.block(1,0,1,2).norm()==0){
+				// We're done
+				ROS_INFO("Flight Complete");
+				quad_status_ = state_.FLYING;
+			}
 		}
 
 	quad_goal_.header.stamp = ros::Time::now();
