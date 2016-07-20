@@ -15,6 +15,8 @@ REACT::REACT(){
 	goal_ = Eigen::Vector3d::Zero();
 	X_ = Eigen::MatrixXd::Zero(3,2);
 	X_stop_ = Eigen::MatrixXd::Zero(3,2);
+	XE_ = Eigen::MatrixXd::Zero(3,2);
+
 
 	ros::param::get("~goal_x",goal_(0));
 	ros::param::get("~goal_y",goal_(1));
@@ -69,15 +71,19 @@ void REACT::stateCB(const acl_system::ViconState& msg)
 void REACT::sendGoal(const ros::TimerEvent& e)
 {	
 
-	if ((goal_.head(2)-X_.block(0,0,1,2).transpose()).norm()<0.3){
-		ROS_INFO("Stopping");
-		v_ = 0;
-		gen_new_traj_ = true;
+	if (!stop_){
+		get_stop_dist(X_,local_goal_,goal_,stop_);
+		if (stop_){
+			v_ = 0;
+			gen_new_traj_ = true;
+		}
 	}
 
 	if (gen_new_traj_){
 		gen_new_traj_ = false;
+		mtx.lock();
 		get_traj(X_,local_goal_,v_,t_xf_,t_yf_,Xf_switch_,Yf_switch_);
+		mtx.unlock();
 		t0_ = ros::Time::now().toSec();
 	}
 
@@ -99,14 +105,14 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 		}
 
 	else if (quad_status_ == state_.GO){
-		mtx.lock();
-		tE_ = ros::Time::now().toSec() - t0_;
-		// get_stop_dist(X_,local_goal_,goal_,v_,t_xf_,t_yf_,Xf_switch_,Yf_switch_);
-		eval_trajectory(Xf_switch_,Yf_switch_,t_xf_,t_yf_,tE_,X_);
-		eigen2quadGoal(X_,quad_goal_);
-		mtx.unlock();
-		quad_goal_.yaw = heading_;
-	}
+			tE_ = ros::Time::now().toSec() - t0_;
+			mtx.lock();		
+			eval_trajectory(Xf_switch_,Yf_switch_,t_xf_,t_yf_,tE_,X_);
+			mtx.unlock();
+
+			eigen2quadGoal(X_,quad_goal_);
+			quad_goal_.yaw = heading_;
+		}
 
 	quad_goal_.header.stamp = ros::Time::now();
 	quad_goal_.header.frame_id = "vicon";
@@ -221,23 +227,24 @@ void REACT::get_traj(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, st
 }
 
 
-void REACT::get_stop_dist(Eigen::MatrixXd X, Eigen::Vector3d local_goal,Eigen::Vector3d goal, double& v, std::vector<double>& t_fx, std::vector<double>& t_fy, Eigen::Matrix4d& Xf_switch, Eigen::Matrix4d& Yf_switch){
+void REACT::get_stop_dist(Eigen::MatrixXd X, Eigen::Vector3d local_goal,Eigen::Vector3d goal, bool& stop){
 	if (local_goal == goal){
+		mtx.lock();
 		get_traj(X,goal,0,t_x_stop_,t_y_stop_,X_switch_stop_,Y_switch_stop_);
+		mtx.unlock();
 
 		t_stop_ = std::max(std::accumulate(t_x_stop_.begin(), t_x_stop_.end(), 0.0), std::accumulate(t_y_stop_.begin(), t_y_stop_.end(), 0.0));
 
-		eval_trajectory(X_switch_stop_,Y_switch_stop_,t_fx,t_fy,t_stop_,X_stop_);
+		mtx.lock();
+		eval_trajectory(X_switch_stop_,Y_switch_stop_,t_x_stop_,t_y_stop_,t_stop_,X_stop_);
+		mtx.unlock();
+
 		d_stop_ = (X_stop_.block(0,0,1,2) - X.block(0,0,1,2)).norm();
-		d_goal_ = (X_stop_.block(0,0,1,2).transpose() - goal.head(2)).norm();
+		d_goal_ = (X.block(0,0,1,2).transpose() - goal.head(2)).norm();
 
 		if (d_stop_ >= d_goal_){
 			// Need to stop
-			v = 0;
-			t_fx = t_x_stop_;
-			t_fy = t_y_stop_;
-			Xf_switch = X_switch_stop_;
-			Yf_switch = Y_switch_stop_;
+			stop = true;
 		}
 	}
 }
@@ -282,17 +289,14 @@ void REACT::collision_check(Eigen::MatrixXd X, Eigen::MatrixXd Sorted_Goals, int
 	ranges_ = Eigen::VectorXd::Zero(Sorted_Goals.cols());
 	ranges_ = Sorted_Goals.col(3);
 	X_prop_ = Eigen::MatrixXd::Zero(3,2);
-	X_prop_ = X;
+	X_prop_ << X;
 
 	current_local_goal_ << Sorted_Goals.block(goal_counter,0,1,3).transpose();
 	
-	get_vels(current_local_goal_,X,v,vfx_,vfy_);
+	mtx.lock();
+	get_traj(X,current_local_goal_,v,t_x_,t_y_,X_switch_,Y_switch_);
+	mtx.unlock();
 
-	x0_ << X.col(0);
-	y0_ << X.col(1);
-
-	find_times(x0_, vfx_, t_x_, X_switch_);
-	find_times(y0_, vfy_, t_y_, Y_switch_);
 
 	// Find closest obstacle (aka)
 	d_min_ = ranges_.minCoeff(&min_d_ind);
@@ -309,7 +313,9 @@ void REACT::collision_check(Eigen::MatrixXd X, Eigen::MatrixXd Sorted_Goals, int
 		// evaluate at time required to travel d_min
 		t_ = d_min_/v;
 		while (!collision_detected_ && !can_reach_goal){
+			mtx.lock();
 			eval_trajectory(X_switch_,Y_switch_,t_x_,t_y_,t_,X_prop_);
+			mtx.unlock();
 			// Re-calculate ranges based on prop state
 			for(int i=0;i<partition;i++){
 				ranges_(i) = (Sorted_Goals.block(i,0,1,2)-X_prop_.row(0)).norm();
@@ -490,9 +496,11 @@ void REACT::sort_clusters( Eigen::Vector3d last_goal, Eigen::MatrixXd Goals,  Ei
  	}
  	else{
 		double j_temp = copysign(j_max_,vf-x0(1));
-		double vfp = x0(1) + pow(x0(2),2)/(2*j_temp);
+		double vfp = x0(1) - pow(x0(2),2)/(2*j_temp);
 
-		if (std::abs(vfp-vf) < 0.01){
+		// std::cout << "vfp: " << vfp << std::endl;
+
+		if (std::abs(vfp-vf) < 0.05*std::abs(vf)){
 			j_V_[0] = -j_temp;
 			// No 2nd and 3rd stage
 			j_V_[1] = 0;
@@ -533,7 +541,7 @@ void REACT::sort_clusters( Eigen::Vector3d last_goal, Eigen::MatrixXd Goals,  Ei
 			t1 = std::max(t1,t2);
 
 			// Check to see if we'll saturate
-			double a1f = x0(2) + j_max_*t1;
+			double a1f = x0(2) + j_temp*t1;
 
 			if (std::abs(a1f) > a_max_){
 				double am = copysign(a_max_,j_temp);
@@ -743,9 +751,11 @@ void REACT::convert2ROS(Eigen::MatrixXd Goals){
 
 	dt_ = tf_/num_;
 	t_ = 0;
-	XE_ = X_;
+	XE_ << X_;
 	for(int i=0; i<num_; i++){
-		eval_trajectory(X_switch_,Y_switch_,t_x_,t_y_,t_,XE_);
+		mtx.lock();
+		eval_trajectory(Xf_switch_,Yf_switch_,t_xf_,t_yf_,t_,XE_);
+		mtx.unlock();
 		temp_path_point_ros_.pose.position.x = XE_(0,0);
 		temp_path_point_ros_.pose.position.y = XE_(0,1);
 		t_+=dt_;

@@ -54,7 +54,7 @@ public:
 	void pubROS();
 
 	// Make these private after testing
-	void get_stop_dist(Eigen::MatrixXd X, Eigen::Vector3d local_goal,Eigen::Vector3d goal, double& v, std::vector<double>& t_fx, std::vector<double>& t_fy, Eigen::Matrix4d& Xf_switch, Eigen::Matrix4d& Yf_switch);
+	void get_stop_dist(Eigen::MatrixXd X, Eigen::Vector3d local_goal,Eigen::Vector3d goal, bool& stop);
 	void get_traj(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, std::vector<double>& t_fx, std::vector<double>& t_fy, Eigen::Matrix4d& Xf_switch, Eigen::Matrix4d& Yf_switch );
 	void sort_clusters( Eigen::Vector3d last_goal, Eigen::MatrixXd Goals,  Eigen::Vector3d pose, Eigen::Vector3d goal, Eigen::MatrixXd& Sorted_Goals);
 	void partition_scan(Eigen::MatrixXd scan, Eigen::Vector3d pose, Eigen::MatrixXd& Goals, int& partition);
@@ -81,7 +81,7 @@ private:
 
 	std::ostringstream errorMsg, warnMsg;
 
-	std::mutex mtx;;
+	std::mutex mtx;
 
 
 
@@ -166,9 +166,12 @@ private:
 	int num_ = 100;
 	double max_angle_, min_angle_, d_angle_;
 
+	double tE_prev_;
+
 	double r_i_, angle_i_, r_goal_;
 
 	bool debug_, can_reach_goal_, collision_detected_, gen_new_traj_;
+	bool stop_ = false;
 
 
 	//## Logging and Debugging Functions

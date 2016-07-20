@@ -23,9 +23,11 @@ int main(int argc, char **argv)
 
 	// run the code
 	// start asynchronous spinner
-	ros::AsyncSpinner spinner(2); // Use 4 threads
-	spinner.start();
-	ros::waitForShutdown();
+	// ros::AsyncSpinner spinner(2); // Use 4 threads
+	// spinner.start();
+	// ros::waitForShutdown();
+
+	ros::spin();
 
 	return 0;
 }
