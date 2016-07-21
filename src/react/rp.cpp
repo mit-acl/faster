@@ -64,6 +64,10 @@ void REACT::stateCB(const acl_system::ViconState& msg)
 		pose_ << msg.pose.position.x, msg.pose.position.y, msg.pose.position.z; 
 
 		yaw_ = tf::getYaw(msg.pose.orientation);
+
+		if (quad_status_ == state_.NOT_FLYING){
+			X_.row(0) << pose_.head(2).transpose();
+		}
 	} 
 	// if (msg.has_twist) velCallback(msg.twist);
 }
@@ -74,7 +78,7 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 	if (gen_new_traj_){
 		gen_new_traj_ = false;
 		mtx.lock();
-		get_traj(X_,local_goal_,v_,t_xf_,t_yf_,Xf_switch_,Yf_switch_);
+		get_traj(X_,local_goal_,v_max_,t_xf_,t_yf_,Xf_switch_,Yf_switch_);
 		mtx.unlock();
 		t0_ = ros::Time::now().toSec();
 	}
@@ -98,9 +102,9 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 
 	else if (quad_status_ == state_.GO){
 			if (!stop_){
-				ROS_INFO("Stop");
 				get_stop_dist(X_,local_goal_,goal_,stop_);
 				if (stop_){
+					ROS_INFO("Stop");
 					v_ = 0;
 					gen_new_traj_ = true;
 				}
@@ -277,6 +281,8 @@ void  REACT::pick_cluster( Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, Eige
  		ROS_ERROR("Need to stop");
  	}
 
+ 	// std::cout << "goal index: " << goal_index_ << std::endl;
+
  	last_goal = local_goal;
  }
 
@@ -305,16 +311,12 @@ void REACT::collision_check(Eigen::MatrixXd X, Eigen::MatrixXd Sorted_Goals, int
 	get_traj(X,current_local_goal_,v,t_x_,t_y_,X_switch_,Y_switch_);
 	mtx.unlock();
 
-
 	// Find closest obstacle (aka)
 	d_min_ = ranges_.minCoeff(&min_d_ind);
-
 
 	// If the closest obstacle is the goal we're heading towards then we're good
 	if (min_d_ind==goal_index_){
 		can_reach_goal = true;
-		// std::cout << "can reach on first try!" << std::endl;;
-
 	} 
 	// Something else is closer, need to prop to next time step
 	else{
@@ -330,6 +332,12 @@ void REACT::collision_check(Eigen::MatrixXd X, Eigen::MatrixXd Sorted_Goals, int
 			}
 
 			d_min_  = ranges_.minCoeff(&min_d_ind);
+			
+			// std::cout << "t_: " << t_ << std::endl;
+			// std::cout << "X prop 2: " << X_prop_ << std::endl;
+			// std::cout << "ranges: " << ranges_ << std::endl;
+			// std::cout << " d_min: " << d_min_ << std::endl;
+			// std::cout << " " << std::endl;
 
 			// Check if the min distance is the current goal
 			if (min_d_ind==goal_index_){
@@ -765,6 +773,7 @@ void REACT::convert2ROS(Eigen::MatrixXd Goals){
 		mtx.unlock();
 		temp_path_point_ros_.pose.position.x = XE_(0,0);
 		temp_path_point_ros_.pose.position.y = XE_(0,1);
+		temp_path_point_ros_.pose.position.z = goal_(2);
 		t_+=dt_;
 		traj_ros_.poses.push_back(temp_path_point_ros_);
 	}
