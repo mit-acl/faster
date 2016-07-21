@@ -3,11 +3,11 @@ thresh: 0.4       # Distance used to cluster scan (m)
 debug: true
 angle_check: 0.7  # +-40deg check
 safe_distance: 2  # Smallest distance before obstacle is no longer viable segment
-buffer: 0.4       # 0.5 width of quad for collision checking
+buffer: 0.35       # 0.5 width of quad for collision checking
 
 # (x,y,z) goal
 goal_x: 0
-goal_y: -4.5
+goal_y: -5.5
 goal_z: 0.5
 
-speed: 1
+speed: 0.5

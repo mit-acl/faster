@@ -157,7 +157,7 @@ void REACT::eventCB(const acl_system::QuadFlightEvent& msg)
 
 		ros::Duration(spinup_time_).sleep();
 		ROS_INFO("Taking off");
-		
+
 		quad_status_ = state_.TAKEOFF; 
 		
 
@@ -259,10 +259,6 @@ void REACT::get_stop_dist(Eigen::MatrixXd X, Eigen::Vector3d local_goal,Eigen::V
 		// Prevents oscillation is our stopping distance is really small (low speed)
 		saturate(d_stop_,0.1,d_stop_);
 
-		std::cout << "stop dist: " << d_stop_ << std::endl;
-		std::cout << "goal dist: " << d_goal_ << std::endl;
-		std::cout << " " << std::endl;
-
 		if (d_stop_ >= d_goal_){
 			// Need to stop
 			stop = true;
@@ -275,6 +271,8 @@ void  REACT::pick_cluster( Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, Eige
  	// Re-initialize 
  	goal_index_ = 0;
 	can_reach_goal = false;
+ 	last_goal = local_goal;
+
  	while(!can_reach_goal && goal_index_ < Sorted_Goals.rows()){
  		if (Sorted_Goals(goal_index_,3) > safe_distance_ || goal_index_==0){
  			collision_check(X,Sorted_Goals,goal_index_,buffer_,v_max_,partition_,tf_,can_reach_goal);
@@ -289,8 +287,6 @@ void  REACT::pick_cluster( Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, Eige
  	else{
  		ROS_ERROR("Need to stop");
  	}
-
- 	last_goal = local_goal;
  }
 
 
@@ -338,12 +334,6 @@ void REACT::collision_check(Eigen::MatrixXd X, Eigen::MatrixXd Sorted_Goals, int
 				ranges_(i) = (Sorted_Goals.block(i,0,1,2)-X_prop_.row(0)).norm();
 			}
 
-			// std::cout << "t_: " << t_ << std::endl;
-			// std::cout << "X prop 2: " << X_prop_ << std::endl;
-			// std::cout << "ranges: " << ranges_ << std::endl;
-			// std::cout << " d_min: " << d_min_ << std::endl;
-			// std::cout << " " << std::endl;
-
 			d_min_  = ranges_.minCoeff(&min_d_ind);			
 
 			// Check if the min distance is the current goal
@@ -384,14 +374,15 @@ void REACT::partition_scan(Eigen::MatrixXd scan, Eigen::Vector3d pose, Eigen::Ma
  	// Clean up logic
     for (int i=0; i < num_samples_-1; i++){
 		if ((std::abs(scan(1,i+1)-scan(1,i)) > thresh_) || i==num_samples_-2){
-    		if ((i-j)>10){
+    		if ((i-j)>3){
 
     			// Convert angle segment incerement to index
     			angle_2_index = angle_seg_inc_/d_angle_;
 
     			// Probably a better way to do this...
     			// Numbers slightly arbitrary
-    			if (double((i-j))/(3*angle_2_index) < 1) num_of_clusters_ = 2;
+    			if (double((i-j))/(angle_2_index) < 1) num_of_clusters_ = 1;
+    			if (double((i-j))/(angle_2_index) > 1) num_of_clusters_ = 2;
     			if (double((i-j))/(3*angle_2_index) > 1) num_of_clusters_ = 3;
     			if (double((i-j))/(5*angle_2_index) > 1) num_of_clusters_ = 5;
     			if (double((i-j))/(7*angle_2_index) > 1) num_of_clusters_ = 7;
@@ -401,7 +392,9 @@ void REACT::partition_scan(Eigen::MatrixXd scan, Eigen::Vector3d pose, Eigen::Ma
     			bool flag_ = false;
 
     			if (scan(1,i)==scan.row(1).maxCoeff()){
-    				 flag_ = true;
+    				flag_ = true;
+					num_of_clusters_ = 2*num_of_clusters_; 
+					// std::cout << "Here" << std::endl;
     			}
  
     			for (int k=0; k < num_of_clusters_; k++){
@@ -409,8 +402,13 @@ void REACT::partition_scan(Eigen::MatrixXd scan, Eigen::Vector3d pose, Eigen::Ma
     				}
     				else{
 	    				// Just cluster based on 
-	    				r_temp.push_back(scan(1, j + k*(i-j)/(num_of_clusters_-1)));
-	    				angle_temp.push_back(min_angle_ + yaw_ + d_angle_*(j + k*(i-j)/(num_of_clusters_-1)));
+	    				r_temp.push_back(scan(1, j + k*(i-j)/(num_of_clusters_)));
+	    				if (num_of_clusters_ > 1){
+	    					angle_temp.push_back(min_angle_ + yaw_ + d_angle_*(j + k*(i-j)/(num_of_clusters_-1)));
+						}
+						else{
+	    					angle_temp.push_back(min_angle_ + yaw_ + d_angle_*((i+j)/2));
+						}
     				}
     			}
 
