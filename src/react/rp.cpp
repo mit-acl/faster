@@ -325,6 +325,7 @@ void REACT::collision_check(Eigen::MatrixXd X, Eigen::MatrixXd Sorted_Goals, int
 	else{
 		// evaluate at time required to travel d_min
 		t_ = d_min_/v;
+		int count = 0;
 		while (!collision_detected_ && !can_reach_goal){
 			mtx.lock();
 			eval_trajectory(X_switch_,Y_switch_,t_x_,t_y_,t_,X_prop_);
@@ -341,13 +342,14 @@ void REACT::collision_check(Eigen::MatrixXd X, Eigen::MatrixXd Sorted_Goals, int
 				can_reach_goal = true;
 			}
 			// Check if the distance is less than our buffer
-			else if (d_min_ < buff){
+			else if (d_min_ < buff && count!=0){
 				collision_detected_ = true;
 				can_reach_goal = false;
 			}
 			// Neither have happened so propogate again
 			else{
 				t_ += d_min_/v;
+				count++;
 			}
 		}
 	}
