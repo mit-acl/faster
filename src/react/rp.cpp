@@ -75,10 +75,11 @@ void REACT::stateCB(const acl_system::ViconState& msg)
 void REACT::sendGoal(const ros::TimerEvent& e)
 {	
 
+
 	if (gen_new_traj_){
 		gen_new_traj_ = false;
 		mtx.lock();
-		get_traj(X_,local_goal_,v_max_,t_xf_,t_yf_,Xf_switch_,Yf_switch_);
+		get_traj(X_,local_goal_,v_,t_xf_,t_yf_,Xf_switch_,Yf_switch_);
 		mtx.unlock();
 		t0_ = ros::Time::now().toSec();
 	}
@@ -139,10 +140,6 @@ void REACT::eventCB(const acl_system::QuadFlightEvent& msg)
 
 		ROS_INFO("Waiting for spinup");
 		ros::Duration(spinup_time_).sleep();
-		ROS_INFO("Taking off");
-
-
-		quad_status_ = state_.TAKEOFF; 
 		quad_goal_.pos.x = pose_(0);
 		quad_goal_.pos.y = pose_(1);
 		quad_goal_.pos.z = pose_(2);
@@ -158,6 +155,10 @@ void REACT::eventCB(const acl_system::QuadFlightEvent& msg)
 		quad_goal_.dyaw = 0;
 
 		quad_goal_.cut_power = false;
+		ROS_INFO("Taking off");
+		
+		quad_status_ = state_.TAKEOFF; 
+		
 
 	}
 	// Emergency kill
