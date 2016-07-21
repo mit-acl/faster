@@ -317,6 +317,10 @@ void REACT::collision_check(Eigen::MatrixXd X, Eigen::MatrixXd Sorted_Goals, int
 	// Find closest obstacle (aka)
 	d_min_ = ranges_.minCoeff(&min_d_ind);
 
+	// std::cout << "goal counter: " << goal_counter << std::endl;
+	// std::cout << "Goal: " << Sorted_Goals.block(goal_counter,0,1,2) << std::endl;
+	// std::cout << "X: " << X.row(0) << std::endl;
+
 	// If the closest obstacle is the goal we're heading towards then we're good
 	if (min_d_ind==goal_index_){
 		can_reach_goal = true;
@@ -324,8 +328,8 @@ void REACT::collision_check(Eigen::MatrixXd X, Eigen::MatrixXd Sorted_Goals, int
 	// Something else is closer, need to prop to next time step
 	else{
 		// evaluate at time required to travel d_min
-		t_ = d_min_/v;
-		int count = 0;
+		t_ = std::max(buff/v,d_min_/v);
+
 		while (!collision_detected_ && !can_reach_goal){
 			mtx.lock();
 			eval_trajectory(X_switch_,Y_switch_,t_x_,t_y_,t_,X_prop_);
@@ -335,6 +339,11 @@ void REACT::collision_check(Eigen::MatrixXd X, Eigen::MatrixXd Sorted_Goals, int
 				ranges_(i) = (Sorted_Goals.block(i,0,1,2)-X_prop_.row(0)).norm();
 			}
 
+			// std::cout << "d_min: " << d_min_ << std::endl;
+			// std::cout << "count: " << count << std::endl;
+			// std::cout << "X_prop: " << X_prop_.row(0) << std::endl;
+			// std::cout << " " << std::endl;
+
 			d_min_  = ranges_.minCoeff(&min_d_ind);			
 
 			// Check if the min distance is the current goal
@@ -342,14 +351,13 @@ void REACT::collision_check(Eigen::MatrixXd X, Eigen::MatrixXd Sorted_Goals, int
 				can_reach_goal = true;
 			}
 			// Check if the distance is less than our buffer
-			else if (d_min_ < buff && count!=0){
+			else if (d_min_ < buff){
 				collision_detected_ = true;
 				can_reach_goal = false;
 			}
 			// Neither have happened so propogate again
 			else{
 				t_ += d_min_/v;
-				count++;
 			}
 		}
 	}
