@@ -254,6 +254,9 @@ void REACT::get_stop_dist(Eigen::MatrixXd X, Eigen::Vector3d local_goal,Eigen::V
 		d_stop_ = (X_stop_.block(0,0,1,2) - X.block(0,0,1,2)).norm();
 		d_goal_ = (X.block(0,0,1,2).transpose() - goal.head(2)).norm();
 
+		// Prevents oscillation is our stopping distance is really small (low speed)
+		saturate(d_stop_,0.1,d_stop_);
+
 		std::cout << "stop dist: " << d_stop_ << std::endl;
 		std::cout << "goal dist: " << d_goal_ << std::endl;
 		std::cout << " " << std::endl;
