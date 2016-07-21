@@ -139,7 +139,6 @@ void REACT::eventCB(const acl_system::QuadFlightEvent& msg)
 	if (msg.mode == msg.TAKEOFF && quad_status_== state_.NOT_FLYING){
 
 		ROS_INFO("Waiting for spinup");
-		ros::Duration(spinup_time_).sleep();
 		quad_goal_.pos.x = pose_(0);
 		quad_goal_.pos.y = pose_(1);
 		quad_goal_.pos.z = pose_(2);
@@ -155,6 +154,8 @@ void REACT::eventCB(const acl_system::QuadFlightEvent& msg)
 		quad_goal_.dyaw = 0;
 
 		quad_goal_.cut_power = false;
+
+		ros::Duration(spinup_time_).sleep();
 		ROS_INFO("Taking off");
 		
 		quad_status_ = state_.TAKEOFF; 
