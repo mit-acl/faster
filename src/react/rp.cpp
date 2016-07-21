@@ -254,6 +254,10 @@ void REACT::get_stop_dist(Eigen::MatrixXd X, Eigen::Vector3d local_goal,Eigen::V
 		d_stop_ = (X_stop_.block(0,0,1,2) - X.block(0,0,1,2)).norm();
 		d_goal_ = (X.block(0,0,1,2).transpose() - goal.head(2)).norm();
 
+		std::cout << "stop dist: " << d_stop_ << std::endl;
+		std::cout << "goal dist: " << d_goal_ << std::endl;
+		std::cout << " " << std::endl;
+
 		if (d_stop_ >= d_goal_){
 			// Need to stop
 			stop = true;
@@ -267,7 +271,7 @@ void  REACT::pick_cluster( Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, Eige
  	goal_index_ = 0;
 	can_reach_goal = false;
  	while(!can_reach_goal && goal_index_ < Sorted_Goals.rows()){
- 		if (Sorted_Goals(goal_index_,3) > safe_distance_){
+ 		if (Sorted_Goals(goal_index_,3) > safe_distance_ || goal_index_==0){
  			collision_check(X,Sorted_Goals,goal_index_,buffer_,v_max_,partition_,tf_,can_reach_goal);
  		}
  		goal_index_++;
@@ -280,8 +284,6 @@ void  REACT::pick_cluster( Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, Eige
  	else{
  		ROS_ERROR("Need to stop");
  	}
-
- 	// std::cout << "goal index: " << goal_index_ << std::endl;
 
  	last_goal = local_goal;
  }
@@ -331,13 +333,13 @@ void REACT::collision_check(Eigen::MatrixXd X, Eigen::MatrixXd Sorted_Goals, int
 				ranges_(i) = (Sorted_Goals.block(i,0,1,2)-X_prop_.row(0)).norm();
 			}
 
-			d_min_  = ranges_.minCoeff(&min_d_ind);
-			
 			// std::cout << "t_: " << t_ << std::endl;
 			// std::cout << "X prop 2: " << X_prop_ << std::endl;
 			// std::cout << "ranges: " << ranges_ << std::endl;
 			// std::cout << " d_min: " << d_min_ << std::endl;
 			// std::cout << " " << std::endl;
+
+			d_min_  = ranges_.minCoeff(&min_d_ind);			
 
 			// Check if the min distance is the current goal
 			if (min_d_ind==goal_index_){
