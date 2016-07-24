@@ -105,7 +105,7 @@ void FilterGP::scanCB(const sensor_msgs::LaserScan& msg)
     	}
 	}
 
- 	screenPrint();
+ 	// screenPrint();
 	
     filtered_scan_pub.publish(msg_filtered);
     point_array_pub.publish(scan_points);

@@ -24,15 +24,7 @@
 
 	</node>
 
-	<node if="$(arg filter)" ns="$(arg quadrotor)" name="scan_filter" pkg="acl_planning" type="gpf" output="screen" clear_params="true">
-
-		<param name="ground_range" type="double" value="4"/>
-		<param name="filter_thresh" type="double" value="0.1"/>
-
-		<remap from="~vicon" to="state_estimate"/>
-		<remap from="~scan" to="scan"/>
-		<remap from="~filtered_scan" to="filtered_scan"/>	
-	</node>
+	<include if="$(arg filter)" file="$(find acl_planning)/launch/filter.launch" ns="$(arg quadrotor)"/>
 
 	<group if="$(arg bag)">
         <!-- Ensure RosBag is saving important data -->

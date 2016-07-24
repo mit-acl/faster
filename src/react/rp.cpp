@@ -31,8 +31,8 @@ REACT::REACT(){
 
 
 	// Should be params
-	j_max_ = 30;
-	a_max_ = 5;
+	ros::param::get("~jerk",j_max_);
+	ros::param::get("~accel",a_max_);
 
 	v_ = 0;
 
@@ -406,8 +406,7 @@ void REACT::partition_scan(Eigen::MatrixXd scan, Eigen::Vector3d pose, Eigen::Ma
 
     			if (scan(1,i)==scan.row(1).maxCoeff()){
     				flag_ = true;
-					num_of_clusters_ = 2*num_of_clusters_; 
-					// std::cout << "Here" << std::endl;
+					num_of_clusters_ = 3*num_of_clusters_; 
     			}
  
     			for (int k=0; k < num_of_clusters_; k++){
