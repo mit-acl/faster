@@ -22,6 +22,7 @@
 #include "acl_system/QuadGoal.h"
 #include "acl_system/QuadState.h"
 #include "acl_system/QuadFlightEvent.h"
+#include "acl_system/FloatStamped.h"
 
 // Global includes
 #include <stdio.h>
@@ -36,7 +37,7 @@ class REACT
 public:
 	REACT();
 
-	ros::Publisher traj_pub, goal_pub, new_goal_pub, int_goal_pub, last_goal_pub, quad_goal_pub, pub_clean_scan;
+	ros::Publisher traj_pub, goal_pub, new_goal_pub, int_goal_pub, last_goal_pub, quad_goal_pub, latency_pub, pub_clean_scan;
 
 	void scanCB(const sensor_msgs::LaserScan& msg);
 	void stateCB(const acl_system::ViconState& msg);
@@ -91,8 +92,9 @@ private:
 	geometry_msgs::Pose temp_goal_point_ros_;
 	geometry_msgs::PoseStamped temp_path_point_ros_;
 	geometry_msgs::PointStamped ros_new_global_goal_, ros_last_global_goal_;
-
 	nav_msgs::Path traj_ros_;
+	acl_system::FloatStamped latency_;
+
 	acl_system::QuadGoal quad_goal_;
 	acl_system::QuadState state_;
 	acl_system::QuadFlightEvent quad_event_;
@@ -162,7 +164,7 @@ private:
 
 
 	double vfx_, vfy_, t_, tE_, dt_, tf_, r_, theta_, d_theta_, d_min_, tx_, ty_, v_, v_max_;
-	double theta_1_, theta_2_, tra_gen_, t_stop_, d_stop_, d_goal_;
+	double theta_1_, theta_2_, traj_gen_, t_stop_, d_stop_, d_goal_;
 	int index1_, index2_, partition_, min_d_ind, goal_index_;
 	int num_ = 100;
 	double max_angle_, min_angle_, d_angle_;

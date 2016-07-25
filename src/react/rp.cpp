@@ -219,7 +219,10 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
 
  	gen_new_traj_ = true;
 
- 	tra_gen_ = ros::WallTime::now().toSec();
+ 	traj_gen_ = ros::WallTime::now().toSec();
+
+ 	latency_.data = traj_gen_ - msg_received_;
+ 	latency_.header.stamp = ros::Time::now();
 
  	// std::cout << "Latency [ms]: " << 1000*( tra_gen_ - msg_received_) << std::endl;
 
@@ -815,4 +818,5 @@ void REACT::convert2ROS(Eigen::MatrixXd Goals){
 void REACT::pubROS(){
 	int_goal_pub.publish(goal_points_ros_);
 	traj_pub.publish(traj_ros_);
+	latency_pub.publish(latency_);
 }
