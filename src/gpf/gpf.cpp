@@ -13,6 +13,7 @@ FilterGP::FilterGP(){
 
 	ros::param::get("~ground_range",ground_range);
 	ros::param::get("~filter_thresh",filter_thresh);
+	ros::param::get("~new_max_range",new_max_range);
 
 	if(ground_range==-1){
 		ground_range = inf;
@@ -46,19 +47,6 @@ void FilterGP::stateCB(const acl_system::ViconState& msg)
 
 void FilterGP::scanCB(const sensor_msgs::LaserScan& msg)
  {
-
- 	// std::cout << ros::Time() << std::endl;
- 	// std::cout << ros::Duration(1) << std::endl;
- 	// double then = ros::Time::now().toSec();
-  //   listener.waitForTransform("/vicon", "/laser", ros::Time::now(), ros::Duration(1));
-  //   listener.lookupTransform("/vicon", "/laser", ros::Time::now(), trans);
-
-  //   std::cout << "Tranform latency: " << ros::Time::now().toSec() - then << std::endl;
-  //       //Do something
-
-  //   pose = trans.getOrigin();
-  //   q = trans.getRotation();
-
 
  	sensor_msgs::LaserScan msg_filtered;
 
@@ -102,6 +90,10 @@ void FilterGP::scanCB(const sensor_msgs::LaserScan& msg)
 	    		msg_filtered.ranges[i] = ground_range;
 	    		points_removed++;
 	    	}
+    	}
+
+    	if (msg.ranges[i] > new_max_range){
+    		msg_filtered.ranges[i] = inf;
     	}
 	}
 

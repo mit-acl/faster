@@ -74,8 +74,6 @@ void REACT::stateCB(const acl_system::ViconState& msg)
 
 void REACT::sendGoal(const ros::TimerEvent& e)
 {	
-
-
 	if (gen_new_traj_){
 		gen_new_traj_ = false;
 		mtx.lock();
@@ -320,11 +318,6 @@ void REACT::collision_check(Eigen::MatrixXd X, Eigen::MatrixXd Sorted_Goals, int
 	// Find closest obstacle (aka)
 	d_min_ = ranges_.minCoeff(&min_d_ind);
 
-	// std::cout << "goal counter: " << goal_counter << std::endl;
-	// std::cout << "Goal: " << Sorted_Goals.block(goal_counter,0,1,2) << std::endl;
-	// std::cout << "X: " << X.row(0) << std::endl;
-	// std::cout << "d min 1: " << d_min_ << std::endl;
-
 	partition = Sorted_Goals.rows();
 
 	// If the closest obstacle is the goal we're heading towards then we're good
@@ -346,11 +339,6 @@ void REACT::collision_check(Eigen::MatrixXd X, Eigen::MatrixXd Sorted_Goals, int
 			}
 
 			d_min_  = ranges_.minCoeff(&min_d_ind);	
-
-			// std::cout << "d_min: " << d_min_ << std::endl;
-			// std::cout << "X_prop: " << X_prop_.row(0) << std::endl;
-			// std::cout << "t: " << t_ << std::endl;
-			// std::cout << " " << std::endl;		
 
 			// Check if the min distance is the current goal
 			if (min_d_ind==goal_index_){
@@ -409,7 +397,7 @@ void REACT::partition_scan(Eigen::MatrixXd scan, Eigen::Vector3d pose, Eigen::Ma
 
     			if (scan(1,i)==scan.row(1).maxCoeff()){
     				flag_ = true;
-					num_of_clusters_ = 3*num_of_clusters_; 
+					num_of_clusters_ = 2*num_of_clusters_; 
     			}
  
     			for (int k=0; k < num_of_clusters_; k++){

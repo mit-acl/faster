@@ -38,7 +38,7 @@ public:
 
 private:
 
-	double max_range, alt;
+	double max_range, alt, new_max_range;
 	double ang_min, ang_max;
 	double increment, num_samples;
 	double inf;
