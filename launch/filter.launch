@@ -4,7 +4,7 @@
 
 		<param name="ground_range" type="double" value="5.6"/>
 		<param name="filter_thresh" type="double" value="0.2"/>
-		<param name="new_max_range" type="double" value="1.5"/>
+		<param name="new_max_range" type="double" value="1"/>
 
 		<remap from="~vicon" to="state_estimate"/>
 		<remap from="~scan" to="scan"/>
