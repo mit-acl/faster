@@ -12,5 +12,5 @@ goal_z: 0.5
 
 speed: 3.0
 
-jerk: 30  
-accel: 8
+jerk: 200  
+accel: 10
