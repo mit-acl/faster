@@ -54,7 +54,7 @@ void FilterGP::scanCB(const sensor_msgs::LaserScan& msg)
 
 	increment = msg.angle_increment;
 
-	num_samples = (ang_max-ang_min) / increment;
+	num_samples = (ang_max-ang_min) / increment + 1;
 
 	ang_min = msg.angle_min;
 	ang_max = msg.angle_max;
