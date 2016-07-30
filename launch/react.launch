@@ -29,7 +29,7 @@
 
 	<group if="$(arg bag)">
         <!-- Ensure RosBag is saving important data -->
-        <node ns="$(arg quadrotor)" pkg="rosbag" type="record" name="rosbag_record_planner" args="-o /media/odroid/LOGGER_USB1/bags/$(arg quadrotor)PlannerLogFile scan filtered_scan global_goal int_goal new_global_goal last_global_goal clean_scan traj event latency /tf"/>
+        <node ns="$(arg quadrotor)" pkg="rosbag" type="record" name="rosbag_record_planner" args="-o /media/odroid/LOGGER_USB1/bags/$(arg quadrotor)PlannerLogFile filtered_scan global_goal int_goal new_global_goal last_global_goal clean_scan traj event latency /tf"/>
     </group>
 
 </launch>
