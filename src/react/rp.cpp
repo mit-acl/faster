@@ -306,7 +306,7 @@ void REACT::collision_check(Eigen::MatrixXd X, Eigen::MatrixXd Sorted_Goals, int
 	min_d_ind = 0;
 	ranges_ = Eigen::VectorXd::Zero(Sorted_Goals.cols());
 	ranges_ = Sorted_Goals.col(3);
-	X_prop_ = Eigen::MatrixXd::Zero(3,2);
+	X_prop_ = Eigen::MatrixXd::Zero(4,2);
 	X_prop_ << X;
 
 	current_local_goal_ << Sorted_Goals.block(goal_counter,0,1,3).transpose();
