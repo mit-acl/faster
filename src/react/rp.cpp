@@ -13,9 +13,9 @@ REACT::REACT(){
 	last_goal_ = Eigen::Vector3d::Zero();
 	pose_= Eigen::Vector3d::Zero();
 	goal_ = Eigen::Vector3d::Zero();
-	X_ = Eigen::MatrixXd::Zero(3,2);
-	X_stop_ = Eigen::MatrixXd::Zero(3,2);
-	XE_ = Eigen::MatrixXd::Zero(3,2);
+	X_ = Eigen::MatrixXd::Zero(4,2);
+	X_stop_ = Eigen::MatrixXd::Zero(4,2);
+	XE_ = Eigen::MatrixXd::Zero(4,2);
 
 
 	ros::param::get("~goal_x",goal_(0));
@@ -234,8 +234,8 @@ void REACT::get_traj(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, st
 	//Generate new traj
 	get_vels(local_goal,X,v,vfx_,vfy_);
 
-	x0_ << X.col(0);
-	y0_ << X.col(1);
+	x0_ << X.block(0,0,3,1);
+	y0_ << X.block(0,1,3,1);
 
 	find_times(x0_, vfx_, t_fx, Xf_switch);
 	find_times(y0_, vfy_, t_fy, Yf_switch);
@@ -665,10 +665,12 @@ void REACT::eval_trajectory(Eigen::Matrix4d X_switch, Eigen::Matrix4d Y_switch, 
 	Xc(0,0) = X_switch(0,k) + X_switch(1,k)*tx_ + 0.5*X_switch(2,k)*pow(tx_,2) + 1.0/6.0*X_switch(3,k)*pow(tx_,3);
 	Xc(1,0) = X_switch(1,k) + X_switch(2,k)*tx_ + 0.5*X_switch(3,k)*pow(tx_,2);
 	Xc(2,0) = X_switch(2,k) + X_switch(3,k)*tx_;
+	Xc(3,0) = X_switch(3,k);
 
 	Xc(0,1) = Y_switch(0,l) + Y_switch(1,l)*ty_ + 0.5*Y_switch(2,l)*pow(ty_,2) + 1.0/6.0*Y_switch(3,l)*pow(ty_,3);
 	Xc(1,1) = Y_switch(1,l) + Y_switch(2,l)*ty_ + 0.5*Y_switch(3,l)*pow(ty_,2);
 	Xc(2,1) = Y_switch(2,l) + Y_switch(3,l)*ty_;
+	Xc(3,1) = Y_switch(3,l);
 }
 
 
@@ -715,11 +717,13 @@ void REACT::vis_better_scan(const sensor_msgs::LaserScan& msg)
 void REACT::eigen2quadGoal(Eigen::MatrixXd Xc, acl_system::QuadGoal& quad_goal){
  	quad_goal_.pos.x = Xc(0,0);
  	quad_goal_.vel.x = Xc(1,0);
- 	// quad_goal_.accel.x = Xc(2,0);
+ 	quad_goal_.accel.x = Xc(2,0);
+ 	quad_goal_.jerk.x = Xc(3,0);
 
  	quad_goal_.pos.y = Xc(0,1);
  	quad_goal_.vel.y = Xc(1,1);
- 	// quad_goal_.accel.y = Xc(2,1);
+ 	quad_goal_.accel.y = Xc(2,1);
+ 	quad_goal_.jerk.y = Xc(3,1);
  }
 
 
