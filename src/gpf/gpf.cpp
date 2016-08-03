@@ -70,13 +70,18 @@ void FilterGP::scanCB(const sensor_msgs::LaserScan& msg)
 	for (int i=0; i < num_samples; i++){
 		if (!isinf(msg.ranges[i]) && !isnan(msg.ranges[i])){
 			
+			q_temp_.setX( q_last_.getX() + i*(q.getX()-q_last_.getX())/num_samples);
+			q_temp_.setY( q_last_.getY() + i*(q.getY()-q_last_.getY())/num_samples);
+			q_temp_.setZ( q_last_.getZ() + i*(q.getZ()-q_last_.getZ())/num_samples);
+			q_temp_.setW( q_last_.getW() + i*(q.getW()-q_last_.getW())/num_samples);
+
 			geometry_msgs::PoseStamped temp;
 
 			x = msg.ranges[i]*std::cos(ang_min + increment*i);
 			y = msg.ranges[i]*std::sin(ang_min + increment*i);
 			z = 0.1;
 			tf::Quaternion n_body_q = tf::Quaternion(x, y, z, 0.0);
-			tf::Quaternion n_wolrd_q = q*n_body_q*q.inverse();
+			tf::Quaternion n_wolrd_q = q_temp_*n_body_q*q_temp_.inverse();
 
 			tf::Vector3 n_world =  tf::Vector3(n_wolrd_q.getX()+pose.getX(),n_wolrd_q.getY()+pose.getY(),n_wolrd_q.getZ()+pose.getZ());
 
@@ -101,6 +106,7 @@ void FilterGP::scanCB(const sensor_msgs::LaserScan& msg)
 	
     filtered_scan_pub.publish(msg_filtered);
     point_array_pub.publish(scan_points);
+    q_last_ = q;
  }
 
 

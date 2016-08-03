@@ -50,6 +50,8 @@ private:
 	tf::Vector3 pose;
 
 	tf::Quaternion q;
+	tf::Quaternion q_last_;
+	tf::Quaternion q_temp_;
 
 	std::ostringstream errorMsg, warnMsg;
 
