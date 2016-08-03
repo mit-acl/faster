@@ -715,11 +715,11 @@ void REACT::vis_better_scan(const sensor_msgs::LaserScan& msg)
 void REACT::eigen2quadGoal(Eigen::MatrixXd Xc, acl_system::QuadGoal& quad_goal){
  	quad_goal_.pos.x = Xc(0,0);
  	quad_goal_.vel.x = Xc(1,0);
- 	quad_goal_.accel.x = Xc(2,0);
+ 	// quad_goal_.accel.x = Xc(2,0);
 
  	quad_goal_.pos.y = Xc(0,1);
  	quad_goal_.vel.y = Xc(1,1);
- 	quad_goal_.accel.y = Xc(2,1);
+ 	// quad_goal_.accel.y = Xc(2,1);
  }
 
 
