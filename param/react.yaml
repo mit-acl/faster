@@ -7,10 +7,10 @@ buffer: 0.35       # 0.5 width of quad for collision checking
 
 # (x,y,z) goal
 goal_x: 0
-goal_y: -5.5
+goal_y: -6.0
 goal_z: 0.5
 
 speed: 3
 
-jerk: 40  
+jerk: 50  
 accel: 10
