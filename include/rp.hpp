@@ -74,7 +74,7 @@ private:
 	double thresh_, yaw_, dist_2_goal_, angle_2_goal_, angle_check_, msg_received_, cost_, cost_i_, angle_diff_, safe_distance_, min_cost_, buffer_;
 	double num_samples_, angle_max_, angle_min_, angle_increment_;
 	double angle_diff_last_, angle_seg_inc_;
-	int down_sample_, num_of_clusters_, collision_counter_, collision_counter_corridor_;
+	int down_sample_, num_of_clusters_, collision_counter_, collision_counter_corridor_, num_of_segement_;
 
 	double spinup_time_, heading_, j_max_, a_max_, t0_;
 	int quad_status_;

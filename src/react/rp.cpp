@@ -178,12 +178,13 @@ void REACT::eventCB(const acl_system::QuadFlightEvent& msg)
 	}
 	// GO!!!!
 	else if (msg.mode == msg.START && quad_status_ == state_.FLYING){
-		quad_status_ = state_.GO;
-		ROS_INFO("Starting");
 		// Set speed to desired speed
 		v_ = v_max_;
 		// Generate new traj
 		gen_new_traj_ = true;
+		quad_status_ = state_.GO;
+		ROS_INFO("Starting");
+		
 	}
 	// STOP!!!
 	else if (msg.mode == msg.ESTOP && quad_status_ == state_.GO){
@@ -341,7 +342,7 @@ void REACT::collision_check(Eigen::MatrixXd X, Eigen::MatrixXd Sorted_Goals, int
 			d_min_  = ranges_.minCoeff(&min_d_ind);	
 
 			// Check if the min distance is the current goal
-			if (min_d_ind==goal_index_){
+			if (min_d_ind==goal_counter){
 				can_reach_goal = true;
 			}
 			// Check if the distance is less than our buffer
@@ -373,7 +374,7 @@ void REACT::partition_scan(Eigen::MatrixXd scan, Eigen::Vector3d pose, Eigen::Ma
  	d_angle_ = scan(0,1)-scan(0,0);
 
  	num_samples_ = scan.cols(); 
- 	num_of_clusters_ = 0;
+ 	num_of_segement_ = 0;
 
  	// Clean up logic
     for (int i=0; i < num_samples_-1; i++){
@@ -385,29 +386,29 @@ void REACT::partition_scan(Eigen::MatrixXd scan, Eigen::Vector3d pose, Eigen::Ma
 
     			// Probably a better way to do this...
     			// Numbers slightly arbitrary
-    			if (double((i-j))/(angle_2_index) < 1) num_of_clusters_ = 1;
-    			if (double((i-j))/(angle_2_index) > 1) num_of_clusters_ = 2;
-    			if (double((i-j))/(3*angle_2_index) > 1) num_of_clusters_ = 3;
-    			if (double((i-j))/(5*angle_2_index) > 1) num_of_clusters_ = 5;
-    			if (double((i-j))/(7*angle_2_index) > 1) num_of_clusters_ = 7;
-    			if (double((i-j))/(9*angle_2_index) > 1) num_of_clusters_ = 9;
-    			if (double((i-j))/(11*angle_2_index) > 1) num_of_clusters_ = 11;
+    			if (double((i-j))/(angle_2_index) < 1) num_of_segement_ = 1;
+    			if (double((i-j))/(angle_2_index) > 1) num_of_segement_ = 2;
+    			if (double((i-j))/(3*angle_2_index) > 1) num_of_segement_ = 3;
+    			if (double((i-j))/(5*angle_2_index) > 1) num_of_segement_ = 5;
+    			if (double((i-j))/(7*angle_2_index) > 1) num_of_segement_ = 7;
+    			if (double((i-j))/(9*angle_2_index) > 1) num_of_segement_ = 9;
+    			if (double((i-j))/(11*angle_2_index) > 1) num_of_segement_ = 11;
 
     			bool flag_ = false;
 
     			if (scan(1,i)==scan.row(1).maxCoeff()){
     				flag_ = true;
-					num_of_clusters_ = 2*num_of_clusters_; 
+					num_of_segement_ = 2*num_of_segement_; 
     			}
  
-    			for (int k=0; k < num_of_clusters_; k++){
-    				if (flag_ && (k==0 || k==num_of_clusters_-1)){
+    			for (int k=0; k < num_of_segement_; k++){
+    				if (flag_ && (k==0 || k==num_of_segement_-1)){
     				}
     				else{
 	    				// Just cluster based on 
-	    				r_temp.push_back(scan(1, j + k*(i-j)/(num_of_clusters_)));
-	    				if (num_of_clusters_ > 1){
-	    					angle_temp.push_back(min_angle_ + yaw_ + d_angle_*(j + k*(i-j)/(num_of_clusters_-1)));
+	    				r_temp.push_back(scan(1, j + k*(i-j)/(num_of_segement_)));
+	    				if (num_of_segement_ > 1){
+	    					angle_temp.push_back(min_angle_ + yaw_ + d_angle_*(j + k*(i-j)/(num_of_segement_-1)));
 						}
 						else{
 	    					angle_temp.push_back(min_angle_ + yaw_ + d_angle_*((i+j)/2));
@@ -420,7 +421,7 @@ void REACT::partition_scan(Eigen::MatrixXd scan, Eigen::Vector3d pose, Eigen::Ma
 		}
 	}
 
-	Goals = Eigen::MatrixXd::Zero(r_temp.size(),5);
+	Goals = Eigen::MatrixXd::Zero(r_temp.size()+1,5);
 	int count = 0;
 
 	// This is wrong, i >= count
@@ -436,7 +437,11 @@ void REACT::partition_scan(Eigen::MatrixXd scan, Eigen::Vector3d pose, Eigen::Ma
 		count++;
 	}
 
-	partition = r_temp.size();
+	Goals.block(count,0,1,3) << last_goal_.transpose() ;
+	Goals(count,3) = (last_goal_-pose).norm();
+	Goals(count,4) = std::atan2(last_goal_(1)-pose(1),last_goal_(0)-pose(0));
+
+	partition = r_temp.size()+1;
 }
 
 
@@ -445,7 +450,7 @@ void REACT::sort_clusters( Eigen::Vector3d last_goal, Eigen::MatrixXd Goals,  Ei
 
  	// Re-initialize
 	cost_queue_ = std::priority_queue<double, std::vector<double>, std::greater<double> > ();
-	Sorted_Goals = Eigen::MatrixXd::Zero(Goals.rows()+1,Goals.cols()+1);
+	Sorted_Goals = Eigen::MatrixXd::Zero(Goals.rows(),Goals.cols()+1);
 	cost_v_.clear();
 
 	last_goal_V_ = last_goal - pose;
@@ -454,7 +459,7 @@ void REACT::sort_clusters( Eigen::Vector3d last_goal, Eigen::MatrixXd Goals,  Ei
 	r_goal_ = (goal - pose).norm();
 	angle_2_goal_ = atan2( goal(1) -pose(1), goal(0) - pose(0)) ;
 
-	num_of_clusters_ = Goals.rows();
+	num_of_clusters_ = Goals.rows()-1;
 
  	for (int i=0; i < num_of_clusters_ ; i++){
 
