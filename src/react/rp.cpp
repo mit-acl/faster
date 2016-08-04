@@ -521,7 +521,7 @@ void REACT::sort_clusters( Eigen::Vector3d last_goal, Eigen::MatrixXd Goals,  Ei
  	else{
 		
 		// Could be interesting, need to justify 
-		double j_temp = std::min(j_max_/(0.4*v_max_)*std::abs(vf-x0(1)) + 10,j_max_);
+		double j_temp = std::min(j_max_/(0.5*v_max_)*std::abs(vf-x0(1)),j_max_);
 		j_temp = copysign(j_temp,vf-x0(1));
 
 		double vfp = x0(1) + pow(x0(2),2)/(2*j_temp);
