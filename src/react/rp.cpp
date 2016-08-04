@@ -117,7 +117,7 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 			eigen2quadGoal(X_,quad_goal_);
 			quad_goal_.yaw = heading_;
 
-			if (X_.block(1,0,1,2).norm()==0){
+			if (X_.block(1,0,1,2).norm()<0.01){
 				// We're done
 				ROS_INFO("Flight Complete");
 				quad_status_ = state_.FLYING;
@@ -531,7 +531,13 @@ void REACT::sort_clusters( Eigen::Vector3d last_goal, Eigen::MatrixXd Goals,  Ei
 		}
 		else{
 			// Could be interesting, need to justify 
-			j_temp = std::min(j_max_/(0.5*v_max_)*std::abs(vf-x0(1)),j_max_);
+			if (std::abs(vf-x0(1))/v_max_ < 0.1){
+				j_temp = 5;
+			}
+			else{
+				j_temp = j_max_;
+			}
+			// j_temp = std::min(j_max_/(0.5*v_max_)*std::abs(vf-x0(1)),j_max_);
 		}
 		j_temp = copysign(j_temp,vf-x0(1));
 
