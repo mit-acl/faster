@@ -77,7 +77,7 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 	if (gen_new_traj_){
 		gen_new_traj_ = false;
 		mtx.lock();
-		get_traj(X_,local_goal_,v_,t_xf_,t_yf_,Xf_switch_,Yf_switch_);
+		get_traj(X_,local_goal_,v_,t_xf_,t_yf_,Xf_switch_,Yf_switch_,false);
 		mtx.unlock();
 		t0_ = ros::Time::now().toSec();
 	}
@@ -231,22 +231,22 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
  	} 	
 }
 
-void REACT::get_traj(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, std::vector<double>& t_fx, std::vector<double>& t_fy, Eigen::Matrix4d& Xf_switch, Eigen::Matrix4d& Yf_switch ){
+void REACT::get_traj(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, std::vector<double>& t_fx, std::vector<double>& t_fy, Eigen::Matrix4d& Xf_switch, Eigen::Matrix4d& Yf_switch, bool stop_check ){
 	//Generate new traj
 	get_vels(local_goal,X,v,vfx_,vfy_);
 
 	x0_ << X.block(0,0,3,1);
 	y0_ << X.block(0,1,3,1);
 
-	find_times(x0_, vfx_, t_fx, Xf_switch);
-	find_times(y0_, vfy_, t_fy, Yf_switch);
+	find_times(x0_, vfx_, t_fx, Xf_switch,stop_check);
+	find_times(y0_, vfy_, t_fy, Yf_switch,stop_check);
 }
 
 
 void REACT::get_stop_dist(Eigen::MatrixXd X, Eigen::Vector3d local_goal,Eigen::Vector3d goal, bool& stop){
 	if (local_goal == goal){
 		mtx.lock();
-		get_traj(X,goal,0,t_x_stop_,t_y_stop_,X_switch_stop_,Y_switch_stop_);
+		get_traj(X,goal,0,t_x_stop_,t_y_stop_,X_switch_stop_,Y_switch_stop_,true);
 		mtx.unlock();
 
 		t_stop_ = std::max(std::accumulate(t_x_stop_.begin(), t_x_stop_.end(), 0.0), std::accumulate(t_y_stop_.begin(), t_y_stop_.end(), 0.0));
@@ -313,7 +313,7 @@ void REACT::collision_check(Eigen::MatrixXd X, Eigen::MatrixXd Sorted_Goals, int
 	current_local_goal_ << Sorted_Goals.block(goal_counter,0,1,3).transpose();
 	
 	mtx.lock();
-	get_traj(X,current_local_goal_,v,t_x_,t_y_,X_switch_,Y_switch_);
+	get_traj(X,current_local_goal_,v,t_x_,t_y_,X_switch_,Y_switch_,false);
 	mtx.unlock();
 
 	// Find closest obstacle (aka)
@@ -498,7 +498,7 @@ void REACT::sort_clusters( Eigen::Vector3d last_goal, Eigen::MatrixXd Goals,  Ei
 	}
  }
 
- void REACT::find_times( Eigen::Vector3d x0, double vf, std::vector<double>& t, Eigen::Matrix4d&  X_switch){
+ void REACT::find_times( Eigen::Vector3d x0, double vf, std::vector<double>& t, Eigen::Matrix4d&  X_switch, bool stop_check){
  	if (vf == x0(1)){
  		j_V_[0] = 0;
 		j_V_[1] = 0; 
@@ -525,8 +525,14 @@ void REACT::sort_clusters( Eigen::Vector3d last_goal, Eigen::MatrixXd Goals,  Ei
  	}
  	else{
 		
-		// Could be interesting, need to justify 
-		double j_temp = std::min(j_max_/(0.5*v_max_)*std::abs(vf-x0(1)),j_max_);
+		double j_temp;
+		if (stop_check){
+			j_temp = j_max_;
+		}
+		else{
+			// Could be interesting, need to justify 
+			j_temp = std::min(j_max_/(0.5*v_max_)*std::abs(vf-x0(1)),j_max_);
+		}
 		j_temp = copysign(j_temp,vf-x0(1));
 
 		double vfp = x0(1) + pow(x0(2),2)/(2*j_temp);

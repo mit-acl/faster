@@ -56,10 +56,10 @@ public:
 
 	// Make these private after testing
 	void get_stop_dist(Eigen::MatrixXd X, Eigen::Vector3d local_goal,Eigen::Vector3d goal, bool& stop);
-	void get_traj(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, std::vector<double>& t_fx, std::vector<double>& t_fy, Eigen::Matrix4d& Xf_switch, Eigen::Matrix4d& Yf_switch );
+	void get_traj(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, std::vector<double>& t_fx, std::vector<double>& t_fy, Eigen::Matrix4d& Xf_switch, Eigen::Matrix4d& Yf_switch, bool stop_check  );
 	void sort_clusters( Eigen::Vector3d last_goal, Eigen::MatrixXd Goals,  Eigen::Vector3d pose, Eigen::Vector3d goal, Eigen::MatrixXd& Sorted_Goals);
 	void partition_scan(Eigen::MatrixXd scan, Eigen::Vector3d pose, Eigen::MatrixXd& Goals, int& partition);
-	void find_times( Eigen::Vector3d x0, double vf, std::vector<double>& t, Eigen::Matrix4d&  X_switch);
+	void find_times( Eigen::Vector3d x0, double vf, std::vector<double>& t, Eigen::Matrix4d&  X_switch , bool stop_check );
 	void eval_trajectory(Eigen::Matrix4d X0, Eigen::Matrix4d Y0, std::vector<double> t_x, std::vector<double> t_y, double t, Eigen::MatrixXd& X);
 	void convert_scan(sensor_msgs::LaserScan msg, Eigen::MatrixXd& scanE , std::vector<double>& scanV );
 	void collision_check(Eigen::MatrixXd X, Eigen::MatrixXd Sorted_Goals, int goal_counter_, double buff, double v, int partition , double& tf, bool& can_reach_goal);
