@@ -533,7 +533,7 @@ void REACT::sort_clusters( Eigen::Vector3d last_goal, Eigen::MatrixXd Goals,  Ei
 		}
 		else{
 			// Could be interesting, need to justify 
-			if (std::abs(vf-x0(1))/v_max_ < 0.1 && std::abs(x0(3)) != j_max_){
+			if (std::abs(vf-x0(1))/v_max_ < 0.2 && std::abs(x0(3)) != j_max_){
 				j_temp = 5;
 			}
 			else{

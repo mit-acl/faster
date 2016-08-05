@@ -12,7 +12,7 @@ goal_z: 0.5
 
 speed: 3
 
-jerk: 50  
+jerk: 40  
 accel: 10
 
 plan_eval: 0.01 
