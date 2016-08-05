@@ -24,7 +24,7 @@ int main(int argc, char **argv)
 	
 
 	// SendCmd timer
-	ros::Timer sendGoalTimer = n.createTimer(ros::Duration(0.01), &REACT::sendGoal, &rp);
+	ros::Timer sendGoalTimer = n.createTimer(ros::Duration(rp.plan_eval_time_), &REACT::sendGoal, &rp);
 
 
 	rp.pub_clean_scan = n.advertise<sensor_msgs::LaserScan>("clean_scan", 1);

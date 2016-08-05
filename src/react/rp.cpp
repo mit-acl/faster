@@ -29,10 +29,11 @@ REACT::REACT(){
 	ros::param::get("cntrl/spinup_time",spinup_time_);
 	ros::param::get("~speed",v_max_);
 
-
-	// Should be params
 	ros::param::get("~jerk",j_max_);
 	ros::param::get("~accel",a_max_);
+
+	ros::param::get("~plan_eval",plan_eval_time_);
+
 
 	v_ = 0;
 
@@ -79,7 +80,7 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 		mtx.lock();
 		get_traj(X_,local_goal_,v_,t_xf_,t_yf_,Xf_switch_,Yf_switch_,false);
 		mtx.unlock();
-		t0_ = ros::Time::now().toSec();
+		t0_ = ros::Time::now().toSec() - plan_eval_time_;
 	}
 
 	if (quad_status_== state_.TAKEOFF){
@@ -110,6 +111,7 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 			}
 
 			tE_ = ros::Time::now().toSec() - t0_;
+			
 			mtx.lock();		
 			eval_trajectory(Xf_switch_,Yf_switch_,t_xf_,t_yf_,tE_,X_);
 			mtx.unlock();
@@ -117,7 +119,7 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 			eigen2quadGoal(X_,quad_goal_);
 			quad_goal_.yaw = heading_;
 
-			if (X_.block(1,0,1,2).norm()<0.01){
+			if (X_.block(1,0,1,2).norm() == 0){
 				// We're done
 				ROS_INFO("Flight Complete");
 				quad_status_ = state_.FLYING;
@@ -235,8 +237,8 @@ void REACT::get_traj(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, st
 	//Generate new traj
 	get_vels(local_goal,X,v,vfx_,vfy_);
 
-	x0_ << X.block(0,0,3,1);
-	y0_ << X.block(0,1,3,1);
+	x0_ << X.block(0,0,4,1);
+	y0_ << X.block(0,1,4,1);
 
 	find_times(x0_, vfx_, t_fx, Xf_switch,stop_check);
 	find_times(y0_, vfy_, t_fy, Yf_switch,stop_check);
@@ -498,7 +500,7 @@ void REACT::sort_clusters( Eigen::Vector3d last_goal, Eigen::MatrixXd Goals,  Ei
 	}
  }
 
- void REACT::find_times( Eigen::Vector3d x0, double vf, std::vector<double>& t, Eigen::Matrix4d&  X_switch, bool stop_check){
+ void REACT::find_times( Eigen::Vector4d x0, double vf, std::vector<double>& t, Eigen::Matrix4d&  X_switch, bool stop_check){
  	if (vf == x0(1)){
  		j_V_[0] = 0;
 		j_V_[1] = 0; 
@@ -531,7 +533,7 @@ void REACT::sort_clusters( Eigen::Vector3d last_goal, Eigen::MatrixXd Goals,  Ei
 		}
 		else{
 			// Could be interesting, need to justify 
-			if (std::abs(vf-x0(1))/v_max_ < 0.1){
+			if (std::abs(vf-x0(1))/v_max_ < 0.1 && std::abs(x0(3)) != j_max_){
 				j_temp = 5;
 			}
 			else{

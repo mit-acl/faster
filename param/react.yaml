@@ -14,3 +14,5 @@ speed: 3
 
 jerk: 50  
 accel: 10
+
+plan_eval: 0.01 
