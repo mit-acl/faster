@@ -341,7 +341,7 @@ void REACT::collision_check(Eigen::MatrixXd X, Eigen::MatrixXd Sorted_Goals, int
 				ranges_(i) = (Sorted_Goals.block(i,0,1,2)-X_prop_.row(0)).norm();
 			}
 
-			d_min_  = ranges_.minCoeff(&min_d_ind);	
+			d_min_  = ranges_.minCoeff(&min_d_ind);
 
 			// Check if the min distance is the current goal
 			if (min_d_ind==goal_counter){
@@ -423,7 +423,7 @@ void REACT::partition_scan(Eigen::MatrixXd scan, Eigen::Vector3d pose, Eigen::Ma
 		}
 	}
 
-	Goals = Eigen::MatrixXd::Zero(r_temp.size()+1,5);
+	Goals = Eigen::MatrixXd::Zero(r_temp.size(),5);
 	int count = 0;
 
 	// This is wrong, i >= count
@@ -439,11 +439,11 @@ void REACT::partition_scan(Eigen::MatrixXd scan, Eigen::Vector3d pose, Eigen::Ma
 		count++;
 	}
 
-	Goals.block(count,0,1,3) << last_goal_.transpose() ;
-	Goals(count,3) = (last_goal_-pose).norm();
-	Goals(count,4) = std::atan2(last_goal_(1)-pose(1),last_goal_(0)-pose(0));
+	// Goals.block(count,0,1,3) << last_goal_.transpose() ;
+	// Goals(count,3) = (last_goal_-pose).norm();
+	// Goals(count,4) = std::atan2(last_goal_(1)-pose(1),last_goal_(0)-pose(0));
 
-	partition = r_temp.size()+1;
+	partition = r_temp.size();
 }
 
 
@@ -475,7 +475,7 @@ void REACT::sort_clusters( Eigen::Vector3d last_goal, Eigen::MatrixXd Goals,  Ei
  		// Normalize
 		next_goal_V_ = next_goal_V_/next_goal_V_.norm();
 
- 		angle_diff_last_ = acos(next_goal_V_.dot(last_goal_V_));
+ 		angle_diff_last_ = 2*acos(next_goal_V_.dot(last_goal_V_));
 
  		cost_i_ = pow(angle_diff_,2) + pow(angle_diff_last_,2) + pow(1/r_i_,2);
 
