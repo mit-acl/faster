@@ -197,23 +197,38 @@ void REACT::eventCB(const acl_system::QuadFlightEvent& msg)
 	}
 }
 
-
-void REACT::scanCB(const sensor_msgs::LaserScan& msg)
+void REACT::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
  {
- 	msg_received_ = ros::WallTime::now().toSec();
- 	convert_scan(msg, scanE_, scanV_);
- 	// Cluster
- 	partition_scan(scanE_, pose_, Goals_, partition_);
- 	// Sort clusters
- 	sort_clusters(last_goal_, Goals_, pose_, goal_, Sorted_Goals_);
- 	// Pick cluster
- 	pick_cluster(Sorted_Goals_, X_, last_goal_, local_goal_, can_reach_goal_);
 
- 	if (!can_reach_goal_){
- 		// Need to stop!!!
- 		v_ = 0;
- 		ROS_ERROR("Emergency stop -- no feasible path");
- 	}
+ 	pcl::PCLPointCloud2* cloud = new pcl::PCLPointCloud2; 
+	pcl::PCLPointCloud2ConstPtr cloudPtr(cloud);
+	
+	pcl_conversions::toPCL(*msg, *cloud);
+	pcl::PointCloud<pcl::PointXYZ>::Ptr xyz_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+	pcl::fromPCLPointCloud2(*cloud,*xyz_cloud);
+
+ 	msg_received_ = ros::WallTime::now().toSec();
+	
+	kd_tree_.Initialize(xyz_cloud);
+
+ 	// Build k-d tree
+ 	// kd_tree_.Initialize(msg);
+ // 	pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
+	// kdtree.setInputCloud (msg);
+
+ 	// convert_scan(msg, scanE_, scanV_);
+ 	// // Cluster
+ 	// partition_scan(scanE_, pose_, Goals_, partition_);
+ 	// // Sort clusters
+ 	// sort_clusters(last_goal_, Goals_, pose_, goal_, Sorted_Goals_);
+ 	// // Pick cluster
+ 	// pick_cluster(Sorted_Goals_, X_, last_goal_, local_goal_, can_reach_goal_);
+
+ 	// if (!can_reach_goal_){
+ 	// 	// Need to stop!!!
+ 	// 	v_ = 0;
+ 	// 	ROS_ERROR("Emergency stop -- no feasible path");
+ 	// }
 
  	gen_new_traj_ = true;
 
@@ -222,7 +237,7 @@ void REACT::scanCB(const sensor_msgs::LaserScan& msg)
  	latency_.data = traj_gen_ - msg_received_;
  	latency_.header.stamp = ros::Time::now();
 
- 	// std::cout << "Latency [ms]: " << 1000*( tra_gen_ - msg_received_) << std::endl;
+ 	std::cout << "Latency [ms]: " << 1000*(traj_gen_ - msg_received_) << std::endl;
 
  	if(debug_){
  		convert2ROS(Goals_);
