@@ -24,6 +24,13 @@
 #include "acl_system/QuadFlightEvent.h"
 #include "acl_system/FloatStamped.h"
 
+#include <pcl_ros/point_cloud.h>
+#include <pcl_conversions/pcl_conversions.h>
+// #include <pcl/kdtree/kdtree_flann.h>
+#include <nanoflann.hpp>
+#include <pcl/point_cloud.h>
+#include "kd_tree.h"
+
 // Global includes
 #include <stdio.h>
 #include <math.h>
@@ -41,7 +48,7 @@ public:
 
 	ros::Publisher traj_pub, goal_pub, new_goal_pub, int_goal_pub, last_goal_pub, quad_goal_pub, latency_pub, pub_clean_scan;
 
-	void scanCB(const sensor_msgs::LaserScan& msg);
+	void pclCB(const sensor_msgs::PointCloud2ConstPtr& msg);
 	void stateCB(const acl_system::ViconState& msg);
 	void global_goalCB(const geometry_msgs::PointStamped& msg);
 
@@ -86,7 +93,7 @@ private:
 
 	std::mutex mtx;
 
-
+	KDTree<double> kd_tree_;
 
 	// // // // //
 	// Ros var initialization

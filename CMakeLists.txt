@@ -1,12 +1,15 @@
 cmake_minimum_required(VERSION 2.8.3)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -O3")
 project(acl_planning)
 
-# need to latest c++ compiler standard
-add_compile_options(-std=c++11)
 
 find_package( Eigen3 REQUIRED )
 include_directories(${EIGEN3_INCLUDE_DIR})
 
+find_package(PCL REQUIRED)
+include_directories(${PCL_INCLUDE_DIRS})
+add_definitions(${PCL_DEFINITIONS})
+link_directories(${PCL_LIBRARY_DIRS})
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -22,6 +25,7 @@ find_package(catkin REQUIRED COMPONENTS
 	roslib
 	acl_system
 	sensor_msgs
+	pcl_ros
 	)
 
 # generate_messages(
