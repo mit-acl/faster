@@ -203,8 +203,15 @@ void REACT::eventCB(const acl_system::QuadFlightEvent& msg)
 void REACT::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
  {
 
- 	msg_received_ = ros::WallTime::now().toSec();
+ 	pcl::PCLPointCloud2* cloud = new pcl::PCLPointCloud2; 
+	pcl::PCLPointCloud2ConstPtr cloudPtr(cloud);
+	
+	pcl_conversions::toPCL(*msg, *cloud);
+	pcl::PointCloud<pcl::PointXYZ>::Ptr xyz_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+	pcl::fromPCLPointCloud2(*cloud,*xyz_cloud);
 
+ 	msg_received_ = ros::WallTime::now().toSec();
+	
  	pcl::PCLPointCloud2* cloud2 = new pcl::PCLPointCloud2; 
 	pcl::PCLPointCloud2ConstPtr cloudPtr(cloud2);
 	
