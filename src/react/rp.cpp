@@ -203,21 +203,41 @@ void REACT::eventCB(const acl_system::QuadFlightEvent& msg)
 void REACT::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
  {
 
- 	pcl::PCLPointCloud2* cloud = new pcl::PCLPointCloud2; 
-	pcl::PCLPointCloud2ConstPtr cloudPtr(cloud);
-	
-	pcl_conversions::toPCL(*msg, *cloud);
-	pcl::PointCloud<pcl::PointXYZ>::Ptr xyz_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-	pcl::fromPCLPointCloud2(*cloud,*xyz_cloud);
-
  	msg_received_ = ros::WallTime::now().toSec();
-	
-	kd_tree_.Initialize(xyz_cloud);
 
+ 	pcl::PCLPointCloud2* cloud2 = new pcl::PCLPointCloud2; 
+	pcl::PCLPointCloud2ConstPtr cloudPtr(cloud2);
+	
+	pcl_conversions::toPCL(*msg, *cloud2);
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
+	pcl::fromPCLPointCloud2(*cloud2,*cloud);
+
+	
  	// Build k-d tree
- 	// kd_tree_.Initialize(msg);
- // 	pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
-	// kdtree.setInputCloud (msg);
+ 	// kd_tree_.Initialize(cloud);
+ 	pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
+	kdtree.setInputCloud (cloud);
+
+	// # of nearest neighbors
+  	int K = 25;
+
+  	// Robot pose	
+  	pcl::PointXYZ searchPoint;
+
+	searchPoint.x = 0;
+	searchPoint.y = 0;
+	searchPoint.z = 0;
+
+	std::vector<int> pointIdxNKNSearch(K);
+  	std::vector<float> pointNKNSquaredDistance(K);
+
+	kdtree.nearestKSearch (searchPoint, K, pointIdxNKNSearch, pointNKNSquaredDistance);
+
+	// for (size_t i = 0; i < pointIdxNKNSearch.size (); ++i)
+	//       std::cout << "    "  <<   cloud->points[ pointIdxNKNSearch[i] ].x 
+	//                 << " " << cloud->points[ pointIdxNKNSearch[i] ].y 
+	//                 << " " << cloud->points[ pointIdxNKNSearch[i] ].z 
+	//                 << " (squared distance: " << pointNKNSquaredDistance[i] << ")" << std::endl;
 
  	// convert_scan(msg, scanE_, scanV_);
  	// // Cluster

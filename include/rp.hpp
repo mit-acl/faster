@@ -26,7 +26,7 @@
 
 #include <pcl_ros/point_cloud.h>
 #include <pcl_conversions/pcl_conversions.h>
-// #include <pcl/kdtree/kdtree_flann.h>
+#include <pcl/kdtree/kdtree_flann.h>
 #include <nanoflann.hpp>
 #include <pcl/point_cloud.h>
 #include "kd_tree.h"
