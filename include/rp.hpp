@@ -13,6 +13,7 @@
 #include "geometry_msgs/TwistStamped.h"
 #include "geometry_msgs/Vector3Stamped.h"
 #include "tf/transform_datatypes.h"
+#include <tf/transform_listener.h>
 #include "nav_msgs/Path.h"
 
 #include <Eigen/Dense>
@@ -25,6 +26,8 @@
 #include "acl_system/FloatStamped.h"
 
 #include <pcl_ros/point_cloud.h>
+#include "pcl_ros/transforms.h"
+#include "pcl_ros/impl/transforms.hpp"
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/kdtree/kdtree_flann.h>
 #include <nanoflann.hpp>
@@ -48,6 +51,7 @@ public:
 
 	ros::Publisher traj_pub, goal_pub, new_goal_pub, int_goal_pub, last_goal_pub, quad_goal_pub, latency_pub, pub_clean_scan;
 
+
 	void pclCB(const sensor_msgs::PointCloud2ConstPtr& msg);
 	void stateCB(const acl_system::ViconState& msg);
 	void global_goalCB(const geometry_msgs::PointStamped& msg);
@@ -61,21 +65,24 @@ public:
 
 	// Make these private after testing
 	void get_stop_dist(Eigen::MatrixXd X, Eigen::Vector3d local_goal,Eigen::Vector3d goal, bool& stop);
-	void get_traj(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, std::vector<double>& t_fx, std::vector<double>& t_fy, Eigen::Matrix4d& Xf_switch, Eigen::Matrix4d& Yf_switch, bool stop_check  );
+	void get_traj(Eigen::MatrixXd X, double angle_2_local_goal, double v, std::vector<double>& t_fx, std::vector<double>& t_fy, Eigen::Matrix4d& Xf_switch, Eigen::Matrix4d& Yf_switch, bool stop_check  );
 	
 	void sample_ss(Eigen::MatrixXd& Goals);
-	void sort_ss(Eigen::Vector3d last_goal, Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d goal, Eigen::MatrixXd& Sorted_Goals);
+	void sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d goal, double angle_2_last_goal, Eigen::MatrixXd& Sorted_Goals);
 	void pick_ss(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, Eigen::Vector3d& last_goal, Eigen::Vector3d& local_goal, bool& can_reach_goal);
 
+	void collision_check(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd X, double current_angle_2_local_goal, double buff, double v, double& tf, bool& can_reach_goal);
+	
 	void convert2pcl(const sensor_msgs::PointCloud2ConstPtr msg,pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_out);
 	void find_times( Eigen::Vector4d x0, double vf, std::vector<double>& t, Eigen::Matrix4d&  X_switch , bool stop_check );
 	void eval_trajectory(Eigen::Matrix4d X0, Eigen::Matrix4d Y0, std::vector<double> t_x, std::vector<double> t_y, double t, Eigen::MatrixXd& X);
-	void collision_check(Eigen::MatrixXd X, Eigen::MatrixXd Sorted_Goals, int goal_counter_, double buff, double v, int partition , double& tf, bool& can_reach_goal);
-	void get_vels(Eigen::Vector3d local_goal, Eigen::MatrixXd X, double v, double& vx, double& vy);
+	void get_vels(Eigen::MatrixXd X, double angle_2_local_goal, double v, double& vx, double& vy);
 	void saturate(double &var, double min, double max);
 	void eigen2quadGoal(Eigen::MatrixXd X, acl_system::QuadGoal& quad_goal);
 
 private:
+
+	tf::TransformListener tf_listener_;
 
 	double inf_; // Infinity definition
 	double thresh_, yaw_, dist_2_goal_, angle_2_goal_, angle_check_, msg_received_, cost_, cost_i_, angle_diff_, safe_distance_, min_cost_, buffer_;
@@ -163,10 +170,6 @@ private:
 	Eigen::Vector3d last_goal_V_;
 	Eigen::Vector3d next_goal_V_;
 	Eigen::Vector3d pose_;
-	Eigen::Vector3d current_local_goal_;
-
-
-	Eigen::VectorXd ranges_;	
 
 	pcl::PointXYZ searchPoint_;
 
@@ -175,20 +178,20 @@ private:
 	double theta_1_, theta_2_, traj_gen_, t_stop_, d_stop_, d_goal_;
 	int index1_, index2_, partition_, min_d_ind, goal_index_;
 	int num_ = 100, K_, K_buffer_;
-	double h_fov_, angle_2_last_goal, d_angle_;
+	double h_fov_, angle_2_last_goal_, current_angle_2_local_goal_, mean_distance_, goal_distance_, distance_traveled_, local_goal_angle_ ;
 
 	double tE_prev_;
 
 	double angle_i_, r_goal_;
 
 	bool debug_, can_reach_goal_, collision_detected_, gen_new_traj_;
-	bool stop_ = false;
+	bool stop_ = false, initialized_ = false;
 
 
 	//## Logging and Debugging Functions
 
-	void takeoff();
-	void land();
+	void takeoff(double& z);
+	void land(double& z);
 	
 };
 

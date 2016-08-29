@@ -12,9 +12,9 @@ REACT::REACT(){
 	last_goal_ = Eigen::Vector3d::Zero();
 	pose_= Eigen::Vector3d::Zero();
 	goal_ = Eigen::Vector3d::Zero();
-	X_ = Eigen::MatrixXd::Zero(4,2);
-	X_stop_ = Eigen::MatrixXd::Zero(4,2);
-	XE_ = Eigen::MatrixXd::Zero(4,2);
+	X_ = Eigen::MatrixXd::Zero(4,3);
+	X_stop_ = Eigen::MatrixXd::Zero(4,3);
+	XE_ = Eigen::MatrixXd::Zero(4,3);
 
 
 	ros::param::get("~goal_x",goal_(0));
@@ -22,6 +22,8 @@ REACT::REACT(){
 	ros::param::get("~goal_z",goal_(2));
 
 	heading_ = atan2(goal_(1),goal_(0));
+	angle_2_last_goal_ = heading_;
+	local_goal_angle_ = heading_;
 	last_goal_ << goal_;
 	local_goal_ << goal_;
 
@@ -39,7 +41,7 @@ REACT::REACT(){
 	ros::param::get("~h_fov",h_fov_);
 	h_fov_ = h_fov_*PI/180;
 
-	v_ = 0;
+	v_ = v_max_;
 
 	angle_seg_inc_ = 10*PI/180;
 
@@ -52,6 +54,8 @@ REACT::REACT(){
 	quad_status_ = state_.NOT_FLYING;
 
 	quad_goal_.cut_power = true;
+
+	tf_listener_.waitForTransform("/vicon","/world", ros::Time(0), ros::Duration(1));
 
 	ROS_INFO("Planner initialized.");
 
@@ -71,7 +75,7 @@ void REACT::stateCB(const acl_system::ViconState& msg)
 		yaw_ = tf::getYaw(msg.pose.orientation);
 
 		if (quad_status_ == state_.NOT_FLYING){
-			X_.row(0) << pose_.head(2).transpose();
+			X_.row(0) << pose_.transpose();
 		}
 	} 
 	// if (msg.has_twist) velCallback(msg.twist);
@@ -81,23 +85,24 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 {	
 	if (gen_new_traj_){
 		gen_new_traj_ = false;
+		X_(1,1) = -v_max_;
 		mtx.lock();
-		get_traj(X_,local_goal_,v_,t_xf_,t_yf_,Xf_switch_,Yf_switch_,false);
+		get_traj(X_,local_goal_angle_,v_,t_xf_,t_yf_,Xf_switch_,Yf_switch_,false);
 		mtx.unlock();
 		t0_ = ros::Time::now().toSec() - plan_eval_time_;
 	}
 
 	if (quad_status_== state_.TAKEOFF){
-		takeoff();
-		if (quad_goal_.pos.z == goal_(2)){
+		takeoff(X_(0,2));
+		if (X_(0,2) == goal_(2)){
 			quad_status_ = state_.FLYING;
 			ROS_INFO("Take-off Complete");
 		}
 	}
 
 	else if (quad_status_== state_.LAND){
-			land();
-			if (quad_goal_.pos.z == -0.1){
+			land(X_(0,2));
+			if (X_(0,2) == -0.1){
 				quad_status_ = state_.NOT_FLYING;
 				quad_goal_.cut_power = true;
 				ROS_INFO("Landing Complete");
@@ -149,6 +154,7 @@ void REACT::eventCB(const acl_system::QuadFlightEvent& msg)
 
 		X_(0,0) = pose_(0);
 		X_(0,1) = pose_(1);
+		X_(0,2) = pose_(2);
 
 		quad_goal_.vel.x = 0;
 		quad_goal_.vel.y = 0;
@@ -219,16 +225,16 @@ void REACT::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 	sample_ss(Goals_);
 
 	// Sort allowable final states
-	sort_ss(last_goal_,Goals_,pose_,goal_,Sorted_Goals_);
+	sort_ss(Goals_,pose_,goal_, angle_2_last_goal_, Sorted_Goals_);
 
 	// Pick desired final state
 	pick_ss(cloud_, Sorted_Goals_, X_, last_goal_, local_goal_, can_reach_goal_);
 
- 	// if (!can_reach_goal_){
- 	// 	// Need to stop!!!
- 	// 	v_ = 0;
- 	// 	ROS_ERROR("Emergency stop -- no feasible path");
- 	// }
+ 	if (!can_reach_goal_){
+ 		// Need to stop!!!
+ 		v_ = 0;
+ 		ROS_ERROR("Emergency stop -- no feasible path");
+ 	}
 
  	gen_new_traj_ = true;
 
@@ -239,10 +245,10 @@ void REACT::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 
  	std::cout << "Latency [ms]: " << 1000*(traj_gen_ - msg_received_) << std::endl;
 
- 	// if(debug_){
- 	// 	convert2ROS(Goals_);
- 	// 	pubROS();
- 	// } 	
+ 	if(debug_){
+ 		convert2ROS(Goals_);
+ 		pubROS();
+ 	} 	
 }
 
 void REACT::sample_ss(Eigen::MatrixXd& Goals){
@@ -251,14 +257,13 @@ void REACT::sample_ss(Eigen::MatrixXd& Goals){
 	// std::cout << Goals << std::endl;
 }
 
-void REACT::sort_ss(Eigen::Vector3d last_goal, Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d goal, Eigen::MatrixXd& Sorted_Goals){
+void REACT::sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d goal, double angle_2_last_goal, Eigen::MatrixXd& Sorted_Goals){
  	// Re-initialize
 	cost_queue_ = std::priority_queue<double, std::vector<double>, std::greater<double> > ();
 	Sorted_Goals = Eigen::MatrixXd::Zero(Goals.rows()+1,Goals.cols()+1);
 	cost_v_.clear();
 
 	angle_2_goal_ = atan2( goal(1) -pose(1), goal(0) - pose(0)) ;
-	angle_2_last_goal = atan2( last_goal(1) -pose(1), last_goal(0) - pose(0)) ;
 
 	num_of_clusters_ = Goals.rows();
 
@@ -294,36 +299,16 @@ void REACT::pick_ss(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd S
 	goal_index_ = 0;
 	can_reach_goal = false;
  	last_goal = local_goal;
-
-	pcl::PointXYZ searchPoint;
-
-	searchPoint.x = 0;
-	searchPoint.y = 0;
-	searchPoint.z = 0;
-
-	// std::vector<int> pointIdxNKNSearch(K_);
- //  	std::vector<float> pointNKNSquaredDistance(K_);
-
-	// kdtree_.nearestKSearch (searchPoint, K_, pointIdxNKNSearch, pointNKNSquaredDistance);
-
-	// for (size_t i = 0; i < pointIdxNKNSearch.size (); ++i)
-	//       std::cout << "    "  <<   cloud->points[ pointIdxNKNSearch[i] ].x 
-	//                 << " " << cloud->points[ pointIdxNKNSearch[i] ].y 
-	//                 << " " << cloud->points[ pointIdxNKNSearch[i] ].z 
-	//                 << " (distance: " << std::sqrt(pointNKNSquaredDistance[i]) << ")" << std::endl;
-
+ 	angle_2_last_goal_ = local_goal_angle_;
 
  	while(!can_reach_goal && goal_index_ < Sorted_Goals.rows()){
- 		// if (Sorted_Goals(goal_index_,0) > safe_distance_ || goal_index_==0){
- 		// 	collision_check(X,Sorted_Goals,goal_index_,buffer_,v_max_,partition_,tf_,can_reach_goal);
- 		// }
- 		can_reach_goal = true;
+		collision_check(cloud,X,Sorted_Goals(goal_index_,0),buffer_,v_max_,tf_,can_reach_goal); 		
  		goal_index_++;
  	}
 
  	if(can_reach_goal){
  		goal_index_--;
- 		local_goal << 0,0,0;
+ 		local_goal_angle_ = Sorted_Goals(goal_index_);
  	}
  	else{
  		ROS_ERROR("Need to stop");
@@ -331,9 +316,9 @@ void REACT::pick_ss(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd S
 }
 
 
-void REACT::get_traj(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, std::vector<double>& t_fx, std::vector<double>& t_fy, Eigen::Matrix4d& Xf_switch, Eigen::Matrix4d& Yf_switch, bool stop_check ){
+void REACT::get_traj(Eigen::MatrixXd X, double angle_2_local_goal, double v, std::vector<double>& t_fx, std::vector<double>& t_fy, Eigen::Matrix4d& Xf_switch, Eigen::Matrix4d& Yf_switch, bool stop_check ){
 	//Generate new traj
-	get_vels(local_goal,X,v,vfx_,vfy_);
+	get_vels(X,angle_2_local_goal,v,vfx_,vfy_);
 
 	x0_ << X.block(0,0,4,1);
 	y0_ << X.block(0,1,4,1);
@@ -345,91 +330,104 @@ void REACT::get_traj(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, st
 
 void REACT::get_stop_dist(Eigen::MatrixXd X, Eigen::Vector3d local_goal,Eigen::Vector3d goal, bool& stop){
 	if (local_goal == goal){
-		mtx.lock();
-		get_traj(X,goal,0,t_x_stop_,t_y_stop_,X_switch_stop_,Y_switch_stop_,true);
-		mtx.unlock();
+		// mtx.lock();
+		// get_traj(X,goal,0,t_x_stop_,t_y_stop_,X_switch_stop_,Y_switch_stop_,true);
+		// mtx.unlock();
 
-		t_stop_ = std::max(std::accumulate(t_x_stop_.begin(), t_x_stop_.end(), 0.0), std::accumulate(t_y_stop_.begin(), t_y_stop_.end(), 0.0));
+		// t_stop_ = std::max(std::accumulate(t_x_stop_.begin(), t_x_stop_.end(), 0.0), std::accumulate(t_y_stop_.begin(), t_y_stop_.end(), 0.0));
 
-		mtx.lock();
-		eval_trajectory(X_switch_stop_,Y_switch_stop_,t_x_stop_,t_y_stop_,t_stop_,X_stop_);
-		mtx.unlock();
+		// mtx.lock();
+		// eval_trajectory(X_switch_stop_,Y_switch_stop_,t_x_stop_,t_y_stop_,t_stop_,X_stop_);
+		// mtx.unlock();
 
-		d_stop_ = (X_stop_.block(0,0,1,2) - X.block(0,0,1,2)).norm();
-		d_goal_ = (X.block(0,0,1,2).transpose() - goal.head(2)).norm();
+		// d_stop_ = (X_stop_.block(0,0,1,2) - X.block(0,0,1,2)).norm();
+		// d_goal_ = (X.block(0,0,1,2).transpose() - goal.head(2)).norm();
 
-		// Prevents oscillation is our stopping distance is really small (low speed)
-		saturate(d_stop_,0.1,d_stop_);
+		// // Prevents oscillation is our stopping distance is really small (low speed)
+		// saturate(d_stop_,0.1,d_stop_);
 
-		if (d_stop_ >= d_goal_){
-			// Need to stop
-			stop = true;
-		}
+		// if (d_stop_ >= d_goal_){
+		// 	// Need to stop
+		// 	stop = true;
+		// }
 	}
 }
 
 
-void REACT::get_vels(Eigen::Vector3d local_goal, Eigen::MatrixXd X, double v, double& vx, double& vy){
-	angle_2_goal_ = atan2( local_goal(1) - X(0,1), local_goal(0) - X(0,0));
-
-	vx = v*cos(angle_2_goal_);
-	vy = v*sin(angle_2_goal_);
+void REACT::get_vels(Eigen::MatrixXd X, double angle_2_local_goal, double v, double& vx, double& vy){
+	vx = v*cos(angle_2_local_goal);
+	vy = v*sin(angle_2_local_goal);
 }
 
 
-void REACT::collision_check(Eigen::MatrixXd X, Eigen::MatrixXd Sorted_Goals, int goal_counter, double buff, double v, int partition, double& tf, bool& can_reach_goal){
+void REACT::collision_check(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd X, double current_angle_2_local_goal, double buff, double v, double& tf, bool& can_reach_goal){
 	//Re-intialize
 	can_reach_goal = false;
 	collision_detected_ = false;
 	min_d_ind = 0;
-	ranges_ = Eigen::VectorXd::Zero(Sorted_Goals.cols());
-	ranges_ = Sorted_Goals.col(3);
-	X_prop_ = Eigen::MatrixXd::Zero(4,2);
+	
+	X_prop_ = Eigen::MatrixXd::Zero(4,3);
 	X_prop_ << X;
-
-	current_local_goal_ << Sorted_Goals.block(goal_counter,0,1,3).transpose();
 	
 	mtx.lock();
-	get_traj(X,current_local_goal_,v,t_x_,t_y_,X_switch_,Y_switch_,false);
+	get_traj(X,current_angle_2_local_goal,v,t_x_,t_y_,X_switch_,Y_switch_,false);
 	mtx.unlock();
 
-	// Find closest obstacle (aka)
-	d_min_ = ranges_.minCoeff(&min_d_ind);
+	goal_distance_ = (goal_ - X.row(0).transpose()).norm();
 
-	partition = Sorted_Goals.rows();
+	searchPoint_.x = X(0,0);
+	searchPoint_.y = X(0,1);
+	searchPoint_.z = X(0,2);
 
-	// If the closest obstacle is the goal we're heading towards then we're good
-	if (min_d_ind==goal_index_){
-		can_reach_goal = true;
-	} 
-	// Something else is closer, need to prop to next time step
+	std::vector<int> pointIdxNKNSearch(K_);
+  	std::vector<float> pointNKNSquaredDistance(K_);
+
+	kdtree_.nearestKSearch (searchPoint_, K_, pointIdxNKNSearch, pointNKNSquaredDistance);
+
+    mean_distance_ = std::sqrt(std::accumulate(pointNKNSquaredDistance.begin(), pointNKNSquaredDistance.end(), 0.0f)/pointIdxNKNSearch.size());
+
+    std::cout << "mean distance: " << mean_distance_ << std::endl;
+
+
+    // If the obstacle is farther than safe distance or goal is within mean distance then we're good
+    if (mean_distance_ > safe_distance_ || mean_distance_ > goal_distance_){
+    	can_reach_goal = true;
+    }
+    // Something else is closer, need to prop to next time step
 	else{
 		// evaluate at time required to travel d_min
-		t_ = std::max(buff/v,d_min_/v);
+		t_ = std::max(buff/v,mean_distance_/v);
 
 		while (!collision_detected_ && !can_reach_goal){
+
+		    std::cout << "mean distance: " << mean_distance_ << std::endl;
+
 			mtx.lock();
 			eval_trajectory(X_switch_,Y_switch_,t_x_,t_y_,t_,X_prop_);
 			mtx.unlock();
-			// Re-calculate ranges based on prop state
-			for(int i=0;i<partition;i++){
-				ranges_(i) = (Sorted_Goals.block(i,0,1,2)-X_prop_.row(0)).norm();
-			}
 
-			d_min_  = ranges_.minCoeff(&min_d_ind);
+			searchPoint_.x = X_prop_(0,0);
+			searchPoint_.y = X_prop_(0,1);
+			searchPoint_.z = X_prop_(0,2);
+
+			kdtree_.nearestKSearch (searchPoint_, K_, pointIdxNKNSearch, pointNKNSquaredDistance);
+
+    		mean_distance_ = std::sqrt(std::accumulate(pointNKNSquaredDistance.begin(), pointNKNSquaredDistance.end(), 0.0f)/pointIdxNKNSearch.size());
+
+    		distance_traveled_ = (X_prop_.row(0)-X.row(0)).norm();
 
 			// Check if the min distance is the current goal
-			if (min_d_ind==goal_counter){
+			if (mean_distance_ > safe_distance_ || distance_traveled_ > safe_distance_){
 				can_reach_goal = true;
 			}
 			// Check if the distance is less than our buffer
-			else if (d_min_ < buff){
+			else if (mean_distance_ < buff){
 				collision_detected_ = true;
 				can_reach_goal = false;
 			}
 			// Neither have happened so propogate again
 			else{
-				t_ += d_min_/v;
+				t_ += mean_distance_/v;
 			}
 		}
 	}
@@ -635,8 +633,14 @@ void REACT::eval_trajectory(Eigen::Matrix4d X_switch, Eigen::Matrix4d Y_switch, 
 
 
 void REACT::convert2pcl(const sensor_msgs::PointCloud2ConstPtr msg,pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_out){
+  	
+  	sensor_msgs::PointCloud2 msg_out;
+
+	tf_listener_.waitForTransform(msg->header.frame_id,"/world", msg->header.stamp, ros::Duration(2));
+  	pcl_ros::transformPointCloud("/world", *msg, msg_out, tf_listener_);
+
 	pcl::PCLPointCloud2* cloud2 = new pcl::PCLPointCloud2; 
-	pcl_conversions::toPCL(*msg, *cloud2);
+	pcl_conversions::toPCL(msg_out, *cloud2);
 	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
 	pcl::fromPCLPointCloud2(*cloud2,*cloud);
 
@@ -654,24 +658,29 @@ void REACT::eigen2quadGoal(Eigen::MatrixXd Xc, acl_system::QuadGoal& quad_goal){
  	quad_goal_.vel.y = Xc(1,1);
  	quad_goal_.accel.y = Xc(2,1);
  	quad_goal_.jerk.y = Xc(3,1);
+
+ 	quad_goal_.pos.z = Xc(0,2);
+ 	quad_goal_.vel.z = Xc(1,2);
+ 	quad_goal_.accel.z = Xc(2,2);
+ 	quad_goal_.jerk.z = Xc(3,2);
  }
 
 
 
-void REACT::takeoff(){
-	quad_goal_.pos.z+=0.003;
-	saturate(quad_goal_.pos.z,-0.1,goal_(2));
+void REACT::takeoff(double& z){
+	z+=0.003;
+	saturate(z,-0.1,goal_(2));
 }
 
 
-void REACT::land(){
-	if (quad_goal_.pos.z > 0.4){
-		quad_goal_.pos.z-=0.003;
-		saturate(quad_goal_.pos.z,-0.1,goal_(2));
+void REACT::land(double& z){
+	if (z > 0.4){
+		z-=0.003;
+		saturate(z,-0.1,goal_(2));
 	}
 	else{
-		quad_goal_.pos.z-=0.001;
-		saturate(quad_goal_.pos.z,-0.1,goal_(2));
+		z-=0.001;
+		saturate(z,-0.1,goal_(2));
 	}
 }
 
@@ -691,12 +700,12 @@ void REACT::convert2ROS(Eigen::MatrixXd Goals){
  	goal_points_ros_.header.frame_id = "vicon";
 
  	for (int i=0; i < Goals.rows(); i++){
- 		temp_goal_point_ros_.position.x = Goals(i,0);
- 		temp_goal_point_ros_.position.y = Goals(i,1);
- 		temp_goal_point_ros_.position.z = Goals(i,2);
+ 		temp_goal_point_ros_.position.x = 4*cos(Goals(i,0))+pose_(0);
+ 		temp_goal_point_ros_.position.y = 4*sin(Goals(i,0))+pose_(1);
+ 		temp_goal_point_ros_.position.z = goal_(2);
 
- 		temp_goal_point_ros_.orientation.w = cos(Goals(i,4)/2) ;
- 		temp_goal_point_ros_.orientation.z = sin(Goals(i,4)/2);
+ 		temp_goal_point_ros_.orientation.w = cos(Goals(i,0)/2) ;
+ 		temp_goal_point_ros_.orientation.z = sin(Goals(i,0)/2);
 
  		goal_points_ros_.poses.push_back(temp_goal_point_ros_);
 	}
@@ -722,15 +731,15 @@ void REACT::convert2ROS(Eigen::MatrixXd Goals){
 
 	ros_new_global_goal_.header.stamp = ros::Time::now();
 	ros_new_global_goal_.header.frame_id = "vicon";
-	ros_new_global_goal_.point.x = local_goal_(0);
-	ros_new_global_goal_.point.y = local_goal_(1);
-	ros_new_global_goal_.point.z = local_goal_(2);
+	ros_new_global_goal_.point.x = 4*cos(local_goal_angle_);
+	ros_new_global_goal_.point.y = 4*sin(local_goal_angle_);
+	ros_new_global_goal_.point.z = goal_(2);
 
-	ros_last_global_goal_.header.stamp = ros::Time::now();
-	ros_last_global_goal_.header.frame_id = "vicon";
-	ros_last_global_goal_.point.x = last_goal_(0);
-	ros_last_global_goal_.point.y = last_goal_(1);
-	ros_last_global_goal_.point.z = last_goal_(2);
+	// ros_last_global_goal_.header.stamp = ros::Time::now();
+	// ros_last_global_goal_.header.frame_id = "vicon";
+	// ros_last_global_goal_.point.x = last_goal_(0);
+	// ros_last_global_goal_.point.y = last_goal_(1);
+	// ros_last_global_goal_.point.z = last_goal_(2);
 
 	new_goal_pub.publish(ros_new_global_goal_);
 	last_goal_pub.publish(ros_last_global_goal_);
