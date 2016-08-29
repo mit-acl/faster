@@ -66,14 +66,17 @@ public:
 	// Make these private after testing
 	void get_stop_dist(Eigen::MatrixXd X, Eigen::Vector3d local_goal,Eigen::Vector3d goal, bool& stop);
 	void get_traj(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, std::vector<double>& t_fx, std::vector<double>& t_fy, Eigen::Matrix4d& Xf_switch, Eigen::Matrix4d& Yf_switch, bool stop_check  );
-	void sort_clusters( Eigen::Vector3d last_goal, Eigen::MatrixXd Goals,  Eigen::Vector3d pose, Eigen::Vector3d goal, Eigen::MatrixXd& Sorted_Goals);
-	void partition_scan(Eigen::MatrixXd scan, Eigen::Vector3d pose, Eigen::MatrixXd& Goals, int& partition);
+	
+	void sample_ss(Eigen::MatrixXd& Goals);
+	void sort_ss(Eigen::Vector3d last_goal, Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d goal, Eigen::MatrixXd& Sorted_Goals);
+	
+	void sort_clusters(Eigen::Vector3d last_goal, Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d goal, Eigen::MatrixXd& Sorted_Goals);
+	void pick_cluster( Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, Eigen::Vector3d& last_goal, Eigen::Vector3d& local_goal, bool& can_reach_goal);
+
 	void find_times( Eigen::Vector4d x0, double vf, std::vector<double>& t, Eigen::Matrix4d&  X_switch , bool stop_check );
 	void eval_trajectory(Eigen::Matrix4d X0, Eigen::Matrix4d Y0, std::vector<double> t_x, std::vector<double> t_y, double t, Eigen::MatrixXd& X);
-	void convert_scan(sensor_msgs::LaserScan msg, Eigen::MatrixXd& scanE , std::vector<double>& scanV );
 	void collision_check(Eigen::MatrixXd X, Eigen::MatrixXd Sorted_Goals, int goal_counter_, double buff, double v, int partition , double& tf, bool& can_reach_goal);
 	void get_vels(Eigen::Vector3d local_goal, Eigen::MatrixXd X, double v, double& vx, double& vy);
-	void pick_cluster( Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, Eigen::Vector3d& last_goal, Eigen::Vector3d& local_goal, bool& can_reach_goal);
 	void saturate(double &var, double min, double max);
 	void eigen2quadGoal(Eigen::MatrixXd X, acl_system::QuadGoal& quad_goal);
 
@@ -129,7 +132,6 @@ private:
 	// Note the last entry is always zero
 	std::vector<double> j_V_{std::vector<double>(4,0)};
 
-	std::vector<double> scanV_;
 	std::vector<double> cost_v_;
 	std::vector<double>::iterator it_;
 
@@ -150,7 +152,6 @@ private:
 
 	Eigen::MatrixXd X_; 
 	Eigen::MatrixXd XE_;
-	Eigen::MatrixXd scanE_;
 	Eigen::MatrixXd Goals_;
 	Eigen::MatrixXd Sorted_Goals_;
 	Eigen::MatrixXd X_prop_;
@@ -176,12 +177,12 @@ private:
 	double vfx_, vfy_, t_, tE_, dt_, tf_, r_, theta_, d_theta_, d_min_, tx_, ty_, v_, v_max_;
 	double theta_1_, theta_2_, traj_gen_, t_stop_, d_stop_, d_goal_;
 	int index1_, index2_, partition_, min_d_ind, goal_index_;
-	int num_ = 100;
-	double max_angle_, min_angle_, d_angle_;
+	int num_ = 100, K_, K_buffer_;
+	double h_fov_, angle_2_last_goal, d_angle_;
 
 	double tE_prev_;
 
-	double r_i_, angle_i_, r_goal_;
+	double angle_i_, r_goal_;
 
 	bool debug_, can_reach_goal_, collision_detected_, gen_new_traj_;
 	bool stop_ = false;

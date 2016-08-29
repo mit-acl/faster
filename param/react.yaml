@@ -1,7 +1,6 @@
 # Params for REACT planner
-thresh: 0.4       # Distance used to cluster scan (m)
+thresh: 0.3       # Distance used to cluster scan (m)
 debug: true
-angle_check: 0.7  # +-40deg check
 safe_distance: 3  # Smallest distance before obstacle is no longer viable segment
 buffer: 0.42       # 0.5 width of quad for collision checking
 
@@ -10,9 +9,20 @@ goal_x: 0
 goal_y: -6.0
 goal_z: 0.5
 
+# Flight params
 speed: 3
 
 jerk: 40  
 accel: 10
 
+# Trajectory evaluation rate
 plan_eval: 0.01 
+
+# Number of samples from k-d tree to find obstacle 
+K: 25
+
+# Number of samples within buffer to be deemed collision
+K_buff: 5
+
+# Sensor horizontal FOV (deg)
+h_fov: 60

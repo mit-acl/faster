@@ -6,7 +6,6 @@ REACT::REACT(){
 	// Should be read as param
 	ros::param::get("~thresh",thresh_);
 	ros::param::get("~debug",debug_);
-	ros::param::get("~angle_check",angle_check_);
 	ros::param::get("~safe_distance",safe_distance_);
 	ros::param::get("~buffer",buffer_);
 
@@ -34,6 +33,11 @@ REACT::REACT(){
 
 	ros::param::get("~plan_eval",plan_eval_time_);
 
+	ros::param::get("~K",K_);
+	ros::param::get("~K_buffer",K_buffer_);
+
+	ros::param::get("~h_fov",h_fov_);
+	h_fov_ = h_fov_*PI/180;
 
 	v_ = 0;
 
@@ -204,40 +208,47 @@ void REACT::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
  {
 
  	msg_received_ = ros::WallTime::now().toSec();
-	
- 	pcl::PCLPointCloud2* cloud2 = new pcl::PCLPointCloud2; 
-	pcl::PCLPointCloud2ConstPtr cloudPtr(cloud2);
-	
+
+	// Convert pcl
+ 	pcl::PCLPointCloud2* cloud2 = new pcl::PCLPointCloud2; 	
 	pcl_conversions::toPCL(*msg, *cloud2);
 	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
 	pcl::fromPCLPointCloud2(*cloud2,*cloud);
-
 	
  	// Build k-d tree
  	// kd_tree_.Initialize(cloud);
  	pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
 	kdtree.setInputCloud (cloud);
 
-	// # of nearest neighbors
-  	int K = 25;
-
   	// Robot pose	
-  	pcl::PointXYZ searchPoint;
+ //  	pcl::PointXYZ searchPoint;
 
-	searchPoint.x = 0;
-	searchPoint.y = 0;
-	searchPoint.z = 0;
+	// searchPoint.x = 0;
+	// searchPoint.y = 0;
+	// searchPoint.z = 0;
 
-	std::vector<int> pointIdxNKNSearch(K);
-  	std::vector<float> pointNKNSquaredDistance(K);
+	// std::vector<int> pointIdxNKNSearch(K_);
+ //  	std::vector<float> pointNKNSquaredDistance(K_);
 
-	kdtree.nearestKSearch (searchPoint, K, pointIdxNKNSearch, pointNKNSquaredDistance);
+	// kdtree.nearestKSearch (searchPoint, K_, pointIdxNKNSearch, pointNKNSquaredDistance);
 
 	// for (size_t i = 0; i < pointIdxNKNSearch.size (); ++i)
 	//       std::cout << "    "  <<   cloud->points[ pointIdxNKNSearch[i] ].x 
 	//                 << " " << cloud->points[ pointIdxNKNSearch[i] ].y 
 	//                 << " " << cloud->points[ pointIdxNKNSearch[i] ].z 
-	//                 << " (squared distance: " << pointNKNSquaredDistance[i] << ")" << std::endl;
+	//                 << " (distance: " << std::sqrt(pointNKNSquaredDistance[i]) << ")" << std::endl;
+
+
+
+
+	// Generate allowable final states
+	sample_ss(Goals_);
+
+	// Sort allowable final states
+	sort_ss(last_goal_,Goals_,pose_,goal_,Sorted_Goals_);
+
+	// Pick desired final state
+	// pick_ss(kdtree, Sorted_Goals_, X_, last_goal_, local_goal_, can_reach_goal_);
 
  	// convert_scan(msg, scanE_, scanV_);
  	// // Cluster
@@ -262,11 +273,58 @@ void REACT::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 
  	std::cout << "Latency [ms]: " << 1000*(traj_gen_ - msg_received_) << std::endl;
 
- 	if(debug_){
- 		convert2ROS(Goals_);
- 		pubROS();
- 	} 	
+ 	// if(debug_){
+ 	// 	convert2ROS(Goals_);
+ 	// 	pubROS();
+ 	// } 	
 }
+
+void REACT::sample_ss(Eigen::MatrixXd& Goals){
+	Goals = Eigen::MatrixXd::Zero(12,1);
+	Goals.col(0).setLinSpaced(12,-h_fov_/2+yaw_,h_fov_/2+yaw_);
+	// std::cout << Goals << std::endl;
+}
+
+void REACT::sort_ss(Eigen::Vector3d last_goal, Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d goal, Eigen::MatrixXd& Sorted_Goals){
+ 	// Re-initialize
+	cost_queue_ = std::priority_queue<double, std::vector<double>, std::greater<double> > ();
+	Sorted_Goals = Eigen::MatrixXd::Zero(Goals.rows()+1,Goals.cols()+1);
+	cost_v_.clear();
+
+	angle_2_goal_ = atan2( goal(1) -pose(1), goal(0) - pose(0)) ;
+	angle_2_last_goal = atan2( last_goal(1) -pose(1), last_goal(0) - pose(0)) ;
+
+	num_of_clusters_ = Goals.rows();
+
+ 	for (int i=0; i < num_of_clusters_ ; i++){
+		angle_i_ = Goals(i,0);
+ 		angle_diff_  =  std::abs(angle_i_)  - std::abs(angle_2_goal_ );
+
+ 		angle_diff_last_ = std::abs(angle_i_) - std::abs(angle_2_last_goal);
+
+ 		cost_i_ = pow(angle_diff_,2) + pow(angle_diff_last_,2);
+
+ 		cost_queue_.push(cost_i_);
+ 		cost_v_.push_back(cost_i_);
+
+ 	}
+
+ 	Sorted_Goals.row(0)<< angle_2_goal_, 0;
+
+ 	for (int i=0; i < num_of_clusters_ ; i++){
+
+	 	min_cost_ = cost_queue_.top();
+
+		it_ = std::find(cost_v_.begin(),cost_v_.end(),min_cost_);
+		goal_index_ = it_ - cost_v_.begin();
+
+		Sorted_Goals.row(i+1) << Goals.row(goal_index_), min_cost_;
+
+		cost_queue_.pop();
+	}
+}
+
+
 
 void REACT::get_traj(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, std::vector<double>& t_fx, std::vector<double>& t_fy, Eigen::Matrix4d& Xf_switch, Eigen::Matrix4d& Yf_switch, bool stop_check ){
 	//Generate new traj
@@ -397,91 +455,6 @@ void REACT::collision_check(Eigen::MatrixXd X, Eigen::MatrixXd Sorted_Goals, int
 }
 
 
-void REACT::partition_scan(Eigen::MatrixXd scan, Eigen::Vector3d pose, Eigen::MatrixXd& Goals, int& partition){
- 	int j = 0;
- 	double sum = 0;
- 	double angle_2_index;
-
- 	std::vector<double> r;
- 	std::vector<double> r_temp;
- 	std::vector<double> angle;
- 	std::vector<double> angle_temp;
-
- 	min_angle_ = scan(0,0);
- 	d_angle_ = scan(0,1)-scan(0,0);
-
- 	num_samples_ = scan.cols(); 
- 	num_of_segement_ = 0;
-
- 	// Clean up logic
-    for (int i=0; i < num_samples_-1; i++){
-		if ((std::abs(scan(1,i+1)-scan(1,i)) > thresh_) || i==num_samples_-2){
-    		if ((i-j)>3){
-
-    			// Convert angle segment incerement to index
-    			angle_2_index = angle_seg_inc_/d_angle_;
-
-    			// Probably a better way to do this...
-    			// Numbers slightly arbitrary
-    			if (double((i-j))/(angle_2_index) < 1) num_of_segement_ = 1;
-    			if (double((i-j))/(angle_2_index) > 1) num_of_segement_ = 2;
-    			if (double((i-j))/(3*angle_2_index) > 1) num_of_segement_ = 3;
-    			if (double((i-j))/(5*angle_2_index) > 1) num_of_segement_ = 5;
-    			if (double((i-j))/(7*angle_2_index) > 1) num_of_segement_ = 7;
-    			if (double((i-j))/(9*angle_2_index) > 1) num_of_segement_ = 9;
-    			if (double((i-j))/(11*angle_2_index) > 1) num_of_segement_ = 11;
-
-    			bool flag_ = false;
-
-    			if (scan(1,i)==scan.row(1).maxCoeff()){
-    				flag_ = true;
-					num_of_segement_ = 2*num_of_segement_; 
-    			}
- 
-    			for (int k=0; k < num_of_segement_; k++){
-    				if (flag_ && (k==0 || k==num_of_segement_-1)){
-    				}
-    				else{
-	    				// Just cluster based on 
-	    				r_temp.push_back(scan(1, j + k*(i-j)/(num_of_segement_)));
-	    				if (num_of_segement_ > 1){
-	    					angle_temp.push_back(min_angle_ + yaw_ + d_angle_*(j + k*(i-j)/(num_of_segement_-1)));
-						}
-						else{
-	    					angle_temp.push_back(min_angle_ + yaw_ + d_angle_*((i+j)/2));
-						}
-    				}
-    			}
-
-    		}
-			j = i+1;   			
-		}
-	}
-
-	Goals = Eigen::MatrixXd::Zero(r_temp.size(),5);
-	int count = 0;
-
-	// This is wrong, i >= count
-	for (int i = 0; i < r_temp.size(); i++){
-		r.push_back(r_temp[i]);
-		angle.push_back(angle_temp[i]);
-
-		Goals(count,0) = r[i]*cos(angle[i]) + pose(0);
-		Goals(count,1) = r[i]*sin(angle[i]) + pose(1);
-		Goals(count,2) = goal_(2);
-		Goals(count,3) = r[i];
-		Goals(count,4) = angle[i];
-		count++;
-	}
-
-	// Goals.block(count,0,1,3) << last_goal_.transpose() ;
-	// Goals(count,3) = (last_goal_-pose).norm();
-	// Goals(count,4) = std::atan2(last_goal_(1)-pose(1),last_goal_(0)-pose(0));
-
-	partition = r_temp.size();
-}
-
-
 
 void REACT::sort_clusters( Eigen::Vector3d last_goal, Eigen::MatrixXd Goals,  Eigen::Vector3d pose, Eigen::Vector3d goal, Eigen::MatrixXd& Sorted_Goals){
 
@@ -502,7 +475,6 @@ void REACT::sort_clusters( Eigen::Vector3d last_goal, Eigen::MatrixXd Goals,  Ei
 
  		next_goal_V_ = Goals.block(i,0,1,3).transpose() - pose;
 
- 		r_i_ = next_goal_V_.norm();
  		angle_i_ = atan2 ( Goals(i,1) - pose(1), Goals(i,0) - pose(0) );
  		
  		angle_diff_  =  std::abs(angle_i_)  - std::abs(angle_2_goal_ );
@@ -512,7 +484,7 @@ void REACT::sort_clusters( Eigen::Vector3d last_goal, Eigen::MatrixXd Goals,  Ei
 
  		angle_diff_last_ = 2*acos(next_goal_V_.dot(last_goal_V_));
 
- 		cost_i_ = pow(angle_diff_,2) + pow(angle_diff_last_,2) + pow(1/r_i_,2);
+ 		cost_i_ = pow(angle_diff_,2) + pow(angle_diff_last_,2);
 
  		cost_queue_.push(cost_i_);
  		cost_v_.push_back(cost_i_);
@@ -731,30 +703,6 @@ void REACT::eval_trajectory(Eigen::Matrix4d X_switch, Eigen::Matrix4d Y_switch, 
 	Xc(3,1) = Y_switch(3,l);
 }
 
-
-void REACT::convert_scan(sensor_msgs::LaserScan msg, Eigen::MatrixXd& scanE , std::vector<double>& scanV ){
- 	angle_max_ = msg.angle_max;
-	angle_min_ = msg.angle_min;
-	angle_increment_ = msg.angle_increment;
-
-	num_samples_ = (int) std::floor((angle_max_ - angle_min_) / angle_increment_ );
-
-	scanE.resize(2,num_samples_);
-
-	// Seems really inefficient
-	for (int i=0;i<num_samples_;i++){
-		if (!isinf(msg.ranges[i]) && !isnan(msg.ranges[i])){
-			scanE(0,i) = angle_min_ + i*angle_increment_;
-			scanE(1,i) = msg.ranges[i];
-			scanV.push_back(msg.ranges[i]);
-		}
-		else{
-			scanE(0,i) = angle_min_ + i*angle_increment_;
-			scanE(1,i) = msg.range_max;
-			scanV.push_back(msg.range_max);
-		}
-	}
-}
 
 void REACT::vis_better_scan(const sensor_msgs::LaserScan& msg)
  {
