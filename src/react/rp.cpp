@@ -386,9 +386,6 @@ void REACT::collision_check(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::Ma
 
     mean_distance_ = std::sqrt(std::accumulate(pointNKNSquaredDistance.begin(), pointNKNSquaredDistance.end(), 0.0f)/pointIdxNKNSearch.size());
 
-    std::cout << "mean distance: " << mean_distance_ << std::endl;
-
-
     // If the obstacle is farther than safe distance or goal is within mean distance then we're good
     if (mean_distance_ > safe_distance_ || mean_distance_ > goal_distance_){
     	can_reach_goal = true;
@@ -399,8 +396,6 @@ void REACT::collision_check(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::Ma
 		t_ = std::max(buff/v,mean_distance_/v);
 
 		while (!collision_detected_ && !can_reach_goal){
-
-		    std::cout << "mean distance: " << mean_distance_ << std::endl;
 
 			mtx.lock();
 			eval_trajectory(X_switch_,Y_switch_,t_x_,t_y_,t_,X_prop_);
@@ -416,15 +411,15 @@ void REACT::collision_check(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::Ma
 
     		distance_traveled_ = (X_prop_.row(0)-X.row(0)).norm();
 
-			// Check if the min distance is the current goal
-			if (mean_distance_ > safe_distance_ || distance_traveled_ > safe_distance_){
-				can_reach_goal = true;
-			}
-			// Check if the distance is less than our buffer
-			else if (mean_distance_ < buff){
+    		// Check if the distance is less than our buffer
+			if (mean_distance_ < buff){
 				collision_detected_ = true;
 				can_reach_goal = false;
 			}
+			// Check if the min distance is the current goal
+			else if (mean_distance_ > safe_distance_ || distance_traveled_ > safe_distance_){
+				can_reach_goal = true;
+			}			
 			// Neither have happened so propogate again
 			else{
 				t_ += mean_distance_/v;
@@ -718,13 +713,14 @@ void REACT::convert2ROS(Eigen::MatrixXd Goals){
 	dt_ = tf_/num_;
 	t_ = 0;
 	XE_ << X_;
+	XE_.row(0) << pose_.transpose();
 	for(int i=0; i<num_; i++){
 		mtx.lock();
 		eval_trajectory(Xf_switch_,Yf_switch_,t_xf_,t_yf_,t_,XE_);
 		mtx.unlock();
 		temp_path_point_ros_.pose.position.x = XE_(0,0);
 		temp_path_point_ros_.pose.position.y = XE_(0,1);
-		temp_path_point_ros_.pose.position.z = goal_(2);
+		temp_path_point_ros_.pose.position.z = XE_(0,2);
 		t_+=dt_;
 		traj_ros_.poses.push_back(temp_path_point_ros_);
 	}
