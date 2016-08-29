@@ -228,7 +228,7 @@ void REACT::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 	sort_ss(Goals_,pose_,goal_, angle_2_last_goal_, Sorted_Goals_);
 
 	// Pick desired final state
-	pick_ss(cloud_, Sorted_Goals_, X_, last_goal_, local_goal_, can_reach_goal_);
+	pick_ss(cloud_, Sorted_Goals_, X_, can_reach_goal_);
 
  	if (!can_reach_goal_){
  		// Need to stop!!!
@@ -295,10 +295,9 @@ void REACT::sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d
 	}
 }
 
-void REACT::pick_ss(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, Eigen::Vector3d& last_goal, Eigen::Vector3d& local_goal, bool& can_reach_goal){
+void REACT::pick_ss(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, bool& can_reach_goal){
 	goal_index_ = 0;
 	can_reach_goal = false;
- 	last_goal = local_goal;
  	angle_2_last_goal_ = local_goal_angle_;
 
  	while(!can_reach_goal && goal_index_ < Sorted_Goals.rows()){

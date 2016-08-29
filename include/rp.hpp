@@ -69,7 +69,7 @@ public:
 	
 	void sample_ss(Eigen::MatrixXd& Goals);
 	void sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d goal, double angle_2_last_goal, Eigen::MatrixXd& Sorted_Goals);
-	void pick_ss(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, Eigen::Vector3d& last_goal, Eigen::Vector3d& local_goal, bool& can_reach_goal);
+	void pick_ss(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, bool& can_reach_goal);
 
 	void collision_check(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd X, double current_angle_2_local_goal, double buff, double v, double& tf, bool& can_reach_goal);
 	
