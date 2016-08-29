@@ -210,36 +210,10 @@ void REACT::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
  	msg_received_ = ros::WallTime::now().toSec();
 
 	// Convert pcl
- 	pcl::PCLPointCloud2* cloud2 = new pcl::PCLPointCloud2; 	
-	pcl_conversions::toPCL(*msg, *cloud2);
-	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
-	pcl::fromPCLPointCloud2(*cloud2,*cloud);
-	
- 	// Build k-d tree
- 	// kd_tree_.Initialize(cloud);
- 	pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
-	kdtree.setInputCloud (cloud);
-
-  	// Robot pose	
- //  	pcl::PointXYZ searchPoint;
-
-	// searchPoint.x = 0;
-	// searchPoint.y = 0;
-	// searchPoint.z = 0;
-
-	// std::vector<int> pointIdxNKNSearch(K_);
- //  	std::vector<float> pointNKNSquaredDistance(K_);
-
-	// kdtree.nearestKSearch (searchPoint, K_, pointIdxNKNSearch, pointNKNSquaredDistance);
-
-	// for (size_t i = 0; i < pointIdxNKNSearch.size (); ++i)
-	//       std::cout << "    "  <<   cloud->points[ pointIdxNKNSearch[i] ].x 
-	//                 << " " << cloud->points[ pointIdxNKNSearch[i] ].y 
-	//                 << " " << cloud->points[ pointIdxNKNSearch[i] ].z 
-	//                 << " (distance: " << std::sqrt(pointNKNSquaredDistance[i]) << ")" << std::endl;
-
-
-
+	convert2pcl(msg,cloud_);
+ 	
+	// Build k-d tree
+	kdtree_.setInputCloud (cloud_);
 
 	// Generate allowable final states
 	sample_ss(Goals_);
@@ -248,15 +222,7 @@ void REACT::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 	sort_ss(last_goal_,Goals_,pose_,goal_,Sorted_Goals_);
 
 	// Pick desired final state
-	// pick_ss(kdtree, Sorted_Goals_, X_, last_goal_, local_goal_, can_reach_goal_);
-
- 	// convert_scan(msg, scanE_, scanV_);
- 	// // Cluster
- 	// partition_scan(scanE_, pose_, Goals_, partition_);
- 	// // Sort clusters
- 	// sort_clusters(last_goal_, Goals_, pose_, goal_, Sorted_Goals_);
- 	// // Pick cluster
- 	// pick_cluster(Sorted_Goals_, X_, last_goal_, local_goal_, can_reach_goal_);
+	pick_ss(cloud_, Sorted_Goals_, X_, last_goal_, local_goal_, can_reach_goal_);
 
  	// if (!can_reach_goal_){
  	// 	// Need to stop!!!
@@ -324,6 +290,45 @@ void REACT::sort_ss(Eigen::Vector3d last_goal, Eigen::MatrixXd Goals, Eigen::Vec
 	}
 }
 
+void REACT::pick_ss(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, Eigen::Vector3d& last_goal, Eigen::Vector3d& local_goal, bool& can_reach_goal){
+	goal_index_ = 0;
+	can_reach_goal = false;
+ 	last_goal = local_goal;
+
+	pcl::PointXYZ searchPoint;
+
+	searchPoint.x = 0;
+	searchPoint.y = 0;
+	searchPoint.z = 0;
+
+	// std::vector<int> pointIdxNKNSearch(K_);
+ //  	std::vector<float> pointNKNSquaredDistance(K_);
+
+	// kdtree_.nearestKSearch (searchPoint, K_, pointIdxNKNSearch, pointNKNSquaredDistance);
+
+	// for (size_t i = 0; i < pointIdxNKNSearch.size (); ++i)
+	//       std::cout << "    "  <<   cloud->points[ pointIdxNKNSearch[i] ].x 
+	//                 << " " << cloud->points[ pointIdxNKNSearch[i] ].y 
+	//                 << " " << cloud->points[ pointIdxNKNSearch[i] ].z 
+	//                 << " (distance: " << std::sqrt(pointNKNSquaredDistance[i]) << ")" << std::endl;
+
+
+ 	while(!can_reach_goal && goal_index_ < Sorted_Goals.rows()){
+ 		// if (Sorted_Goals(goal_index_,0) > safe_distance_ || goal_index_==0){
+ 		// 	collision_check(X,Sorted_Goals,goal_index_,buffer_,v_max_,partition_,tf_,can_reach_goal);
+ 		// }
+ 		can_reach_goal = true;
+ 		goal_index_++;
+ 	}
+
+ 	if(can_reach_goal){
+ 		goal_index_--;
+ 		local_goal << 0,0,0;
+ 	}
+ 	else{
+ 		ROS_ERROR("Need to stop");
+ 	}
+}
 
 
 void REACT::get_traj(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, std::vector<double>& t_fx, std::vector<double>& t_fy, Eigen::Matrix4d& Xf_switch, Eigen::Matrix4d& Yf_switch, bool stop_check ){
@@ -362,29 +367,6 @@ void REACT::get_stop_dist(Eigen::MatrixXd X, Eigen::Vector3d local_goal,Eigen::V
 		}
 	}
 }
-
-void  REACT::pick_cluster( Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, Eigen::Vector3d& last_goal, Eigen::Vector3d& local_goal, bool& can_reach_goal){
- 	// Iterate through and pick cluster based on collision check
- 	// Re-initialize 
- 	goal_index_ = 0;
-	can_reach_goal = false;
- 	last_goal = local_goal;
-
- 	while(!can_reach_goal && goal_index_ < Sorted_Goals.rows()){
- 		if (Sorted_Goals(goal_index_,3) > safe_distance_ || goal_index_==0){
- 			collision_check(X,Sorted_Goals,goal_index_,buffer_,v_max_,partition_,tf_,can_reach_goal);
- 		}
- 		goal_index_++;
- 	}
-
- 	if(can_reach_goal){
- 		goal_index_--;
- 		local_goal << Sorted_Goals.block(goal_index_,0,1,3).transpose();
- 	}
- 	else{
- 		ROS_ERROR("Need to stop");
- 	}
- }
 
 
 void REACT::get_vels(Eigen::Vector3d local_goal, Eigen::MatrixXd X, double v, double& vx, double& vy){
@@ -455,59 +437,7 @@ void REACT::collision_check(Eigen::MatrixXd X, Eigen::MatrixXd Sorted_Goals, int
 }
 
 
-
-void REACT::sort_clusters( Eigen::Vector3d last_goal, Eigen::MatrixXd Goals,  Eigen::Vector3d pose, Eigen::Vector3d goal, Eigen::MatrixXd& Sorted_Goals){
-
- 	// Re-initialize
-	cost_queue_ = std::priority_queue<double, std::vector<double>, std::greater<double> > ();
-	Sorted_Goals = Eigen::MatrixXd::Zero(Goals.rows(),Goals.cols()+1);
-	cost_v_.clear();
-
-	last_goal_V_ = last_goal - pose;
-	last_goal_V_ = last_goal_V_/last_goal_V_.norm();
-
-	r_goal_ = (goal - pose).norm();
-	angle_2_goal_ = atan2( goal(1) -pose(1), goal(0) - pose(0)) ;
-
-	num_of_clusters_ = Goals.rows()-1;
-
- 	for (int i=0; i < num_of_clusters_ ; i++){
-
- 		next_goal_V_ = Goals.block(i,0,1,3).transpose() - pose;
-
- 		angle_i_ = atan2 ( Goals(i,1) - pose(1), Goals(i,0) - pose(0) );
- 		
- 		angle_diff_  =  std::abs(angle_i_)  - std::abs(angle_2_goal_ );
-
- 		// Normalize
-		next_goal_V_ = next_goal_V_/next_goal_V_.norm();
-
- 		angle_diff_last_ = 2*acos(next_goal_V_.dot(last_goal_V_));
-
- 		cost_i_ = pow(angle_diff_,2) + pow(angle_diff_last_,2);
-
- 		cost_queue_.push(cost_i_);
- 		cost_v_.push_back(cost_i_);
-
- 	}
-
- 	// There should be a better way to do this
- 	Sorted_Goals.row(0) << goal(0), goal(1), goal(2), r_goal_, angle_2_goal_, 0; 
-
- 	for (int i=0; i < num_of_clusters_ ; i++){
-
-	 	min_cost_ = cost_queue_.top();
-
-		it_ = std::find(cost_v_.begin(),cost_v_.end(),min_cost_);
-		goal_index_ = it_ - cost_v_.begin();
-
-		Sorted_Goals.row(i+1) << Goals.row(goal_index_), min_cost_;
-
-		cost_queue_.pop();
-	}
- }
-
- void REACT::find_times( Eigen::Vector4d x0, double vf, std::vector<double>& t, Eigen::Matrix4d&  X_switch, bool stop_check){
+void REACT::find_times( Eigen::Vector4d x0, double vf, std::vector<double>& t, Eigen::Matrix4d&  X_switch, bool stop_check){
  	if (vf == x0(1)){
  		j_V_[0] = 0;
 		j_V_[1] = 0; 
@@ -704,20 +634,14 @@ void REACT::eval_trajectory(Eigen::Matrix4d X_switch, Eigen::Matrix4d Y_switch, 
 }
 
 
-void REACT::vis_better_scan(const sensor_msgs::LaserScan& msg)
- {
- 	sensor_msgs::LaserScan clean_scan;
- 	clean_scan = msg;
- 	clean_scan.header.frame_id = "laser";
- 	clean_scan.range_max = 1.1*msg.range_max;
- 	double num_samples = (msg.angle_max - msg.angle_min) / msg.angle_increment + 1;
-    for (int i=0; i < num_samples; i++){
-    	if(isinf(clean_scan.ranges[i])){
-    		clean_scan.ranges[i] = msg.range_max;
-    	}
-    }
-    pub_clean_scan.publish(clean_scan);
- }
+void REACT::convert2pcl(const sensor_msgs::PointCloud2ConstPtr msg,pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_out){
+	pcl::PCLPointCloud2* cloud2 = new pcl::PCLPointCloud2; 
+	pcl_conversions::toPCL(*msg, *cloud2);
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
+	pcl::fromPCLPointCloud2(*cloud2,*cloud);
+
+	cloud_out = cloud;
+}
 
 
 void REACT::eigen2quadGoal(Eigen::MatrixXd Xc, acl_system::QuadGoal& quad_goal){

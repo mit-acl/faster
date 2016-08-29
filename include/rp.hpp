@@ -51,10 +51,6 @@ public:
 	void pclCB(const sensor_msgs::PointCloud2ConstPtr& msg);
 	void stateCB(const acl_system::ViconState& msg);
 	void global_goalCB(const geometry_msgs::PointStamped& msg);
-
-	// void partition_scan(const sensor_msgs::LaserScan& msg);
-	void vis_better_scan(const sensor_msgs::LaserScan& msg);
-
 	void eventCB(const acl_system::QuadFlightEvent& msg);
 
 	// ROS timed functions
@@ -69,10 +65,9 @@ public:
 	
 	void sample_ss(Eigen::MatrixXd& Goals);
 	void sort_ss(Eigen::Vector3d last_goal, Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d goal, Eigen::MatrixXd& Sorted_Goals);
-	
-	void sort_clusters(Eigen::Vector3d last_goal, Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d goal, Eigen::MatrixXd& Sorted_Goals);
-	void pick_cluster( Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, Eigen::Vector3d& last_goal, Eigen::Vector3d& local_goal, bool& can_reach_goal);
+	void pick_ss(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, Eigen::Vector3d& last_goal, Eigen::Vector3d& local_goal, bool& can_reach_goal);
 
+	void convert2pcl(const sensor_msgs::PointCloud2ConstPtr msg,pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_out);
 	void find_times( Eigen::Vector4d x0, double vf, std::vector<double>& t, Eigen::Matrix4d&  X_switch , bool stop_check );
 	void eval_trajectory(Eigen::Matrix4d X0, Eigen::Matrix4d Y0, std::vector<double> t_x, std::vector<double> t_y, double t, Eigen::MatrixXd& X);
 	void collision_check(Eigen::MatrixXd X, Eigen::MatrixXd Sorted_Goals, int goal_counter_, double buff, double v, int partition , double& tf, bool& can_reach_goal);
@@ -96,8 +91,9 @@ private:
 
 	std::mutex mtx;
 
-	KDTree<double> kd_tree_;
-
+	// KDTree<double> kd_tree_;
+	pcl::KdTreeFLANN<pcl::PointXYZ> kdtree_;
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_;
 	// // // // //
 	// Ros var initialization
 	geometry_msgs::PoseArray goal_points_ros_ ;
@@ -172,6 +168,7 @@ private:
 
 	Eigen::VectorXd ranges_;	
 
+	pcl::PointXYZ searchPoint_;
 
 
 	double vfx_, vfy_, t_, tE_, dt_, tf_, r_, theta_, d_theta_, d_min_, tx_, ty_, v_, v_max_;

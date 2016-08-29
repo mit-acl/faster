@@ -19,10 +19,10 @@ accel: 10
 plan_eval: 0.01 
 
 # Number of samples from k-d tree to find obstacle 
-K: 25
+K: 100
 
 # Number of samples within buffer to be deemed collision
-K_buff: 5
+K_buff: 20
 
 # Sensor horizontal FOV (deg)
 h_fov: 60
