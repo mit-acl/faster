@@ -43,13 +43,10 @@ REACT::REACT(){
 
 	v_ = v_max_;
 
-	angle_seg_inc_ = 10*PI/180;
 
-	num_of_clusters_ = 0;
-	collision_counter_corridor_ = 0;
-	collision_counter_ = 0;
+	stop_ = false;
+	can_reach_global_goal_ = true;
 	can_reach_goal_ = false;
-	inf_ = std::numeric_limits<double>::max();
 
 	quad_status_ = state_.NOT_FLYING;
 
@@ -85,7 +82,7 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 {	
 	if (gen_new_traj_){
 		gen_new_traj_ = false;
-		X_(1,1) = -v_max_;
+		// X_(1,1) = -v_max_;
 		mtx.lock();
 		get_traj(X_,local_goal_angle_,v_,t_xf_,t_yf_,Xf_switch_,Yf_switch_,false);
 		mtx.unlock();
@@ -111,7 +108,7 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 
 	else if (quad_status_ == state_.GO){
 			if (!stop_){
-				get_stop_dist(X_,local_goal_,goal_,stop_);
+				get_stop_dist(X_,goal_,pose_,can_reach_global_goal_,stop_);
 				if (stop_){
 					ROS_INFO("Stop");
 					v_ = 0;
@@ -125,9 +122,6 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 			eval_trajectory(Xf_switch_,Yf_switch_,t_xf_,t_yf_,tE_,X_);
 			mtx.unlock();
 
-			eigen2quadGoal(X_,quad_goal_);
-			quad_goal_.yaw = heading_;
-
 			if (X_.block(1,0,1,2).norm() == 0){
 				// We're done
 				ROS_INFO("Flight Complete");
@@ -135,6 +129,9 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 				stop_ = false;
 			}
 		}
+
+	eigen2quadGoal(X_,quad_goal_);
+	// quad_goal_.yaw = heading_;
 
 	quad_goal_.header.stamp = ros::Time::now();
 	quad_goal_.header.frame_id = "vicon";
@@ -243,10 +240,10 @@ void REACT::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
  	latency_.data = traj_gen_ - msg_received_;
  	latency_.header.stamp = ros::Time::now();
 
- 	std::cout << "Latency [ms]: " << 1000*(traj_gen_ - msg_received_) << std::endl;
+ 	// std::cout << "Latency [ms]: " << 1000*(traj_gen_ - msg_received_) << std::endl;
 
  	if(debug_){
- 		convert2ROS(Goals_);
+ 		convert2ROS();
  		pubROS();
  	} 	
 }
@@ -254,7 +251,6 @@ void REACT::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 void REACT::sample_ss(Eigen::MatrixXd& Goals){
 	Goals = Eigen::MatrixXd::Zero(12,1);
 	Goals.col(0).setLinSpaced(12,-h_fov_/2+yaw_,h_fov_/2+yaw_);
-	// std::cout << Goals << std::endl;
 }
 
 void REACT::sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d goal, double angle_2_last_goal, Eigen::MatrixXd& Sorted_Goals){
@@ -308,6 +304,8 @@ void REACT::pick_ss(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd S
  	if(can_reach_goal){
  		goal_index_--;
  		local_goal_angle_ = Sorted_Goals(goal_index_);
+ 		if (goal_index_ == 0) can_reach_global_goal_ = true;
+ 		else can_reach_global_goal_ = false;
  	}
  	else{
  		ROS_ERROR("Need to stop");
@@ -327,28 +325,29 @@ void REACT::get_traj(Eigen::MatrixXd X, double angle_2_local_goal, double v, std
 }
 
 
-void REACT::get_stop_dist(Eigen::MatrixXd X, Eigen::Vector3d local_goal,Eigen::Vector3d goal, bool& stop){
-	if (local_goal == goal){
-		// mtx.lock();
-		// get_traj(X,goal,0,t_x_stop_,t_y_stop_,X_switch_stop_,Y_switch_stop_,true);
-		// mtx.unlock();
+void REACT::get_stop_dist(Eigen::MatrixXd X, Eigen::Vector3d goal,Eigen::Vector3d pose, bool can_reach_global_goal, bool& stop){
+	if (can_reach_global_goal){
+		double angle_2_goal = atan2( goal(1) -pose(1), goal(0) - pose(0)) ;
+		mtx.lock();
+		get_traj(X,angle_2_goal,0,t_x_stop_,t_y_stop_,X_switch_stop_,Y_switch_stop_,true);
+		mtx.unlock();
 
-		// t_stop_ = std::max(std::accumulate(t_x_stop_.begin(), t_x_stop_.end(), 0.0), std::accumulate(t_y_stop_.begin(), t_y_stop_.end(), 0.0));
+		t_stop_ = std::max(std::accumulate(t_x_stop_.begin(), t_x_stop_.end(), 0.0), std::accumulate(t_y_stop_.begin(), t_y_stop_.end(), 0.0));
 
-		// mtx.lock();
-		// eval_trajectory(X_switch_stop_,Y_switch_stop_,t_x_stop_,t_y_stop_,t_stop_,X_stop_);
-		// mtx.unlock();
+		mtx.lock();
+		eval_trajectory(X_switch_stop_,Y_switch_stop_,t_x_stop_,t_y_stop_,t_stop_,X_stop_);
+		mtx.unlock();
 
-		// d_stop_ = (X_stop_.block(0,0,1,2) - X.block(0,0,1,2)).norm();
-		// d_goal_ = (X.block(0,0,1,2).transpose() - goal.head(2)).norm();
+		d_stop_ = (X_stop_.block(0,0,1,2) - X.block(0,0,1,2)).norm();
+		d_goal_ = (X.block(0,0,1,2).transpose() - goal.head(2)).norm();
 
-		// // Prevents oscillation is our stopping distance is really small (low speed)
-		// saturate(d_stop_,0.1,d_stop_);
+		// Prevents oscillation if our stopping distance is really small (low speed)
+		saturate(d_stop_,0.1,d_stop_);
 
-		// if (d_stop_ >= d_goal_){
-		// 	// Need to stop
-		// 	stop = true;
-		// }
+		if (d_stop_ >= d_goal_){
+			// Need to stop
+			stop = true;
+		}
 	}
 }
 
@@ -643,20 +642,20 @@ void REACT::convert2pcl(const sensor_msgs::PointCloud2ConstPtr msg,pcl::PointClo
 
 
 void REACT::eigen2quadGoal(Eigen::MatrixXd Xc, acl_system::QuadGoal& quad_goal){
- 	quad_goal_.pos.x = Xc(0,0);
- 	quad_goal_.vel.x = Xc(1,0);
+ 	quad_goal_.pos.x   = Xc(0,0);
+ 	quad_goal_.vel.x   = Xc(1,0);
  	quad_goal_.accel.x = Xc(2,0);
- 	quad_goal_.jerk.x = Xc(3,0);
+ 	quad_goal_.jerk.x  = Xc(3,0);
 
- 	quad_goal_.pos.y = Xc(0,1);
- 	quad_goal_.vel.y = Xc(1,1);
+ 	quad_goal_.pos.y   = Xc(0,1);
+ 	quad_goal_.vel.y   = Xc(1,1);
  	quad_goal_.accel.y = Xc(2,1);
- 	quad_goal_.jerk.y = Xc(3,1);
+ 	quad_goal_.jerk.y  = Xc(3,1);
 
- 	quad_goal_.pos.z = Xc(0,2);
- 	quad_goal_.vel.z = Xc(1,2);
+ 	quad_goal_.pos.z   = Xc(0,2);
+ 	quad_goal_.vel.z   = Xc(1,2);
  	quad_goal_.accel.z = Xc(2,2);
- 	quad_goal_.jerk.z = Xc(3,2);
+ 	quad_goal_.jerk.z  = Xc(3,2);
  }
 
 
@@ -687,19 +686,19 @@ void REACT::saturate(double &var, double min, double max){
 	}
 }
 
-void REACT::convert2ROS(Eigen::MatrixXd Goals){
+void REACT::convert2ROS(){
  	// Cluster
  	goal_points_ros_.poses.clear();
  	goal_points_ros_.header.stamp = ros::Time::now();
  	goal_points_ros_.header.frame_id = "vicon";
 
- 	for (int i=0; i < Goals.rows(); i++){
- 		temp_goal_point_ros_.position.x = 4*cos(Goals(i,0))+pose_(0);
- 		temp_goal_point_ros_.position.y = 4*sin(Goals(i,0))+pose_(1);
+ 	for (int i=0; i < Goals_.rows(); i++){
+ 		temp_goal_point_ros_.position.x = 4*cos(Goals_(i,0))+pose_(0);
+ 		temp_goal_point_ros_.position.y = 4*sin(Goals_(i,0))+pose_(1);
  		temp_goal_point_ros_.position.z = goal_(2);
 
- 		temp_goal_point_ros_.orientation.w = cos(Goals(i,0)/2) ;
- 		temp_goal_point_ros_.orientation.z = sin(Goals(i,0)/2);
+ 		temp_goal_point_ros_.orientation.w = cos(Goals_(i,0)/2) ;
+ 		temp_goal_point_ros_.orientation.z = sin(Goals_(i,0)/2);
 
  		goal_points_ros_.poses.push_back(temp_goal_point_ros_);
 	}

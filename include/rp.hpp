@@ -60,11 +60,11 @@ public:
 	// ROS timed functions
 	void sendGoal(const ros::TimerEvent&);
 
-	void convert2ROS(Eigen::MatrixXd Goals);
+	void convert2ROS();
 	void pubROS();
 
 	// Make these private after testing
-	void get_stop_dist(Eigen::MatrixXd X, Eigen::Vector3d local_goal,Eigen::Vector3d goal, bool& stop);
+	void get_stop_dist(Eigen::MatrixXd X, Eigen::Vector3d goal,Eigen::Vector3d pose, bool can_reach_global_goal, bool& stop);
 	void get_traj(Eigen::MatrixXd X, double angle_2_local_goal, double v, std::vector<double>& t_fx, std::vector<double>& t_fy, Eigen::Matrix4d& Xf_switch, Eigen::Matrix4d& Yf_switch, bool stop_check  );
 	
 	void sample_ss(Eigen::MatrixXd& Goals);
@@ -185,7 +185,7 @@ private:
 	double angle_i_, r_goal_;
 
 	bool debug_, can_reach_goal_, collision_detected_, gen_new_traj_;
-	bool stop_ = false, initialized_ = false;
+	bool stop_, can_reach_global_goal_;
 
 
 	//## Logging and Debugging Functions
