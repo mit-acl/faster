@@ -1,9 +1,9 @@
 <launch>
 
-	<arg name="quadrotor"/>
+	<arg name="quad"/>
 	<arg name="bag"/>
 
-	<node ns="$(arg quadrotor)" name="reactive_planner" pkg="acl_planning" type="reactive_planner" output="screen" clear_params="true">
+	<node ns="$(arg quad)" name="reactive_planner" pkg="acl_planning" type="reactive_planner" output="screen" clear_params="true">
 
 		<rosparam file="$(find acl_planning)/param/react.yaml" command="load"/>
 
@@ -25,7 +25,7 @@
 
 	<group if="$(arg bag)">
         <!-- Ensure RosBag is saving important data -->
-        <node ns="$(arg quadrotor)" pkg="rosbag" type="record" name="rosbag_record_planner" args="-o /media/odroid/LOGGER_USB1/bags/$(arg quadrotor)PlannerLogFile global_goal int_goal new_global_goal last_global_goal traj event latency /tf"/>
+        <node ns="$(arg quad)" pkg="rosbag" type="record" name="rosbag_record_planner" args="-o /media/ubuntu/LOGGER_USB/bags/$(arg quad)PlannerLogFile global_goal int_goal new_global_goal last_global_goal traj event latency /tf"/>
     </group>
 
 </launch>
