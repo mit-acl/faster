@@ -227,7 +227,7 @@ void REACT::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 	// Pick desired final state
 	pick_ss(cloud_, Sorted_Goals_, X_, can_reach_goal_);
 
- 	if (!can_reach_goal_){
+ 	if (!can_reach_goal_ && quad_status_ == state_.FLYING){
  		// Need to stop!!!
  		v_ = 0;
  		ROS_ERROR("Emergency stop -- no feasible path");
@@ -269,7 +269,7 @@ void REACT::sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d
 
  		angle_diff_last_ = std::abs(angle_i_) - std::abs(angle_2_last_goal);
 
- 		cost_i_ = pow(angle_diff_,2) + pow(angle_diff_last_,2);
+ 		cost_i_ = pow(angle_diff_,2) + 2*pow(angle_diff_last_,2);
 
  		cost_queue_.push(cost_i_);
  		cost_v_.push_back(cost_i_);
@@ -693,8 +693,8 @@ void REACT::convert2ROS(){
  	goal_points_ros_.header.frame_id = "vicon";
 
  	for (int i=0; i < Goals_.rows(); i++){
- 		temp_goal_point_ros_.position.x = 4*cos(Goals_(i,0))+pose_(0);
- 		temp_goal_point_ros_.position.y = 4*sin(Goals_(i,0))+pose_(1);
+ 		temp_goal_point_ros_.position.x = 3*cos(Goals_(i,0))+pose_(0);
+ 		temp_goal_point_ros_.position.y = 3*sin(Goals_(i,0))+pose_(1);
  		temp_goal_point_ros_.position.z = goal_(2);
 
  		temp_goal_point_ros_.orientation.w = cos(Goals_(i,0)/2) ;
@@ -725,8 +725,14 @@ void REACT::convert2ROS(){
 
 	ros_new_global_goal_.header.stamp = ros::Time::now();
 	ros_new_global_goal_.header.frame_id = "vicon";
-	ros_new_global_goal_.point.x = 4*cos(local_goal_angle_);
-	ros_new_global_goal_.point.y = 4*sin(local_goal_angle_);
+	if (can_reach_global_goal_){
+		ros_new_global_goal_.point.x = goal_(0);
+		ros_new_global_goal_.point.y = goal_(1);
+	} 
+	else{
+		ros_new_global_goal_.point.x = 3*cos(local_goal_angle_)+pose_(0);
+		ros_new_global_goal_.point.y = 3*sin(local_goal_angle_)+pose_(1);
+	}
 	ros_new_global_goal_.point.z = goal_(2);
 
 	// ros_last_global_goal_.header.stamp = ros::Time::now();
