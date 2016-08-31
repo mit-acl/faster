@@ -6,7 +6,7 @@ buffer: 0.42       # 0.5 width of quad for collision checking
 # (x,y,z) goal
 goal_x: 0
 goal_y: -6.0
-goal_z: 0.75
+goal_z: 0.955
 
 # Flight params
 speed: 3
@@ -23,5 +23,12 @@ K: 50
 # Sensor horizontal FOV (deg)
 h_fov: 60
 
+# Number of horizontal FOV discretization
+h_samples: 6
+
 # Sensor vertical FOV (deg)
-v_fov: 0
+v_fov: 45
+
+# Number of vertical FOV discretization
+v_samples: 5
+    

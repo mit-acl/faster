@@ -37,7 +37,9 @@ REACT::REACT(){
 	ros::param::get("~K",K_);
 
 	ros::param::get("~h_fov",h_fov_);
+	ros::param::get("~h_samples",h_samples_);
 	ros::param::get("~v_fov",v_fov_);
+	ros::param::get("~v_samples",v_samples_);
 
 	h_fov_ = h_fov_*PI/180;
 	v_fov_ = v_fov_*PI/180;
@@ -46,7 +48,6 @@ REACT::REACT(){
 	sample_ss(Goals_);
 
 	v_ = v_max_;
-
 
 	stop_ = false;
 	can_reach_global_goal_ = true;
@@ -86,7 +87,6 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 {	
 	if (gen_new_traj_){
 		gen_new_traj_ = false;
-		// X_(1,1) = -v_max_;
 		mtx.lock();
 		get_traj(X_,local_goal_angle_,v_,t_xf_,t_yf_,Xf_switch_,Yf_switch_,false);
 		mtx.unlock();
@@ -222,17 +222,17 @@ void REACT::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 	// Build k-d tree
 	kdtree_.setInputCloud (cloud_);
 
-	// // Sort allowable final states
-	// sort_ss(Goals_,pose_,goal_, angle_2_last_goal_, Sorted_Goals_);
+	// Sort allowable final states
+	sort_ss(Goals_,pose_,goal_, last_goal_, Sorted_Goals_);
 
 	// // Pick desired final state
-	// pick_ss(cloud_, Sorted_Goals_, X_, can_reach_goal_);
+	pick_ss(cloud_, Sorted_Goals_, X_, can_reach_goal_);
 
- // 	if (!can_reach_goal_ && quad_status_ == state_.FLYING){
- // 		// Need to stop!!!
- // 		v_ = 0;
- // 		ROS_ERROR("Emergency stop -- no feasible path");
- // 	}
+ 	if (!can_reach_goal_ && quad_status_ == state_.FLYING){
+ 		// Need to stop!!!
+ 		v_ = 0;
+ 		ROS_ERROR("Emergency stop -- no feasible path");
+ 	}
 
  	gen_new_traj_ = true;
 
@@ -250,45 +250,50 @@ void REACT::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 }
 
 void REACT::sample_ss(Eigen::MatrixXd& Goals){
-	int spacing_h = std::floor(h_fov_*180/PI/5);
-	theta_ = Eigen::VectorXd::Zero(spacing_h);
-	theta_.setLinSpaced(spacing_h,-h_fov_/2,h_fov_/2);
+	theta_ = Eigen::VectorXd::Zero(h_samples_);
+	theta_.setLinSpaced(h_samples_,-h_fov_/2,h_fov_/2);
 	
-	int spacing_v = std::floor(v_fov_*180/PI/5);
-	if (spacing_v==0) spacing_v=1;
-	phi_ = Eigen::VectorXd::Zero(spacing_v);
-	phi_.setLinSpaced(spacing_v,-v_fov_/2,v_fov_/2);
+	if (v_samples_==0) v_samples_=1;
+	phi_ = Eigen::VectorXd::Zero(v_samples_);
+	phi_.setLinSpaced(v_samples_,-v_fov_/2,v_fov_/2);
 
-	Goals = Eigen::MatrixXd::Zero((spacing_h)*(spacing_v),3);
+	Goals = Eigen::MatrixXd::Zero((h_samples_)*(v_samples_),3);
 	int k = 0;
 
-	for(int j=0; j < spacing_v; j++){
-		for (int i=0; i < spacing_h; i++){
+	for(int j=0; j < v_samples_; j++){
+		for (int i=0; i < h_samples_; i++){
 			Goals.row(k) << cos(theta_(i))*cos(phi_(j)), sin(theta_(i))*cos(phi_(j)), sin(phi_(j));
 			k++;
 		}
 	}
-
-	// std::cout << std::endl;
-	// std::cout << Goals << std::endl;
 }
 
-void REACT::sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d goal, double angle_2_last_goal, Eigen::MatrixXd& Sorted_Goals){
+void REACT::sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d goal, Eigen::Vector3d vector_last, Eigen::MatrixXd& Sorted_Goals){
  	// Re-initialize
 	cost_queue_ = std::priority_queue<double, std::vector<double>, std::greater<double> > ();
 	Sorted_Goals = Eigen::MatrixXd::Zero(Goals.rows()+1,Goals.cols()+1);
 	cost_v_.clear();
 
-	angle_2_goal_ = atan2( goal(1) -pose(1), goal(0) - pose(0)) ;
+	vector_2_goal_= goal-pose ;
+	vector_2_goal_.normalize();
 
-	num_of_v_pnts_ = Goals.rows();
-	num_of_h_pnts_ = Goals.rows();
+	q_.w() = cos(heading_/2);
+	q_.vec() << 0.0,0.0,sin(-heading_/2);
 
- 	for (int i=0; i < num_of_h_pnts_ ; i++){
-		angle_i_ = Goals(i,0);
- 		angle_diff_  =  std::abs(angle_i_)  - std::abs(angle_2_goal_ );
+	vector_2_goal_body_ = q_._transformVector(vector_2_goal_);
 
- 		angle_diff_last_ = std::abs(angle_i_) - std::abs(angle_2_last_goal);
+	Eigen::Vector3d temp;
+	temp = vector_last-pose;
+	temp.normalize();
+	vector_last_body_ = q_._transformVector(temp);
+
+	num_of_pnts_ = Goals.rows();
+
+ 	for (int i=0; i < num_of_pnts_ ; i++){
+		vector_i_ << Goals.row(i).transpose();
+		angle_diff_ = acos(vector_i_.dot(vector_2_goal_body_));
+
+		angle_diff_last_ = acos(vector_i_.dot(vector_last_body_));
 
  		cost_i_ = pow(angle_diff_,2) + 2*pow(angle_diff_last_,2);
 
@@ -297,19 +302,21 @@ void REACT::sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d
 
  	}
 
- 	Sorted_Goals.row(0)<< angle_2_goal_, 0;
+ 	Sorted_Goals.row(0)<< vector_2_goal_body_.transpose(),0;
 
- 	for (int i=0; i < num_of_h_pnts_ ; i++){
+ 	for (int i=0; i < num_of_pnts_ ; i++){
 
 	 	min_cost_ = cost_queue_.top();
 
 		it_ = std::find(cost_v_.begin(),cost_v_.end(),min_cost_);
 		goal_index_ = it_ - cost_v_.begin();
-
 		Sorted_Goals.row(i+1) << Goals.row(goal_index_), min_cost_;
 
 		cost_queue_.pop();
 	}
+
+	std::cout << Sorted_Goals << std::endl;
+	std::cout << std::endl;
 }
 
 void REACT::pick_ss(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, bool& can_reach_goal){
@@ -331,15 +338,17 @@ void REACT::pick_ss(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd S
 }
 
 
-void REACT::get_traj(Eigen::MatrixXd X, double angle_2_local_goal, double v, std::vector<double>& t_fx, std::vector<double>& t_fy, Eigen::Matrix4d& Xf_switch, Eigen::Matrix4d& Yf_switch, bool stop_check ){
+void REACT::get_traj(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, std::vector<double>& t_fx, std::vector<double>& t_fy, , std::vector<double>& t_fz, Eigen::Matrix4d& Xf_switch, Eigen::Matrix4d& Yf_switch, Eigen::Matrix4d& Zf_switch, bool stop_check ){
 	//Generate new traj
-	get_vels(X,angle_2_local_goal,v,vfx_,vfy_);
+	get_vels(X,local_goal,v,vfx_,vfy_,vfz_);
 
 	x0_ << X.block(0,0,4,1);
 	y0_ << X.block(0,1,4,1);
+	z0_ << X.block(0,2,4,1);
 
 	find_times(x0_, vfx_, t_fx, Xf_switch,stop_check);
 	find_times(y0_, vfy_, t_fy, Yf_switch,stop_check);
+	find_times(z0_, vfz_, t_fz, Zf_switch,stop_check);
 }
 
 
@@ -370,9 +379,10 @@ void REACT::get_stop_dist(Eigen::MatrixXd X, Eigen::Vector3d goal,Eigen::Vector3
 }
 
 
-void REACT::get_vels(Eigen::MatrixXd X, double angle_2_local_goal, double v, double& vx, double& vy){
-	vx = v*cos(angle_2_local_goal);
-	vy = v*sin(angle_2_local_goal);
+void REACT::get_vels(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, double& vx, double& vy, double& vz){
+	vx = v*local_goal(0);
+	vy = v*local_goal(1);
+	vz = v*local_goal(2);
 }
 
 
@@ -707,59 +717,59 @@ void REACT::convert2ROS(){
  	// Cluster
  	goal_points_ros_.poses.clear();
  	goal_points_ros_.header.stamp = ros::Time::now();
- 	goal_points_ros_.header.frame_id = "vicon";
+ 	goal_points_ros_.header.frame_id = "LQ02";
 
  	for (int i=0; i < Goals_.rows(); i++){
- 		temp_goal_point_ros_.position.x = 3*cos(Goals_(i,0))+pose_(0);
- 		temp_goal_point_ros_.position.y = 3*sin(Goals_(i,0))+pose_(1);
- 		temp_goal_point_ros_.position.z = goal_(2);
+ 		temp_goal_point_ros_.position.x = 3*Goals_(i,0);
+ 		temp_goal_point_ros_.position.y = 3*Goals_(i,1);
+ 		temp_goal_point_ros_.position.z = 3*Goals_(i,2);
 
- 		temp_goal_point_ros_.orientation.w = cos(Goals_(i,0)/2) ;
- 		temp_goal_point_ros_.orientation.z = sin(Goals_(i,0)/2);
+ 		// temp_goal_point_ros_.orientation.w = cos(Goals_(i,0)/2) ;
+ 		// temp_goal_point_ros_.orientation.z = sin(Goals_(i,0)/2);
 
  		goal_points_ros_.poses.push_back(temp_goal_point_ros_);
 	}
 
 	// Trajectory
-	traj_ros_.poses.clear();
-	traj_ros_.header.stamp = ros::Time::now();
-	traj_ros_.header.frame_id = "vicon";
+	// traj_ros_.poses.clear();
+	// traj_ros_.header.stamp = ros::Time::now();
+	// traj_ros_.header.frame_id = "vicon";
 
-	dt_ = tf_/num_;
-	t_ = 0;
-	XE_ << X_;
-	XE_.row(0) << pose_.transpose();
-	for(int i=0; i<num_; i++){
-		mtx.lock();
-		eval_trajectory(Xf_switch_,Yf_switch_,t_xf_,t_yf_,t_,XE_);
-		mtx.unlock();
-		temp_path_point_ros_.pose.position.x = XE_(0,0);
-		temp_path_point_ros_.pose.position.y = XE_(0,1);
-		temp_path_point_ros_.pose.position.z = XE_(0,2);
-		t_+=dt_;
-		traj_ros_.poses.push_back(temp_path_point_ros_);
-	}
+	// dt_ = tf_/num_;
+	// t_ = 0;
+	// XE_ << X_;
+	// XE_.row(0) << pose_.transpose();
+	// for(int i=0; i<num_; i++){
+	// 	mtx.lock();
+	// 	eval_trajectory(Xf_switch_,Yf_switch_,t_xf_,t_yf_,t_,XE_);
+	// 	mtx.unlock();
+	// 	temp_path_point_ros_.pose.position.x = XE_(0,0);
+	// 	temp_path_point_ros_.pose.position.y = XE_(0,1);
+	// 	temp_path_point_ros_.pose.position.z = XE_(0,2);
+	// 	t_+=dt_;
+	// 	traj_ros_.poses.push_back(temp_path_point_ros_);
+	// }
 
-	ros_new_global_goal_.header.stamp = ros::Time::now();
-	ros_new_global_goal_.header.frame_id = "vicon";
-	if (can_reach_global_goal_){
-		ros_new_global_goal_.point.x = goal_(0);
-		ros_new_global_goal_.point.y = goal_(1);
-	} 
-	else{
-		ros_new_global_goal_.point.x = 3*cos(local_goal_angle_)+pose_(0);
-		ros_new_global_goal_.point.y = 3*sin(local_goal_angle_)+pose_(1);
-	}
-	ros_new_global_goal_.point.z = goal_(2);
+	// ros_new_global_goal_.header.stamp = ros::Time::now();
+	// ros_new_global_goal_.header.frame_id = "vicon";
+	// if (can_reach_global_goal_){
+	// 	ros_new_global_goal_.point.x = goal_(0);
+	// 	ros_new_global_goal_.point.y = goal_(1);
+	// } 
+	// else{
+	// 	ros_new_global_goal_.point.x = 3*cos(local_goal_angle_)+pose_(0);
+	// 	ros_new_global_goal_.point.y = 3*sin(local_goal_angle_)+pose_(1);
+	// }
+	// ros_new_global_goal_.point.z = goal_(2);
 
-	// ros_last_global_goal_.header.stamp = ros::Time::now();
-	// ros_last_global_goal_.header.frame_id = "vicon";
-	// ros_last_global_goal_.point.x = last_goal_(0);
-	// ros_last_global_goal_.point.y = last_goal_(1);
-	// ros_last_global_goal_.point.z = last_goal_(2);
+	// // ros_last_global_goal_.header.stamp = ros::Time::now();
+	// // ros_last_global_goal_.header.frame_id = "vicon";
+	// // ros_last_global_goal_.point.x = last_goal_(0);
+	// // ros_last_global_goal_.point.y = last_goal_(1);
+	// // ros_last_global_goal_.point.z = last_goal_(2);
 
-	new_goal_pub.publish(ros_new_global_goal_);
-	last_goal_pub.publish(ros_last_global_goal_);
+	// new_goal_pub.publish(ros_new_global_goal_);
+	// last_goal_pub.publish(ros_last_global_goal_);
 
  }
 

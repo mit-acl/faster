@@ -65,10 +65,10 @@ public:
 
 	// Make these private after testing
 	void get_stop_dist(Eigen::MatrixXd X, Eigen::Vector3d goal,Eigen::Vector3d pose, bool can_reach_global_goal, bool& stop);
-	void get_traj(Eigen::MatrixXd X, double angle_2_local_goal, double v, std::vector<double>& t_fx, std::vector<double>& t_fy, Eigen::Matrix4d& Xf_switch, Eigen::Matrix4d& Yf_switch, bool stop_check  );
+	void get_traj(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, std::vector<double>& t_fx, std::vector<double>& t_fy, , std::vector<double>& t_fz, Eigen::Matrix4d& Xf_switch, Eigen::Matrix4d& Yf_switch, Eigen::Matrix4d& Zf_switch, bool stop_check );	
 	
 	void sample_ss(Eigen::MatrixXd& Goals);
-	void sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d goal, double angle_2_last_goal, Eigen::MatrixXd& Sorted_Goals);
+	void sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d goal, Eigen::Vector3d vector_last, Eigen::MatrixXd& Sorted_Goals);
 	void pick_ss(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, bool& can_reach_goal);
 
 	void collision_check(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd X, double current_angle_2_local_goal, double buff, double v, double& tf, bool& can_reach_goal);
@@ -76,7 +76,7 @@ public:
 	void convert2pcl(const sensor_msgs::PointCloud2ConstPtr msg,pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_out);
 	void find_times( Eigen::Vector4d x0, double vf, std::vector<double>& t, Eigen::Matrix4d&  X_switch , bool stop_check );
 	void eval_trajectory(Eigen::Matrix4d X0, Eigen::Matrix4d Y0, std::vector<double> t_x, std::vector<double> t_y, double t, Eigen::MatrixXd& X);
-	void get_vels(Eigen::MatrixXd X, double angle_2_local_goal, double v, double& vx, double& vy);
+	void get_vels(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, double& vx, double& vy, double& vz);
 	void saturate(double &var, double min, double max);
 	void eigen2quadGoal(Eigen::MatrixXd X, acl_system::QuadGoal& quad_goal);
 
@@ -90,7 +90,7 @@ private:
 	double h_fov_, v_fov_, angle_2_last_goal_, current_angle_2_local_goal_, mean_distance_, goal_distance_, distance_traveled_, local_goal_angle_ ;
 	double tE_prev_;
 	double angle_i_, r_goal_, spinup_time_, heading_, j_max_, a_max_, t0_;
-	int num_ = 100, K_, goal_index_, num_of_v_pnts_, num_of_h_pnts_, quad_status_ ;
+	int num_ = 100, K_, goal_index_, num_of_pnts_, quad_status_, h_samples_, v_samples_ ;
 	bool debug_, can_reach_goal_, collision_detected_, gen_new_traj_, stop_, can_reach_global_goal_;
 	
 
@@ -163,6 +163,7 @@ private:
 
 	Eigen::Vector4d x0_;
 	Eigen::Vector4d y0_;
+	Eigen::Vector4d z0_;
 	
 	Eigen::Vector3d goal_;
 	Eigen::Vector3d local_goal_;
@@ -170,6 +171,13 @@ private:
 	Eigen::Vector3d last_goal_V_;
 	Eigen::Vector3d next_goal_V_;
 	Eigen::Vector3d pose_;
+
+	Eigen::Vector3d vector_2_goal_;
+	Eigen::Vector3d vector_2_goal_body_;
+	Eigen::Vector3d vector_last_body_;
+	Eigen::Vector3d vector_i_;
+
+	Eigen::Quaterniond q_;
 
 	Eigen::VectorXd theta_, phi_;
 
