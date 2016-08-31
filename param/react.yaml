@@ -1,12 +1,12 @@
 # Params for REACT planner
 debug: true
-safe_distance: 2  # Smallest distance before obstacle is no longer viable segment
+safe_distance: 3  # Smallest distance before obstacle is no longer viable segment
 buffer: 0.42       # 0.5 width of quad for collision checking
 
 # (x,y,z) goal
-goal_x: 0
+goal_x: -1
 goal_y: -6.0
-goal_z: 0.955
+goal_z: 0.8
 
 # Flight params
 speed: 3
@@ -24,7 +24,7 @@ K: 50
 h_fov: 60
 
 # Number of horizontal FOV discretization
-h_samples: 6
+h_samples: 10
 
 # Sensor vertical FOV (deg)
 v_fov: 45

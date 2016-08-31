@@ -65,17 +65,17 @@ public:
 
 	// Make these private after testing
 	void get_stop_dist(Eigen::MatrixXd X, Eigen::Vector3d goal,Eigen::Vector3d pose, bool can_reach_global_goal, bool& stop);
-	void get_traj(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, std::vector<double>& t_fx, std::vector<double>& t_fy, , std::vector<double>& t_fz, Eigen::Matrix4d& Xf_switch, Eigen::Matrix4d& Yf_switch, Eigen::Matrix4d& Zf_switch, bool stop_check );	
+	void get_traj(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, std::vector<double>& t_fx, std::vector<double>& t_fy, std::vector<double>& t_fz, Eigen::Matrix4d& Xf_switch, Eigen::Matrix4d& Yf_switch, Eigen::Matrix4d& Zf_switch, bool stop_check );	
 	
 	void sample_ss(Eigen::MatrixXd& Goals);
 	void sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d goal, Eigen::Vector3d vector_last, Eigen::MatrixXd& Sorted_Goals);
 	void pick_ss(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, bool& can_reach_goal);
 
-	void collision_check(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd X, double current_angle_2_local_goal, double buff, double v, double& tf, bool& can_reach_goal);
+	void collision_check(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd X, Eigen::Vector3d local_goal, double buff, double v, double& tf, bool& can_reach_goal);
 	
 	void convert2pcl(const sensor_msgs::PointCloud2ConstPtr msg,pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_out);
 	void find_times( Eigen::Vector4d x0, double vf, std::vector<double>& t, Eigen::Matrix4d&  X_switch , bool stop_check );
-	void eval_trajectory(Eigen::Matrix4d X0, Eigen::Matrix4d Y0, std::vector<double> t_x, std::vector<double> t_y, double t, Eigen::MatrixXd& X);
+	void eval_trajectory(Eigen::Matrix4d X0, Eigen::Matrix4d Y0, Eigen::Matrix4d Z0, std::vector<double> t_x, std::vector<double> t_y, std::vector<double> t_z, double t, Eigen::MatrixXd& X);
 	void get_vels(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, double& vx, double& vy, double& vz);
 	void saturate(double &var, double min, double max);
 	void eigen2quadGoal(Eigen::MatrixXd X, acl_system::QuadGoal& quad_goal);
@@ -85,7 +85,7 @@ private:
 	tf::TransformListener tf_listener_;
 
 	double yaw_, dist_2_goal_, angle_2_goal_, msg_received_, cost_, cost_i_, angle_diff_, angle_diff_last_, safe_distance_, min_cost_, buffer_;
-	double vfx_, vfy_, t_, tE_, dt_, tf_, r_, d_min_, tx_, ty_, v_, v_max_;
+	double vfx_, vfy_, vfz_, t_, tE_, dt_, tf_, r_, d_min_, tx_, ty_, tz_, v_, v_max_;
 	double traj_gen_, t_stop_, d_stop_, d_goal_;
 	double h_fov_, v_fov_, angle_2_last_goal_, current_angle_2_local_goal_, mean_distance_, goal_distance_, distance_traveled_, local_goal_angle_ ;
 	double tE_prev_;
@@ -118,16 +118,20 @@ private:
 	// Weird initialization
 	std::vector<double> t_x_{std::vector<double>(3,0)};
 	std::vector<double> t_y_{std::vector<double>(3,0)}; 
+	std::vector<double> t_z_{std::vector<double>(3,0)}; 
 
 	std::vector<double> t_xf_{std::vector<double>(3,0)};
 	std::vector<double> t_yf_{std::vector<double>(3,0)};
+	std::vector<double> t_zf_{std::vector<double>(3,0)};
 
 	std::vector<double> t2_xf_{std::vector<double>(3,0)};
 	std::vector<double> t2_yf_{std::vector<double>(3,0)};
+	std::vector<double> t2_zf_{std::vector<double>(3,0)};
 
 
 	std::vector<double> t_x_stop_{std::vector<double>(3,0)};
 	std::vector<double> t_y_stop_{std::vector<double>(3,0)};
+	std::vector<double> t_z_stop_{std::vector<double>(3,0)};
 
 	std::vector<double> x0_V_{std::vector<double>(4,0)};
 	std::vector<double> v0_V_{std::vector<double>(4,0)};
@@ -143,15 +147,19 @@ private:
 
 	Eigen::Matrix4d X_switch_; // [x0; v0; a0; j0]
 	Eigen::Matrix4d Y_switch_;
+	Eigen::Matrix4d Z_switch_;
 
 	Eigen::Matrix4d Xf_switch_; // [x0; v0; a0; j0]
 	Eigen::Matrix4d Yf_switch_;
+	Eigen::Matrix4d Zf_switch_;
 
 	Eigen::Matrix4d X2f_switch_; // [x0; v0; a0; j0]
 	Eigen::Matrix4d Y2f_switch_;
+	Eigen::Matrix4d Z2f_switch_;
 
 	Eigen::Matrix4d X_switch_stop_ ;
 	Eigen::Matrix4d Y_switch_stop_ ;
+	Eigen::Matrix4d Z_switch_stop_ ;
 
 	Eigen::MatrixXd X_; 
 	Eigen::MatrixXd XE_;
@@ -177,7 +185,10 @@ private:
 	Eigen::Vector3d vector_last_body_;
 	Eigen::Vector3d vector_i_;
 
-	Eigen::Quaterniond q_;
+	Eigen::Vector3d temp_local_goal_;
+
+	Eigen::Quaterniond qw2b_;
+	Eigen::Quaterniond qb2w_;
 
 	Eigen::VectorXd theta_, phi_;
 
