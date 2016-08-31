@@ -1,5 +1,4 @@
 # Params for REACT planner
-thresh: 0.3       # Distance used to cluster scan (m)
 debug: true
 safe_distance: 2  # Smallest distance before obstacle is no longer viable segment
 buffer: 0.42       # 0.5 width of quad for collision checking
@@ -21,8 +20,8 @@ plan_eval: 0.01
 # Number of samples from k-d tree to find obstacle 
 K: 50
 
-# Number of samples within buffer to be deemed collision
-K_buff: 20
-
 # Sensor horizontal FOV (deg)
 h_fov: 60
+
+# Sensor vertical FOV (deg)
+v_fov: 0

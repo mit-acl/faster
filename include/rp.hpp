@@ -84,14 +84,14 @@ private:
 
 	tf::TransformListener tf_listener_;
 
-	double inf_; // Infinity definition
-	double thresh_, yaw_, dist_2_goal_, angle_2_goal_, angle_check_, msg_received_, cost_, cost_i_, angle_diff_, safe_distance_, min_cost_, buffer_;
-	double num_samples_, angle_max_, angle_min_, angle_increment_;
-	double angle_diff_last_, angle_seg_inc_;
-	int down_sample_, num_of_clusters_, collision_counter_, collision_counter_corridor_, num_of_segement_;
-
-	double spinup_time_, heading_, j_max_, a_max_, t0_;
-	int quad_status_;
+	double yaw_, dist_2_goal_, angle_2_goal_, msg_received_, cost_, cost_i_, angle_diff_, angle_diff_last_, safe_distance_, min_cost_, buffer_;
+	double vfx_, vfy_, t_, tE_, dt_, tf_, r_, d_min_, tx_, ty_, v_, v_max_;
+	double traj_gen_, t_stop_, d_stop_, d_goal_;
+	double h_fov_, v_fov_, angle_2_last_goal_, current_angle_2_local_goal_, mean_distance_, goal_distance_, distance_traveled_, local_goal_angle_ ;
+	double tE_prev_;
+	double angle_i_, r_goal_, spinup_time_, heading_, j_max_, a_max_, t0_;
+	int num_ = 100, K_, goal_index_, num_of_v_pnts_, num_of_h_pnts_, quad_status_ ;
+	bool debug_, can_reach_goal_, collision_detected_, gen_new_traj_, stop_, can_reach_global_goal_;
 	
 
 	std::ostringstream errorMsg, warnMsg;
@@ -171,21 +171,9 @@ private:
 	Eigen::Vector3d next_goal_V_;
 	Eigen::Vector3d pose_;
 
+	Eigen::VectorXd theta_, phi_;
+
 	pcl::PointXYZ searchPoint_;
-
-
-	double vfx_, vfy_, t_, tE_, dt_, tf_, r_, theta_, d_theta_, d_min_, tx_, ty_, v_, v_max_;
-	double theta_1_, theta_2_, traj_gen_, t_stop_, d_stop_, d_goal_;
-	int index1_, index2_, partition_, min_d_ind, goal_index_;
-	int num_ = 100, K_, K_buffer_;
-	double h_fov_, angle_2_last_goal_, current_angle_2_local_goal_, mean_distance_, goal_distance_, distance_traveled_, local_goal_angle_ ;
-
-	double tE_prev_;
-
-	double angle_i_, r_goal_;
-
-	bool debug_, can_reach_goal_, collision_detected_, gen_new_traj_;
-	bool stop_, can_reach_global_goal_;
 
 
 	//## Logging and Debugging Functions

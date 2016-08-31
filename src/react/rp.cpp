@@ -4,7 +4,6 @@ REACT::REACT(){
 
 
 	// Should be read as param
-	ros::param::get("~thresh",thresh_);
 	ros::param::get("~debug",debug_);
 	ros::param::get("~safe_distance",safe_distance_);
 	ros::param::get("~buffer",buffer_);
@@ -36,10 +35,15 @@ REACT::REACT(){
 	ros::param::get("~plan_eval",plan_eval_time_);
 
 	ros::param::get("~K",K_);
-	ros::param::get("~K_buffer",K_buffer_);
 
 	ros::param::get("~h_fov",h_fov_);
+	ros::param::get("~v_fov",v_fov_);
+
 	h_fov_ = h_fov_*PI/180;
+	v_fov_ = v_fov_*PI/180;
+
+	// Generate allowable final states
+	sample_ss(Goals_);
 
 	v_ = v_max_;
 
@@ -218,20 +222,17 @@ void REACT::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 	// Build k-d tree
 	kdtree_.setInputCloud (cloud_);
 
-	// Generate allowable final states
-	sample_ss(Goals_);
+	// // Sort allowable final states
+	// sort_ss(Goals_,pose_,goal_, angle_2_last_goal_, Sorted_Goals_);
 
-	// Sort allowable final states
-	sort_ss(Goals_,pose_,goal_, angle_2_last_goal_, Sorted_Goals_);
+	// // Pick desired final state
+	// pick_ss(cloud_, Sorted_Goals_, X_, can_reach_goal_);
 
-	// Pick desired final state
-	pick_ss(cloud_, Sorted_Goals_, X_, can_reach_goal_);
-
- 	if (!can_reach_goal_ && quad_status_ == state_.FLYING){
- 		// Need to stop!!!
- 		v_ = 0;
- 		ROS_ERROR("Emergency stop -- no feasible path");
- 	}
+ // 	if (!can_reach_goal_ && quad_status_ == state_.FLYING){
+ // 		// Need to stop!!!
+ // 		v_ = 0;
+ // 		ROS_ERROR("Emergency stop -- no feasible path");
+ // 	}
 
  	gen_new_traj_ = true;
 
@@ -249,8 +250,27 @@ void REACT::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 }
 
 void REACT::sample_ss(Eigen::MatrixXd& Goals){
-	Goals = Eigen::MatrixXd::Zero(12,1);
-	Goals.col(0).setLinSpaced(12,-h_fov_/2+yaw_,h_fov_/2+yaw_);
+	int spacing_h = std::floor(h_fov_*180/PI/5);
+	theta_ = Eigen::VectorXd::Zero(spacing_h);
+	theta_.setLinSpaced(spacing_h,-h_fov_/2,h_fov_/2);
+	
+	int spacing_v = std::floor(v_fov_*180/PI/5);
+	if (spacing_v==0) spacing_v=1;
+	phi_ = Eigen::VectorXd::Zero(spacing_v);
+	phi_.setLinSpaced(spacing_v,-v_fov_/2,v_fov_/2);
+
+	Goals = Eigen::MatrixXd::Zero((spacing_h)*(spacing_v),3);
+	int k = 0;
+
+	for(int j=0; j < spacing_v; j++){
+		for (int i=0; i < spacing_h; i++){
+			Goals.row(k) << cos(theta_(i))*cos(phi_(j)), sin(theta_(i))*cos(phi_(j)), sin(phi_(j));
+			k++;
+		}
+	}
+
+	// std::cout << std::endl;
+	// std::cout << Goals << std::endl;
 }
 
 void REACT::sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d goal, double angle_2_last_goal, Eigen::MatrixXd& Sorted_Goals){
@@ -261,9 +281,10 @@ void REACT::sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d
 
 	angle_2_goal_ = atan2( goal(1) -pose(1), goal(0) - pose(0)) ;
 
-	num_of_clusters_ = Goals.rows();
+	num_of_v_pnts_ = Goals.rows();
+	num_of_h_pnts_ = Goals.rows();
 
- 	for (int i=0; i < num_of_clusters_ ; i++){
+ 	for (int i=0; i < num_of_h_pnts_ ; i++){
 		angle_i_ = Goals(i,0);
  		angle_diff_  =  std::abs(angle_i_)  - std::abs(angle_2_goal_ );
 
@@ -278,7 +299,7 @@ void REACT::sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d
 
  	Sorted_Goals.row(0)<< angle_2_goal_, 0;
 
- 	for (int i=0; i < num_of_clusters_ ; i++){
+ 	for (int i=0; i < num_of_h_pnts_ ; i++){
 
 	 	min_cost_ = cost_queue_.top();
 
@@ -359,7 +380,6 @@ void REACT::collision_check(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::Ma
 	//Re-intialize
 	can_reach_goal = false;
 	collision_detected_ = false;
-	min_d_ind = 0;
 	
 	X_prop_ = Eigen::MatrixXd::Zero(4,3);
 	X_prop_ << X;
