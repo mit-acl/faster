@@ -4,7 +4,7 @@ safe_distance: 3  # Smallest distance before obstacle is no longer viable segmen
 buffer: 0.42       # 0.5 width of quad for collision checking
 
 # (x,y,z) goal
-goal_x: -1
+goal_x: 0
 goal_y: -6.0
 goal_z: 0.8
 
@@ -30,5 +30,5 @@ h_samples: 10
 v_fov: 45
 
 # Number of vertical FOV discretization
-v_samples: 5
+v_samples: 10
     

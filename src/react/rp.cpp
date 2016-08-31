@@ -76,11 +76,13 @@ void REACT::stateCB(const acl_system::ViconState& msg)
 
 		yaw_ = tf::getYaw(msg.pose.orientation);
 
+		qw2b_.w() = cos(yaw_/2);
+		qw2b_.vec() << 0.0,0.0,sin(-yaw_/2);
+
 		if (quad_status_ == state_.NOT_FLYING){
 			X_.row(0) << pose_.transpose();
 		}
 	} 
-	// if (msg.has_twist) velCallback(msg.twist);
 }
 
 void REACT::sendGoal(const ros::TimerEvent& e)
@@ -278,9 +280,6 @@ void REACT::sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d
 	vector_2_goal_= goal-pose ;
 	vector_2_goal_.normalize();
 
-	qw2b_.w() = cos(heading_/2);
-	qw2b_.vec() << 0.0,0.0,sin(-heading_/2);
-
 	vector_2_goal_body_ = qw2b_._transformVector(vector_2_goal_);
 
 	Eigen::Vector3d temp = vector_last-pose;
@@ -314,9 +313,6 @@ void REACT::sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d
 
 		cost_queue_.pop();
 	}
-
-	// std::cout << Sorted_Goals << std::endl;
-	// std::cout << std::endl;
 }
 
 void REACT::pick_ss(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, bool& can_reach_goal){
@@ -327,7 +323,6 @@ void REACT::pick_ss(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd S
  		temp_local_goal_ << Sorted_Goals.block(goal_index_,0,1,3).transpose();
  		// Tranform temp local goal to world frame
  		temp_local_goal_ = qw2b_.conjugate()._transformVector(temp_local_goal_);
- 		// std::cout << temp_local_goal_ << std::endl;
 		collision_check(cloud,X,temp_local_goal_,buffer_,v_max_,tf_,can_reach_goal); 		
  		goal_index_++;
  	}
@@ -336,7 +331,7 @@ void REACT::pick_ss(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd S
  		goal_index_--;
  		temp_local_goal_ << Sorted_Goals.block(goal_index_,0,1,3).transpose();
  		// Tranform temp local goal to world frame
- 		local_goal_ = 3*qw2b_.conjugate()._transformVector(temp_local_goal_);
+ 		local_goal_ = qw2b_.conjugate()._transformVector(temp_local_goal_);
  		if (goal_index_ == 0) can_reach_global_goal_ = true;
  		else can_reach_global_goal_ = false;
  	}
@@ -373,8 +368,8 @@ void REACT::get_stop_dist(Eigen::MatrixXd X, Eigen::Vector3d goal,Eigen::Vector3
 		eval_trajectory(X_switch_stop_,Y_switch_stop_,Z_switch_stop_,t_x_stop_,t_y_stop_,t_z_stop_,t_stop_,X_stop_);
 		mtx.unlock();
 
-		d_stop_ = (X_stop_ - X).norm();
-		d_goal_ = (X.transpose() - goal).norm();
+		d_stop_ = (X_stop_.block(0,0,1,2) - X.block(0,0,1,2)).norm();
+		d_goal_ = (X.block(0,0,1,2) - goal.head(0)).norm();
 
 		// Prevents oscillation if our stopping distance is really small (low speed)
 		saturate(d_stop_,0.1,d_stop_);
@@ -750,15 +745,16 @@ void REACT::convert2ROS(){
  	// Cluster
  	goal_points_ros_.poses.clear();
  	goal_points_ros_.header.stamp = ros::Time::now();
- 	goal_points_ros_.header.frame_id = "LQ02";
+ 	goal_points_ros_.header.frame_id = "world";
 
  	for (int i=0; i < Goals_.rows(); i++){
- 		temp_goal_point_ros_.position.x = 3*Goals_(i,0);
- 		temp_goal_point_ros_.position.y = 3*Goals_(i,1);
- 		temp_goal_point_ros_.position.z = 3*Goals_(i,2);
+ 		temp_local_goal_ = qw2b_.conjugate()._transformVector(Goals_.row(i).transpose());
+ 		temp_goal_point_ros_.position.x = 3*temp_local_goal_(0)+pose_(0);
+ 		temp_goal_point_ros_.position.y = 3*temp_local_goal_(1)+pose_(1);
+ 		temp_goal_point_ros_.position.z = 3*temp_local_goal_(2)+pose_(2);
 
- 		// temp_goal_point_ros_.orientation.w = cos(Goals_(i,0)/2) ;
- 		// temp_goal_point_ros_.orientation.z = sin(Goals_(i,0)/2);
+ 		temp_goal_point_ros_.orientation.w = cos(yaw_/2) ;
+ 		temp_goal_point_ros_.orientation.z = sin(yaw_/2);
 
  		goal_points_ros_.poses.push_back(temp_goal_point_ros_);
 	}
@@ -783,17 +779,20 @@ void REACT::convert2ROS(){
 		traj_ros_.poses.push_back(temp_path_point_ros_);
 	}
 
-	// ros_new_global_goal_.header.stamp = ros::Time::now();
-	// ros_new_global_goal_.header.frame_id = "vicon";
-	// if (can_reach_global_goal_){
-	// 	ros_new_global_goal_.point.x = goal_(0);
-	// 	ros_new_global_goal_.point.y = goal_(1);
-	// } 
-	// else{
-	// 	ros_new_global_goal_.point.x = 3*cos(local_goal_angle_)+pose_(0);
-	// 	ros_new_global_goal_.point.y = 3*sin(local_goal_angle_)+pose_(1);
-	// }
-	// ros_new_global_goal_.point.z = goal_(2);
+	ros_new_global_goal_.header.stamp = ros::Time::now();
+	ros_new_global_goal_.header.frame_id = "vicon";
+	if (can_reach_global_goal_){
+		ros_new_global_goal_.point.x = goal_(0);
+		ros_new_global_goal_.point.y = goal_(1);
+		ros_new_global_goal_.point.z = goal_(2);
+
+	} 
+	else{
+		ros_new_global_goal_.point.x = 3*local_goal_(0)+pose_(0);
+		ros_new_global_goal_.point.y = 3*local_goal_(1)+pose_(1);
+		ros_new_global_goal_.point.z = 3*local_goal_(2)+pose_(2);
+
+	}
 
 	// // ros_last_global_goal_.header.stamp = ros::Time::now();
 	// // ros_last_global_goal_.header.frame_id = "vicon";
@@ -801,7 +800,7 @@ void REACT::convert2ROS(){
 	// // ros_last_global_goal_.point.y = last_goal_(1);
 	// // ros_last_global_goal_.point.z = last_goal_(2);
 
-	// new_goal_pub.publish(ros_new_global_goal_);
+	new_goal_pub.publish(ros_new_global_goal_);
 	// last_goal_pub.publish(ros_last_global_goal_);
 
  }
