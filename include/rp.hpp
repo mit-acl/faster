@@ -103,7 +103,8 @@ private:
 	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_;
 	// // // // //
 	// Ros var initialization
-	geometry_msgs::PoseArray goal_points_ros_ ;
+	// geometry_msgs::PoseArray goal_points_ros_ ;
+	sensor_msgs::PointCloud goal_points_ros_;
 	geometry_msgs::Pose temp_goal_point_ros_;
 	geometry_msgs::PoseStamped temp_path_point_ros_;
 	geometry_msgs::PointStamped ros_new_global_goal_, ros_last_global_goal_;

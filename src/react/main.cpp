@@ -27,7 +27,7 @@ int main(int argc, char **argv)
 	ros::Timer sendGoalTimer = n.createTimer(ros::Duration(rp.plan_eval_time_), &REACT::sendGoal, &rp);
 
 	rp.new_goal_pub = n.advertise<geometry_msgs::PointStamped>("new_global_goal", 1);
-	rp.int_goal_pub = n.advertise<geometry_msgs::PoseArray>("int_goal", 1);
+	rp.int_goal_pub = n.advertise<sensor_msgs::PointCloud>("int_goal", 1);
 	rp.last_goal_pub = n.advertise<geometry_msgs::PointStamped>("last_global_goal",1);
 	rp.traj_pub = n.advertise<nav_msgs::Path>("traj",1);
 	rp.latency_pub = n.advertise<acl_system::FloatStamped>("latency",1);

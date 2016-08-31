@@ -76,8 +76,8 @@ void REACT::stateCB(const acl_system::ViconState& msg)
 
 		yaw_ = tf::getYaw(msg.pose.orientation);
 
-		qw2b_.w() = cos(yaw_/2);
-		qw2b_.vec() << 0.0,0.0,sin(-yaw_/2);
+		qw2b_.w() = msg.pose.orientation.w;
+		qw2b_.vec() << -msg.pose.orientation.x,-msg.pose.orientation.y,-msg.pose.orientation.z;
 
 		if (quad_status_ == state_.NOT_FLYING){
 			X_.row(0) << pose_.transpose();
@@ -743,20 +743,21 @@ void REACT::saturate(double &var, double min, double max){
 
 void REACT::convert2ROS(){
  	// Cluster
- 	goal_points_ros_.poses.clear();
+ 	goal_points_ros_.points.clear();
  	goal_points_ros_.header.stamp = ros::Time::now();
  	goal_points_ros_.header.frame_id = "world";
 
  	for (int i=0; i < Goals_.rows(); i++){
  		temp_local_goal_ = qw2b_.conjugate()._transformVector(Goals_.row(i).transpose());
- 		temp_goal_point_ros_.position.x = 3*temp_local_goal_(0)+pose_(0);
- 		temp_goal_point_ros_.position.y = 3*temp_local_goal_(1)+pose_(1);
- 		temp_goal_point_ros_.position.z = 3*temp_local_goal_(2)+pose_(2);
+ 		geometry_msgs::Point32 point;
+ 		point.x = 3*temp_local_goal_(0)+pose_(0);
+ 		point.y = 3*temp_local_goal_(1)+pose_(1);
+ 		point.z = 3*temp_local_goal_(2)+pose_(2);
 
- 		temp_goal_point_ros_.orientation.w = cos(yaw_/2) ;
- 		temp_goal_point_ros_.orientation.z = sin(yaw_/2);
+ 		// temp_goal_point_ros_.orientation.w = cos(yaw_/2) ;
+ 		// temp_goal_point_ros_.orientation.z = sin(yaw_/2);
 
- 		goal_points_ros_.poses.push_back(temp_goal_point_ros_);
+ 		goal_points_ros_.points.push_back(point);
 	}
 
 	// Trajectory
@@ -768,7 +769,8 @@ void REACT::convert2ROS(){
 	t_ = 0;
 	XE_ << X_;
 	XE_.row(0) << pose_.transpose();
-	for(int i=0; i<num_; i++){
+	double dist=0;
+	while (dist<3){
 		mtx.lock();
 		eval_trajectory(Xf_switch_,Yf_switch_,Zf_switch_,t_xf_,t_yf_,t_zf_,t_,XE_);
 		mtx.unlock();
@@ -777,7 +779,18 @@ void REACT::convert2ROS(){
 		temp_path_point_ros_.pose.position.z = XE_(0,2);
 		t_+=dt_;
 		traj_ros_.poses.push_back(temp_path_point_ros_);
+		dist = XE_.row(0).norm();
 	}
+	// for(int i=0; i<num_; i++){
+	// 	mtx.lock();
+	// 	eval_trajectory(Xf_switch_,Yf_switch_,Zf_switch_,t_xf_,t_yf_,t_zf_,t_,XE_);
+	// 	mtx.unlock();
+	// 	temp_path_point_ros_.pose.position.x = XE_(0,0);
+	// 	temp_path_point_ros_.pose.position.y = XE_(0,1);
+	// 	temp_path_point_ros_.pose.position.z = XE_(0,2);
+	// 	t_+=dt_;
+	// 	traj_ros_.poses.push_back(temp_path_point_ros_);
+	// }
 
 	ros_new_global_goal_.header.stamp = ros::Time::now();
 	ros_new_global_goal_.header.frame_id = "vicon";
