@@ -307,9 +307,6 @@ void REACT::pick_ss(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd S
  		if (goal_index_ == 0) can_reach_global_goal_ = true;
  		else can_reach_global_goal_ = false;
  	}
- 	else{
- 		ROS_ERROR("Need to stop");
- 	}
 }
 
 
