@@ -89,7 +89,7 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 {	
 	if (gen_new_traj_){
 		gen_new_traj_ = false;
-		X_(1,1) = -v_max_;
+		// X_(1,1) = -v_max_;
 		mtx.lock();
 		get_traj(X_,local_goal_,v_,t_xf_,t_yf_,t_zf_,Xf_switch_,Yf_switch_,Zf_switch_,false);
 		mtx.unlock();
@@ -379,8 +379,9 @@ void REACT::get_stop_dist(Eigen::MatrixXd X, Eigen::Vector3d goal,Eigen::Vector3
 		eval_trajectory(X_switch_stop_,Y_switch_stop_,Z_switch_stop_,t_x_stop_,t_y_stop_,t_z_stop_,t_stop_,X_stop_);
 		mtx.unlock();
 
+		// Double check this
 		d_stop_ = (X_stop_.block(0,0,1,2) - X.block(0,0,1,2)).norm();
-		d_goal_ = (X.block(0,0,1,2) - goal.head(0)).norm();
+		d_goal_ = (X.block(0,0,1,2).transpose() - goal.head(2)).norm();
 
 		// Prevents oscillation if our stopping distance is really small (low speed)
 		saturate(d_stop_,0.1,d_stop_);
