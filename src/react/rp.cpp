@@ -780,8 +780,7 @@ void REACT::convert2ROS(){
 	t_ = 0;
 	XE_ << X_;
 	XE_.row(0) << pose_.transpose();
-	double dist=0;
-	while (dist<3){
+	for(int i=0; i<num_; i++){
 		mtx.lock();
 		eval_trajectory(Xf_switch_,Yf_switch_,Zf_switch_,t_xf_,t_yf_,t_zf_,t_,XE_);
 		mtx.unlock();
@@ -790,7 +789,6 @@ void REACT::convert2ROS(){
 		temp_path_point_ros_.pose.position.z = XE_(0,2);
 		t_+=dt_;
 		traj_ros_.poses.push_back(temp_path_point_ros_);
-		dist = XE_.row(0).norm();
 	}
 
 	ros_new_global_goal_.header.stamp = ros::Time::now();
