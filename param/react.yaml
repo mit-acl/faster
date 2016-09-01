@@ -21,7 +21,7 @@ plan_eval: 0.01
 K: 75
 
 # Sensor horizontal FOV (deg)
-h_fov: 60
+h_fov: 56
 
 # Number of horizontal FOV discretization
 h_samples: 10

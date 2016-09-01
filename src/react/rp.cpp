@@ -253,6 +253,7 @@ void REACT::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 }
 
 void REACT::sample_ss(Eigen::MatrixXd& Goals){
+
 	theta_ = Eigen::VectorXd::Zero(h_samples_);
 	theta_.setLinSpaced(h_samples_,-h_fov_/2,h_fov_/2);
 	
@@ -261,11 +262,20 @@ void REACT::sample_ss(Eigen::MatrixXd& Goals){
 	phi_.setLinSpaced(v_samples_,-v_fov_/2,v_fov_/2);
 
 	Goals = Eigen::MatrixXd::Zero((h_samples_)*(v_samples_),3);
-	int k = 0;
+	proj_goals_ = Eigen::MatrixXd::Zero(Goals_.rows(),Goals_.cols());
+ 	Eigen::VectorXd x;
+ 	Eigen::VectorXd y;
+ 	Eigen::VectorXd z;
+ 	x = Eigen::VectorXd::Zero(Goals_.rows());
+ 	x.setConstant(3);
+ 	y.setLinSpaced(h_samples_,-3*tan(h_fov_/2),3*tan(h_fov_/2));
+ 	z.setLinSpaced(v_samples_,-3*tan(v_fov_/2),3*tan(v_fov_/2));
 
+	int k = 0;
 	for(int j=0; j < v_samples_; j++){
 		for (int i=0; i < h_samples_; i++){
 			Goals.row(k) << cos(theta_(i))*cos(phi_(j)), sin(theta_(i))*cos(phi_(j)), sin(phi_(j));
+			proj_goals_.row(k) << x(k),y(i),z(j);
 			k++;
 		}
 	}
@@ -332,7 +342,8 @@ void REACT::pick_ss(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd S
  		temp_local_goal_ << Sorted_Goals.block(goal_index_,0,1,3).transpose();
  		// Tranform temp local goal to world frame
  		local_goal_ = qw2b_.conjugate()._transformVector(temp_local_goal_);
- 		if (goal_index_ == 0) can_reach_global_goal_ = true;
+ 		double d = (goal_-pose_).norm();
+ 		if (goal_index_ == 0 && d<3) can_reach_global_goal_ = true;
  		else can_reach_global_goal_ = false;
  	}
 }
@@ -748,11 +759,11 @@ void REACT::convert2ROS(){
  	goal_points_ros_.header.frame_id = "world";
 
  	for (int i=0; i < Goals_.rows(); i++){
- 		temp_local_goal_ = qw2b_.conjugate()._transformVector(Goals_.row(i).transpose());
+ 		temp_local_goal_ = qw2b_.conjugate()._transformVector(proj_goals_.row(i).transpose());
  		geometry_msgs::Point32 point;
- 		point.x = 3*temp_local_goal_(0)+pose_(0);
- 		point.y = 3*temp_local_goal_(1)+pose_(1);
- 		point.z = 3*temp_local_goal_(2)+pose_(2);
+ 		point.x = temp_local_goal_(0)+pose_(0);
+ 		point.y = temp_local_goal_(1)+pose_(1);
+ 		point.z = temp_local_goal_(2)+pose_(2);
 
  		// temp_goal_point_ros_.orientation.w = cos(yaw_/2) ;
  		// temp_goal_point_ros_.orientation.z = sin(yaw_/2);
@@ -781,16 +792,6 @@ void REACT::convert2ROS(){
 		traj_ros_.poses.push_back(temp_path_point_ros_);
 		dist = XE_.row(0).norm();
 	}
-	// for(int i=0; i<num_; i++){
-	// 	mtx.lock();
-	// 	eval_trajectory(Xf_switch_,Yf_switch_,Zf_switch_,t_xf_,t_yf_,t_zf_,t_,XE_);
-	// 	mtx.unlock();
-	// 	temp_path_point_ros_.pose.position.x = XE_(0,0);
-	// 	temp_path_point_ros_.pose.position.y = XE_(0,1);
-	// 	temp_path_point_ros_.pose.position.z = XE_(0,2);
-	// 	t_+=dt_;
-	// 	traj_ros_.poses.push_back(temp_path_point_ros_);
-	// }
 
 	ros_new_global_goal_.header.stamp = ros::Time::now();
 	ros_new_global_goal_.header.frame_id = "vicon";
