@@ -216,7 +216,6 @@ void REACT::eventCB(const acl_system::QuadFlightEvent& msg)
 
 void REACT::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
  {
-
  	msg_received_ = ros::WallTime::now().toSec();
 
 	// Convert pcl
@@ -231,7 +230,7 @@ void REACT::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 	// // Pick desired final state
 	pick_ss(cloud_, Sorted_Goals_, X_, can_reach_goal_);
 
- 	if (!can_reach_goal_ && quad_status_ == state_.FLYING){
+ 	if (!can_reach_goal_ && quad_status_ != state_.NOT_FLYING){
  		// Need to stop!!!
  		v_ = 0;
  		ROS_ERROR("Emergency stop -- no feasible path");
