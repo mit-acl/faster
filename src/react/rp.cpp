@@ -198,7 +198,6 @@ void REACT::eventCB(const acl_system::QuadFlightEvent& msg)
 		double dyaw = 0;
 		diff =  fmod(diff+PI,2*PI) - PI;
 		while(fabs(diff)>0.001){
-			std::cout << abs(diff) << std::endl;
 			saturate(diff,-0.003,0.003);
 			quad_goal_.yaw+=diff;	
 			diff = heading_ - quad_goal_.yaw;
