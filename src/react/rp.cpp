@@ -48,6 +48,7 @@ REACT::REACT(){
 	sample_ss(Goals_);
 
 	v_ = v_max_;
+	yaw_ = 0;
 
 	stop_ = false;
 	can_reach_global_goal_ = true;
@@ -65,7 +66,11 @@ REACT::REACT(){
 
 void REACT::global_goalCB(const geometry_msgs::PointStamped& msg){
 	goal_ << msg.point.x, msg.point.y, msg.point.z;
-	heading_ = atan2(goal_(1),goal_(0));
+	if (quad_status_!=state_.GO){
+		// Transform goal into local frame
+		local_goal_ << goal_-X_.block(0,0,1,3).transpose();
+		heading_ = atan2(goal_(1)-X_(0,1),goal_(0)-X_(0,0));
+	}
 }
 
 void REACT::stateCB(const acl_system::ViconState& msg)
@@ -189,7 +194,17 @@ void REACT::eventCB(const acl_system::QuadFlightEvent& msg)
 	}
 	// Initializing
 	else if (msg.mode == msg.INIT && quad_status_ == state_.FLYING){
-		quad_goal_.yaw = heading_;
+		double diff = heading_ - quad_goal_.yaw;
+		double dyaw = 0;
+		diff =  fmod(diff+PI,2*PI) - PI;
+		while(fabs(diff)>0.001){
+			std::cout << abs(diff) << std::endl;
+			saturate(diff,-0.003,0.003);
+			quad_goal_.yaw+=diff;	
+			diff = heading_ - quad_goal_.yaw;
+			diff =  fmod(diff+PI,2*PI) - PI;	
+			ros::Duration(0.002).sleep();
+		}
 		ROS_INFO("Initialized");
 	}
 	// GO!!!!
