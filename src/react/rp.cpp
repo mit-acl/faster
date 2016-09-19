@@ -499,7 +499,7 @@ void REACT::find_times( Eigen::Vector4d x0, double vf, std::vector<double>& t, E
 		t[0] = 0;
 		t[1] = 0; 
 		t[2] = 0;
-		
+
 		a0_V_[0] = 0;
 		a0_V_[1] = 0; 
 		a0_V_[2] = 0;
@@ -535,7 +535,7 @@ void REACT::find_times( Eigen::Vector4d x0, double vf, std::vector<double>& t, E
 
 		double vfp = x0(1) + pow(x0(2),2)/(2*j_temp);
 
-		if (std::abs(vfp-vf) < 0.01*std::abs(vf)){
+		if (std::abs(vfp-vf) < 0.075*std::abs(vf)){
 
 			j_V_[0] = -j_temp;
 			// No 2nd and 3rd stage
