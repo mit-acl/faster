@@ -24,11 +24,11 @@ K: 75
 h_fov: 56
 
 # Number of horizontal FOV discretization
-h_samples: 10
+h_samples: 7
 
 # Sensor vertical FOV (deg)
 v_fov: 40
 
 # Number of vertical FOV discretization
-v_samples: 10
+v_samples: 5
     
