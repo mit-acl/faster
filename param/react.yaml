@@ -9,16 +9,16 @@ goal_y: -6.0
 goal_z: 0.75
 
 # Flight params
-speed: 1
+speed: 2
 
 jerk: 20  
 accel: 10
 
 # Trajectory evaluation rate
-plan_eval: 0.01 
+plan_eval: 0.005
 
 # Number of samples from k-d tree to find obstacle 
-K: 75
+K: 50
 
 # Sensor horizontal FOV (deg)
 h_fov: 56
