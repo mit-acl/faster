@@ -496,9 +496,9 @@ void REACT::find_times( Eigen::Vector4d x0, double vf, std::vector<double>& t, E
 		j_V_[1] = 0; 
 		j_V_[2] = 0;
 
-		t[0] = 0;
-		t[1] = 0; 
-		t[2] = 0;
+		t[0] = -1;
+		t[1] = -1; 
+		t[2] = -1;
 
 		a0_V_[0] = 0;
 		a0_V_[1] = 0; 
@@ -535,7 +535,7 @@ void REACT::find_times( Eigen::Vector4d x0, double vf, std::vector<double>& t, E
 
 		double vfp = x0(1) + pow(x0(2),2)/(2*j_temp);
 
-		if (std::abs(vfp-vf) < 0.05*std::abs(vf)){
+		if (std::abs(vfp-vf) < 0.01*std::abs(vf)){
 
 			j_V_[0] = -j_temp;
 			// No 2nd and 3rd stage
@@ -544,8 +544,8 @@ void REACT::find_times( Eigen::Vector4d x0, double vf, std::vector<double>& t, E
 
 			t[0] = -x0(2)/j_V_[0];
 			// No 2nd and 3rd stage
-			t[1] = 0;
-			t[2] = 0;
+			t[1] = -1;
+			t[2] = -1;
 
 			v0_V_[0] = x0(1);
 			// No 2nd and 3rd stage
@@ -608,7 +608,7 @@ void REACT::find_times( Eigen::Vector4d x0, double vf, std::vector<double>& t, E
 				j_V_[2] = -j_temp;
 
 				t[0] = t1;
-				t[1] = 0; // No second phase
+				t[1] = -1; // No second phase
 				t[2] = -(x0(2)+j_V_[0]*t1)/j_V_[2];
 
 				a0_V_[0] = x0(2);
