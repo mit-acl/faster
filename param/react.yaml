@@ -9,9 +9,9 @@ goal_y: -6.0
 goal_z: 0.75
 
 # Flight params
-speed: 3
+speed: 2
 
-jerk: 30  
+jerk: 20  
 accel: 10
 
 # Trajectory evaluation rate
