@@ -41,6 +41,8 @@ REACT::REACT(){
 	ros::param::get("~v_fov",v_fov_);
 	ros::param::get("~v_samples",v_samples_);
 
+	ros::param::get("~r_max",r_max_);
+
 	h_fov_ = h_fov_*PI/180;
 	v_fov_ = v_fov_*PI/180;
 
@@ -198,12 +200,15 @@ void REACT::eventCB(const acl_system::QuadFlightEvent& msg)
 		double dyaw = 0;
 		diff =  fmod(diff+PI,2*PI) - PI;
 		while(fabs(diff)>0.001){
-			saturate(diff,-0.003,0.003);
+			saturate(diff,-0.002*r_max_,0.002*r_max_);
+			if (diff>0) quad_goal_.dyaw =  r_max_;
+			else        quad_goal_.dyaw = -r_max_;
 			quad_goal_.yaw+=diff;	
 			diff = heading_ - quad_goal_.yaw;
 			diff =  fmod(diff+PI,2*PI) - PI;	
 			ros::Duration(0.002).sleep();
 		}
+		quad_goal_.dyaw = 0;
 		ROS_INFO("Initialized");
 	}
 	// GO!!!!

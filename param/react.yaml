@@ -9,9 +9,9 @@ goal_y: -6.0
 goal_z: 0.75
 
 # Flight params
-speed: 2
+speed: 3
 
-jerk: 20  
+jerk: 30  
 accel: 10
 
 # Trajectory evaluation rate
@@ -31,4 +31,7 @@ v_fov: 40
 
 # Number of vertical FOV discretization
 v_samples: 5
+
+# Max yaw rate (rad/s)
+r_max: 2
     
