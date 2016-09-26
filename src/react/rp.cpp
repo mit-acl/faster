@@ -74,7 +74,6 @@ void REACT::global_goalCB(const geometry_msgs::PointStamped& msg){
 	// }
 	local_goal_ << goal_-X_.block(0,0,1,3).transpose();
 	heading_ = atan2(goal_(1)-X_(0,1),goal_(0)-X_(0,0));
-	gen_new_traj_=true;
 }
 
 void REACT::stateCB(const acl_system::ViconState& msg)
@@ -143,6 +142,7 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 				else        quad_goal_.dyaw = -r_max_;
 				quad_goal_.yaw+=diff;
 			}
+			else quad_goal_.dyaw=0;
 
 			tE_ = ros::Time::now().toSec() - t0_;
 			
