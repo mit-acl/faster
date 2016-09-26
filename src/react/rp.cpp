@@ -809,13 +809,20 @@ void REACT::convert2ROS(){
 	traj_ros_.header.stamp = ros::Time::now();
 	traj_ros_.header.frame_id = "vicon";
 
+	Xf_eval_ = Xf_switch_;
+	Yf_eval_ = Yf_switch_;
+	Zf_eval_ = Zf_switch_;
+	t_xf_e_ = t_xf_;
+	t_yf_e_ = t_yf_;
+	t_zf_e_ = t_zf_;
+
 	dt_ = tf_/num_;
 	t_ = 0;
 	XE_ << X_;
 	XE_.row(0) << pose_.transpose();
 	for(int i=0; i<num_; i++){
 		mtx.lock();
-		eval_trajectory(Xf_switch_,Yf_switch_,Zf_switch_,t_xf_,t_yf_,t_zf_,t_,XE_);
+		eval_trajectory(Xf_eval_,Yf_eval_,Zf_eval_,t_xf_e_,t_yf_e_,t_zf_e_,t_,XE_);
 		mtx.unlock();
 		temp_path_point_ros_.pose.position.x = XE_(0,0);
 		temp_path_point_ros_.pose.position.y = XE_(0,1);
