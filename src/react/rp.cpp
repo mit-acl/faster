@@ -68,11 +68,13 @@ REACT::REACT(){
 
 void REACT::global_goalCB(const geometry_msgs::PointStamped& msg){
 	goal_ << msg.point.x, msg.point.y, msg.point.z;
-	if (quad_status_!=state_.GO){
-		// Transform goal into local frame
-		local_goal_ << goal_-X_.block(0,0,1,3).transpose();
-		heading_ = atan2(goal_(1)-X_(0,1),goal_(0)-X_(0,0));
-	}
+	// if (quad_status_!=state_.GO){
+	// 	// Transform goal into local frame
+		
+	// }
+	local_goal_ << goal_-X_.block(0,0,1,3).transpose();
+	heading_ = atan2(goal_(1)-X_(0,1),goal_(0)-X_(0,0));
+	gen_new_traj_=true;
 }
 
 void REACT::stateCB(const acl_system::ViconState& msg)
@@ -130,6 +132,16 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 				}
 			}
 
+			double diff = heading_ - quad_goal_.yaw;
+			double dyaw = 0;
+			diff =  fmod(diff+PI,2*PI) - PI;
+			if(fabs(diff)>0.2 && !stop_){
+				saturate(diff,-0.002*r_max_,0.002*r_max_);
+				if (diff>0) quad_goal_.dyaw =  r_max_;
+				else        quad_goal_.dyaw = -r_max_;
+				quad_goal_.yaw+=diff;
+			}
+
 			tE_ = ros::Time::now().toSec() - t0_;
 			
 			mtx.lock();		
@@ -144,12 +156,14 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 			}
 		}
 
+
 	eigen2quadGoal(X_,quad_goal_);
 	// quad_goal_.yaw = heading_;
 
 	quad_goal_.header.stamp = ros::Time::now();
 	quad_goal_.header.frame_id = "vicon";
 	quad_goal_pub.publish(quad_goal_);
+
 }
 
 
