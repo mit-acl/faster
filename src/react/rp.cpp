@@ -136,6 +136,8 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 			double dyaw = 0;
 			diff =  fmod(diff+PI,2*PI) - PI;
 			if(fabs(diff)>0.2 && !stop_){
+				if (fabs(diff)>PI/4) v_ = 0;
+				else v_ = v_max_;
 				saturate(diff,-0.002*r_max_,0.002*r_max_);
 				if (diff>0) quad_goal_.dyaw =  r_max_;
 				else        quad_goal_.dyaw = -r_max_;
@@ -148,7 +150,7 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 			eval_trajectory(Xf_switch_,Yf_switch_,Zf_switch_,t_xf_,t_yf_,t_zf_,tE_,X_);
 			mtx.unlock();
 
-			if (X_.block(1,0,1,2).norm() == 0){
+			if (X_.block(1,0,1,2).norm() == 0 && stop_){
 				// We're done
 				ROS_INFO("Flight Complete");
 				quad_status_ = state_.FLYING;
