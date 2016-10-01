@@ -52,6 +52,7 @@ REACT::REACT(){
 	v_ = v_max_;
 	yaw_ = 0;
 
+	keep_yaw_ = false;
 	stop_ = false;
 	can_reach_global_goal_ = true;
 	can_reach_goal_ = false;
@@ -72,7 +73,7 @@ void REACT::global_goalCB(const geometry_msgs::PointStamped& msg){
 	// 	// Transform goal into local frame
 		
 	// }
-	local_goal_ << goal_-X_.block(0,0,1,3).transpose();
+	// local_goal_ << goal_-X_.block(0,0,1,3).transpose();
 	heading_ = atan2(goal_(1)-X_(0,1),goal_(0)-X_(0,0));
 }
 
@@ -135,14 +136,28 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 			double dyaw = 0;
 			diff =  fmod(diff+PI,2*PI) - PI;
 			if(fabs(diff)>0.2 && !stop_){
-				if (fabs(diff)>PI/4) v_ = 0;
+				if (fabs(diff)>PI/2) v_ = 0;
 				else v_ = v_max_;
-				saturate(diff,-0.002*r_max_,0.002*r_max_);
-				if (diff>0) quad_goal_.dyaw =  r_max_;
-				else        quad_goal_.dyaw = -r_max_;
-				quad_goal_.yaw+=diff;
+				// Only yaw the vehicle is at right speed
+				if(v_==0){
+					if (X_.block(1,0,1,2).norm() == v_){
+						saturate(diff,-0.002*r_max_,0.002*r_max_);
+						if (diff>0) quad_goal_.dyaw =  r_max_;
+						else        quad_goal_.dyaw = -r_max_;
+						quad_goal_.yaw+=diff;
+					}
+				}
+				else{
+					saturate(diff,-0.002*r_max_,0.002*r_max_);
+					if (diff>0) quad_goal_.dyaw =  r_max_;
+					else        quad_goal_.dyaw = -r_max_;
+					quad_goal_.yaw+=diff;
+				}
 			}
-			else quad_goal_.dyaw=0;
+			else if (!stop_) {
+				v_ = v_max_;
+				quad_goal_.dyaw=0;
+			} 
 
 			tE_ = ros::Time::now().toSec() - t0_;
 			
@@ -242,7 +257,7 @@ void REACT::eventCB(const acl_system::QuadFlightEvent& msg)
 		ROS_WARN("Stopping");
 		// Stay in go command but set speed to zero
 		v_ = 0;
-
+		stop_ = true;
 		// Generate new traj
 		gen_new_traj_ = true;
 		
@@ -253,37 +268,43 @@ void REACT::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
  {
  	msg_received_ = ros::WallTime::now().toSec();
 
-	// Convert pcl
+ 	// Convert pcl
 	convert2pcl(msg,cloud_);
- 	
-	// Build k-d tree
-	kdtree_.setInputCloud (cloud_);
+ 	if (cloud_->points.size()>K_){
 
-	// Sort allowable final states
-	sort_ss(Goals_,pose_,goal_, last_goal_, Sorted_Goals_);
+		// Build k-d tree
+		kdtree_.setInputCloud (cloud_);
+		
+		// Sort allowable final states
+		sort_ss(Goals_,pose_,goal_, last_goal_, Sorted_Goals_);
 
-	// // Pick desired final state
-	pick_ss(cloud_, Sorted_Goals_, X_, can_reach_goal_);
+		// // Pick desired final state
+		pick_ss(cloud_, Sorted_Goals_, X_, can_reach_goal_);
 
- 	if (!can_reach_goal_ && quad_status_ != state_.NOT_FLYING){
- 		// Need to stop!!!
- 		v_ = 0;
- 		ROS_ERROR("Emergency stop -- no feasible path");
- 	}
+	 	if (!can_reach_goal_ && quad_status_ != state_.NOT_FLYING){
+	 		// Need to stop!!!
+	 		stop_=true;
+	 		v_ = 0;
+	 		ROS_ERROR("Emergency stop -- no feasible path");
+	 	}
 
- 	gen_new_traj_ = true;
+	 	gen_new_traj_ = true;
 
- 	traj_gen_ = ros::WallTime::now().toSec();
+	 	traj_gen_ = ros::WallTime::now().toSec();
 
- 	latency_.data = traj_gen_ - msg_received_;
- 	latency_.header.stamp = ros::Time::now();
+	 	latency_.data = traj_gen_ - msg_received_;
+	 	latency_.header.stamp = ros::Time::now();
 
- 	// std::cout << "Latency [ms]: " << 1000*(traj_gen_ - msg_received_) << std::endl;
+	 	// std::cout << "Latency [ms]: " << 1000*(traj_gen_ - msg_received_) << std::endl;
 
- 	if(debug_){
- 		convert2ROS();
- 		pubROS();
- 	} 	
+	 	if(debug_){
+	 		convert2ROS();
+	 		pubROS();
+	 	} 	
+	 } 	
+	 else{
+	 	ROS_WARN("Point cloud is empty.");
+	 }
 }
 
 void REACT::sample_ss(Eigen::MatrixXd& Goals){
@@ -730,7 +751,7 @@ void REACT::convert2pcl(const sensor_msgs::PointCloud2ConstPtr msg,pcl::PointClo
   	
   	sensor_msgs::PointCloud2 msg_out;
 
-	tf_listener_.waitForTransform(msg->header.frame_id,"/world", msg->header.stamp, ros::Duration(2));
+	tf_listener_.waitForTransform(msg->header.frame_id,"/world", ros::Time(0), ros::Duration(2));
   	pcl_ros::transformPointCloud("/world", *msg, msg_out, tf_listener_);
 
 	pcl::PCLPointCloud2* cloud2 = new pcl::PCLPointCloud2; 

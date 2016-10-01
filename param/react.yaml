@@ -18,7 +18,7 @@ accel: 10
 plan_eval: 0.01
 
 # Number of samples from k-d tree to find obstacle 
-K: 50
+K: 10
 
 # Sensor horizontal FOV (deg)
 h_fov: 56
