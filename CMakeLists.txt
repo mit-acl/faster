@@ -45,14 +45,11 @@ include_directories(
     ${catkin_INCLUDE_DIRS}
     )
 
-add_executable(reactive_planner src/react/main.cpp src/react/rp.cpp )
+add_executable(reactive_planner src/main.cpp src/rp.cpp )
 add_dependencies(reactive_planner ${catkin_EXPORTED_TARGETS})
 target_link_libraries(reactive_planner ${catkin_LIBRARIES})
 
-add_executable(unit_test src/react/test_pcl.cpp src/react/rp.cpp )
+add_executable(unit_test src/test_pcl.cpp src/rp.cpp )
 add_dependencies(unit_test ${catkin_EXPORTED_TARGETS})
 target_link_libraries(unit_test ${catkin_LIBRARIES})
 
-add_executable(gpf src/gpf/main.cpp src/gpf/gpf.cpp)
-add_dependencies(gpf ${catkin_EXPORTED_TARGETS})
-target_link_libraries(gpf ${catkin_LIBRARIES})

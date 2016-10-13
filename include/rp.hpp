@@ -30,9 +30,7 @@
 #include "pcl_ros/impl/transforms.hpp"
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/kdtree/kdtree_flann.h>
-#include <nanoflann.hpp>
 #include <pcl/point_cloud.h>
-#include "kd_tree.h"
 
 // Global includes
 #include <stdio.h>

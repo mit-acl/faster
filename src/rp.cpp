@@ -114,6 +114,7 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 	}
 
 	else if (quad_status_== state_.LAND){
+		if (X_.block(1,0,1,2).norm() == 0){
 			land(X_(0,2));
 			if (X_(0,2) == -0.1){
 				quad_status_ = state_.NOT_FLYING;
@@ -121,6 +122,7 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 				ROS_INFO("Landing Complete");
 			}
 		}
+	}
 
 	else if (quad_status_ == state_.GO){
 			if (!stop_){
@@ -258,6 +260,7 @@ void REACT::eventCB(const acl_system::QuadFlightEvent& msg)
 		// Stay in go command but set speed to zero
 		v_ = 0;
 		stop_ = true;
+		quad_goal_.dyaw = 0;
 		// Generate new traj
 		gen_new_traj_ = true;
 		
@@ -268,43 +271,45 @@ void REACT::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
  {
  	msg_received_ = ros::WallTime::now().toSec();
 
- 	// Convert pcl
-	convert2pcl(msg,cloud_);
- 	if (cloud_->points.size()>K_){
+ 	if (!stop_){
+	 	// Convert pcl
+		convert2pcl(msg,cloud_);
+	 	if (cloud_->points.size()>K_){
 
-		// Build k-d tree
-		kdtree_.setInputCloud (cloud_);
-		
-		// Sort allowable final states
-		sort_ss(Goals_,pose_,goal_, last_goal_, Sorted_Goals_);
+			// Build k-d tree
+			kdtree_.setInputCloud (cloud_);
+			
+			// Sort allowable final states
+			sort_ss(Goals_,pose_,goal_, last_goal_, Sorted_Goals_);
 
-		// // Pick desired final state
-		pick_ss(cloud_, Sorted_Goals_, X_, can_reach_goal_);
+			// // Pick desired final state
+			pick_ss(cloud_, Sorted_Goals_, X_, can_reach_goal_);
 
-	 	if (!can_reach_goal_ && quad_status_ != state_.NOT_FLYING){
-	 		// Need to stop!!!
-	 		stop_=true;
-	 		v_ = 0;
-	 		ROS_ERROR("Emergency stop -- no feasible path");
-	 	}
+		 	if (!can_reach_goal_ && quad_status_ != state_.NOT_FLYING){
+		 		// Need to stop!!!
+		 		stop_=true;
+		 		v_ = 0;
+		 		ROS_ERROR("Emergency stop -- no feasible path");
+		 	}
 
-	 	gen_new_traj_ = true;
+		 	gen_new_traj_ = true;
 
-	 	traj_gen_ = ros::WallTime::now().toSec();
+		 	traj_gen_ = ros::WallTime::now().toSec();
 
-	 	latency_.data = traj_gen_ - msg_received_;
-	 	latency_.header.stamp = ros::Time::now();
+		 	latency_.data = traj_gen_ - msg_received_;
+		 	latency_.header.stamp = ros::Time::now();
 
-	 	// std::cout << "Latency [ms]: " << 1000*(traj_gen_ - msg_received_) << std::endl;
+		 	// std::cout << "Latency [ms]: " << 1000*(traj_gen_ - msg_received_) << std::endl;
 
-	 	if(debug_){
-	 		convert2ROS();
-	 		pubROS();
-	 	} 	
-	 } 	
-	 else{
-	 	ROS_WARN("Point cloud is empty.");
-	 }
+		 	if(debug_){
+		 		convert2ROS();
+		 		pubROS();
+		 	} 	
+		 } 	
+		 else{
+		 	ROS_WARN("Point cloud is empty.");
+		 }
+	}
 }
 
 void REACT::sample_ss(Eigen::MatrixXd& Goals){
