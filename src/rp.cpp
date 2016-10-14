@@ -268,7 +268,6 @@ void REACT::eventCB(const acl_system::QuadFlightEvent& msg)
 void REACT::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
  {
  	msg_received_ = ros::WallTime::now().toSec();
-
  	
  	// Convert pcl
 	convert2pcl(msg,cloud_);
