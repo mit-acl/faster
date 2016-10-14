@@ -1,6 +1,7 @@
 # Params for REACT planner
 debug: true
 safe_distance: 2  # Smallest distance before obstacle is no longer viable segment
+sensor_distance: 3 # Primitives evaluated up to this distance
 buffer: 0.42       # 0.5 width of quad for collision checking
 
 # (x,y,z) goal

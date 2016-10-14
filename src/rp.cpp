@@ -7,6 +7,7 @@ REACT::REACT(){
 	ros::param::get("~debug",debug_);
 	ros::param::get("~safe_distance",safe_distance_);
 	ros::param::get("~buffer",buffer_);
+	ros::param::get("~sensor_distance",sensor_distance_);
 
 	last_goal_ = Eigen::Vector3d::Zero();
 	pose_= Eigen::Vector3d::Zero();
@@ -60,6 +61,8 @@ REACT::REACT(){
 	quad_status_ = state_.NOT_FLYING;
 
 	quad_goal_.cut_power = true;
+
+	inf = std::numeric_limits<double>::max();
 
 	tf_listener_.waitForTransform("/vicon","/world", ros::Time(0), ros::Duration(1));
 
@@ -398,18 +401,25 @@ void REACT::pick_ss(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd S
 	can_reach_goal = false;
 
  	while(!can_reach_goal && goal_index_ < Sorted_Goals.rows()){
- 		temp_local_goal_ << Sorted_Goals.block(goal_index_,0,1,3).transpose();
  		// Tranform temp local goal to world frame
- 		temp_local_goal_ = qw2b_.conjugate()._transformVector(temp_local_goal_);
-		collision_check(cloud,X,temp_local_goal_,buffer_,v_max_,tf_,can_reach_goal); 		
+ 		Eigen::Vector4d temp_local_goal_aug;
+ 		temp_local_goal_aug << qw2b_.conjugate()._transformVector(Sorted_Goals.block(goal_index_,0,1,3).transpose()), Sorted_Goals(goal_index_,3);
+
+		collision_check(cloud,X,buffer_,v_max_,tf_,can_reach_goal,temp_local_goal_aug); 	
+
+		// Update cost
+		Sorted_Goals(goal_index_,3) = temp_local_goal_aug(3);
+
  		goal_index_++;
  	}
 
+ 	if (!can_reach_goal) std::cout << Sorted_Goals << std::endl << std::endl;
+
+
  	if(can_reach_goal){
  		goal_index_--;
- 		temp_local_goal_ << Sorted_Goals.block(goal_index_,0,1,3).transpose();
  		// Tranform temp local goal to world frame
- 		local_goal_ = qw2b_.conjugate()._transformVector(temp_local_goal_);
+ 		local_goal_ = qw2b_.conjugate()._transformVector(Sorted_Goals.block(goal_index_,0,1,3).transpose());
  		double d = (goal_-pose_).norm();
  		// ### CHECK THIS ###
  		if (goal_index_ == 0 && d<3) can_reach_global_goal_ = true;
@@ -417,6 +427,78 @@ void REACT::pick_ss(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd S
  	}
 }
 
+
+void REACT::collision_check(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd X, double buff, double v, double& tf, bool& can_reach_goal, Eigen::Vector4d& local_goal_aug){
+	//Re-intialize
+	can_reach_goal = false;
+	collision_detected_ = false;
+	
+	X_prop_ = Eigen::MatrixXd::Zero(4,3);
+	X_prop_ << X;
+
+	Eigen::Vector3d local_goal;
+	local_goal << local_goal_aug.head(3);
+	
+	mtx.lock();
+	get_traj(X,local_goal,v,t_x_,t_y_,t_z_,X_switch_,Y_switch_,Z_switch_,false);
+	mtx.unlock();
+
+	goal_distance_ = (goal_ - X.row(0).transpose()).norm();
+
+	searchPoint_.x = X(0,0);
+	searchPoint_.y = X(0,1);
+	searchPoint_.z = X(0,2);
+
+	std::vector<int> pointIdxNKNSearch(K_);
+  	std::vector<float> pointNKNSquaredDistance(K_);
+
+	kdtree_.nearestKSearch (searchPoint_, K_, pointIdxNKNSearch, pointNKNSquaredDistance);
+
+    mean_distance_ = std::sqrt(std::accumulate(pointNKNSquaredDistance.begin(), pointNKNSquaredDistance.end(), 0.0f)/pointIdxNKNSearch.size());
+
+    // If the obstacle is farther than safe distance or goal is within mean distance then we're good
+    if (mean_distance_ > safe_distance_ || mean_distance_ > goal_distance_){
+    	can_reach_goal = true;
+    }
+    // Something else is closer, need to prop to next time step
+	else{
+		// evaluate at time required to travel d_min
+		t_ = std::max(buff/v,mean_distance_/v);
+
+		while (!collision_detected_ && !can_reach_goal){
+
+			mtx.lock();
+			eval_trajectory(X_switch_,Y_switch_,Z_switch_,t_x_,t_y_,t_z_,t_,X_prop_);
+			mtx.unlock();
+
+			searchPoint_.x = X_prop_(0,0);
+			searchPoint_.y = X_prop_(0,1);
+			searchPoint_.z = X_prop_(0,2);
+
+			kdtree_.nearestKSearch (searchPoint_, K_, pointIdxNKNSearch, pointNKNSquaredDistance);
+
+    		mean_distance_ = std::sqrt(std::accumulate(pointNKNSquaredDistance.begin(), pointNKNSquaredDistance.end(), 0.0f)/pointIdxNKNSearch.size());
+
+    		distance_traveled_ = (X_prop_.row(0)-X.row(0)).norm();
+
+    		// Check if the distance is less than our buffer
+			if (mean_distance_ < buff){
+				collision_detected_ = true;
+				can_reach_goal = false;
+				local_goal_aug(3) = inf;
+			}
+			// Check if the min distance is the current goal
+			else if (mean_distance_ > safe_distance_ || distance_traveled_ > safe_distance_){
+				can_reach_goal = true;
+			}			
+			// Neither have happened so propogate again
+			else{
+				t_ += mean_distance_/v;
+			}
+		}
+	}
+	tf = t_;
+}
 
 void REACT::get_traj(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, std::vector<double>& t_fx, std::vector<double>& t_fy, std::vector<double>& t_fz, Eigen::Matrix4d& Xf_switch, Eigen::Matrix4d& Yf_switch, Eigen::Matrix4d& Zf_switch, bool stop_check ){
 	//Generate new traj
@@ -471,74 +553,6 @@ void REACT::get_vels(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, do
 	vz = v*temp(2);
 }
 
-
-void REACT::collision_check(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd X, Eigen::Vector3d local_goal, double buff, double v, double& tf, bool& can_reach_goal){
-	//Re-intialize
-	can_reach_goal = false;
-	collision_detected_ = false;
-	
-	X_prop_ = Eigen::MatrixXd::Zero(4,3);
-	X_prop_ << X;
-	
-	mtx.lock();
-	get_traj(X,local_goal,v,t_x_,t_y_,t_z_,X_switch_,Y_switch_,Z_switch_,false);
-	mtx.unlock();
-
-	goal_distance_ = (goal_ - X.row(0).transpose()).norm();
-
-	searchPoint_.x = X(0,0);
-	searchPoint_.y = X(0,1);
-	searchPoint_.z = X(0,2);
-
-	std::vector<int> pointIdxNKNSearch(K_);
-  	std::vector<float> pointNKNSquaredDistance(K_);
-
-	kdtree_.nearestKSearch (searchPoint_, K_, pointIdxNKNSearch, pointNKNSquaredDistance);
-
-    mean_distance_ = std::sqrt(std::accumulate(pointNKNSquaredDistance.begin(), pointNKNSquaredDistance.end(), 0.0f)/pointIdxNKNSearch.size());
-
-    // If the obstacle is farther than safe distance or goal is within mean distance then we're good
-    if (mean_distance_ > safe_distance_ || mean_distance_ > goal_distance_){
-    	can_reach_goal = true;
-    }
-    // Something else is closer, need to prop to next time step
-	else{
-		// evaluate at time required to travel d_min
-		t_ = std::max(buff/v,mean_distance_/v);
-
-		while (!collision_detected_ && !can_reach_goal){
-
-			mtx.lock();
-			eval_trajectory(X_switch_,Y_switch_,Z_switch_,t_x_,t_y_,t_z_,t_,X_prop_);
-			mtx.unlock();
-
-			searchPoint_.x = X_prop_(0,0);
-			searchPoint_.y = X_prop_(0,1);
-			searchPoint_.z = X_prop_(0,2);
-
-			kdtree_.nearestKSearch (searchPoint_, K_, pointIdxNKNSearch, pointNKNSquaredDistance);
-
-    		mean_distance_ = std::sqrt(std::accumulate(pointNKNSquaredDistance.begin(), pointNKNSquaredDistance.end(), 0.0f)/pointIdxNKNSearch.size());
-
-    		distance_traveled_ = (X_prop_.row(0)-X.row(0)).norm();
-
-    		// Check if the distance is less than our buffer
-			if (mean_distance_ < buff){
-				collision_detected_ = true;
-				can_reach_goal = false;
-			}
-			// Check if the min distance is the current goal
-			else if (mean_distance_ > safe_distance_ || distance_traveled_ > safe_distance_){
-				can_reach_goal = true;
-			}			
-			// Neither have happened so propogate again
-			else{
-				t_ += mean_distance_/v;
-			}
-		}
-	}
-	tf = t_;
-}
 
 
 void REACT::find_times( Eigen::Vector4d x0, double vf, std::vector<double>& t, Eigen::Matrix4d&  X_switch, bool stop_check){

@@ -69,7 +69,7 @@ public:
 	void sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d goal, Eigen::Vector3d vector_last, Eigen::MatrixXd& Sorted_Goals);
 	void pick_ss(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, bool& can_reach_goal);
 
-	void collision_check(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd X, Eigen::Vector3d local_goal, double buff, double v, double& tf, bool& can_reach_goal);
+	void collision_check(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd X, double buff, double v, double& tf, bool& can_reach_goal, Eigen::Vector4d& local_goal_aug);
 	
 	void convert2pcl(const sensor_msgs::PointCloud2ConstPtr msg,pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_out);
 	void find_times( Eigen::Vector4d x0, double vf, std::vector<double>& t, Eigen::Matrix4d&  X_switch , bool stop_check );
@@ -82,7 +82,7 @@ private:
 
 	tf::TransformListener tf_listener_;
 
-	double yaw_, dist_2_goal_, angle_2_goal_, msg_received_, cost_, cost_i_, angle_diff_, angle_diff_last_, safe_distance_, min_cost_, buffer_;
+	double yaw_, dist_2_goal_, angle_2_goal_, msg_received_, cost_, cost_i_, angle_diff_, angle_diff_last_, safe_distance_, sensor_distance_, min_cost_, buffer_;
 	double vfx_, vfy_, vfz_, t_, tE_, dt_, tf_, r_, d_min_, tx_, ty_, tz_, v_, v_max_;
 	double traj_gen_, t_stop_, d_stop_, d_goal_;
 	double h_fov_, v_fov_, angle_2_last_goal_, current_angle_2_local_goal_, mean_distance_, goal_distance_, distance_traveled_, local_goal_angle_ ;
@@ -90,6 +90,7 @@ private:
 	double angle_i_, r_goal_, spinup_time_, heading_, j_max_, a_max_, t0_, r_max_;
 	int num_ = 50, K_, goal_index_, num_of_pnts_, quad_status_, h_samples_, v_samples_ ;
 	bool debug_, can_reach_goal_, collision_detected_, gen_new_traj_, stop_, can_reach_global_goal_, yawing_;
+	double inf;
 	
 
 	std::ostringstream errorMsg, warnMsg;
