@@ -89,7 +89,7 @@ private:
 	double tE_prev_;
 	double angle_i_, r_goal_, spinup_time_, heading_, j_max_, a_max_, t0_, r_max_;
 	int num_ = 50, K_, goal_index_, num_of_pnts_, quad_status_, h_samples_, v_samples_ ;
-	bool debug_, can_reach_goal_, collision_detected_, gen_new_traj_, stop_, can_reach_global_goal_, keep_yaw_;
+	bool debug_, can_reach_goal_, collision_detected_, gen_new_traj_, stop_, can_reach_global_goal_, yawing_;
 	
 
 	std::ostringstream errorMsg, warnMsg;

@@ -52,7 +52,7 @@ REACT::REACT(){
 	v_ = v_max_;
 	yaw_ = 0;
 
-	keep_yaw_ = false;
+	yawing_ = false;
 	stop_ = false;
 	can_reach_global_goal_ = true;
 	can_reach_goal_ = false;
@@ -135,14 +135,14 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 			}
 
 			double diff = heading_ - quad_goal_.yaw;
-			double dyaw = 0;
 			diff =  fmod(diff+PI,2*PI) - PI;
 			if(fabs(diff)>0.2 && !stop_){
-				if (fabs(diff)>PI/2) v_ = 0;
+				if (fabs(diff)>PI/2 || yawing_) v_ = 0;
 				else v_ = v_max_;
 				// Only yaw the vehicle is at right speed
 				if(v_==0){
 					if (X_.block(1,0,1,2).norm() == v_){
+						yawing_ = true;
 						saturate(diff,-0.002*r_max_,0.002*r_max_);
 						if (diff>0) quad_goal_.dyaw =  r_max_;
 						else        quad_goal_.dyaw = -r_max_;
@@ -159,6 +159,7 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 			else if (!stop_) {
 				v_ = v_max_;
 				quad_goal_.dyaw=0;
+				yawing_ = false;
 			} 
 
 			tE_ = ros::Time::now().toSec() - t0_;
@@ -190,7 +191,6 @@ void REACT::eventCB(const acl_system::QuadFlightEvent& msg)
 {
 	// Takeoff
 	if (msg.mode == msg.TAKEOFF && quad_status_== state_.NOT_FLYING){
-
 		ROS_INFO("Waiting for spinup");
 		quad_goal_.pos.x = pose_(0);
 		quad_goal_.pos.y = pose_(1);
@@ -213,8 +213,6 @@ void REACT::eventCB(const acl_system::QuadFlightEvent& msg)
 		ROS_INFO("Taking off");
 
 		quad_status_ = state_.TAKEOFF; 
-		
-
 	}
 	// Emergency kill
 	else if (msg.mode == msg.KILL && quad_status_ != state_.NOT_FLYING){
@@ -271,46 +269,46 @@ void REACT::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
  {
  	msg_received_ = ros::WallTime::now().toSec();
 
- 	if (!stop_){
-	 	// Convert pcl
-		convert2pcl(msg,cloud_);
-	 	if (cloud_->points.size()>K_){
+ 	
+ 	// Convert pcl
+	convert2pcl(msg,cloud_);
+ 	if (cloud_->points.size()>K_){
 
-			// Build k-d tree
-			kdtree_.setInputCloud (cloud_);
-			
-			// Sort allowable final states
-			sort_ss(Goals_,pose_,goal_, last_goal_, Sorted_Goals_);
+		// Build k-d tree
+		kdtree_.setInputCloud (cloud_);
+		
+		// Sort allowable final states
+		sort_ss(Goals_,pose_,goal_, last_goal_, Sorted_Goals_);
 
-			// // Pick desired final state
-			pick_ss(cloud_, Sorted_Goals_, X_, can_reach_goal_);
+		// // Pick desired final state
+		pick_ss(cloud_, Sorted_Goals_, X_, can_reach_goal_);
 
-		 	if (!can_reach_goal_ && quad_status_ != state_.NOT_FLYING){
-		 		// Need to stop!!!
-		 		stop_=true;
-		 		v_ = 0;
-		 		ROS_ERROR("Emergency stop -- no feasible path");
-		 	}
+	 	if (!can_reach_goal_ && quad_status_ == state_.GO){
+	 		// Need to stop!!!
+	 		stop_=true;
+	 		v_ = 0;
+	 		ROS_ERROR("Emergency stop -- no feasible path");
+	 	}
 
-		 	gen_new_traj_ = true;
+	 	gen_new_traj_ = true;
 
-		 	traj_gen_ = ros::WallTime::now().toSec();
+	 	traj_gen_ = ros::WallTime::now().toSec();
 
-		 	latency_.data = traj_gen_ - msg_received_;
-		 	latency_.header.stamp = ros::Time::now();
+	 	latency_.data = traj_gen_ - msg_received_;
+	 	latency_.header.stamp = ros::Time::now();
 
-		 	// std::cout << "Latency [ms]: " << 1000*(traj_gen_ - msg_received_) << std::endl;
+	 	// std::cout << "Latency [ms]: " << 1000*(traj_gen_ - msg_received_) << std::endl;
 
-		 	if(debug_){
-		 		convert2ROS();
-		 		pubROS();
-		 	} 	
-		 } 	
-		 else{
-		 	ROS_WARN("Point cloud is empty.");
-		 }
-	}
+	 	if(debug_){
+	 		convert2ROS();
+	 		pubROS();
+	 	} 	
+	 } 	
+	 else{
+	 	ROS_WARN("Point cloud is empty.");
+	 }
 }
+
 
 void REACT::sample_ss(Eigen::MatrixXd& Goals){
 
@@ -344,7 +342,6 @@ void REACT::sample_ss(Eigen::MatrixXd& Goals){
 void REACT::sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d goal, Eigen::Vector3d vector_last, Eigen::MatrixXd& Sorted_Goals){
  	// Re-initialize
 	cost_queue_ = std::priority_queue<double, std::vector<double>, std::greater<double> > ();
-	Sorted_Goals = Eigen::MatrixXd::Zero(Goals.rows()+1,Goals.cols()+1);
 	cost_v_.clear();
 
 	vector_2_goal_= goal-pose ;
@@ -371,18 +368,30 @@ void REACT::sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d
 
  	}
 
- 	Sorted_Goals.row(0)<< vector_2_goal_body_.transpose(),0;
+ 	Eigen::MatrixXd Sorted_Goals_temp;
+ 	Sorted_Goals_temp = Eigen::MatrixXd::Zero(Goals.rows(),Goals.cols()+1);
 
  	for (int i=0; i < num_of_pnts_ ; i++){
-
 	 	min_cost_ = cost_queue_.top();
 
 		it_ = std::find(cost_v_.begin(),cost_v_.end(),min_cost_);
 		goal_index_ = it_ - cost_v_.begin();
-		Sorted_Goals.row(i+1) << Goals.row(goal_index_), min_cost_;
+		Sorted_Goals_temp.row(i) << Goals.row(goal_index_), min_cost_;
 
 		cost_queue_.pop();
 	}
+    
+    // Check if vector_2_goal_body_ is within horizontal FOV
+ 	double angle = acos(vector_2_goal_(0)) - fabs(yaw_);
+ 	if (fabs(angle) < h_fov_/2){
+ 		Sorted_Goals = Eigen::MatrixXd::Zero(Goals.rows()+1,Goals.cols()+1);
+    	Sorted_Goals.row(0)<< vector_2_goal_body_.transpose(),0;
+    	Sorted_Goals.block(1,0,Sorted_Goals.rows()-1,Sorted_Goals.cols()) << Sorted_Goals_temp;
+ 	}
+ 	else{
+ 		Sorted_Goals = Eigen::MatrixXd::Zero(Goals.rows(),Goals.cols()+1);
+ 		Sorted_Goals << Sorted_Goals_temp;
+ 	}
 }
 
 void REACT::pick_ss(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, bool& can_reach_goal){
@@ -403,6 +412,7 @@ void REACT::pick_ss(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd S
  		// Tranform temp local goal to world frame
  		local_goal_ = qw2b_.conjugate()._transformVector(temp_local_goal_);
  		double d = (goal_-pose_).norm();
+ 		// ### CHECK THIS ###
  		if (goal_index_ == 0 && d<3) can_reach_global_goal_ = true;
  		else can_reach_global_goal_ = false;
  	}
