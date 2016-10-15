@@ -413,8 +413,20 @@ void REACT::pick_ss(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd S
  		goal_index_++;
  	}
 
- 	if (!can_reach_goal) std::cout << Sorted_Goals << std::endl << std::endl;
+ 	if (!can_reach_goal) {
+ 		int index;
+ 		double min_cost = Sorted_Goals.col(3).minCoeff(&index);
+ 		// std::cout << Sorted_Goals << std::endl << std::endl;
+ 		// std::cout << "min cost: " << min_cost << std::endl;
+ 		// std::cout << "index: " << index << std::endl;
+ 		// std::cout << "min row" << Sorted_Goals.row(index) << std::endl;
 
+ 		if (min_cost!=inf){
+ 			goal_index_ = index+1;
+ 			can_reach_goal = true;
+ 		} 
+
+ 	}
 
  	if(can_reach_goal){
  		goal_index_--;
@@ -457,7 +469,7 @@ void REACT::collision_check(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::Ma
     mean_distance_ = std::sqrt(std::accumulate(pointNKNSquaredDistance.begin(), pointNKNSquaredDistance.end(), 0.0f)/pointIdxNKNSearch.size());
 
     // If the obstacle is farther than safe distance or goal is within mean distance then we're good
-    if (mean_distance_ > safe_distance_ || mean_distance_ > goal_distance_){
+    if (mean_distance_ > sensor_distance_ || mean_distance_ > goal_distance_){
     	can_reach_goal = true;
     }
     // Something else is closer, need to prop to next time step
@@ -485,10 +497,12 @@ void REACT::collision_check(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::Ma
 			if (mean_distance_ < buff){
 				collision_detected_ = true;
 				can_reach_goal = false;
-				local_goal_aug(3) = inf;
+				if (distance_traveled_ < safe_distance_) local_goal_aug(3) = inf;
+				else local_goal_aug(3) = pow(sensor_distance_-distance_traveled_,2);
+
 			}
 			// Check if the min distance is the current goal
-			else if (mean_distance_ > safe_distance_ || distance_traveled_ > safe_distance_){
+			else if (mean_distance_ > safe_distance_ || distance_traveled_ > sensor_distance_){
 				can_reach_goal = true;
 			}			
 			// Neither have happened so propogate again
