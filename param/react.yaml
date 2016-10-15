@@ -7,7 +7,7 @@ buffer: 0.42       # 0.5 width of quad for collision checking
 # (x,y,z) goal
 goal_x: 0
 goal_y: -6.0
-goal_z: 0.8
+goal_z: 0.75
 
 # Flight params
 speed: 3
