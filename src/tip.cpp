@@ -1,6 +1,6 @@
-#include "rp.hpp"
+#include "tip.hpp"
 
-REACT::REACT(){
+TIP::TIP(){
 
 
 	// Should be read as param
@@ -70,7 +70,7 @@ REACT::REACT(){
 
 }
 
-void REACT::global_goalCB(const geometry_msgs::PointStamped& msg){
+void TIP::global_goalCB(const geometry_msgs::PointStamped& msg){
 	goal_ << msg.point.x, msg.point.y, msg.point.z;
 	// if (quad_status_!=state_.GO){
 	// 	// Transform goal into local frame
@@ -80,7 +80,7 @@ void REACT::global_goalCB(const geometry_msgs::PointStamped& msg){
 	heading_ = atan2(goal_(1)-X_(0,1),goal_(0)-X_(0,0));
 }
 
-void REACT::stateCB(const acl_system::ViconState& msg)
+void TIP::stateCB(const acl_system::ViconState& msg)
 {
 	// TODO time check.
 	if (msg.has_pose) {
@@ -97,7 +97,7 @@ void REACT::stateCB(const acl_system::ViconState& msg)
 	} 
 }
 
-void REACT::sendGoal(const ros::TimerEvent& e)
+void TIP::sendGoal(const ros::TimerEvent& e)
 {	
 	if (gen_new_traj_){
 		gen_new_traj_ = false;
@@ -190,7 +190,7 @@ void REACT::sendGoal(const ros::TimerEvent& e)
 }
 
 
-void REACT::eventCB(const acl_system::QuadFlightEvent& msg)
+void TIP::eventCB(const acl_system::QuadFlightEvent& msg)
 {
 	// Takeoff
 	if (msg.mode == msg.TAKEOFF && quad_status_== state_.NOT_FLYING){
@@ -268,7 +268,7 @@ void REACT::eventCB(const acl_system::QuadFlightEvent& msg)
 	}
 }
 
-void REACT::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
+void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
  {
  	msg_received_ = ros::WallTime::now().toSec();
  	
@@ -312,7 +312,7 @@ void REACT::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 }
 
 
-void REACT::sample_ss(Eigen::MatrixXd& Goals){
+void TIP::sample_ss(Eigen::MatrixXd& Goals){
 
 	theta_ = Eigen::VectorXd::Zero(h_samples_);
 	theta_.setLinSpaced(h_samples_,-h_fov_/2,h_fov_/2);
@@ -341,7 +341,7 @@ void REACT::sample_ss(Eigen::MatrixXd& Goals){
 	}
 }
 
-void REACT::sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d goal, Eigen::Vector3d vector_last, Eigen::MatrixXd& Sorted_Goals){
+void TIP::sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d goal, Eigen::Vector3d vector_last, Eigen::MatrixXd& Sorted_Goals){
  	// Re-initialize
 	cost_queue_ = std::priority_queue<double, std::vector<double>, std::greater<double> > ();
 	cost_v_.clear();
@@ -396,7 +396,7 @@ void REACT::sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d
  	}
 }
 
-void REACT::pick_ss(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, bool& can_reach_goal){
+void TIP::pick_ss(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, bool& can_reach_goal){
 	goal_index_ = 0;
 	can_reach_goal = false;
 
@@ -440,7 +440,7 @@ void REACT::pick_ss(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd S
 }
 
 
-void REACT::collision_check(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd X, double buff, double v, double& tf, bool& can_reach_goal, Eigen::Vector4d& local_goal_aug){
+void TIP::collision_check(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd X, double buff, double v, double& tf, bool& can_reach_goal, Eigen::Vector4d& local_goal_aug){
 	//Re-intialize
 	can_reach_goal = false;
 	collision_detected_ = false;
@@ -463,8 +463,6 @@ void REACT::collision_check(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::Ma
 
 	std::vector<int> pointIdxNKNSearch(K_);
   	std::vector<float> pointNKNSquaredDistance(K_);
-
-	kdtree_.nearestKSearch (searchPoint_, K_, pointIdxNKNSearch, pointNKNSquaredDistance);
 
     mean_distance_ = std::sqrt(std::accumulate(pointNKNSquaredDistance.begin(), pointNKNSquaredDistance.end(), 0.0f)/pointIdxNKNSearch.size());
 
@@ -514,7 +512,7 @@ void REACT::collision_check(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::Ma
 	tf = t_;
 }
 
-void REACT::get_traj(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, std::vector<double>& t_fx, std::vector<double>& t_fy, std::vector<double>& t_fz, Eigen::Matrix4d& Xf_switch, Eigen::Matrix4d& Yf_switch, Eigen::Matrix4d& Zf_switch, bool stop_check ){
+void TIP::get_traj(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, std::vector<double>& t_fx, std::vector<double>& t_fy, std::vector<double>& t_fz, Eigen::Matrix4d& Xf_switch, Eigen::Matrix4d& Yf_switch, Eigen::Matrix4d& Zf_switch, bool stop_check ){
 	//Generate new traj
 	get_vels(X,local_goal,v,vfx_,vfy_,vfz_);
 
@@ -528,7 +526,7 @@ void REACT::get_traj(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, st
 }
 
 
-void REACT::get_stop_dist(Eigen::MatrixXd X, Eigen::Vector3d goal,Eigen::Vector3d pose, bool can_reach_global_goal, bool& stop){
+void TIP::get_stop_dist(Eigen::MatrixXd X, Eigen::Vector3d goal,Eigen::Vector3d pose, bool can_reach_global_goal, bool& stop){
 	if (can_reach_global_goal){
 		Eigen::Vector3d vector_2_goal = goal - pose ;
 		vector_2_goal.normalize();
@@ -559,7 +557,7 @@ void REACT::get_stop_dist(Eigen::MatrixXd X, Eigen::Vector3d goal,Eigen::Vector3
 }
 
 
-void REACT::get_vels(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, double& vx, double& vy, double& vz){
+void TIP::get_vels(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, double& vx, double& vy, double& vz){
 	Eigen::Vector3d temp = local_goal;
 	temp.normalize();
 	vx = v*temp(0);
@@ -569,7 +567,7 @@ void REACT::get_vels(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, do
 
 
 
-void REACT::find_times( Eigen::Vector4d x0, double vf, std::vector<double>& t, Eigen::Matrix4d&  X_switch, bool stop_check){
+void TIP::find_times( Eigen::Vector4d x0, double vf, std::vector<double>& t, Eigen::Matrix4d&  X_switch, bool stop_check){
  	if (vf == x0(1)){
  		j_V_[0] = 0;
 		j_V_[1] = 0; 
@@ -714,7 +712,7 @@ void REACT::find_times( Eigen::Vector4d x0, double vf, std::vector<double>& t, E
 	X_switch.row(3) << j_V_[0],j_V_[1],j_V_[2],j_V_[3];
 }
 
-void REACT::eval_trajectory(Eigen::Matrix4d X_switch, Eigen::Matrix4d Y_switch, Eigen::Matrix4d Z_switch, std::vector<double> t_x, std::vector<double> t_y, std::vector<double> t_z, double t, Eigen::MatrixXd& Xc){
+void TIP::eval_trajectory(Eigen::Matrix4d X_switch, Eigen::Matrix4d Y_switch, Eigen::Matrix4d Z_switch, std::vector<double> t_x, std::vector<double> t_y, std::vector<double> t_z, double t, Eigen::MatrixXd& Xc){
 	// Eval x trajectory
 	int k = 0;
 	if (t < t_x[0]){
@@ -789,7 +787,7 @@ void REACT::eval_trajectory(Eigen::Matrix4d X_switch, Eigen::Matrix4d Y_switch, 
 }
 
 
-void REACT::convert2pcl(const sensor_msgs::PointCloud2ConstPtr msg,pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_out){
+void TIP::convert2pcl(const sensor_msgs::PointCloud2ConstPtr msg,pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_out){
   	
   	sensor_msgs::PointCloud2 msg_out;
 
@@ -805,7 +803,7 @@ void REACT::convert2pcl(const sensor_msgs::PointCloud2ConstPtr msg,pcl::PointClo
 }
 
 
-void REACT::eigen2quadGoal(Eigen::MatrixXd Xc, acl_system::QuadGoal& quad_goal){
+void TIP::eigen2quadGoal(Eigen::MatrixXd Xc, acl_system::QuadGoal& quad_goal){
  	quad_goal_.pos.x   = Xc(0,0);
  	quad_goal_.vel.x   = Xc(1,0);
  	quad_goal_.accel.x = Xc(2,0);
@@ -824,13 +822,13 @@ void REACT::eigen2quadGoal(Eigen::MatrixXd Xc, acl_system::QuadGoal& quad_goal){
 
 
 
-void REACT::takeoff(double& z){
+void TIP::takeoff(double& z){
 	z+=0.003;
 	saturate(z,-0.1,goal_(2));
 }
 
 
-void REACT::land(double& z){
+void TIP::land(double& z){
 	if (z > 0.4){
 		z-=0.003;
 		saturate(z,-0.1,goal_(2));
@@ -841,7 +839,7 @@ void REACT::land(double& z){
 	}
 }
 
-void REACT::saturate(double &var, double min, double max){
+void TIP::saturate(double &var, double min, double max){
 	if (var < min){
 		var = min;
 	}
@@ -850,7 +848,7 @@ void REACT::saturate(double &var, double min, double max){
 	}
 }
 
-void REACT::convert2ROS(){
+void TIP::convert2ROS(){
  	// Cluster
  	goal_points_ros_.points.clear();
  	goal_points_ros_.header.stamp = ros::Time::now();
@@ -922,7 +920,7 @@ void REACT::convert2ROS(){
 
  }
 
-void REACT::pubROS(){
+void TIP::pubROS(){
 	int_goal_pub.publish(goal_points_ros_);
 	traj_pub.publish(traj_ros_);
 	latency_pub.publish(latency_);

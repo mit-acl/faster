@@ -1,16 +1,16 @@
 # Params for REACT planner
 debug: true
-safe_distance: 1.3  # Smallest distance before obstacle is no longer viable segment
-sensor_distance: 3 # Primitives evaluated up to this distance
+safe_distance: 7  # Smallest distance before obstacle is no longer viable segment
+sensor_distance: 10 # Primitives evaluated up to this distance
 buffer: 0.42       # 0.5 width of quad for collision checking
 
 # (x,y,z) goal
-goal_x: 0
-goal_y: -6.0
-goal_z: 0.75
+goal_x: -50.0
+goal_y: 0.0
+goal_z: 0.7
 
 # Flight params
-speed: 3
+speed: 8
 
 jerk: 30  
 accel: 10

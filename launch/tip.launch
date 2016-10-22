@@ -3,9 +3,9 @@
 	<arg name="quad"/>
 	<arg name="bag"/>
 
-	<node ns="$(arg quad)" name="reactive_planner" pkg="acl_planning" type="reactive_planner" output="screen" clear_params="true">
+	<node ns="$(arg quad)" name="tip_planner" pkg="acl_planning" type="tip_planner" output="screen" clear_params="true">
 
-		<rosparam file="$(find acl_planning)/param/react.yaml" command="load"/>
+		<rosparam file="$(find acl_planning)/param/tip.yaml" command="load"/>
 
 		<remap from="~vicon" to="state_estimate"/>
 		<remap from="~goal" to="goal" />

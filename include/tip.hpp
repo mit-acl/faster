@@ -1,5 +1,5 @@
-#ifndef RP_HPP_
-#define RP_HPP_
+#ifndef TIP_HPP_
+#define TIP_HPP_
 
 #define SCREEN_PRINT_RATE	0.5
 #define PI 3.14159
@@ -40,10 +40,10 @@
 #include <queue>
 #include <mutex>
 
-class REACT
+class TIP
 {
 public:
-	REACT();
+	TIP();
 
 	double plan_eval_time_ ;
 

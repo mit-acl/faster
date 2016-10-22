@@ -1,4 +1,4 @@
-#include "rp.hpp"
+#include "tip.hpp"
 #include "nav_msgs/Path.h"
 #include "geometry_msgs/PoseStamped.h"
 // #include <pcl/filters/radius_outlier_removal.h>
@@ -13,7 +13,7 @@ int main(int argc, char **argv)
 
 	ros::NodeHandle n("~");
 
-	REACT rp;
+	TIP tip;
 
 
 	Eigen::Matrix4d X0 = Eigen::Matrix4d::Zero();
@@ -42,9 +42,9 @@ int main(int argc, char **argv)
 
 	for (int i=0; i<100000; i++){
 		then = ros::WallTime::now().toSec();
-		rp.find_times(x,vf,t_x,X0,false);
-		rp.find_times(x,vf,t_x,X0,false);
-		rp.find_times(x,vf,t_x,X0,false);
+		tip.find_times(x,vf,t_x,X0,false);
+		tip.find_times(x,vf,t_x,X0,false);
+		tip.find_times(x,vf,t_x,X0,false);
 		times_(i) = ros::WallTime::now().toSec()-then;
 	}
 
