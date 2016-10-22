@@ -61,11 +61,12 @@ TIP::TIP(){
 	quad_status_ = state_.NOT_FLYING;
 
 	quad_goal_.cut_power = true;
+	// quad_goal_.mode = acl_system::QuadGoal::MODE_VEL;
+	quad_goal_.mode = acl_system::QuadGoal::MODE_POS;
 
 	inf = std::numeric_limits<double>::max();
 
 	tf_listener_.waitForTransform("/vicon","/world", ros::Time(0), ros::Duration(1));
-
 	ROS_INFO("Planner initialized.");
 
 }
@@ -139,8 +140,8 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 
 			double diff = heading_ - quad_goal_.yaw;
 			diff =  fmod(diff+PI,2*PI) - PI;
-			if(fabs(diff)>0.2 && !stop_){
-				if (fabs(diff)>PI/2 || yawing_) v_ = 0;
+			if(std::abs(diff)>0.2 && !stop_){
+				if (std::abs(diff)>PI/2 || yawing_) v_ = 0;
 				else v_ = v_max_;
 				// Only yaw the vehicle is at right speed
 				if(v_==0){
@@ -178,7 +179,6 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 				stop_ = false;
 			}
 		}
-
 
 	eigen2quadGoal(X_,quad_goal_);
 	// quad_goal_.yaw = heading_;
@@ -233,7 +233,7 @@ void TIP::eventCB(const acl_system::QuadFlightEvent& msg)
 		double diff = heading_ - quad_goal_.yaw;
 		double dyaw = 0;
 		diff =  fmod(diff+PI,2*PI) - PI;
-		while(fabs(diff)>0.001){
+		while(std::abs(diff)>0.001){
 			saturate(diff,-0.002*r_max_,0.002*r_max_);
 			if (diff>0) quad_goal_.dyaw =  r_max_;
 			else        quad_goal_.dyaw = -r_max_;
@@ -274,7 +274,7 @@ void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
  	
  	// Convert pcl
 	convert2pcl(msg,cloud_);
- 	if (cloud_->points.size()>K_){
+ 	if (cloud_->points.size()>K_ && quad_status_!=state_.NOT_FLYING && !stop_){
 
 		// Build k-d tree
 		kdtree_.setInputCloud (cloud_);
@@ -306,9 +306,9 @@ void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 	 		pubROS();
 	 	} 	
 	 } 	
-	 else{
-	 	ROS_WARN("Point cloud is empty.");
-	 }
+	 // else{
+	 // 	ROS_WARN("Point cloud is empty.");
+	 // }
 }
 
 
@@ -384,8 +384,8 @@ void TIP::sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d g
 	}
     
     // Check if vector_2_goal_body_ is within horizontal FOV
- 	double angle = acos(vector_2_goal_(0)) - fabs(yaw_);
- 	if (fabs(angle) < h_fov_/2){
+ 	double angle = acos(vector_2_goal_(0)) - std::abs(yaw_);
+ 	if (std::abs(angle) < h_fov_/2){
  		Sorted_Goals = Eigen::MatrixXd::Zero(Goals.rows()+1,Goals.cols()+1);
     	Sorted_Goals.row(0)<< vector_2_goal_body_.transpose(),0;
     	Sorted_Goals.block(1,0,Sorted_Goals.rows()-1,Sorted_Goals.cols()) << Sorted_Goals_temp;
@@ -519,10 +519,10 @@ void TIP::get_traj(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, std:
 	x0_ << X.block(0,0,4,1);
 	y0_ << X.block(0,1,4,1);
 	z0_ << X.block(0,2,4,1);
-
 	find_times(x0_, vfx_, t_fx, Xf_switch,stop_check);
 	find_times(y0_, vfy_, t_fy, Yf_switch,stop_check);
 	find_times(z0_, vfz_, t_fz, Zf_switch,stop_check);
+
 }
 
 
@@ -600,7 +600,7 @@ void TIP::find_times( Eigen::Vector4d x0, double vf, std::vector<double>& t, Eig
 		}
 		else{
 			// Could be interesting, need to justify 
-			if (std::abs(vf-x0(1))/v_max_ < 0.2 && std::abs(x0(3)) != j_max_){
+			if (std::abs(vf-x0(1))/v_max_ < 0.2 && std::abs(x0(3)) != j_max_ && std::abs(x0(2))!=a_max_){
 				j_temp = 5;
 			}
 			else{
@@ -612,7 +612,7 @@ void TIP::find_times( Eigen::Vector4d x0, double vf, std::vector<double>& t, Eig
 
 		double vfp = x0(1) + pow(x0(2),2)/(2*j_temp);
 
-		if (std::abs(vfp-vf) < 0.05*std::abs(vf)){
+		if (std::abs(vfp-vf) < 0.05*std::abs(vf) && x0(2)*(vf-x0(1))>0){
 
 			j_V_[0] = -j_temp;
 			// No 2nd and 3rd stage
@@ -651,7 +651,11 @@ void TIP::find_times( Eigen::Vector4d x0, double vf, std::vector<double>& t, Eig
 			double t1 = -x0(2)/j_temp + std::sqrt(0.5*pow(x0(2),2) - j_temp*(x0(1)-vf))/j_temp;
 			double t2 = -x0(2)/j_temp - std::sqrt(0.5*pow(x0(2),2) - j_temp*(x0(1)-vf))/j_temp;
 
-			t1 = std::max(t1,t2);
+			t1 = std::fmax(t1,t2);
+
+			// if (t1<0) std::cout << "t1 < 0: " << t1 << std::endl;
+
+			t1 = std::fmax(0,t1);
 
 			// Check to see if we'll saturate
 			double a1f = x0(2) + j_temp*t1;
@@ -660,6 +664,8 @@ void TIP::find_times( Eigen::Vector4d x0, double vf, std::vector<double>& t, Eig
 				double am = copysign(a_max_,j_temp);
 				t[0] = (am-x0(2))/j_V_[0];
 				t[2] = -am/j_V_[2];
+
+				if (x0(2)==am) j_V_[0] = 0;
 
 				a0_V_[0] = x0(2);
 				a0_V_[1] = a0_V_[0] + j_V_[0]*t[0];
@@ -671,7 +677,9 @@ void TIP::find_times( Eigen::Vector4d x0, double vf, std::vector<double>& t, Eig
 				v0_V_[2] = vf - am*t[2] - 0.5*j_V_[2]*pow(t[2],2);
 				v0_V_[3] = vf;
 
-				t[1] = (v0_V_[2]-v0_V_[1])/am;		
+				t[1] = (v0_V_[2]-v0_V_[1])/am;	
+
+				// if (t[1]<=0) std::cout << "t2 < 0: " << t[1] << " v1: " << v0_V_[1] << " v2: " << v0_V_[2] << std::endl;	
 
 				x0_V_[0] = x0(0);
 				x0_V_[1] = x0_V_[0] + v0_V_[0]*t[0] + 0.5*a0_V_[0]*pow(t[0],2) + 1./6*j_V_[0]*pow(t[0],3);
@@ -706,10 +714,13 @@ void TIP::find_times( Eigen::Vector4d x0, double vf, std::vector<double>& t, Eig
 		}
 	}
 
+
+
 	X_switch.row(0) << x0_V_[0],x0_V_[1],x0_V_[2],x0_V_[3];
 	X_switch.row(1) << v0_V_[0],v0_V_[1],v0_V_[2],v0_V_[3];
 	X_switch.row(2) << a0_V_[0],a0_V_[1],a0_V_[2],a0_V_[3];
 	X_switch.row(3) << j_V_[0],j_V_[1],j_V_[2],j_V_[3];
+
 }
 
 void TIP::eval_trajectory(Eigen::Matrix4d X_switch, Eigen::Matrix4d Y_switch, Eigen::Matrix4d Z_switch, std::vector<double> t_x, std::vector<double> t_y, std::vector<double> t_z, double t, Eigen::MatrixXd& Xc){
@@ -784,6 +795,15 @@ void TIP::eval_trajectory(Eigen::Matrix4d X_switch, Eigen::Matrix4d Y_switch, Ei
 	Xc(1,2) = Z_switch(1,m) + Z_switch(2,m)*tz_ + 0.5*Z_switch(3,m)*pow(tz_,2);
 	Xc(2,2) = Z_switch(2,m) + Z_switch(3,m)*tz_;
 	Xc(3,2) = Z_switch(3,m);
+
+	// if (std::abs(Xc(2,0)-quad_goal_.accel.x)>0.5 && cmd){
+	// 	ROS_FATAL("Jump detected");
+	// 	std::cout << "k: " << k << std::endl;
+	// 	std::cout << "tx_: " << tx_ << std::endl;
+	// 	std::cout << "t_x: " << t_x[0] << " " << t_x[1] << " " << t_x[2] << std::endl;
+	// 	std::cout << "t: " << t << std::endl;
+	// 	std::cout << X_switch << std::endl;
+	// }
 }
 
 
