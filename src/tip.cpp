@@ -612,7 +612,7 @@ void TIP::find_times( Eigen::Vector4d x0, double vf, std::vector<double>& t, Eig
 
 		double vfp = x0(1) + pow(x0(2),2)/(2*j_temp);
 
-		if (std::abs(vfp-vf) < 0.05*std::abs(vf) && x0(2)*(vf-x0(1))>0){
+		if (std::abs(vfp-vf) < 0.02*std::abs(vf) && x0(2)*(vf-x0(1))>0){
 
 			j_V_[0] = -j_temp;
 			// No 2nd and 3rd stage
