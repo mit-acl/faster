@@ -62,7 +62,8 @@ TIP::TIP(){
 
 	quad_goal_.cut_power = true;
 	// quad_goal_.mode = acl_system::QuadGoal::MODE_VEL;
-	quad_goal_.mode = acl_system::QuadGoal::MODE_POS;
+	quad_goal_.xy_mode = acl_system::QuadGoal::MODE_POS;
+	quad_goal_.z_mode = acl_system::QuadGoal::MODE_POS;
 
 	inf = std::numeric_limits<double>::max();
 
