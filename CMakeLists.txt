@@ -26,6 +26,10 @@ find_package(catkin REQUIRED COMPONENTS
 	acl_system
 	sensor_msgs
 	pcl_ros
+	tf2
+	tf2_ros
+	tf2_geometry_msgs
+	tf2_sensor_msgs
 	)
 
 # generate_messages(

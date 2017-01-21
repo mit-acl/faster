@@ -27,8 +27,6 @@ int main(int argc, char **argv)
 	ros::Timer sendGoalTimer = n.createTimer(ros::Duration(tip.plan_eval_time_), &TIP::sendGoal, &tip);
 
 	tip.new_goal_pub = n.advertise<geometry_msgs::PointStamped>("new_global_goal", 1);
-	tip.int_goal_pub = n.advertise<sensor_msgs::PointCloud>("int_goal", 1);
-	tip.last_goal_pub = n.advertise<geometry_msgs::PointStamped>("last_global_goal",1);
 	tip.traj_pub = n.advertise<nav_msgs::Path>("traj",1);
 	tip.latency_pub = n.advertise<acl_system::FloatStamped>("latency",1);
 

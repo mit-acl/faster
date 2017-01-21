@@ -1,9 +1,6 @@
 #ifndef TIP_HPP_
 #define TIP_HPP_
 
-#define SCREEN_PRINT_RATE	0.5
-#define PI 3.14159
-
 // ROS includes
 #include "ros/ros.h"
 #include "sensor_msgs/LaserScan.h"
@@ -12,8 +9,9 @@
 #include "geometry_msgs/PoseArray.h"
 #include "geometry_msgs/TwistStamped.h"
 #include "geometry_msgs/Vector3Stamped.h"
-#include "tf/transform_datatypes.h"
-#include <tf/transform_listener.h>
+#include <tf2_ros/transform_listener.h>
+#include "tf2_geometry_msgs/tf2_geometry_msgs.h"
+#include "tf2_sensor_msgs/tf2_sensor_msgs.h"
 #include "nav_msgs/Path.h"
 
 #include <Eigen/Dense>
@@ -47,7 +45,7 @@ public:
 
 	double plan_eval_time_ ;
 
-	ros::Publisher traj_pub, goal_pub, new_goal_pub, int_goal_pub, last_goal_pub, quad_goal_pub, latency_pub, pub_clean_scan;
+	ros::Publisher traj_pub, goal_pub, new_goal_pub, quad_goal_pub, latency_pub;
 
 
 	void pclCB(const sensor_msgs::PointCloud2ConstPtr& msg);
@@ -62,14 +60,14 @@ public:
 	void pubROS();
 
 	// Make these private after testing
-	void get_stop_dist(Eigen::MatrixXd X, Eigen::Vector3d goal,Eigen::Vector3d pose, bool can_reach_global_goal, bool& stop);
+	void get_stop_dist(Eigen::MatrixXd X, Eigen::Vector3d goal,bool can_reach_global_goal, bool& stop);
 	void get_traj(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, std::vector<double>& t_fx, std::vector<double>& t_fy, std::vector<double>& t_fz, Eigen::Matrix4d& Xf_switch, Eigen::Matrix4d& Yf_switch, Eigen::Matrix4d& Zf_switch, bool stop_check );	
 	
 	void sample_ss(Eigen::MatrixXd& Goals);
 	void sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d goal, Eigen::Vector3d vector_last, Eigen::MatrixXd& Sorted_Goals);
-	void pick_ss(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, bool& can_reach_goal);
+	void pick_ss(Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, bool& can_reach_goal);
 
-	void collision_check(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, Eigen::MatrixXd X, double buff, double v, double& tf, bool& can_reach_goal, Eigen::Vector4d& local_goal_aug);
+	void collision_check(Eigen::MatrixXd X, double buff, double v, bool& can_reach_goal, Eigen::Vector4d& local_goal_aug);
 	
 	void convert2pcl(const sensor_msgs::PointCloud2ConstPtr msg,pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_out);
 	void find_times( Eigen::Vector4d x0, double vf, std::vector<double>& t, Eigen::Matrix4d&  X_switch , bool stop_check );
@@ -80,7 +78,8 @@ public:
 
 private:
 
-	tf::TransformListener tf_listener_;
+	tf2_ros::Buffer tf_buffer_;
+    tf2_ros::TransformListener tf_listener_;
 
 	double yaw_, dist_2_goal_, angle_2_goal_, msg_received_, cost_, cost_i_, angle_diff_, angle_diff_last_, safe_distance_, sensor_distance_, min_cost_, buffer_;
 	double vfx_, vfy_, vfz_, t_, tE_, dt_, tf_, r_, d_min_, tx_, ty_, tz_, v_, v_max_;
