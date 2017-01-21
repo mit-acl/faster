@@ -42,12 +42,17 @@ TIP::TIP() : tf_listener_(tf_buffer_) {
 	ros::param::get("~v_samples",v_samples_);
 
 	ros::param::get("~r_max",r_max_);
+	ros::param::get("~jump_thresh",jump_thresh_);
 
 	h_fov_ = h_fov_*M_PI/180;
 	v_fov_ = v_fov_*M_PI/180;
 
 	// Generate allowable final states
 	sample_ss(Goals_);
+
+	bias_x_=0;
+	bias_y_=0;
+	bias_z_=0;
 
 	v_ = v_max_;
 	yaw_ = 0;
@@ -86,19 +91,27 @@ void TIP::global_goalCB(const geometry_msgs::PointStamped& msg){
 
 void TIP::stateCB(const acl_system::ViconState& msg)
 {
-	// TODO time check.
-	if (msg.has_pose) {
-		pose_ << msg.pose.position.x, msg.pose.position.y, msg.pose.position.z; 
-
-		yaw_ = tf::getYaw(msg.pose.orientation);
-
-		qw2b_.w() = msg.pose.orientation.w;
-		qw2b_.vec() << -msg.pose.orientation.x,-msg.pose.orientation.y,-msg.pose.orientation.z;
-
-		if (quad_status_ == state_.NOT_FLYING){
-			X_.row(0) << pose_.transpose();
+	// Check if estimate jumped 
+	if (sqrt(pow(pose_(0)-msg.pose.position.x,2) + pow(pose_(1)- msg.pose.position.y,2) + pow(pose_(2)- msg.pose.position.z,2)) > jump_thresh_){
+		ROS_WARN("Jump Detected -- magnitude: %0.3f",sqrt(pow(pose_(0)-msg.pose.position.x,2) + pow(pose_(1)- msg.pose.position.y,2) + pow(pose_(2)- msg.pose.position.z,2)));
+		if (quad_status_ == state_.GO){
+			bias_x_ = msg.pose.position.x-pose_(0);
+			bias_y_ = msg.pose.position.y-pose_(1);
+			bias_z_ = msg.pose.position.z-pose_(2);
+			X_.row(0) << X_(0,0)+bias_x_,X_(0,1)+bias_y_,X_(0,2)+bias_z_;
+			gen_new_traj_ = true;
 		}
-	} 
+	}
+
+	pose_ << msg.pose.position.x, msg.pose.position.y, msg.pose.position.z; 
+
+	qw2b_.w() = msg.pose.orientation.w;
+	qw2b_.vec() << -msg.pose.orientation.x,-msg.pose.orientation.y,-msg.pose.orientation.z;
+
+	// Check this
+	if (quad_status_ == state_.NOT_FLYING){
+		X_.row(0) << pose_.transpose();
+	}
 }
 
 void TIP::sendGoal(const ros::TimerEvent& e)

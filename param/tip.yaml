@@ -35,4 +35,7 @@ v_samples: 5
 
 # Max yaw rate (rad/s)
 r_max: 2
+
+# Maximum tolerable jump in state estimate before replanning
+jump_thresh: 0.5
     
