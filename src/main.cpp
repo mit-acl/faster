@@ -28,8 +28,8 @@ int main(int argc, char **argv)
 
 	tip.new_goal_pub = n.advertise<geometry_msgs::PointStamped>("new_global_goal", 1);
 	tip.traj_pub = n.advertise<nav_msgs::Path>("traj",1);
+	tip.speed_pub = n.advertise<acl_system::FloatStamped>("speed",1);
 	tip.latency_pub = n.advertise<acl_system::FloatStamped>("latency",1);
-
 	tip.quad_goal_pub = n.advertise<acl_system::QuadGoal>("goal",1);
 
 	// run the code

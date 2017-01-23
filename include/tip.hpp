@@ -45,7 +45,7 @@ public:
 
 	double plan_eval_time_ ;
 
-	ros::Publisher traj_pub, goal_pub, new_goal_pub, quad_goal_pub, latency_pub;
+	ros::Publisher traj_pub, goal_pub, new_goal_pub, quad_goal_pub, latency_pub, speed_pub;
 
 
 	void pclCB(const sensor_msgs::PointCloud2ConstPtr& msg);
@@ -110,7 +110,7 @@ private:
 	geometry_msgs::PoseStamped temp_path_point_ros_;
 	geometry_msgs::PointStamped ros_new_global_goal_, ros_last_global_goal_;
 	nav_msgs::Path traj_ros_;
-	acl_system::FloatStamped latency_;
+	acl_system::FloatStamped latency_, speed_;
 
 	acl_system::QuadGoal quad_goal_;
 	acl_system::QuadState state_;

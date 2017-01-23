@@ -211,6 +211,9 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 	quad_goal_.header.frame_id = "world";
 	quad_goal_pub.publish(quad_goal_);
 
+	speed_.header.stamp = ros::Time::now();
+	speed_.data = X_.row(1).norm();
+
 }
 
 
