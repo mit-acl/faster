@@ -10,7 +10,7 @@ goal_y: 0.0
 goal_z: 1
 
 # Flight params
-speed: 8
+max_speed: 8
 
 jerk: 30  
 accel: 10

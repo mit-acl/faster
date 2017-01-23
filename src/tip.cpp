@@ -30,7 +30,7 @@ TIP::TIP() : tf_listener_(tf_buffer_) {
 	local_goal_ << goal_;
 
 	ros::param::get("cntrl/spinup_time",spinup_time_);
-	ros::param::get("~speed",v_max_);
+	ros::param::get("~max_speed",v_max_);
 
 	ros::param::get("~jerk",j_max_);
 	ros::param::get("~accel",a_max_);
@@ -213,6 +213,7 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 
 	speed_.header.stamp = ros::Time::now();
 	speed_.data = X_.row(1).norm();
+	speed_pub.publish(speed_);
 
 }
 
@@ -539,7 +540,6 @@ void TIP::collision_check(Eigen::MatrixXd X, double buff, double v, bool& can_re
   	std::vector<float> pointNKNSquaredDistance(K_);
 
   	kdtree_.nearestKSearch(searchPoint_, K_, pointIdxNKNSearch, pointNKNSquaredDistance);	
-
     mean_distance_ = std::sqrt(std::accumulate(pointNKNSquaredDistance.begin(), pointNKNSquaredDistance.end(), 0.0f)/pointIdxNKNSearch.size());
 
     // If the obstacle is farther than safe distance or goal is within mean distance then we're good
@@ -561,7 +561,7 @@ void TIP::collision_check(Eigen::MatrixXd X, double buff, double v, bool& can_re
 			searchPoint_.y = X_prop_(0,1);
 			searchPoint_.z = X_prop_(0,2);
 
-			kdtree_.nearestKSearch (searchPoint_, K_, pointIdxNKNSearch, pointNKNSquaredDistance);
+		  	kdtree_.nearestKSearch(searchPoint_, K_, pointIdxNKNSearch, pointNKNSquaredDistance);	
 
     		mean_distance_ = std::sqrt(std::accumulate(pointNKNSquaredDistance.begin(), pointNKNSquaredDistance.end(), 0.0f)/pointIdxNKNSearch.size());
 
