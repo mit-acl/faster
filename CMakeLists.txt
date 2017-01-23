@@ -53,7 +53,7 @@ add_executable(tip_planner src/main.cpp src/tip.cpp )
 add_dependencies(tip_planner ${catkin_EXPORTED_TARGETS})
 target_link_libraries(tip_planner ${catkin_LIBRARIES})
 
-#add_executable(unit_test src/test.cpp src/tip.cpp )
+#add_executable(unit_test src/debug/test_pcl.cpp src/tip.cpp )
 #add_dependencies(unit_test ${catkin_EXPORTED_TARGETS})
 #target_link_libraries(unit_test ${catkin_LIBRARIES})
 

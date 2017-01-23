@@ -207,28 +207,28 @@ int main(int argc, char **argv)
 
 	// #### Stop check #### 
 	// X(1,0) = v;
-	std::vector<double> t_x_{std::vector<double>(3,0)};
+	// std::vector<double> t_x_{std::vector<double>(3,0)};
 	// std::vector<double> t_y_{std::vector<double>(3,0)};
 
-	Eigen::Matrix4d X0_ = Eigen::Matrix4d::Zero();
+	// Eigen::Matrix4d X0_ = Eigen::Matrix4d::Zero();
 	// Eigen::Matrix4d Y0_ = Eigen::Matrix4d::Zero();
 
 	// tip.get_stop_dist(X, goal, goal, v, t_x_, t_y_,X0_, Y0_);
 
 
 	// #### Replan at top speed
-	Eigen::Vector4d x_= Eigen::Vector4d::Zero();
+	// Eigen::Vector4d x_= Eigen::Vector4d::Zero();
 
-	double v = 10;
-	double vfx_ = v*cos(0);
-	double vfy_ = v*sin(0);
+	// double v = 10;
+	// double vfx_ = v*cos(0);
+	// double vfy_ = v*sin(0);
 
 	// std::cout << std::abs(-1.5) << std::endl;
 	// std::cout << std::fabs(-1.5) << std::endl;
 
-	x_(0) = -6.69;
-	x_(1) = 8.0733;
-	x_(2) = 10;
+	// x_(0) = -6.69;
+	// x_(1) = 8.0733;
+	// x_(2) = 10;
 
 	// std::cout << x_ << std::endl;
 	// std::cout << X0_ << std::endl;
@@ -242,10 +242,10 @@ int main(int argc, char **argv)
 	// Xc_(1,1) = 0;
 	// Xc_(2,1) = 0;
 
-	tip.find_times(x_, vfx_,t_x_, X0_,false);
+	// tip.find_times(x_, vfx_,t_x_, X0_,false);
 
-	std::cout << X0_ << std::endl;
-	std::cout << "times: " << t_x_[0] << " " << t_x_[1] << " " << t_x_[2] << std::endl;
+	// std::cout << X0_ << std::endl;
+	// std::cout << "times: " << t_x_[0] << " " << t_x_[1] << " " << t_x_[2] << std::endl;
 
 
 	// tip.eval_trajectory(X0_,Y0_,t_x_,t_y_,5,Xc_);

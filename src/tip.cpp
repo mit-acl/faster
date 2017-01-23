@@ -313,7 +313,7 @@ void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 
  	if (i!=size && quad_status_!=state_.NOT_FLYING){
 		// Build k-d tree
-		kdtree_.setInputCloud (cloud_);
+		kdtree_.setInputCloud(cloud_);
 		
 		// Sort allowable final states
 		sort_ss(Goals_,X_.row(0).transpose(),goal_, last_goal_, Sorted_Goals_,los_);
