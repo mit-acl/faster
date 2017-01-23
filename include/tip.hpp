@@ -64,7 +64,7 @@ public:
 	void get_traj(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, std::vector<double>& t_fx, std::vector<double>& t_fy, std::vector<double>& t_fz, Eigen::Matrix4d& Xf_switch, Eigen::Matrix4d& Yf_switch, Eigen::Matrix4d& Zf_switch, bool stop_check );	
 	
 	void sample_ss(Eigen::MatrixXd& Goals);
-	void sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d goal, Eigen::Vector3d vector_last, Eigen::MatrixXd& Sorted_Goals);
+	void sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d goal, Eigen::Vector3d vector_last, Eigen::MatrixXd& Sorted_Goals, bool& los);
 	void pick_ss(Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, bool& can_reach_goal);
 
 	void collision_check(Eigen::MatrixXd X, double buff, double v, bool& can_reach_goal, Eigen::Vector4d& local_goal_aug);
@@ -87,10 +87,12 @@ private:
 	double h_fov_, v_fov_, angle_2_last_goal_, current_angle_2_local_goal_, mean_distance_, goal_distance_, distance_traveled_, local_goal_angle_ ;
 	double tE_prev_;
 	double angle_i_, r_goal_, spinup_time_, heading_, j_max_, a_max_, t0_, r_max_;
-	int num_ = 50, K_, goal_index_, num_of_pnts_, quad_status_, h_samples_, v_samples_ ;
-	bool debug_, can_reach_goal_, collision_detected_, gen_new_traj_, stop_, can_reach_global_goal_, yawing_;
+	double dist_trav_last_, dist_safe_last_, last_prim_cost_, min_cost_prim_;
 	double jump_thresh_, bias_x_, bias_y_, bias_z_;
 	double inf;
+
+	int num_ = 50, K_, goal_index_, num_of_pnts_, quad_status_, h_samples_, v_samples_ ;
+	bool debug_, can_reach_goal_, collision_detected_, gen_new_traj_, stop_, can_reach_global_goal_, yawing_, following_prim_,los_;
 	
 
 	std::ostringstream errorMsg, warnMsg;
@@ -187,6 +189,7 @@ private:
 	Eigen::Vector3d last_goal_V_;
 	Eigen::Vector3d next_goal_V_;
 	Eigen::Vector3d pose_;
+	Eigen::Vector3d pose_last_mp_;
 
 	Eigen::Vector3d vector_2_goal_;
 	Eigen::Vector3d vector_2_goal_body_;

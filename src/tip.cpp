@@ -2,6 +2,9 @@
 
 TIP::TIP() : tf_listener_(tf_buffer_) {
 
+	std::string name = ros::this_node::getNamespace();
+	// Erase slashes
+	name.erase(0,2);
 
 	// Should be read as param
 	ros::param::get("~debug",debug_);
@@ -50,6 +53,11 @@ TIP::TIP() : tf_listener_(tf_buffer_) {
 	// Generate allowable final states
 	sample_ss(Goals_);
 
+	dist_trav_last_ = 0;
+	last_prim_cost_ = 100;
+	dist_safe_last_ = sensor_distance_;
+	pose_last_mp_= Eigen::Vector3d::Zero();
+
 	bias_x_=0;
 	bias_y_=0;
 	bias_z_=0;
@@ -61,6 +69,7 @@ TIP::TIP() : tf_listener_(tf_buffer_) {
 	stop_ = false;
 	can_reach_global_goal_ = true;
 	can_reach_goal_ = false;
+	following_prim_ = false;
 
 	quad_status_ = state_.NOT_FLYING;
 
@@ -74,7 +83,7 @@ TIP::TIP() : tf_listener_(tf_buffer_) {
 	// wait for body transform to be published before initializing
 	while (true) {
 	  try {
-	    tf_buffer_.lookupTransform("world", "body", ros::Time::now(), ros::Duration(1.0));
+	    tf_buffer_.lookupTransform("world", name, ros::Time::now(), ros::Duration(1.0));
 	    break;
 	  } catch (tf2::TransformException &ex) {
 	    // nothing
@@ -197,8 +206,9 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 	}
 
 	eigen2quadGoal(X_,quad_goal_);
+	yaw_ = quad_goal_.yaw;
 	quad_goal_.header.stamp = ros::Time::now();
-	quad_goal_.header.frame_id = "vicon";
+	quad_goal_.header.frame_id = "world";
 	quad_goal_pub.publish(quad_goal_);
 
 }
@@ -306,33 +316,59 @@ void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 		kdtree_.setInputCloud (cloud_);
 		
 		// Sort allowable final states
-		sort_ss(Goals_,pose_,goal_, last_goal_, Sorted_Goals_);
+		sort_ss(Goals_,X_.row(0).transpose(),goal_, last_goal_, Sorted_Goals_,los_);
 
 		// Pick desired final state
 		pick_ss(Sorted_Goals_, X_, can_reach_goal_);
 
-	 	if (!can_reach_goal_ && quad_status_ == state_.GO){
-	 		// Need to stop!!!
-	 		stop_=true;
-	 		v_ = 0;
-	 		ROS_ERROR("Emergency stop -- no feasible path");
-	 	}
+	 	if ( !los_ && !stop_ && dist_trav_last_ < (sensor_distance_ - safe_distance_) && min_cost_prim_ > last_prim_cost_ && quad_status_==state_.GO){
+			// Update distance traveled
+			dist_trav_last_ = (X_.block(0,0,1,3).transpose() - pose_last_mp_).norm();
+			// ROS_INFO("following primitive");
+			following_prim_ = true;
+		}
 
-	 	gen_new_traj_ = true;
+		else{
+			following_prim_ = false;
+			if (!can_reach_goal_){
+		 		// Need to stop!!!
+		 		v_ = 0;
+		 		// stop_ = true;
+		 		// ROS_ERROR_THROTTLE(1.0,"Emergency stop -- no feasible path");
+		 	}
+		 	else if (los_ && !stop_ && !yawing_) v_ = v_max_;
+			
+		 	gen_new_traj_ = true;
+		 	pose_last_mp_ = X_.block(0,0,1,3).transpose();
+		 	dist_safe_last_ = distance_traveled_;
+		 	dist_trav_last_ = 0;
+			last_prim_cost_ = min_cost_prim_ ;
+		 }
 
 	 	traj_gen_ = ros::WallTime::now().toSec();
 
 	 	latency_.data = traj_gen_ - msg_received_;
 	 	latency_.header.stamp = ros::Time::now();
 
-	 	// std::cout << "Latency [ms]: " << 1000*(traj_gen_ - msg_received_) << std::endl;
+	 	// std::cout << "Latency (ms): " << 1000*(traj_gen_ - msg_received_) << std::endl;		
+	 }
+	 else {
+	 	// Generate traj
+	 	local_goal_ = goal_ - X_.row(0).transpose();
+	 	gen_new_traj_ = true;
 
-	 	if(debug_){
-	 		convert2ROS();
-	 		pubROS();
-	 	} 	
-	 } 	
-}
+	 	pose_last_mp_ = X_.block(0,0,1,3).transpose();
+	 	dist_safe_last_ = distance_traveled_;
+	 	dist_trav_last_ = 0;
+		last_prim_cost_ = min_cost_prim_ ;
+	 }
+
+ 	if(debug_){
+ 		convert2ROS();
+ 		pubROS();
+ 	} 	
+ } 	
+
 
 
 void TIP::sample_ss(Eigen::MatrixXd& Goals){
@@ -364,7 +400,7 @@ void TIP::sample_ss(Eigen::MatrixXd& Goals){
 	}
 }
 
-void TIP::sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d goal, Eigen::Vector3d vector_last, Eigen::MatrixXd& Sorted_Goals){
+void TIP::sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d goal, Eigen::Vector3d vector_last, Eigen::MatrixXd& Sorted_Goals, bool& los){
  	// Re-initialize
 	cost_queue_ = std::priority_queue<double, std::vector<double>, std::greater<double> > ();
 	cost_v_.clear();
@@ -405,17 +441,32 @@ void TIP::sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d g
 
 		cost_queue_.pop();
 	}
+
+	 // Check if vector_2_goal_body_ is within FOV
+ 	double angle_v = asin(vector_2_goal_body_(2));
+ 	double ang = vector_2_goal_(0)/cos(angle_v);
+ 	
+ 	double angle_h;
+ 	if (std::abs(ang)<1) angle_h = acos(ang);
+ 	else angle_h = acos(copysign(1,ang));
+
+ 	double wrap_yaw = fmod(yaw_ + M_PI,2*M_PI);
+    if (wrap_yaw < 0)
+        wrap_yaw += 2*M_PI;
+    wrap_yaw -= M_PI;
+
+ 	angle_h -= std::abs(wrap_yaw);
     
-    // Check if vector_2_goal_body_ is within horizontal FOV
- 	double angle = acos(vector_2_goal_(0)) - std::abs(yaw_);
- 	if (std::abs(angle) < h_fov_/2){
+    if (std::abs(angle_h) < h_fov_/2 && std::abs(angle_v) < v_fov_/2){
  		Sorted_Goals = Eigen::MatrixXd::Zero(Goals.rows()+1,Goals.cols()+1);
     	Sorted_Goals.row(0)<< vector_2_goal_body_.transpose(),0;
     	Sorted_Goals.block(1,0,Sorted_Goals.rows()-1,Sorted_Goals.cols()) << Sorted_Goals_temp;
+    	los = true;
  	}
  	else{
  		Sorted_Goals = Eigen::MatrixXd::Zero(Goals.rows(),Goals.cols()+1);
  		Sorted_Goals << Sorted_Goals_temp;
+ 		los = false;
  	}
 }
 
@@ -436,23 +487,25 @@ void TIP::pick_ss(Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, bool& can_rea
  		goal_index_++;
  	}
 
- 	if (!can_reach_goal) {
- 		int index;
- 		double min_cost = Sorted_Goals.col(3).minCoeff(&index);
+ 	int index;
+	min_cost_prim_ = Sorted_Goals.col(3).minCoeff(&index);
+	double min_cost = min_cost_prim_;
+
+ 	if (!can_reach_goal) { 		
  		if (min_cost!=inf){
  			goal_index_ = index+1;
  			can_reach_goal = true;
  		} 
-
  	}
 
  	if(can_reach_goal){
  		goal_index_--;
  		// Tranform temp local goal to world frame
  		local_goal_ = qw2b_.conjugate()._transformVector(Sorted_Goals.block(goal_index_,0,1,3).transpose());
- 		double d = (goal_-pose_).norm();
+ 		last_goal_ << local_goal_;
+ 		double d = (goal_-X_.row(0).transpose()).norm();
  		// ### CHECK THIS ###
- 		if (goal_index_ == 0 && d<3) can_reach_global_goal_ = true;
+ 		if (goal_index_ == 0 && d < sensor_distance_) can_reach_global_goal_ = true;
  		else can_reach_global_goal_ = false;
  	}
 }
@@ -882,7 +935,7 @@ void TIP::convert2ROS(){
 	// Trajectory
 	traj_ros_.poses.clear();
 	traj_ros_.header.stamp = ros::Time::now();
-	traj_ros_.header.frame_id = "vicon";
+	traj_ros_.header.frame_id = "world";
 
 	Xf_eval_ = Xf_switch_;
 	Yf_eval_ = Yf_switch_;
@@ -894,7 +947,6 @@ void TIP::convert2ROS(){
 	dt_ = sensor_distance_/v_max_/num_;
 	t_ = 0;
 	XE_ << X_;
-	XE_.row(0) << pose_.transpose();
 	for(int i=0; i<num_; i++){
 		mtx.lock();
 		eval_trajectory(Xf_eval_,Yf_eval_,Zf_eval_,t_xf_e_,t_yf_e_,t_zf_e_,t_,XE_);
@@ -907,7 +959,7 @@ void TIP::convert2ROS(){
 	}
 
 	ros_new_global_goal_.header.stamp = ros::Time::now();
-	ros_new_global_goal_.header.frame_id = "vicon";
+	ros_new_global_goal_.header.frame_id = "world";
 	if (can_reach_global_goal_){
 		ros_new_global_goal_.point.x = goal_(0);
 		ros_new_global_goal_.point.y = goal_(1);
