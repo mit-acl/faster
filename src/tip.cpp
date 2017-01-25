@@ -47,6 +47,9 @@ TIP::TIP() : tf_listener_(tf_buffer_) {
 	ros::param::get("~r_max",r_max_);
 	ros::param::get("~jump_thresh",jump_thresh_);
 
+	ros::param::get("~z_min",z_min_);
+	ros::param::get("~z_max",z_max_);
+
 	h_fov_ = h_fov_*M_PI/180;
 	v_fov_ = v_fov_*M_PI/180;
 
@@ -198,9 +201,8 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 		mtx.unlock();
 
 		if (X_.block(1,0,1,2).norm() == 0 && stop_){
-			// We're done
-			ROS_INFO("Flight Complete");
-			quad_status_ = state_.FLYING;
+			// We're done			
+			if ((goal_.head(2)-X_.block(0,0,1,2).transpose()).norm() < 5){ ROS_INFO("Flight Complete"); quad_status_ = state_.FLYING; }
 			stop_ = false;
 		}
 	}
@@ -328,17 +330,17 @@ void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 	 	if ( !los_ && !stop_ && dist_trav_last_ < (sensor_distance_ - safe_distance_) && min_cost_prim_ > last_prim_cost_ && quad_status_==state_.GO){
 			// Update distance traveled
 			dist_trav_last_ = (X_.block(0,0,1,3).transpose() - pose_last_mp_).norm();
-			// ROS_INFO("following primitive");
+			ROS_INFO("following primitive");
 			following_prim_ = true;
 		}
 
 		else{
 			following_prim_ = false;
-			if (!can_reach_goal_){
+			if (!can_reach_goal_ && quad_status_==state_.GO){
 		 		// Need to stop!!!
 		 		v_ = 0;
-		 		// stop_ = true;
-		 		// ROS_ERROR_THROTTLE(1.0,"Emergency stop -- no feasible path");
+		 		stop_ = true;
+		 		ROS_ERROR_THROTTLE(1.0,"Emergency stop -- no feasible path");
 		 	}
 		 	else if (los_ && !stop_ && !yawing_) v_ = v_max_;
 			
@@ -577,8 +579,16 @@ void TIP::collision_check(Eigen::MatrixXd X, double buff, double v, bool& can_re
 			}
 			// Check if the min distance is the current goal
 			else if (distance_traveled_ > sensor_distance_){
-				can_reach_goal = true;
-				distance_traveled_ = sensor_distance_;
+				// If traj is not within z bounds then it's not valid
+				if (X_prop_(0,2) < z_min_ || X_prop_(0,2) > z_max_){
+			    	can_reach_goal = false;
+			    	local_goal_aug(3) = inf;
+			    	return;
+			    }
+		    	else{
+					can_reach_goal = true;
+					distance_traveled_ = sensor_distance_;
+				}
 			}			
 			// Neither have happened so propogate again
 			else{

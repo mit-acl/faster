@@ -1,11 +1,11 @@
 # Params for REACT planner
 debug: true
-safe_distance: 6  # Smallest distance before obstacle is no longer viable segment
-sensor_distance: 10 # Primitives evaluated up to this distance
+safe_distance: 12  # Smallest distance before obstacle is no longer viable segment
+sensor_distance: 15 # Primitives evaluated up to this distance
 buffer: 0.42       # 0.5 width of quad for collision checking
 
 # (x,y,z) goal
-goal_x: 50.0
+goal_x: 60.0
 goal_y: 0.0
 goal_z: 1
 
@@ -13,7 +13,7 @@ goal_z: 1
 max_speed: 8
 
 jerk: 30  
-accel: 10
+accel: 3
 
 # Trajectory evaluation rate
 plan_eval: 0.01
@@ -38,4 +38,7 @@ r_max: 2
 
 # Maximum tolerable jump in state estimate before replanning
 jump_thresh: 0.5
+
+z_min: 0.2
+z_max: 3.0
     
