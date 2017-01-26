@@ -8,6 +8,7 @@ TIP::TIP() : tf_listener_(tf_buffer_) {
 
 	// Should be read as param
 	ros::param::get("~debug",debug_);
+	ros::param::get("~use_memory",use_memory_);
 	ros::param::get("~safe_distance",safe_distance_);
 	ros::param::get("~buffer",buffer_);
 	ros::param::get("~sensor_distance",sensor_distance_);
@@ -34,6 +35,7 @@ TIP::TIP() : tf_listener_(tf_buffer_) {
 
 	ros::param::get("~jerk",j_max_);
 	ros::param::get("~accel",a_max_);
+	ros::param::get("~accel_stop",a_stop_);
 
 	ros::param::get("~plan_eval",plan_eval_time_);
 
@@ -131,7 +133,8 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 	if (gen_new_traj_){
 		gen_new_traj_ = false;
 		mtx.lock();
-		get_traj(X_,local_goal_,v_,t_xf_,t_yf_,t_zf_,Xf_switch_,Yf_switch_,Zf_switch_,false);
+		if (stop_) get_traj(X_,local_goal_,v_,t_xf_,t_yf_,t_zf_,Xf_switch_,Yf_switch_,Zf_switch_,true);
+		else get_traj(X_,local_goal_,v_,t_xf_,t_yf_,t_zf_,Xf_switch_,Yf_switch_,Zf_switch_,false);
 		mtx.unlock();
 		t0_ = ros::Time::now().toSec() - plan_eval_time_;
 	}
@@ -327,10 +330,10 @@ void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 		// Pick desired final state
 		pick_ss(Sorted_Goals_, X_, can_reach_goal_);
 
-	 	if ( !los_ && !stop_ && dist_trav_last_ < (sensor_distance_ - safe_distance_) && min_cost_prim_ > last_prim_cost_ && quad_status_==state_.GO){
+	 	if ( use_memory_ && !los_ && !stop_ && dist_trav_last_ < (sensor_distance_ - safe_distance_) && min_cost_prim_ > last_prim_cost_ && quad_status_==state_.GO){
 			// Update distance traveled
 			dist_trav_last_ = (X_.block(0,0,1,3).transpose() - pose_last_mp_).norm();
-			ROS_INFO("following primitive");
+			if (!following_prim_) ROS_INFO("following primitive");
 			following_prim_ = true;
 		}
 
@@ -681,10 +684,13 @@ void TIP::find_times( Eigen::Vector4d x0, double vf, std::vector<double>& t, Eig
  	else{
 		
 		double j_temp;
+		double a_temp;
 		if (stop_check){
 			j_temp = j_max_;
+			a_temp = a_stop_;
 		}
 		else{
+			a_temp = a_max_;
 			// Could be interesting, need to justify 
 			if (std::abs(vf-x0(1))/v_max_ < 0.2 && std::abs(x0(3)) != j_max_ && std::abs(x0(2))!=a_max_){
 				j_temp = 5;
@@ -742,8 +748,8 @@ void TIP::find_times( Eigen::Vector4d x0, double vf, std::vector<double>& t, Eig
 			// Check to see if we'll saturate
 			double a1f = x0(2) + j_temp*t1;
 
-			if (std::abs(a1f) >= a_max_){
-				double am = copysign(a_max_,j_temp);
+			if (std::abs(a1f) >= a_temp){
+				double am = copysign(a_temp,j_temp);
 				t[0] = (am-x0(2))/j_V_[0];
 				t[2] = -am/j_V_[2];
 

@@ -86,13 +86,13 @@ private:
 	double traj_gen_, t_stop_, d_stop_, d_goal_;
 	double h_fov_, v_fov_, angle_2_last_goal_, current_angle_2_local_goal_, mean_distance_, goal_distance_, distance_traveled_, local_goal_angle_ ;
 	double tE_prev_;
-	double angle_i_, r_goal_, spinup_time_, heading_, j_max_, a_max_, t0_, r_max_;
+	double angle_i_, r_goal_, spinup_time_, heading_, j_max_, a_max_, a_stop_, t0_, r_max_;
 	double dist_trav_last_, dist_safe_last_, last_prim_cost_, min_cost_prim_;
 	double jump_thresh_, bias_x_, bias_y_, bias_z_;
 	double inf, z_min_, z_max_;
 
 	int num_ = 50, K_, goal_index_, num_of_pnts_, quad_status_, h_samples_, v_samples_ ;
-	bool debug_, can_reach_goal_, collision_detected_, gen_new_traj_, stop_, can_reach_global_goal_, yawing_, following_prim_,los_;
+	bool debug_, can_reach_goal_, collision_detected_, gen_new_traj_, stop_, can_reach_global_goal_, yawing_, following_prim_,los_, use_memory_;
 	
 
 	std::ostringstream errorMsg, warnMsg;

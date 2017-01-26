@@ -1,8 +1,9 @@
-# Params for REACT planner
+# Params for TIP planner
 debug: true
-safe_distance: 12  # Smallest distance before obstacle is no longer viable segment
-sensor_distance: 15 # Primitives evaluated up to this distance
-buffer: 0.42       # 0.5 width of quad for collision checking
+use_memory: false
+safe_distance: 6    # Smallest distance before obstacle is no longer viable segment
+sensor_distance: 10 # Primitives evaluated up to this distance
+buffer: 0.42        # 0.5 width of quad for collision checking
 
 # (x,y,z) goal
 goal_x: 60.0
@@ -13,7 +14,8 @@ goal_z: 1
 max_speed: 8
 
 jerk: 30  
-accel: 3
+accel: 3.0
+accel_stop: 10.0
 
 # Trajectory evaluation rate
 plan_eval: 0.01
