@@ -75,6 +75,7 @@ public:
 	void get_vels(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, double& vx, double& vy, double& vz);
 	void saturate(double &var, double min, double max);
 	void eigen2quadGoal(Eigen::MatrixXd X, acl_system::QuadGoal& quad_goal);
+	void check_current_prim(Eigen::Matrix4d X0, Eigen::Matrix4d Y0, Eigen::Matrix4d Z0, std::vector<double> t_x, std::vector<double> t_y, std::vector<double> t_z, double t, Eigen::MatrixXd X, bool& clear);
 
 private:
 
@@ -92,7 +93,7 @@ private:
 	double inf, z_min_, z_max_;
 
 	int num_ = 50, K_, goal_index_, num_of_pnts_, quad_status_, h_samples_, v_samples_, count2 ;
-	bool debug_, can_reach_goal_, collision_detected_, gen_new_traj_, stop_, can_reach_global_goal_, yawing_, following_prim_,los_, use_memory_;
+	bool debug_, can_reach_goal_, collision_detected_, gen_new_traj_, stop_, can_reach_global_goal_, yawing_, following_prim_,los_, use_memory_, still_clear_;
 	
 
 	std::ostringstream errorMsg, warnMsg;

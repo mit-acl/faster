@@ -72,6 +72,7 @@ TIP::TIP() : tf_listener_(tf_buffer_) {
 
 	yawing_ = false;
 	stop_ = false;
+	still_clear_ = true;
 	can_reach_global_goal_ = true;
 	can_reach_goal_ = false;
 	following_prim_ = false;
@@ -332,9 +333,14 @@ void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 		// Pick desired final state
 		pick_ss(Sorted_Goals_, X_, can_reach_goal_);
 
-		double current_vel = X_.row(1).norm();
+		// Check if current primitive is still collision free
+		if (following_prim_) {
+			check_current_prim(Xf_switch_,Yf_switch_,Zf_switch_,t_xf_,t_yf_,t_zf_,tE_,X_,still_clear_);
+			ROS_INFO("Still clear: %i",still_clear_);
+		}
 
-	 	if (current_vel > 0 && use_memory_ && !stop_ && dist_trav_last_ < (sensor_distance_ - safe_distance_) && min_cost_prim_ > last_prim_cost_ && quad_status_==state_.GO){
+
+	 	if (still_clear_ && X_.row(1).norm() > 0 && use_memory_ && !stop_ && dist_trav_last_ < (sensor_distance_ - safe_distance_) && min_cost_prim_ > last_prim_cost_ && quad_status_==state_.GO){
 			// Update distance traveled
 			dist_trav_last_ = (X_.block(0,0,1,3).transpose() - pose_last_mp_).norm();
 			if (!following_prim_) {count2 = 0; ROS_INFO("following primitive");}
@@ -346,6 +352,7 @@ void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 		else{
 			if (following_prim_) ROS_INFO("not following primitive");
 			following_prim_ = false;
+			still_clear_ = true;
 			if (!can_reach_goal_ && quad_status_==state_.GO){
 		 		// Need to stop!!!
 		 		v_ = 0;
@@ -386,9 +393,68 @@ void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
  } 	
 
 
+void TIP::check_current_prim(Eigen::Matrix4d X0, Eigen::Matrix4d Y0, Eigen::Matrix4d Z0, std::vector<double> t_x, std::vector<double> t_y, std::vector<double> t_z, double t, Eigen::MatrixXd X, bool& clear){
+	clear = false;
+	collision_detected_ = false;
+
+	X_prop_ = Eigen::MatrixXd::Zero(4,3);
+	X_prop_ << X;
+
+	searchPoint_.x = X(0,0);
+	searchPoint_.y = X(0,1);
+	searchPoint_.z = X(0,2);
+
+	std::vector<int> pointIdxNKNSearch(K_);
+  	std::vector<float> pointNKNSquaredDistance(K_);
+
+  	kdtree_.nearestKSearch(searchPoint_, K_, pointIdxNKNSearch, pointNKNSquaredDistance);	
+    mean_distance_ = std::sqrt(std::accumulate(pointNKNSquaredDistance.begin(), pointNKNSquaredDistance.end(), 0.0f)/pointIdxNKNSearch.size());
+
+    // If the obstacle is farther than safe distance or goal is within mean distance then we're good
+    if (mean_distance_ > safe_distance_){
+    	clear = true;
+    }
+    // Something else is closer, need to prop to next time step
+	else{
+		// evaluate at time required to travel d_min
+		t_ = std::max(buffer_/v_max_,mean_distance_/v_max_) + t;
+
+		while (!collision_detected_ && !clear){
+
+			mtx.lock();
+			eval_trajectory(X0,Y0,Z0,t_x,t_y,t_z,t_,X_prop_);
+			mtx.unlock();
+
+			searchPoint_.x = X_prop_(0,0);
+			searchPoint_.y = X_prop_(0,1);
+			searchPoint_.z = X_prop_(0,2);
+
+		  	kdtree_.nearestKSearch(searchPoint_, K_, pointIdxNKNSearch, pointNKNSquaredDistance);	
+
+    		mean_distance_ = std::sqrt(std::accumulate(pointNKNSquaredDistance.begin(), pointNKNSquaredDistance.end(), 0.0f)/pointIdxNKNSearch.size());
+
+    		distance_traveled_ = (X_prop_.row(0)-X.row(0)).norm();
+
+    		// Check if the distance is less than our buffer
+			if (mean_distance_ < buffer_){
+				collision_detected_ = true;
+				clear = false;
+			}
+			// Check if the min distance is the current goal
+			else if (distance_traveled_ > safe_distance_){
+					clear = true;
+					distance_traveled_ = sensor_distance_;
+			}			
+			// Neither have happened so propogate again
+			else{
+				t_ += mean_distance_/v_max_;
+			}
+		}
+	}
+}
+
 
 void TIP::sample_ss(Eigen::MatrixXd& Goals){
-
 	theta_ = Eigen::VectorXd::Zero(h_samples_);
 	theta_.setLinSpaced(h_samples_,-h_fov_/2,h_fov_/2);
 	
