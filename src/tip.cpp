@@ -86,6 +86,7 @@ TIP::TIP() : tf_listener_(tf_buffer_) {
 	inf = std::numeric_limits<double>::max();
 
 	// wait for body transform to be published before initializing
+	ROS_INFO("Waiting for world to body transform...");
 	while (true) {
 	  try {
 	    tf_buffer_.lookupTransform("world", name, ros::Time::now(), ros::Duration(1.0));
@@ -95,7 +96,6 @@ TIP::TIP() : tf_listener_(tf_buffer_) {
 	  }
 	}
 	ROS_INFO("Planner initialized.");
-
 }
 
 void TIP::global_goalCB(const geometry_msgs::PointStamped& msg){
@@ -264,8 +264,10 @@ void TIP::eventCB(const acl_system::QuadFlightEvent& msg)
 	// Initializing
 	else if (msg.mode == msg.INIT && quad_status_ == state_.FLYING){
 		double diff = heading_ - quad_goal_.yaw;
-		double dyaw = 0;
 		diff =  fmod(diff+M_PI,2*M_PI) - M_PI;
+		if (diff < 0)
+	        diff += 2*M_PI;
+	    diff -= M_PI;
 		while(std::abs(diff)>0.001){
 			saturate(diff,-0.002*r_max_,0.002*r_max_);
 			if (diff>0) quad_goal_.dyaw =  r_max_;
@@ -330,14 +332,19 @@ void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 		// Pick desired final state
 		pick_ss(Sorted_Goals_, X_, can_reach_goal_);
 
-	 	if ( use_memory_ && !los_ && !stop_ && dist_trav_last_ < (sensor_distance_ - safe_distance_) && min_cost_prim_ > last_prim_cost_ && quad_status_==state_.GO){
+		double current_vel = X_.row(1).norm();
+
+	 	if (current_vel > 0 && use_memory_ && !stop_ && dist_trav_last_ < (sensor_distance_ - safe_distance_) && min_cost_prim_ > last_prim_cost_ && quad_status_==state_.GO){
 			// Update distance traveled
 			dist_trav_last_ = (X_.block(0,0,1,3).transpose() - pose_last_mp_).norm();
-			if (!following_prim_) ROS_INFO("following primitive");
+			if (!following_prim_) {count2 = 0; ROS_INFO("following primitive");}
+			ROS_INFO("%i",count2);
+			count2++;
 			following_prim_ = true;
 		}
 
 		else{
+			if (following_prim_) ROS_INFO("not following primitive");
 			following_prim_ = false;
 			if (!can_reach_goal_ && quad_status_==state_.GO){
 		 		// Need to stop!!!
@@ -512,8 +519,7 @@ void TIP::pick_ss(Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, bool& can_rea
  		// Tranform temp local goal to world frame
  		local_goal_ = qw2b_.conjugate()._transformVector(Sorted_Goals.block(goal_index_,0,1,3).transpose());
  		last_goal_ << local_goal_;
- 		double d = (goal_-X_.row(0).transpose()).norm();
- 		// ### CHECK THIS ###
+ 		double d = (goal_.head(2)-X_.block(0,0,1,2).transpose()).norm();
  		if (goal_index_ == 0 && d < sensor_distance_) can_reach_global_goal_ = true;
  		else can_reach_global_goal_ = false;
  	}

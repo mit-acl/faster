@@ -2,7 +2,7 @@
 debug: true
 use_memory: false
 safe_distance: 6    # Smallest distance before obstacle is no longer viable segment
-sensor_distance: 10 # Primitives evaluated up to this distance
+sensor_distance: 12 # Primitives evaluated up to this distance
 buffer: 0.42        # 0.5 width of quad for collision checking
 
 # (x,y,z) goal
