@@ -648,6 +648,7 @@ void TIP::collision_check(Eigen::MatrixXd X, double buff, double v, bool& can_re
 			if (mean_distance_ < buff){
 				collision_detected_ = true;
 				can_reach_goal = false;
+				// ROS_INFO("Distance traveled: %0.2f", distance_traveled_);
 				if (distance_traveled_ < safe_distance_) local_goal_aug(3) = inf;
 				else local_goal_aug(3) = pow(sensor_distance_-distance_traveled_,2);
 
@@ -684,6 +685,55 @@ void TIP::get_traj(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, std:
 	find_times(y0_, vfy_, t_fy, Yf_switch,stop_check);
 	find_times(z0_, vfz_, t_fz, Zf_switch,stop_check);
 
+	if (X.row(1).norm()==0){
+		// Sync traj
+		double tx = std::accumulate(t_fx.begin(), t_fx.end(), 0.0);
+		double ty = std::accumulate(t_fx.begin(), t_fx.end(), 0.0);
+		double tz = std::accumulate(t_fx.begin(), t_fx.end(), 0.0);
+		double tmax = std::max(std::max(tx,ty),tz);
+
+		sync_times(x0_, tmax, vfx_, t_fx, Xf_switch);
+		sync_times(y0_, tmax, vfy_, t_fy, Yf_switch);
+		sync_times(z0_, tmax, vfz_, t_fz, Zf_switch);
+	}
+
+}
+
+void TIP::sync_times(Eigen::Vector4d x0, double tmax, double vf, std::vector<double>& t, Eigen::Matrix4d& X_switch){
+	if (tmax == std::accumulate(t.begin(), t.end(), 0.0) || vf == 0) return;
+	else {
+		double j_temp = copysign(4*vf/pow(tmax,2),vf);
+		double t1 = std::sqrt(vf/j_temp);
+
+		j_V_[0] = j_temp;
+		j_V_[1] = 0;
+		j_V_[2] = -j_temp;
+
+
+		t[0] = t1;
+		t[1] = 0; // No second phase
+		t[2] = t1;
+
+		a0_V_[0] = x0(2);
+		a0_V_[1] = 0; // No second phase
+		a0_V_[2] = a0_V_[0] + j_V_[0]*t[0];
+		a0_V_[3] = 0;
+
+		v0_V_[0] = x0(1);
+		v0_V_[1] = 0; // No second phase
+		v0_V_[2] = v0_V_[0] + a0_V_[0]*t[0] + 0.5*j_V_[0]*pow(t[0],2);
+		v0_V_[3] = vf;		
+
+		x0_V_[0] = x0(0);
+		x0_V_[1] = 0; // No second phase
+		x0_V_[2] = x0_V_[0] + v0_V_[0]*t[0] + 0.5*a0_V_[0]*pow(t[0],2) + 1./6*j_V_[0]*pow(t[0],3);
+		x0_V_[3] = x0_V_[2] + v0_V_[2]*t[2] + 0.5*a0_V_[2]*pow(t[2],2) + 1./6*j_V_[2]*pow(t[2],3);
+
+		X_switch.row(0) << x0_V_[0],x0_V_[1],x0_V_[2],x0_V_[3];
+		X_switch.row(1) << v0_V_[0],v0_V_[1],v0_V_[2],v0_V_[3];
+		X_switch.row(2) << a0_V_[0],a0_V_[1],a0_V_[2],a0_V_[3];
+		X_switch.row(3) << j_V_[0],j_V_[1],j_V_[2],j_V_[3];
+	}
 }
 
 
@@ -728,7 +778,7 @@ void TIP::get_vels(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, doub
 
 
 
-void TIP::find_times( Eigen::Vector4d x0, double vf, std::vector<double>& t, Eigen::Matrix4d&  X_switch, bool stop_check){
+void TIP::find_times(Eigen::Vector4d x0, double vf, std::vector<double>& t, Eigen::Matrix4d&  X_switch, bool stop_check){
  	if (vf == x0(1)){
  		j_V_[0] = 0;
 		j_V_[1] = 0; 
