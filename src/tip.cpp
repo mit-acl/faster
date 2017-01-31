@@ -380,8 +380,10 @@ void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
  	tipData_.speed = X_.row(1).norm();
  	tipData_.follow_prim = following_prim_;
 
- 	if (following_prim_) tipData_.prim_cost = last_prim_cost_;
- 	else if (min_cost_prim_==inf) tipData_.prim_cost = 5;
+ 	saturate(min_cost_prim_,0,5);
+
+ 	if (quad_status_!=state_.GO || stop_) tipData_.prim_cost = 0;
+ 	else if (following_prim_) tipData_.prim_cost = last_prim_cost_;
     else tipData_.prim_cost = min_cost_prim_;
 
  	if(debug_){
