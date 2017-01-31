@@ -22,6 +22,7 @@
 #include "acl_system/QuadState.h"
 #include "acl_system/QuadFlightEvent.h"
 #include "acl_system/FloatStamped.h"
+#include "acl_planning/TIP.h"
 
 #include <pcl_ros/point_cloud.h>
 #include "pcl_ros/transforms.h"
@@ -45,7 +46,7 @@ public:
 
 	double plan_eval_time_ ;
 
-	ros::Publisher traj_pub, goal_pub, new_goal_pub, quad_goal_pub, latency_pub, speed_pub;
+	ros::Publisher traj_pub, goal_pub, new_goal_pub, quad_goal_pub, tipData_pub;
 
 
 	void pclCB(const sensor_msgs::PointCloud2ConstPtr& msg);
@@ -112,7 +113,7 @@ private:
 	geometry_msgs::PoseStamped temp_path_point_ros_;
 	geometry_msgs::PointStamped ros_new_global_goal_, ros_last_global_goal_;
 	nav_msgs::Path traj_ros_;
-	acl_system::FloatStamped latency_, speed_;
+	acl_planning::TIP tipData_;
 
 	acl_system::QuadGoal quad_goal_;
 	acl_system::QuadState state_;

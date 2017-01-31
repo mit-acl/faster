@@ -30,24 +30,20 @@ find_package(catkin REQUIRED COMPONENTS
 	tf2_ros
 	tf2_geometry_msgs
 	tf2_sensor_msgs
-	)
-
-# generate_messages(
-#   DEPENDENCIES
-#   std_msgs  # Or other packages containing msgs
-#   geometry_msgs
-# )
-
-catkin_package(
-	INCLUDE_DIRS include 
-	# CATKIN_DEPENDS message_runtime std_msgs geometry_msgs
-	# CATKIN_DEPENDS message_runtime std_msgs geometry_msgs
 )
 
-include_directories(
-	include
-    ${catkin_INCLUDE_DIRS}
-    )
+add_message_files(
+  DIRECTORY msg
+  FILES
+  TIP.msg
+)
+
+
+generate_messages(DEPENDENCIES std_msgs geometry_msgs)
+
+catkin_package(INCLUDE_DIRS include CATKIN_DEPENDS message_runtime std_msgs geometry_msgs)
+
+include_directories(include ${catkin_INCLUDE_DIRS})
 
 add_executable(tip_planner src/main.cpp src/tip.cpp )
 add_dependencies(tip_planner ${catkin_EXPORTED_TARGETS})

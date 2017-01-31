@@ -216,11 +216,6 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 	quad_goal_.header.stamp = ros::Time::now();
 	quad_goal_.header.frame_id = "world";
 	quad_goal_pub.publish(quad_goal_);
-
-	speed_.header.stamp = ros::Time::now();
-	speed_.data = X_.row(1).norm();
-	speed_pub.publish(speed_);
-
 }
 
 
@@ -367,12 +362,6 @@ void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 		 	dist_trav_last_ = 0;
 			last_prim_cost_ = min_cost_prim_ ;
 		 }
-
-	 	traj_gen_ = ros::WallTime::now().toSec();
-
-	 	latency_.data = traj_gen_ - msg_received_;
-	 	latency_.header.stamp = ros::Time::now();
-
 	 	// std::cout << "Latency (ms): " << 1000*(traj_gen_ - msg_received_) << std::endl;		
 	 }
 	 else {
@@ -385,6 +374,15 @@ void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 	 	dist_trav_last_ = 0;
 		last_prim_cost_ = min_cost_prim_ ;
 	 }
+
+ 	tipData_.header.stamp = ros::Time::now();
+ 	tipData_.latency = 1000*(ros::WallTime::now().toSec() - msg_received_);
+ 	tipData_.speed = X_.row(1).norm();
+ 	tipData_.follow_prim = following_prim_;
+
+ 	if (following_prim_) tipData_.prim_cost = last_prim_cost_;
+ 	else if (min_cost_prim_==inf) tipData_.prim_cost = 5;
+    else tipData_.prim_cost = min_cost_prim_;
 
  	if(debug_){
  		convert2ROS();
@@ -650,7 +648,7 @@ void TIP::collision_check(Eigen::MatrixXd X, double buff, double v, bool& can_re
 				can_reach_goal = false;
 				// ROS_INFO("Distance traveled: %0.2f", distance_traveled_);
 				if (distance_traveled_ < safe_distance_) local_goal_aug(3) = inf;
-				else local_goal_aug(3) = pow(sensor_distance_-distance_traveled_,2);
+				else local_goal_aug(3) = 0.05*pow(sensor_distance_-distance_traveled_,2);
 
 			}
 			// Check if the min distance is the current goal
@@ -1117,7 +1115,6 @@ void TIP::convert2ROS(){
 
 void TIP::pubROS(){
 	traj_pub.publish(traj_ros_);
-	latency_pub.publish(latency_);
+	tipData_pub.publish(tipData_);
 	new_goal_pub.publish(ros_new_global_goal_);
-
 }

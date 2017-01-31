@@ -1,6 +1,6 @@
 # Params for TIP planner
 debug: true
-use_memory: false
+use_memory: true
 safe_distance: 6    # Smallest distance before obstacle is no longer viable segment
 sensor_distance: 12 # Primitives evaluated up to this distance
 buffer: 0.42        # 0.5 width of quad for collision checking
@@ -14,8 +14,8 @@ goal_z: 1
 max_speed: 8
 
 jerk: 30  
-accel: 3.0
-accel_stop: 10.0
+accel: 10.0
+accel_stop: 12.0
 
 # Trajectory evaluation rate
 plan_eval: 0.01
@@ -27,7 +27,7 @@ K: 10
 h_fov: 56
 
 # Number of horizontal FOV discretization
-h_samples: 7
+h_samples: 8
 
 # Sensor vertical FOV (deg)
 v_fov: 40

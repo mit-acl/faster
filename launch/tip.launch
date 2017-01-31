@@ -14,8 +14,7 @@
 
 		<remap from="~new_global_goal" to="new_global_goal"/>
 		<remap from="~traj" to="traj"/>
-		<remap from="~latency" to="latency"/>
-		<remap from="~speed" to="speed"/>
+		<remap from="~tip_data" to="tip_data"/>
 		<remap from="~goal" to="goal" />
 
 	</node>
