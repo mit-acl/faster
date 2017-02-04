@@ -133,6 +133,7 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 {	
 	if (gen_new_traj_){
 		gen_new_traj_ = false;
+		v_plan_ = v_;
 		mtx.lock();
 		if (stop_) get_traj(X_,local_goal_,v_,t_xf_,t_yf_,t_zf_,Xf_switch_,Yf_switch_,Zf_switch_,true);
 		else get_traj(X_,local_goal_,v_,t_xf_,t_yf_,t_zf_,Xf_switch_,Yf_switch_,Zf_switch_,false);
@@ -166,21 +167,21 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 	        diff += 2*M_PI;
 	    diff -= M_PI;
 		if(fabs(diff)>0.02 && !stop_){
-		if (!yawing_){
-			if (fabs(diff)>M_PI/2 || X_.block(1,0,1,3).norm()==0) {v_ = 0; gen_new_traj_=true;}
-			else if (!stop_) v_ = v_max_;
-			else {v_ = 0; gen_new_traj_ = true;}
-		}
-		// Only yaw if the vehicle is at right speed
-		if (X_.block(1,0,1,3).norm() <= 1.1*v_ && X_.block(1,0,1,3).norm() >= 0.9*v_){
-			yawing_ = true;
-			saturate(diff,-plan_eval_time_*r_max_,plan_eval_time_*r_max_);
-			if (diff>0) quad_goal_.dyaw =  r_max_;
-			else        quad_goal_.dyaw = -r_max_;
-			quad_goal_.yaw+=diff;
-		}				
-		else{
-			yawing_=false;
+			if (!yawing_){
+				if (fabs(diff)>M_PI/2 || X_.block(1,0,1,3).norm()==0) {v_ = 0; gen_new_traj_=true;}
+				else if (!stop_) v_ = v_max_;
+				else {v_ = 0; gen_new_traj_ = true;}
+			}
+			// Only yaw if the vehicle is at right speed
+			if (X_.block(1,0,1,3).norm() <= 1.1*v_ && X_.block(1,0,1,3).norm() >= 0.9*v_){
+				yawing_ = true;
+				saturate(diff,-plan_eval_time_*r_max_,plan_eval_time_*r_max_);
+				if (diff>0) quad_goal_.dyaw =  r_max_;
+				else        quad_goal_.dyaw = -r_max_;
+				quad_goal_.yaw+=diff;
+			}				
+			else{
+				yawing_=false;
 			}			
 		}
 		else if (!stop_) {
@@ -204,10 +205,11 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 		eval_trajectory(Xf_switch_,Yf_switch_,Zf_switch_,t_xf_,t_yf_,t_zf_,tE_,X_);
 		mtx.unlock();
 
-		if (X_.block(1,0,1,2).norm() == 0 && stop_){
-			// We're done			
-			if ((goal_.head(2)-X_.block(0,0,1,2).transpose()).norm() < 5){ ROS_INFO("Flight Complete"); quad_status_ = state_.FLYING; }
+		if (X_.row(1).norm() == 0 && stop_){
+			// We're done	
 			stop_ = false;
+			if ((goal_.head(2)-X_.block(0,0,1,2).transpose()).norm() < 5){ ROS_INFO("Flight Complete"); quad_status_ = state_.FLYING; }
+			else {v_ = v_max_; gen_new_traj_ = true;};
 		}
 	}
 
@@ -329,17 +331,17 @@ void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 		pick_ss(Sorted_Goals_, X_, can_reach_goal_);
 
 		// Check if current primitive is still collision free
-		if (following_prim_) {
+		if (following_prim_ && v_plan_ > 0) {
 			check_current_prim(Xf_switch_,Yf_switch_,Zf_switch_,t_xf_,t_yf_,t_zf_,tE_,X_,still_clear_);
-			ROS_INFO("Still clear: %i",still_clear_);
+			// ROS_INFO("Still clear: %i",still_clear_);
 		}
 
 
-	 	if (still_clear_ && X_.row(1).norm() > 0 && use_memory_ && !stop_ && dist_trav_last_ < (sensor_distance_ - safe_distance_) && min_cost_prim_ > last_prim_cost_ && quad_status_==state_.GO){
+	 	if (still_clear_ && v_plan_ > 0 && use_memory_ && !stop_ && dist_trav_last_ < (sensor_distance_ - safe_distance_) && min_cost_prim_ > last_prim_cost_ && quad_status_==state_.GO){
 			// Update distance traveled
 			dist_trav_last_ = (X_.block(0,0,1,3).transpose() - pose_last_mp_).norm();
 			if (!following_prim_) {count2 = 0; ROS_INFO("following primitive");}
-			ROS_INFO("%i",count2);
+			// ROS_INFO("%i",count2);
 			count2++;
 			following_prim_ = true;
 		}
@@ -361,19 +363,19 @@ void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 		 	dist_safe_last_ = distance_traveled_;
 		 	dist_trav_last_ = 0;
 			last_prim_cost_ = min_cost_prim_ ;
-		 }
+	 	}
 	 	// std::cout << "Latency (ms): " << 1000*(traj_gen_ - msg_received_) << std::endl;		
 	 }
-	 else {
-	 	// Generate traj
-	 	local_goal_ = goal_ - X_.row(0).transpose();
-	 	gen_new_traj_ = true;
+	else {
+		// Generate traj
+		local_goal_ = goal_ - X_.row(0).transpose();
+		gen_new_traj_ = true;
 
-	 	pose_last_mp_ = X_.block(0,0,1,3).transpose();
-	 	dist_safe_last_ = distance_traveled_;
-	 	dist_trav_last_ = 0;
+		pose_last_mp_ = X_.block(0,0,1,3).transpose();
+		dist_safe_last_ = distance_traveled_;
+		dist_trav_last_ = 0;
 		last_prim_cost_ = min_cost_prim_ ;
-	 }
+	}
 
  	tipData_.header.stamp = ros::Time::now();
  	tipData_.latency = 1000*(ros::WallTime::now().toSec() - msg_received_);

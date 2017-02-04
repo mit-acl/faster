@@ -2,8 +2,11 @@
 
 	<arg name="quad"/>
 	<arg name="bag"/>
+	<arg name="memory"/>
 
 	<node ns="$(arg quad)" name="tip_planner" pkg="acl_planning" type="tip_planner" output="screen" clear_params="true">
+
+        <param name="~use_memory" value="$(arg memory)" type="bool"/>
 
 		<rosparam file="$(find acl_planning)/param/tip.yaml" command="load"/>
 
