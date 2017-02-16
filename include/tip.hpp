@@ -65,7 +65,7 @@ public:
 	void get_traj(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, std::vector<double>& t_fx, std::vector<double>& t_fy, std::vector<double>& t_fz, Eigen::Matrix4d& Xf_switch, Eigen::Matrix4d& Yf_switch, Eigen::Matrix4d& Zf_switch, bool stop_check );	
 	
 	void sample_ss(Eigen::MatrixXd& Goals);
-	void sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d goal, Eigen::Vector3d vector_last, Eigen::MatrixXd& Sorted_Goals, bool& los);
+	void sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d goal, Eigen::Vector3d vector_last, Eigen::MatrixXd& Sorted_Goals, bool& v_los);
 	void pick_ss(Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, bool& can_reach_goal);
 
 	void collision_check(Eigen::MatrixXd X, double buff, double v, bool& can_reach_goal, Eigen::Vector4d& local_goal_aug);
@@ -92,10 +92,10 @@ private:
 	double angle_i_, r_goal_, spinup_time_, heading_, j_max_, a_max_, a_stop_, t0_, r_max_;
 	double dist_trav_last_, dist_safe_last_, last_prim_cost_, min_cost_prim_;
 	double jump_thresh_, bias_x_, bias_y_, bias_z_;
-	double inf, z_min_, z_max_, v_plan_;
+	double inf, z_min_, z_max_, v_plan_, mem_distance_;
 
 	int num_ = 50, K_, goal_index_, num_of_pnts_, quad_status_, h_samples_, v_samples_, count2 ;
-	bool debug_, can_reach_goal_, collision_detected_, gen_new_traj_, stop_, can_reach_global_goal_, yawing_, following_prim_,los_, use_memory_, still_clear_;
+	bool debug_, can_reach_goal_, collision_detected_, gen_new_traj_, stop_, can_reach_global_goal_, yawing_, following_prim_, v_los_, use_memory_, still_clear_;
 	
 
 	std::ostringstream errorMsg, warnMsg;
@@ -208,6 +208,7 @@ private:
 
 	pcl::PointXYZ searchPoint_;
 
+	tf::Quaternion att_;
 
 	//## Logging and Debugging Functions
 

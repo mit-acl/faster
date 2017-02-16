@@ -2,11 +2,12 @@
 debug: true
 # use_memory: true
 safe_distance: 6   # Smallest distance before obstacle is no longer viable segment
-sensor_distance: 12 # Primitives evaluated up to this distance
+sensor_distance: 10 # Primitives evaluated up to this distance
+mem_distance: 6
 buffer: 0.42        # 0.5 width of quad for collision checking
 
 # (x,y,z) goal
-goal_x: 60.0
+goal_x: 15.0
 goal_y: 0.0
 goal_z: 1
 
@@ -14,7 +15,7 @@ goal_z: 1
 max_speed: 8
 
 jerk: 30  
-accel: 3.0
+accel: 10.0
 accel_stop: 12.0
 
 # Trajectory evaluation rate
@@ -24,16 +25,16 @@ plan_eval: 0.01
 K: 10
 
 # Sensor horizontal FOV (deg)
-h_fov: 56
+h_fov: 60
 
 # Number of horizontal FOV discretization
-h_samples: 8
+h_samples: 4
 
 # Sensor vertical FOV (deg)
 v_fov: 40
 
 # Number of vertical FOV discretization
-v_samples: 5
+v_samples: 8
 
 # Max yaw rate (rad/s)
 r_max: 2
