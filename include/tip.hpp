@@ -17,11 +17,11 @@
 #include <Eigen/Dense>
 
 // custom messages
-#include "acl_system/ViconState.h"
-#include "acl_system/QuadGoal.h"
-#include "acl_system/QuadState.h"
-#include "acl_system/QuadFlightEvent.h"
-#include "acl_system/FloatStamped.h"
+#include "acl_msgs/ViconState.h"
+#include "acl_msgs/QuadGoal.h"
+#include "acl_msgs/QuadState.h"
+#include "acl_msgs/QuadFlightEvent.h"
+#include "acl_msgs/FloatStamped.h"
 #include "acl_planning/TIP.h"
 
 #include <pcl_ros/point_cloud.h>
@@ -50,9 +50,9 @@ public:
 
 
 	void pclCB(const sensor_msgs::PointCloud2ConstPtr& msg);
-	void stateCB(const acl_system::ViconState& msg);
+	void stateCB(const acl_msgs::ViconState& msg);
 	void global_goalCB(const geometry_msgs::PointStamped& msg);
-	void eventCB(const acl_system::QuadFlightEvent& msg);
+	void eventCB(const acl_msgs::QuadFlightEvent& msg);
 
 	// ROS timed functions
 	void sendGoal(const ros::TimerEvent&);
@@ -75,7 +75,7 @@ public:
 	void eval_trajectory(Eigen::Matrix4d X0, Eigen::Matrix4d Y0, Eigen::Matrix4d Z0, std::vector<double> t_x, std::vector<double> t_y, std::vector<double> t_z, double t, Eigen::MatrixXd& X);
 	void get_vels(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, double& vx, double& vy, double& vz);
 	void saturate(double &var, double min, double max);
-	void eigen2quadGoal(Eigen::MatrixXd X, acl_system::QuadGoal& quad_goal);
+	void eigen2quadGoal(Eigen::MatrixXd X, acl_msgs::QuadGoal& quad_goal);
 	void check_current_prim(Eigen::Matrix4d X0, Eigen::Matrix4d Y0, Eigen::Matrix4d Z0, std::vector<double> t_x, std::vector<double> t_y, std::vector<double> t_z, double t, Eigen::MatrixXd X, bool& clear);
 	void sync_times(Eigen::Vector4d x0, double tmax, double vf, std::vector<double>& tf, Eigen::Matrix4d& X_switch);
 
@@ -115,9 +115,9 @@ private:
 	nav_msgs::Path traj_ros_;
 	acl_planning::TIP tipData_;
 
-	acl_system::QuadGoal quad_goal_;
-	acl_system::QuadState state_;
-	acl_system::QuadFlightEvent quad_event_;
+	acl_msgs::QuadGoal quad_goal_;
+	acl_msgs::QuadState state_;
+	acl_msgs::QuadFlightEvent quad_event_;
 
 
 	// Weird initialization

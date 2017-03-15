@@ -23,7 +23,7 @@ find_package(catkin REQUIRED COMPONENTS
 	tf
 	rosbag
 	roslib
-	acl_system
+	acl_msgs
 	sensor_msgs
 	pcl_ros
 	tf2

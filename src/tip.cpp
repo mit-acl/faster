@@ -82,9 +82,9 @@ TIP::TIP() : tf_listener_(tf_buffer_) {
 	quad_status_ = state_.NOT_FLYING;
 
 	quad_goal_.cut_power = true;
-	// quad_goal_.mode = acl_system::QuadGoal::MODE_VEL;
-	quad_goal_.xy_mode = acl_system::QuadGoal::MODE_POS;
-	quad_goal_.z_mode = acl_system::QuadGoal::MODE_POS;
+	// quad_goal_.mode = acl_msgs::QuadGoal::MODE_VEL;
+	quad_goal_.xy_mode = acl_msgs::QuadGoal::MODE_POS;
+	quad_goal_.z_mode = acl_msgs::QuadGoal::MODE_POS;
 
 	inf = std::numeric_limits<double>::max();
 
@@ -106,7 +106,7 @@ void TIP::global_goalCB(const geometry_msgs::PointStamped& msg){
 	heading_ = atan2(goal_(1)-X_(0,1),goal_(0)-X_(0,0));
 }
 
-void TIP::stateCB(const acl_system::ViconState& msg)
+void TIP::stateCB(const acl_msgs::ViconState& msg)
 {
 	// Check if estimate jumped 
 	if (sqrt(pow(pose_(0)-msg.pose.position.x,2) + pow(pose_(1)- msg.pose.position.y,2) + pow(pose_(2)- msg.pose.position.z,2)) > jump_thresh_){
@@ -226,7 +226,7 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 }
 
 
-void TIP::eventCB(const acl_system::QuadFlightEvent& msg)
+void TIP::eventCB(const acl_msgs::QuadFlightEvent& msg)
 {
 	// Takeoff
 	if (msg.mode == msg.TAKEOFF && quad_status_== state_.NOT_FLYING){
@@ -1033,7 +1033,7 @@ void TIP::convert2pcl(const sensor_msgs::PointCloud2ConstPtr msg,pcl::PointCloud
 }
 
 
-void TIP::eigen2quadGoal(Eigen::MatrixXd Xc, acl_system::QuadGoal& quad_goal){
+void TIP::eigen2quadGoal(Eigen::MatrixXd Xc, acl_msgs::QuadGoal& quad_goal){
  	quad_goal_.pos.x   = Xc(0,0);
  	quad_goal_.vel.x   = Xc(1,0);
  	quad_goal_.accel.x = Xc(2,0);
