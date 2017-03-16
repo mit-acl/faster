@@ -94,7 +94,7 @@ private:
 	double jump_thresh_, bias_x_, bias_y_, bias_z_;
 	double inf, z_min_, z_max_, v_plan_, mem_distance_;
 
-	int num_ = 50, K_, goal_index_, num_of_pnts_, quad_status_, h_samples_, v_samples_, count2 ;
+	int num_ = 50, K_, goal_index_, num_of_pnts_, h_samples_, v_samples_, count2 ;
 	bool debug_, can_reach_goal_, collision_detected_, gen_new_traj_, stop_, can_reach_global_goal_, yawing_, following_prim_, v_los_, use_memory_, still_clear_;
 	
 
@@ -116,7 +116,7 @@ private:
 	acl_planning::TIP tipData_;
 
 	acl_msgs::QuadGoal quad_goal_;
-	acl_msgs::QuadState state_;
+	acl_msgs::QuadState quad_status_;
 	acl_msgs::QuadFlightEvent quad_event_;
 
 

@@ -79,7 +79,7 @@ TIP::TIP() : tf_listener_(tf_buffer_) {
 	can_reach_goal_ = false;
 	following_prim_ = false;
 
-	quad_status_ = state_.NOT_FLYING;
+	quad_status_.mode = quad_status_.NOT_FLYING;
 
 	quad_goal_.cut_power = true;
 	// quad_goal_.mode = acl_msgs::QuadGoal::MODE_VEL;
@@ -111,7 +111,7 @@ void TIP::stateCB(const acl_msgs::ViconState& msg)
 	// Check if estimate jumped 
 	if (sqrt(pow(pose_(0)-msg.pose.position.x,2) + pow(pose_(1)- msg.pose.position.y,2) + pow(pose_(2)- msg.pose.position.z,2)) > jump_thresh_){
 		ROS_WARN("Jump Detected -- magnitude: %0.3f",sqrt(pow(pose_(0)-msg.pose.position.x,2) + pow(pose_(1)- msg.pose.position.y,2) + pow(pose_(2)- msg.pose.position.z,2)));
-		if (quad_status_ == state_.GO){
+		if (quad_status_.mode == quad_status_.GO){
 			bias_x_ = msg.pose.position.x-pose_(0);
 			bias_y_ = msg.pose.position.y-pose_(1);
 			bias_z_ = msg.pose.position.z-pose_(2);
@@ -128,7 +128,7 @@ void TIP::stateCB(const acl_msgs::ViconState& msg)
 	tf::quaternionMsgToTF(msg.pose.orientation, att_);
 
 	// Check this
-	if (quad_status_ == state_.NOT_FLYING){
+	if (quad_status_.mode == quad_status_.NOT_FLYING){
 		X_.row(0) << pose_.transpose();
 	}
 }
@@ -145,32 +145,31 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 		t0_ = ros::Time::now().toSec() - plan_eval_time_;
 	}
 
-	if (quad_status_== state_.TAKEOFF){
+	if (quad_status_.mode == quad_status_.TAKEOFF){
 		takeoff(X_(0,2));
 		if (X_(0,2) == goal_(2)){
-			quad_status_ = state_.FLYING;
+			quad_status_.mode = quad_status_.FLYING;
 			ROS_INFO("Take-off Complete");
 		}
 	}
 
-	else if (quad_status_== state_.LAND){
+	else if (quad_status_.mode == quad_status_.LAND){
 		if (X_.block(1,0,1,2).norm() == 0){
 			land(X_(0,2));
 			if (X_(0,2) == -0.1){
-				quad_status_ = state_.NOT_FLYING;
+				quad_status_.mode = quad_status_.NOT_FLYING;
 				quad_goal_.cut_power = true;
 				ROS_INFO("Landing Complete");
 			}
 		}
 	}
 
-	else if (quad_status_ == state_.GO){			
+	else if (quad_status_.mode == quad_status_.GO){			
 		double diff = heading_ - quad_goal_.yaw;
-		// diff =  fmod(diff+M_PI,2*M_PI);
+		diff =  fmod(diff+M_PI,2*M_PI);
 	    if (diff < 0)
 	        diff += 2*M_PI;
 	    diff -= M_PI;
-	    diff = 0;
 		if(fabs(diff)>0.02 && !stop_){
 			if (!yawing_){
 				if (fabs(diff)>M_PI/2 || X_.block(1,0,1,3).norm()==0) {v_ = 0; gen_new_traj_=true;}
@@ -213,7 +212,7 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 		if (X_.row(1).norm() == 0 && stop_){
 			// We're done	
 			stop_ = false;
-			if ((goal_.head(2)-X_.block(0,0,1,2).transpose()).norm() < 5){ ROS_INFO("Flight Complete"); quad_status_ = state_.FLYING; }
+			if ((goal_.head(2)-X_.block(0,0,1,2).transpose()).norm() < 5){ ROS_INFO("Flight Complete"); quad_status_.mode = quad_status_.FLYING; }
 			else {v_ = v_max_; gen_new_traj_ = true;};
 		}
 	}
@@ -229,7 +228,7 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 void TIP::eventCB(const acl_msgs::QuadFlightEvent& msg)
 {
 	// Takeoff
-	if (msg.mode == msg.TAKEOFF && quad_status_== state_.NOT_FLYING){
+	if (msg.mode == msg.TAKEOFF && quad_status_.mode == quad_status_.NOT_FLYING){
 		ROS_INFO("Waiting for spinup");
 		quad_goal_.pos.x = pose_(0);
 		quad_goal_.pos.y = pose_(1);
@@ -251,21 +250,21 @@ void TIP::eventCB(const acl_msgs::QuadFlightEvent& msg)
 		ros::Duration(spinup_time_).sleep();
 		ROS_INFO("Taking off");
 
-		quad_status_ = state_.TAKEOFF; 
+		quad_status_.mode = quad_status_.TAKEOFF; 
 	}
 	// Emergency kill
-	else if (msg.mode == msg.KILL && quad_status_ != state_.NOT_FLYING){
-		quad_status_ = state_.NOT_FLYING;
+	else if (msg.mode == msg.KILL && quad_status_.mode != quad_status_.NOT_FLYING){
+		quad_status_.mode = quad_status_.NOT_FLYING;
 		quad_goal_.cut_power = true;
 		ROS_ERROR("Killing");
 	}
 	// Landing
-	else if (msg.mode == msg.LAND && quad_status_ == state_.FLYING){
-		quad_status_ = state_.LAND;
+	else if (msg.mode == msg.LAND && quad_status_.mode == quad_status_.FLYING){
+		quad_status_.mode = quad_status_.LAND;
 		ROS_INFO("Landing");
 	}
 	// Initializing
-	else if (msg.mode == msg.INIT && quad_status_ == state_.FLYING){
+	else if (msg.mode == msg.INIT && quad_status_.mode == quad_status_.FLYING){
 		double diff = heading_ - quad_goal_.yaw;
 		diff =  fmod(diff+M_PI,2*M_PI) - M_PI;
 		if (diff < 0)
@@ -284,17 +283,17 @@ void TIP::eventCB(const acl_msgs::QuadFlightEvent& msg)
 		ROS_INFO("Initialized");
 	}
 	// GO!!!!
-	else if (msg.mode == msg.START && quad_status_ == state_.FLYING){
+	else if (msg.mode == msg.START && quad_status_.mode == quad_status_.FLYING){
 		// Set speed to desired speed
 		v_ = v_max_;
 		// Generate new traj
 		gen_new_traj_ = true;
-		quad_status_ = state_.GO;
+		quad_status_.mode = quad_status_.GO;
 		ROS_INFO("Starting");
 		
 	}
 	// STOP!!!
-	else if (msg.mode == msg.ESTOP && quad_status_ == state_.GO){
+	else if (msg.mode == msg.ESTOP && quad_status_.mode == quad_status_.GO){
 		ROS_WARN("Stopping");
 		// Stay in go command but set speed to zero
 		v_ = 0;
@@ -325,7 +324,7 @@ void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 		}
 	}
 
- 	if (i!=size && quad_status_!=state_.NOT_FLYING){
+ 	if (i!=size && quad_status_.mode!=quad_status_.NOT_FLYING){
 		// Build k-d tree
 		kdtree_.setInputCloud(cloud_);
 		
@@ -343,7 +342,7 @@ void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 			// ROS_INFO("Still clear: %i",still_clear_);		
 		}
 
-	 	if (still_clear_ && v_plan_ > 0 && use_memory_ && !stop_ && dist_trav_last_ < mem_distance_ && min_cost_prim_ > last_prim_cost_ && quad_status_== state_.GO){
+	 	if (still_clear_ && v_plan_ > 0 && use_memory_ && !stop_ && dist_trav_last_ < mem_distance_ && min_cost_prim_ > last_prim_cost_ && quad_status_.mode == quad_status_.GO){
 			// Update distance traveled
 			dist_trav_last_ = (X_.block(0,0,1,3).transpose() - pose_last_mp_).norm();
 			if (!following_prim_) {count2 = 0; ROS_INFO("following primitive");}
@@ -356,7 +355,7 @@ void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 			if (following_prim_) {ROS_INFO("not following primitive"); ROS_INFO("Distance traveled: %0.3f",dist_trav_last_);}
 			following_prim_ = false;
 			still_clear_ = true;
-			if (!can_reach_goal_ && quad_status_==state_.GO){
+			if (!can_reach_goal_ && quad_status_.mode==quad_status_.GO){
 		 		// Need to stop!!!
 		 		v_ = 0;
 		 		stop_ = true;
@@ -390,7 +389,7 @@ void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 
  	saturate(min_cost_prim_,0,5);
 
- 	if (quad_status_!=state_.GO || stop_) tipData_.prim_cost = 0;
+ 	if (quad_status_.mode!=quad_status_.GO || stop_) tipData_.prim_cost = 0;
  	else if (following_prim_) tipData_.prim_cost = last_prim_cost_;
     else tipData_.prim_cost = min_cost_prim_;
 
