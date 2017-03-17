@@ -21,6 +21,7 @@
 #include "acl_msgs/QuadGoal.h"
 #include "acl_msgs/QuadState.h"
 #include "acl_msgs/QuadFlightEvent.h"
+#include "acl_msgs/QuadMode.h"
 #include "acl_msgs/FloatStamped.h"
 #include "acl_planning/TIP.h"
 
@@ -53,6 +54,7 @@ public:
 	void stateCB(const acl_msgs::ViconState& msg);
 	void global_goalCB(const geometry_msgs::PointStamped& msg);
 	void eventCB(const acl_msgs::QuadFlightEvent& msg);
+	void modeCB(const acl_msgs::QuadMode& msg);
 
 	// ROS timed functions
 	void sendGoal(const ros::TimerEvent&);

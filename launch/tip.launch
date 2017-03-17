@@ -14,6 +14,7 @@
 		<remap from="~event" to="event" />
 		<remap from="~global_goal" to="global_goal" />
 		<remap from="~camera/cloud" to="camera/cloud"/>	
+		<remap from="~mode" to="mode"/>	
 
 		<remap from="~new_global_goal" to="new_global_goal"/>
 		<remap from="~traj" to="traj"/>

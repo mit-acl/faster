@@ -101,6 +101,20 @@ TIP::TIP() : tf_listener_(tf_buffer_) {
 	ROS_INFO("Planner initialized.");
 }
 
+void TIP::modeCB(const acl_msgs::QuadMode& msg){
+	// If we're in idle or waypoint mode then track position
+	if (msg.mode==msg.MODE_IDLE || msg.mode == msg.MODE_WAYPOINT){
+		quad_goal_.xy_mode = acl_msgs::QuadGoal::MODE_POS;
+		quad_goal_.z_mode = acl_msgs::QuadGoal::MODE_POS;
+	}
+	// Else go open loop in xy with z position control
+	else{
+		quad_goal_.xy_mode = acl_msgs::QuadGoal::MODE_ACCEL;
+		quad_goal_.z_mode = acl_msgs::QuadGoal::MODE_POS;
+	}
+}
+
+
 void TIP::global_goalCB(const geometry_msgs::PointStamped& msg){
 	goal_ << msg.point.x, msg.point.y, msg.point.z;
 	heading_ = atan2(goal_(1)-X_(0,1),goal_(0)-X_(0,0));

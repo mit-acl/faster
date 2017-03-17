@@ -21,7 +21,9 @@ int main(int argc, char **argv)
 
 	// initialize listener callback for global goal
 	ros::Subscriber global_goal_sub = n.subscribe("global_goal", 1, &TIP::global_goalCB, &tip);
-	
+
+	// initialize listener callback for system mode
+	ros::Subscriber mode_sub = n.subscribe("mode", 1, &TIP::modeCB, &tip);	
 
 	// SendCmd timer
 	ros::Timer sendGoalTimer = n.createTimer(ros::Duration(tip.plan_eval_time_), &TIP::sendGoal, &tip);
