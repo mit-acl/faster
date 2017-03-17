@@ -97,7 +97,7 @@ private:
 	double inf, z_min_, z_max_, v_plan_, mem_distance_;
 
 	int num_ = 50, K_, goal_index_, num_of_pnts_, h_samples_, v_samples_, count2 ;
-	bool debug_, can_reach_goal_, collision_detected_, gen_new_traj_, stop_, can_reach_global_goal_, yawing_, following_prim_, v_los_, use_memory_, still_clear_;
+	bool debug_, can_reach_goal_, collision_detected_, gen_new_traj_, stop_, can_reach_global_goal_, yawing_, following_prim_, v_los_, use_memory_, still_clear_, e_stop_;
 	
 
 	std::ostringstream errorMsg, warnMsg;

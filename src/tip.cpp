@@ -78,6 +78,7 @@ TIP::TIP() : tf_listener_(tf_buffer_) {
 	can_reach_global_goal_ = true;
 	can_reach_goal_ = false;
 	following_prim_ = false;
+	e_stop_ = false;
 
 	quad_status_.mode = quad_status_.NOT_FLYING;
 
@@ -226,7 +227,7 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 		if (X_.row(1).norm() == 0 && stop_){
 			// We're done	
 			stop_ = false;
-			if ((goal_.head(2)-X_.block(0,0,1,2).transpose()).norm() < 5){ ROS_INFO("Flight Complete"); quad_status_.mode = quad_status_.FLYING; }
+			if ((goal_.head(2)-X_.block(0,0,1,2).transpose()).norm() < 5 || e_stop_){ ROS_INFO("Flight Complete"); quad_status_.mode = quad_status_.FLYING; }
 			else {v_ = v_max_; gen_new_traj_ = true;};
 		}
 	}
@@ -279,6 +280,7 @@ void TIP::eventCB(const acl_msgs::QuadFlightEvent& msg)
 	}
 	// Initializing
 	else if (msg.mode == msg.INIT && quad_status_.mode == quad_status_.FLYING){
+		e_stop_ = false;
 		double diff = heading_ - quad_goal_.yaw;
 		diff =  fmod(diff+M_PI,2*M_PI) - M_PI;
 		if (diff < 0)
@@ -298,6 +300,7 @@ void TIP::eventCB(const acl_msgs::QuadFlightEvent& msg)
 	}
 	// GO!!!!
 	else if (msg.mode == msg.START && quad_status_.mode == quad_status_.FLYING){
+		e_stop_ = false;
 		// Set speed to desired speed
 		v_ = v_max_;
 		// Generate new traj
@@ -315,7 +318,7 @@ void TIP::eventCB(const acl_msgs::QuadFlightEvent& msg)
 		quad_goal_.dyaw = 0;
 		// Generate new traj
 		gen_new_traj_ = true;
-		
+		e_stop_ = true;		
 	}
 }
 
