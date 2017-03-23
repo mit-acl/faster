@@ -1076,11 +1076,11 @@ void TIP::takeoff(double& z){
 
 void TIP::land(double& z){
 	if (z > 0.4){
-		z-=0.003;
+		z-=0.005;
 		saturate(z,-0.1,goal_(2));
 	}
 	else{
-		z-=0.001;
+		z-=0.005;
 		saturate(z,-0.1,goal_(2));
 	}
 }
