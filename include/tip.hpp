@@ -113,7 +113,6 @@ private:
 	sensor_msgs::PointCloud goal_points_ros_;
 	geometry_msgs::Pose temp_goal_point_ros_;
 	geometry_msgs::PoseStamped temp_path_point_ros_;
-	geometry_msgs::PointStamped ros_new_global_goal_, ros_last_global_goal_;
 	nav_msgs::Path traj_ros_;
 	acl_planning::TIP tipData_;
 

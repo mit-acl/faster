@@ -1,14 +1,14 @@
 # Params for TIP planner
 debug: true
-use_memory: true
+# use_memory: true
 safe_distance: 6   # Smallest distance before obstacle is no longer viable segment
 sensor_distance: 10 # Primitives evaluated up to this distance
 mem_distance: 6
 buffer: 0.42        # 0.5 width of quad for collision checking
 
 # (x,y,z) goal
-goal_x: 50.0
-goal_y: 0.0
+goal_x: 0.0
+goal_y: -20.0
 goal_z: 1
 
 # Flight params

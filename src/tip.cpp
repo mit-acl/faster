@@ -185,6 +185,7 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 	    if (diff < 0)
 	        diff += 2*M_PI;
 	    diff -= M_PI;
+
 		if(fabs(diff)>0.02 && !stop_){
 			if (!yawing_){
 				if (fabs(diff)>M_PI/2 || X_.block(1,0,1,3).norm()==0) {v_ = 0; gen_new_traj_=true;}
@@ -194,14 +195,14 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 			// Only yaw if the vehicle is at right speed
 			if (X_.block(1,0,1,3).norm() <= 1.1*v_ && X_.block(1,0,1,3).norm() >= 0.9*v_){
 				yawing_ = true;
-				saturate(diff,-plan_eval_time_*r_max_,plan_eval_time_*r_max_);
+					saturate(diff,-plan_eval_time_*r_max_,plan_eval_time_*r_max_);
 				if (diff>0) quad_goal_.dyaw =  r_max_;
 				else        quad_goal_.dyaw = -r_max_;
 				quad_goal_.yaw+=diff;
 			}				
 			else{
 				yawing_=false;
-			}			
+			}
 		}
 		else if (!stop_) {
 			v_ = v_max_;
@@ -292,7 +293,6 @@ void TIP::eventCB(const acl_msgs::QuadFlightEvent& msg)
 			else        quad_goal_.dyaw = -r_max_;
 			quad_goal_.yaw+=diff;	
 			diff = heading_ - quad_goal_.yaw;
-			diff =  fmod(diff+M_PI,2*M_PI) - M_PI;	
 			ros::Duration(0.002).sleep();
 		}
 		quad_goal_.dyaw = 0;
@@ -300,9 +300,15 @@ void TIP::eventCB(const acl_msgs::QuadFlightEvent& msg)
 	}
 	// GO!!!!
 	else if (msg.mode == msg.START && quad_status_.mode == quad_status_.FLYING){
-		e_stop_ = false;
+		double diff = heading_ - quad_goal_.yaw;
+		diff =  fmod(diff+M_PI,2*M_PI);
+	    if (diff < 0)
+	        diff += 2*M_PI;
+	    diff -= M_PI;
 		// Set speed to desired speed
-		v_ = v_max_;
+	    if (std::abs(diff)>0.01) {v_=0; yawing_=true;}
+	    else v_ = v_max_;
+		e_stop_ = false;
 		// Generate new traj
 		gen_new_traj_ = true;
 		quad_status_.mode = quad_status_.GO;
@@ -1120,25 +1126,9 @@ void TIP::convert2ROS(){
 		t_+=dt_;
 		traj_ros_.poses.push_back(temp_path_point_ros_);
 	}
-
-	ros_new_global_goal_.header.stamp = ros::Time::now();
-	ros_new_global_goal_.header.frame_id = "world";
-	if (can_reach_global_goal_){
-		ros_new_global_goal_.point.x = goal_(0);
-		ros_new_global_goal_.point.y = goal_(1);
-		ros_new_global_goal_.point.z = goal_(2);
-
-	} 
-	else{
-		ros_new_global_goal_.point.x = 3*local_goal_(0)+pose_(0);
-		ros_new_global_goal_.point.y = 3*local_goal_(1)+pose_(1);
-		ros_new_global_goal_.point.z = 3*local_goal_(2)+pose_(2);
-
-	}
  }
 
 void TIP::pubROS(){
 	traj_pub.publish(traj_ros_);
 	tipData_pub.publish(tipData_);
-	new_goal_pub.publish(ros_new_global_goal_);
 }

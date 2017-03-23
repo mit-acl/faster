@@ -2,7 +2,7 @@
 
 	<arg name="quad"/>
 	<arg name="bag"/>
-	<arg name="memory"/>
+	<arg name="memory" default="true"/>
 
 	<node ns="$(arg quad)" name="tip_planner" pkg="acl_planning" type="tip_planner" output="screen" clear_params="true">
 
@@ -16,7 +16,6 @@
 		<remap from="~camera/cloud" to="camera/cloud"/>	
 		<remap from="~mode" to="mode"/>	
 
-		<remap from="~new_global_goal" to="new_global_goal"/>
 		<remap from="~traj" to="traj"/>
 		<remap from="~tip_data" to="tip_data"/>
 		<remap from="~goal" to="goal" />
