@@ -1,7 +1,7 @@
 <launch>
 
 	<arg name="quad"/>
-	<arg name="bag"/>
+	<arg name="bag" default="false"/>
 	<arg name="memory" default="true"/>
 
 	<node ns="$(arg quad)" name="tip_planner" pkg="acl_planning" type="tip_planner" output="screen" clear_params="true">
