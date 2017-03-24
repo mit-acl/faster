@@ -25,10 +25,10 @@ plan_eval: 0.01
 K: 10
 
 # Sensor horizontal FOV (deg)
-h_fov: 60
+h_fov: 45
 
 # Number of horizontal FOV discretization
-h_samples: 4
+h_samples: 9
 
 # Sensor vertical FOV (deg)
 v_fov: 40
@@ -42,8 +42,10 @@ r_max: 2
 # Maximum tolerable jump in state estimate before replanning
 jump_thresh: 0.5
 
+# Min and max allowable z values 
 z_min: 0.2
 z_max: 3.0
 
+# Goal buffer
 goal_radius: 0.5
     

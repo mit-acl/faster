@@ -100,7 +100,7 @@ TIP::TIP() : tf_listener_(tf_buffer_) {
 	    // nothing
 	  }
 	}
-	ROS_INFO("Planner initialized.");
+	ROS_INFO("Planner initialized");
 }
 
 void TIP::modeCB(const acl_msgs::QuadMode& msg){
@@ -122,7 +122,6 @@ void TIP::global_goalCB(const geometry_msgs::PointStamped& msg){
 	heading_ = atan2(goal_(1)-X_(0,1),goal_(0)-X_(0,0));
 
 	dist_2_goal_ = (goal_.head(2) - X_.row(0).transpose().head(2)).norm();
-
 }
 
 void TIP::stateCB(const acl_msgs::ViconState& msg)
@@ -193,8 +192,8 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 
 		if(fabs(diff)>0.02 && !stop_ && dist_2_goal_ > goal_radius_){
 			if (!yawing_){
-				if (fabs(diff)>M_PI/2 || X_.block(1,0,1,3).norm()==0) {v_ = 0; gen_new_traj_=true;}
-				else if (!stop_) v_ = v_max_;
+				if (fabs(diff)>M_PI/2 || X_.block(1,0,1,3).norm()==0.0) {v_ = 0; gen_new_traj_=true;}
+				else if (!stop_ && can_reach_goal_) {v_ = v_max_;}
 				else {v_ = 0; gen_new_traj_ = true;}
 			}
 			// Only yaw if the vehicle is at right speed
@@ -209,7 +208,7 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 				yawing_=false;
 			}
 		}
-		else if (!stop_ && dist_2_goal_ > goal_radius_) {
+		else if (!stop_ && dist_2_goal_ > goal_radius_ && can_reach_goal_) {
 			v_ = v_max_;
 			quad_goal_.dyaw=0;
 			yawing_ = false;
@@ -234,7 +233,7 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 			// We're done	
 			stop_ = false;
 			if (dist_2_goal_ < goal_radius_ || e_stop_){v_ = 0;}//quad_status_.mode = quad_status_.FLYING; }
-			else {v_ = v_max_; gen_new_traj_ = true;};
+			else if (can_reach_goal_) {v_ = v_max_; gen_new_traj_ = true;}
 		}
 	}
 
@@ -381,7 +380,7 @@ void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 			// if (following_prim_) {ROS_INFO("not following primitive"); ROS_INFO("Distance traveled: %0.3f",dist_trav_last_);}
 			following_prim_ = false;
 			still_clear_ = true;
-			if (!can_reach_goal_ && quad_status_.mode==quad_status_.GO && X_.row(1).norm()>0){
+			if (!can_reach_goal_ && !stop_ && quad_status_.mode==quad_status_.GO && X_.row(1).norm()>0){
 		 		// Need to stop!!!
 		 		v_ = 0;
 		 		stop_ = true;
