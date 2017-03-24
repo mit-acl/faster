@@ -53,7 +53,9 @@ TIP::TIP() : tf_listener_(tf_buffer_) {
 
 	ros::param::get("~z_min",z_min_);
 	ros::param::get("~z_max",z_max_);
-	
+
+	ros::param::get("~goal_radius",goal_radius_);
+
 	h_fov_ = h_fov_*M_PI/180;
 	v_fov_ = v_fov_*M_PI/180;
 
@@ -83,7 +85,6 @@ TIP::TIP() : tf_listener_(tf_buffer_) {
 	quad_status_.mode = quad_status_.NOT_FLYING;
 
 	quad_goal_.cut_power = true;
-	// quad_goal_.mode = acl_msgs::QuadGoal::MODE_VEL;
 	quad_goal_.xy_mode = acl_msgs::QuadGoal::MODE_POS;
 	quad_goal_.z_mode = acl_msgs::QuadGoal::MODE_POS;
 
@@ -119,6 +120,9 @@ void TIP::modeCB(const acl_msgs::QuadMode& msg){
 void TIP::global_goalCB(const geometry_msgs::PointStamped& msg){
 	goal_ << msg.point.x, msg.point.y, msg.point.z;
 	heading_ = atan2(goal_(1)-X_(0,1),goal_(0)-X_(0,0));
+
+	dist_2_goal_ = (goal_.head(2) - X_.row(0).transpose().head(2)).norm();
+
 }
 
 void TIP::stateCB(const acl_msgs::ViconState& msg)
@@ -145,6 +149,7 @@ void TIP::stateCB(const acl_msgs::ViconState& msg)
 	// Check this
 	if (quad_status_.mode == quad_status_.NOT_FLYING){
 		X_.row(0) << pose_.transpose();
+		quad_goal_.yaw = tf::getYaw(msg.pose.orientation);
 	}
 }
 
@@ -186,7 +191,7 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 	        diff += 2*M_PI;
 	    diff -= M_PI;
 
-		if(fabs(diff)>0.02 && !stop_){
+		if(fabs(diff)>0.02 && !stop_ && dist_2_goal_ > goal_radius_){
 			if (!yawing_){
 				if (fabs(diff)>M_PI/2 || X_.block(1,0,1,3).norm()==0) {v_ = 0; gen_new_traj_=true;}
 				else if (!stop_) v_ = v_max_;
@@ -204,13 +209,13 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 				yawing_=false;
 			}
 		}
-		else if (!stop_) {
+		else if (!stop_ && dist_2_goal_ > goal_radius_) {
 			v_ = v_max_;
 			quad_goal_.dyaw=0;
 			yawing_ = false;
 		} 	
 
-		if (!stop_){
+		if (!stop_ && X_.row(1).norm() > 0){
 			get_stop_dist(X_,goal_,can_reach_global_goal_,stop_);
 			if (stop_){
 				v_ = 0;
@@ -228,7 +233,7 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 		if (X_.row(1).norm() == 0 && stop_){
 			// We're done	
 			stop_ = false;
-			if ((goal_.head(2)-X_.block(0,0,1,2).transpose()).norm() < 5 || e_stop_){ ROS_INFO("Flight Complete"); quad_status_.mode = quad_status_.FLYING; }
+			if (dist_2_goal_ < goal_radius_ || e_stop_){v_ = 0;}//quad_status_.mode = quad_status_.FLYING; }
 			else {v_ = v_max_; gen_new_traj_ = true;};
 		}
 	}
@@ -283,7 +288,7 @@ void TIP::eventCB(const acl_msgs::QuadFlightEvent& msg)
 	else if (msg.mode == msg.INIT && quad_status_.mode == quad_status_.FLYING){
 		e_stop_ = false;
 		double diff = heading_ - quad_goal_.yaw;
-		diff =  fmod(diff+M_PI,2*M_PI) - M_PI;
+		diff =  fmod(diff+M_PI,2*M_PI);
 		if (diff < 0)
 	        diff += 2*M_PI;
 	    diff -= M_PI;
@@ -357,34 +362,32 @@ void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 		// Pick desired final state
 		pick_ss(Sorted_Goals_, X_, can_reach_goal_);
 		
-		if (!v_los_) following_prim_ = true;
+		if (!v_los_ && !stop_) following_prim_ = true;
 
 		// Check if current primitive is still collision free
 		if (following_prim_ && v_plan_ > 0) {
 			check_current_prim(Xf_switch_,Yf_switch_,Zf_switch_,t_xf_,t_yf_,t_zf_,tE_,X_,still_clear_);
-			// ROS_INFO("Still clear: %i",still_clear_);		
 		}
 
 	 	if (still_clear_ && v_plan_ > 0 && use_memory_ && !stop_ && dist_trav_last_ < mem_distance_ && min_cost_prim_ > last_prim_cost_ && quad_status_.mode == quad_status_.GO){
 			// Update distance traveled
 			dist_trav_last_ = (X_.block(0,0,1,3).transpose() - pose_last_mp_).norm();
-			if (!following_prim_) {count2 = 0; ROS_INFO("following primitive");}
-			// ROS_INFO("%i",count2);
-			count2++;
+			// if (!following_prim_) {count2 = 0; ROS_INFO("following primitive");}
+			// count2++;
 			following_prim_ = true;
 		}
 
 		else{
-			if (following_prim_) {ROS_INFO("not following primitive"); ROS_INFO("Distance traveled: %0.3f",dist_trav_last_);}
+			// if (following_prim_) {ROS_INFO("not following primitive"); ROS_INFO("Distance traveled: %0.3f",dist_trav_last_);}
 			following_prim_ = false;
 			still_clear_ = true;
-			if (!can_reach_goal_ && quad_status_.mode==quad_status_.GO){
+			if (!can_reach_goal_ && quad_status_.mode==quad_status_.GO && X_.row(1).norm()>0){
 		 		// Need to stop!!!
 		 		v_ = 0;
 		 		stop_ = true;
 		 		ROS_ERROR_THROTTLE(1.0,"Emergency stop -- no feasible path");
 		 	}
-		 	else if (v_los_ && !stop_ && !yawing_) v_ = v_max_;
+		 	// else if (v_los_ && !stop_ && !yawing_) v_ = v_max_;
 			
 		 	gen_new_traj_ = true;
 		 	pose_last_mp_ = X_.block(0,0,1,3).transpose();
