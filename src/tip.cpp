@@ -120,8 +120,6 @@ void TIP::modeCB(const acl_msgs::QuadMode& msg){
 void TIP::global_goalCB(const geometry_msgs::PointStamped& msg){
 	goal_ << msg.point.x, msg.point.y, msg.point.z;
 	heading_ = atan2(goal_(1)-X_(0,1),goal_(0)-X_(0,0));
-
-	dist_2_goal_ = (goal_.head(2) - X_.row(0).transpose().head(2)).norm();
 }
 
 void TIP::stateCB(const acl_msgs::ViconState& msg)
@@ -167,8 +165,8 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 	if (quad_status_.mode == quad_status_.TAKEOFF){
 		takeoff(X_(0,2));
 		if (X_(0,2) == goal_(2)){
-			quad_status_.mode = quad_status_.FLYING;
-			ROS_INFO("Take-off Complete");
+			quad_status_.mode = quad_status_.GO;
+			ROS_INFO("Take-off Complete. GO mode engaged!");
 		}
 	}
 
@@ -183,7 +181,9 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 		}
 	}
 
-	else if (quad_status_.mode == quad_status_.GO){			
+	else if (quad_status_.mode == quad_status_.GO){		
+		dist_2_goal_ = (goal_.head(2) - X_.row(0).transpose().head(2)).norm();
+	
 		double diff = heading_ - quad_goal_.yaw;
 		diff =  fmod(diff+M_PI,2*M_PI);
 	    if (diff < 0)
