@@ -1054,6 +1054,7 @@ void TIP::convert2pcl(const sensor_msgs::PointCloud2ConstPtr msg,pcl::PointCloud
 	pcl::fromPCLPointCloud2(*cloud2,*cloud);
 
 	cloud_out = cloud;
+	delete cloud2;
 }
 
 
