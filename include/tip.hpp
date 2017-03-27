@@ -80,6 +80,7 @@ public:
 	void eigen2quadGoal(Eigen::MatrixXd X, acl_msgs::QuadGoal& quad_goal);
 	void check_current_prim(Eigen::Matrix4d X0, Eigen::Matrix4d Y0, Eigen::Matrix4d Z0, std::vector<double> t_x, std::vector<double> t_y, std::vector<double> t_z, double t, Eigen::MatrixXd X, bool& clear);
 	void sync_times(Eigen::Vector4d x0, double tmax, double vf, std::vector<double>& tf, Eigen::Matrix4d& X_switch);
+	void angle_wrap(double& diff);
 
 private:
 

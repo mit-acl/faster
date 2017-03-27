@@ -103,7 +103,8 @@ TIP::TIP() : tf_listener_(tf_buffer_) {
 	ROS_INFO("Planner initialized");
 }
 
-void TIP::modeCB(const acl_msgs::QuadMode& msg){
+void TIP::modeCB(const acl_msgs::QuadMode& msg)
+{
 	// If we're in idle or waypoint mode then track position
 	if (msg.mode==msg.MODE_IDLE || msg.mode == msg.MODE_WAYPOINT){
 		quad_goal_.xy_mode = acl_msgs::QuadGoal::MODE_POS;
@@ -117,7 +118,8 @@ void TIP::modeCB(const acl_msgs::QuadMode& msg){
 }
 
 
-void TIP::global_goalCB(const geometry_msgs::PointStamped& msg){
+void TIP::global_goalCB(const geometry_msgs::PointStamped& msg)
+{
 	goal_ << msg.point.x, msg.point.y, msg.point.z;
 	heading_ = atan2(goal_(1)-X_(0,1),goal_(0)-X_(0,0));
 }
@@ -167,6 +169,12 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 		if (X_(0,2) == goal_(2)){
 			quad_status_.mode = quad_status_.GO;
 			ROS_INFO("Take-off Complete. GO mode engaged!");
+			double diff = heading_ - quad_goal_.yaw;
+			angle_wrap(diff);
+			// // Set speed to desired speed
+		 //    if (std::abs(diff)>0.02) {v_=0; yawing_=true;}
+		 //    else v_ = v_max_;
+		 //    std::cout << v_ << std::endl;
 		}
 	}
 
@@ -185,10 +193,7 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 		dist_2_goal_ = (goal_.head(2) - X_.row(0).transpose().head(2)).norm();
 	
 		double diff = heading_ - quad_goal_.yaw;
-		diff =  fmod(diff+M_PI,2*M_PI);
-	    if (diff < 0)
-	        diff += 2*M_PI;
-	    diff -= M_PI;
+		angle_wrap(diff);
 
 		if(fabs(diff)>0.02 && !stop_ && dist_2_goal_ > goal_radius_){
 			if (!yawing_){
@@ -197,9 +202,9 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 				else {v_ = 0; gen_new_traj_ = true;}
 			}
 			// Only yaw if the vehicle is at right speed
-			if (X_.block(1,0,1,3).norm() <= 1.1*v_ && X_.block(1,0,1,3).norm() >= 0.9*v_){
+			if (X_.block(1,0,1,3).norm() <= (v_+0.1*v_max_) && X_.block(1,0,1,3).norm() >= (v_-0.1*v_max_)){
 				yawing_ = true;
-					saturate(diff,-plan_eval_time_*r_max_,plan_eval_time_*r_max_);
+				saturate(diff,-plan_eval_time_*r_max_,plan_eval_time_*r_max_);
 				if (diff>0) quad_goal_.dyaw =  r_max_;
 				else        quad_goal_.dyaw = -r_max_;
 				quad_goal_.yaw+=diff;
@@ -232,7 +237,8 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 		if (X_.row(1).norm() == 0 && stop_){
 			// We're done	
 			stop_ = false;
-			if (dist_2_goal_ < goal_radius_ || e_stop_){v_ = 0;}//quad_status_.mode = quad_status_.FLYING; }
+			if (dist_2_goal_ < goal_radius_){v_ = 0;}
+			else if (e_stop_){v_=0; quad_status_.mode = quad_status_.FLYING;}
 			else if (can_reach_goal_) {v_ = v_max_; gen_new_traj_ = true;}
 		}
 	}
@@ -279,7 +285,7 @@ void TIP::eventCB(const acl_msgs::QuadFlightEvent& msg)
 		ROS_ERROR("Killing");
 	}
 	// Landing
-	else if (msg.mode == msg.LAND && quad_status_.mode == quad_status_.FLYING){
+	else if (msg.mode == msg.LAND && quad_status_.mode != quad_status_.NOT_FLYING){
 		quad_status_.mode = quad_status_.LAND;
 		ROS_INFO("Landing");
 	}
@@ -287,10 +293,7 @@ void TIP::eventCB(const acl_msgs::QuadFlightEvent& msg)
 	else if (msg.mode == msg.INIT && quad_status_.mode == quad_status_.FLYING){
 		e_stop_ = false;
 		double diff = heading_ - quad_goal_.yaw;
-		diff =  fmod(diff+M_PI,2*M_PI);
-		if (diff < 0)
-	        diff += 2*M_PI;
-	    diff -= M_PI;
+		angle_wrap(diff);
 		while(std::abs(diff)>0.001){
 			saturate(diff,-0.002*r_max_,0.002*r_max_);
 			if (diff>0) quad_goal_.dyaw =  r_max_;
@@ -305,10 +308,7 @@ void TIP::eventCB(const acl_msgs::QuadFlightEvent& msg)
 	// GO!!!!
 	else if (msg.mode == msg.START && quad_status_.mode == quad_status_.FLYING){
 		double diff = heading_ - quad_goal_.yaw;
-		diff =  fmod(diff+M_PI,2*M_PI);
-	    if (diff < 0)
-	        diff += 2*M_PI;
-	    diff -= M_PI;
+		angle_wrap(diff);
 		// Set speed to desired speed
 	    if (std::abs(diff)>0.01) {v_=0; yawing_=true;}
 	    else v_ = v_max_;
@@ -316,8 +316,7 @@ void TIP::eventCB(const acl_msgs::QuadFlightEvent& msg)
 		// Generate new traj
 		gen_new_traj_ = true;
 		quad_status_.mode = quad_status_.GO;
-		ROS_INFO("Starting");
-		
+		ROS_INFO("Starting");		
 	}
 	// STOP!!!
 	else if (msg.mode == msg.ESTOP && quad_status_.mode == quad_status_.GO){
@@ -333,7 +332,7 @@ void TIP::eventCB(const acl_msgs::QuadFlightEvent& msg)
 }
 
 void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
- {
+{
  	msg_received_ = ros::WallTime::now().toSec();
  	
  	// Convert pcl
@@ -425,7 +424,8 @@ void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
  } 	
 
 
-void TIP::check_current_prim(Eigen::Matrix4d X0, Eigen::Matrix4d Y0, Eigen::Matrix4d Z0, std::vector<double> t_x, std::vector<double> t_y, std::vector<double> t_z, double t, Eigen::MatrixXd X, bool& clear){
+void TIP::check_current_prim(Eigen::Matrix4d X0, Eigen::Matrix4d Y0, Eigen::Matrix4d Z0, std::vector<double> t_x, std::vector<double> t_y, std::vector<double> t_z, double t, Eigen::MatrixXd X, bool& clear)
+{
 	clear = false;
 	collision_detected_ = false;
 
@@ -486,7 +486,8 @@ void TIP::check_current_prim(Eigen::Matrix4d X0, Eigen::Matrix4d Y0, Eigen::Matr
 }
 
 
-void TIP::sample_ss(Eigen::MatrixXd& Goals){
+void TIP::sample_ss(Eigen::MatrixXd& Goals)
+{
 	theta_ = Eigen::VectorXd::Zero(h_samples_);
 	theta_.setLinSpaced(h_samples_,-h_fov_/2,h_fov_/2);
 	
@@ -514,7 +515,8 @@ void TIP::sample_ss(Eigen::MatrixXd& Goals){
 	}
 }
 
-void TIP::sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d goal, Eigen::Vector3d vector_last, Eigen::MatrixXd& Sorted_Goals, bool& v_los){
+void TIP::sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d goal, Eigen::Vector3d vector_last, Eigen::MatrixXd& Sorted_Goals, bool& v_los)
+{
  	// Re-initialize
 	cost_queue_ = std::priority_queue<double, std::vector<double>, std::greater<double> > ();
 	cost_v_.clear();
@@ -563,10 +565,7 @@ void TIP::sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d g
  	double angle_v = p;
 
 	double angle_h = heading_ - quad_goal_.yaw;
-	angle_h =  fmod(angle_h+M_PI,2*M_PI);
-    if (angle_h < 0)
-        angle_h += 2*M_PI;
-    angle_h -= M_PI;
+	angle_wrap(angle_h);
 
     if (std::abs(angle_v) < v_fov_/2) v_los = true;
     else v_los = false;
@@ -582,7 +581,8 @@ void TIP::sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d g
  	}
 }
 
-void TIP::pick_ss(Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, bool& can_reach_goal){
+void TIP::pick_ss(Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, bool& can_reach_goal)
+{
 	goal_index_ = 0;
 	can_reach_goal = false;
 
@@ -622,7 +622,8 @@ void TIP::pick_ss(Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, bool& can_rea
 }
 
 
-void TIP::collision_check(Eigen::MatrixXd X, double buff, double v, bool& can_reach_goal, Eigen::Vector4d& local_goal_aug){
+void TIP::collision_check(Eigen::MatrixXd X, double buff, double v, bool& can_reach_goal, Eigen::Vector4d& local_goal_aug)
+{
 	//Re-intialize
 	can_reach_goal = false;
 	collision_detected_ = false;
@@ -704,7 +705,8 @@ void TIP::collision_check(Eigen::MatrixXd X, double buff, double v, bool& can_re
 	}
 }
 
-void TIP::get_traj(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, std::vector<double>& t_fx, std::vector<double>& t_fy, std::vector<double>& t_fz, Eigen::Matrix4d& Xf_switch, Eigen::Matrix4d& Yf_switch, Eigen::Matrix4d& Zf_switch, bool stop_check ){
+void TIP::get_traj(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, std::vector<double>& t_fx, std::vector<double>& t_fy, std::vector<double>& t_fz, Eigen::Matrix4d& Xf_switch, Eigen::Matrix4d& Yf_switch, Eigen::Matrix4d& Zf_switch, bool stop_check )
+{
 	//Generate new traj
 	get_vels(X,local_goal,v,vfx_,vfy_,vfz_);
 
@@ -715,21 +717,23 @@ void TIP::get_traj(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, std:
 	find_times(y0_, vfy_, t_fy, Yf_switch,stop_check);
 	find_times(z0_, vfz_, t_fz, Zf_switch,stop_check);
 
-	if (X.row(1).norm()==0){
-		// Sync traj
-		double tx = std::accumulate(t_fx.begin(), t_fx.end(), 0.0);
-		double ty = std::accumulate(t_fx.begin(), t_fx.end(), 0.0);
-		double tz = std::accumulate(t_fx.begin(), t_fx.end(), 0.0);
-		double tmax = std::max(std::max(tx,ty),tz);
+	// Sync trajectory experimentation
+	// if (X.row(1).norm()==0){
+	// 	// Sync traj
+	// 	double tx = std::accumulate(t_fx.begin(), t_fx.end(), 0.0);
+	// 	double ty = std::accumulate(t_fy.begin(), t_fy.end(), 0.0);
+	// 	double tz = std::accumulate(t_fz.begin(), t_fz.end(), 0.0);
+	// 	double tmax = std::max(std::max(tx,ty),tz);
 
-		sync_times(x0_, tmax, vfx_, t_fx, Xf_switch);
-		sync_times(y0_, tmax, vfy_, t_fy, Yf_switch);
-		sync_times(z0_, tmax, vfz_, t_fz, Zf_switch);
-	}
+	// 	sync_times(x0_, tmax, vfx_, t_fx, Xf_switch);
+	// 	sync_times(y0_, tmax, vfy_, t_fy, Yf_switch);
+	// 	sync_times(z0_, tmax, vfz_, t_fz, Zf_switch);
+	// }
 
 }
 
-void TIP::sync_times(Eigen::Vector4d x0, double tmax, double vf, std::vector<double>& t, Eigen::Matrix4d& X_switch){
+void TIP::sync_times(Eigen::Vector4d x0, double tmax, double vf, std::vector<double>& t, Eigen::Matrix4d& X_switch)
+{
 	if (tmax == std::accumulate(t.begin(), t.end(), 0.0) || vf == 0) return;
 	else {
 		double j_temp = copysign(4*vf/pow(tmax,2),vf);
@@ -767,7 +771,8 @@ void TIP::sync_times(Eigen::Vector4d x0, double tmax, double vf, std::vector<dou
 }
 
 
-void TIP::get_stop_dist(Eigen::MatrixXd X, Eigen::Vector3d goal, bool can_reach_global_goal, bool& stop){
+void TIP::get_stop_dist(Eigen::MatrixXd X, Eigen::Vector3d goal, bool can_reach_global_goal, bool& stop)
+{
 	if (can_reach_global_goal){
 		Eigen::Vector3d vector_2_goal = goal - X.row(0).transpose() ;
 		vector_2_goal.normalize();
@@ -798,7 +803,8 @@ void TIP::get_stop_dist(Eigen::MatrixXd X, Eigen::Vector3d goal, bool can_reach_
 }
 
 
-void TIP::get_vels(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, double& vx, double& vy, double& vz){
+void TIP::get_vels(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, double& vx, double& vy, double& vz)
+{
 	Eigen::Vector3d temp = local_goal;
 	temp.normalize();
 	vx = v*temp(0);
@@ -808,7 +814,8 @@ void TIP::get_vels(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, doub
 
 
 
-void TIP::find_times(Eigen::Vector4d x0, double vf, std::vector<double>& t, Eigen::Matrix4d&  X_switch, bool stop_check){
+void TIP::find_times(Eigen::Vector4d x0, double vf, std::vector<double>& t, Eigen::Matrix4d&  X_switch, bool stop_check)
+{
  	if (vf == x0(1)){
  		j_V_[0] = 0;
 		j_V_[1] = 0; 
@@ -959,7 +966,8 @@ void TIP::find_times(Eigen::Vector4d x0, double vf, std::vector<double>& t, Eige
 
 }
 
-void TIP::eval_trajectory(Eigen::Matrix4d X_switch, Eigen::Matrix4d Y_switch, Eigen::Matrix4d Z_switch, std::vector<double> t_x, std::vector<double> t_y, std::vector<double> t_z, double t, Eigen::MatrixXd& Xc){
+void TIP::eval_trajectory(Eigen::Matrix4d X_switch, Eigen::Matrix4d Y_switch, Eigen::Matrix4d Z_switch, std::vector<double> t_x, std::vector<double> t_y, std::vector<double> t_z, double t, Eigen::MatrixXd& Xc)
+{
 	// Eval x trajectory
 	int k = 0;
 	if (t < t_x[0]){
@@ -1035,8 +1043,8 @@ void TIP::eval_trajectory(Eigen::Matrix4d X_switch, Eigen::Matrix4d Y_switch, Ei
 }
 
 
-void TIP::convert2pcl(const sensor_msgs::PointCloud2ConstPtr msg,pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_out){
-  	
+void TIP::convert2pcl(const sensor_msgs::PointCloud2ConstPtr msg,pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_out)
+{ 	
 	geometry_msgs::TransformStamped tf_body;
     sensor_msgs::PointCloud2 msg_out;
 	try {
@@ -1058,7 +1066,8 @@ void TIP::convert2pcl(const sensor_msgs::PointCloud2ConstPtr msg,pcl::PointCloud
 }
 
 
-void TIP::eigen2quadGoal(Eigen::MatrixXd Xc, acl_msgs::QuadGoal& quad_goal){
+void TIP::eigen2quadGoal(Eigen::MatrixXd Xc, acl_msgs::QuadGoal& quad_goal)
+{
  	quad_goal_.pos.x   = Xc(0,0);
  	quad_goal_.vel.x   = Xc(1,0);
  	quad_goal_.accel.x = Xc(2,0);
@@ -1077,13 +1086,15 @@ void TIP::eigen2quadGoal(Eigen::MatrixXd Xc, acl_msgs::QuadGoal& quad_goal){
 
 
 
-void TIP::takeoff(double& z){
+void TIP::takeoff(double& z)
+{
 	z+=0.003;
 	saturate(z,-0.1,goal_(2));
 }
 
 
-void TIP::land(double& z){
+void TIP::land(double& z)
+{
 	if (z > 0.4){
 		z-=0.005;
 		saturate(z,-0.1,goal_(2));
@@ -1094,7 +1105,8 @@ void TIP::land(double& z){
 	}
 }
 
-void TIP::saturate(double &var, double min, double max){
+void TIP::saturate(double &var, double min, double max)
+{
 	if (var < min){
 		var = min;
 	}
@@ -1103,7 +1115,8 @@ void TIP::saturate(double &var, double min, double max){
 	}
 }
 
-void TIP::convert2ROS(){
+void TIP::convert2ROS()
+{
 	// Trajectory
 	traj_ros_.poses.clear();
 	traj_ros_.header.stamp = ros::Time::now();
@@ -1131,7 +1144,16 @@ void TIP::convert2ROS(){
 	}
  }
 
-void TIP::pubROS(){
+void TIP::pubROS()
+{
 	traj_pub.publish(traj_ros_);
 	tipData_pub.publish(tipData_);
+}
+
+void TIP::angle_wrap(double& diff)
+{
+	diff =  fmod(diff+M_PI,2*M_PI);
+    if (diff < 0)
+        diff += 2*M_PI;
+    diff -= M_PI;
 }
