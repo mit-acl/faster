@@ -169,12 +169,6 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 		if (X_(0,2) == goal_(2)){
 			quad_status_.mode = quad_status_.GO;
 			ROS_INFO("Take-off Complete. GO mode engaged!");
-			double diff = heading_ - quad_goal_.yaw;
-			angle_wrap(diff);
-			// // Set speed to desired speed
-		 //    if (std::abs(diff)>0.02) {v_=0; yawing_=true;}
-		 //    else v_ = v_max_;
-		 //    std::cout << v_ << std::endl;
 		}
 	}
 
