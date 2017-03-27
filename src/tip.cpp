@@ -148,7 +148,7 @@ void TIP::stateCB(const acl_msgs::ViconState& msg)
 	// Check this
 	if (quad_status_.mode == quad_status_.NOT_FLYING){
 		X_.row(0) << pose_.transpose();
-		quad_goal_.yaw = tf::getYaw(msg.pose.orientation);
+		yaw_ = tf::getYaw(msg.pose.orientation);
 	}
 }
 
@@ -301,14 +301,7 @@ void TIP::eventCB(const acl_msgs::QuadFlightEvent& msg)
 	}
 	// GO!!!!
 	else if (msg.mode == msg.START && quad_status_.mode == quad_status_.FLYING){
-		double diff = heading_ - quad_goal_.yaw;
-		angle_wrap(diff);
-		// Set speed to desired speed
-	    if (std::abs(diff)>0.01) {v_=0; yawing_=true;}
-	    else v_ = v_max_;
 		e_stop_ = false;
-		// Generate new traj
-		gen_new_traj_ = true;
 		quad_status_.mode = quad_status_.GO;
 		ROS_INFO("Starting");		
 	}
