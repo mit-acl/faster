@@ -616,7 +616,8 @@ void TIP::pick_ss(Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, bool& can_rea
  		// Tranform temp local goal to world frame
  		local_goal_ = qw2b_.conjugate()._transformVector(Sorted_Goals.block(goal_index_,0,1,3).transpose());
  		last_goal_ << local_goal_;
- 		double d = (goal_.head(2)-X_.block(0,0,1,2).transpose()).norm();
+ 		Eigen::Vector3d x = X.row(0).transpose();
+ 		double d = (goal_.head(2)-x.head(2)).norm();
  		if (goal_index_ == 0 && d < sensor_distance_) can_reach_global_goal_ = true;
  		else can_reach_global_goal_ = false;
  	}
@@ -790,8 +791,10 @@ void TIP::get_stop_dist(Eigen::MatrixXd X, Eigen::Vector3d goal, bool can_reach_
 		mtx.unlock();
 
 		// Double check this
-		d_stop_ = (X_stop_.block(0,0,1,2) - X.block(0,0,1,2)).norm();
-		d_goal_ = (X.block(0,0,1,2).transpose() - goal.head(2)).norm();
+		Eigen::Vector3d x_stop = X_stop_.row(0).transpose();
+		Eigen::Vector3d x = X.row(0).transpose();
+		d_stop_ = (x_stop.head(2) - x.head(2)).norm();
+		d_goal_ = (x.head(2) - goal.head(2)).norm();
 
 		// Prevents oscillation if our stopping distance is really small (low speed)
 		saturate(d_stop_,0.1,d_stop_);
