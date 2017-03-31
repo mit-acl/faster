@@ -173,13 +173,20 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 	}
 
 	else if (quad_status_.mode == quad_status_.LAND){
-		if (X_.block(1,0,1,2).norm() == 0){
+		if (X_.row(1).norm() == 0){
 			land(X_(0,2));
 			if (X_(0,2) == -0.1){
 				quad_status_.mode = quad_status_.NOT_FLYING;
 				quad_goal_.cut_power = true;
 				ROS_INFO("Landing Complete");
 			}
+		}
+		else {
+			tE_ = ros::Time::now().toSec() - t0_;
+		
+			mtx.lock();		
+			eval_trajectory(Xf_switch_,Yf_switch_,Zf_switch_,t_xf_,t_yf_,t_zf_,tE_,X_);
+			mtx.unlock();
 		}
 	}
 
@@ -281,6 +288,13 @@ void TIP::eventCB(const acl_msgs::QuadFlightEvent& msg)
 	// Landing
 	else if (msg.mode == msg.LAND && quad_status_.mode != quad_status_.NOT_FLYING){
 		quad_status_.mode = quad_status_.LAND;
+		if (v_ != 0){
+			v_ = 0;
+			stop_ = true;
+			quad_goal_.dyaw = 0;
+			// Generate new traj
+			gen_new_traj_ = true;
+		}
 		ROS_INFO("Landing");
 	}
 	// Initializing
