@@ -198,12 +198,12 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 
 		if(fabs(diff)>0.02 && !stop_ && dist_2_goal_ > goal_radius_){
 			if (!yawing_){
-				if (fabs(diff)>M_PI/2 || X_.block(1,0,1,3).norm()==0.0) {v_ = 0; gen_new_traj_=true;}
+				if (fabs(diff)>M_PI/2 || X_.row(1).norm()==0.0) {v_ = 0; gen_new_traj_=true;}
 				else if (!stop_ && can_reach_goal_) {v_ = v_max_;}
 				else {v_ = 0; gen_new_traj_ = true;}
 			}
 			// Only yaw if the vehicle is at right speed
-			if (X_.block(1,0,1,3).norm() <= (v_+0.1*v_max_) && X_.block(1,0,1,3).norm() >= (v_-0.1*v_max_)){
+			if (X_.row(1).norm() <= (v_+0.1*v_max_) && X_.row(1).norm() >= (v_-0.1*v_max_)){
 				yawing_ = true;
 				saturate(diff,-plan_eval_time_*r_max_,plan_eval_time_*r_max_);
 				if (diff>0) quad_goal_.dyaw =  r_max_;
@@ -295,7 +295,7 @@ void TIP::eventCB(const acl_msgs::QuadFlightEvent& msg)
 			// Generate new traj
 			gen_new_traj_ = true;
 		}
-		ROS_INFO("Landing");
+		ROS_INFO_THROTTLE(1.0,"Landing");
 	}
 	// Initializing
 	else if (msg.mode == msg.INIT && quad_status_.mode == quad_status_.FLYING){
@@ -321,7 +321,7 @@ void TIP::eventCB(const acl_msgs::QuadFlightEvent& msg)
 	}
 	// STOP!!!
 	else if (msg.mode == msg.ESTOP && quad_status_.mode == quad_status_.GO){
-		ROS_WARN("Stopping");
+		ROS_INFO_THROTTLE(1.0,"Stopping");
 		// Stay in go command but set speed to zero
 		v_ = 0;
 		stop_ = true;
@@ -370,7 +370,7 @@ void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 
 	 	if (still_clear_ && v_plan_ > 0 && use_memory_ && !stop_ && dist_trav_last_ < mem_distance_ && min_cost_prim_ > last_prim_cost_ && quad_status_.mode == quad_status_.GO){
 			// Update distance traveled
-			dist_trav_last_ = (X_.block(0,0,1,3).transpose() - pose_last_mp_).norm();
+			dist_trav_last_ = (X_.row(0).transpose() - pose_last_mp_).norm();
 			// if (!following_prim_) {count2 = 0; ROS_INFO("following primitive");}
 			// count2++;
 			following_prim_ = true;
@@ -389,7 +389,7 @@ void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 		 	// else if (v_los_ && !stop_ && !yawing_) v_ = v_max_;
 			
 		 	gen_new_traj_ = true;
-		 	pose_last_mp_ = X_.block(0,0,1,3).transpose();
+		 	pose_last_mp_ = X_.row(0).transpose();
 		 	dist_safe_last_ = distance_traveled_;
 		 	dist_trav_last_ = 0;
 			last_prim_cost_ = min_cost_prim_ ;
@@ -401,7 +401,7 @@ void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 		local_goal_ = goal_ - X_.row(0).transpose();
 		gen_new_traj_ = true;
 
-		pose_last_mp_ = X_.block(0,0,1,3).transpose();
+		pose_last_mp_ = X_.row(0).transpose();
 		dist_safe_last_ = distance_traveled_;
 		dist_trav_last_ = 0;
 		last_prim_cost_ = min_cost_prim_ ;
@@ -711,9 +711,9 @@ void TIP::get_traj(Eigen::MatrixXd X, Eigen::Vector3d local_goal, double v, std:
 	//Generate new traj
 	get_vels(X,local_goal,v,vfx_,vfy_,vfz_);
 
-	x0_ << X.block(0,0,4,1);
-	y0_ << X.block(0,1,4,1);
-	z0_ << X.block(0,2,4,1);
+	x0_ << X.col(0);
+	y0_ << X.col(1);
+	z0_ << X.col(2);
 	find_times(x0_, vfx_, t_fx, Xf_switch,stop_check);
 	find_times(y0_, vfy_, t_fy, Yf_switch,stop_check);
 	find_times(z0_, vfz_, t_fz, Zf_switch,stop_check);
