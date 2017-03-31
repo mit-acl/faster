@@ -28,7 +28,6 @@ int main(int argc, char **argv)
 	// SendCmd timer
 	ros::Timer sendGoalTimer = n.createTimer(ros::Duration(tip.plan_eval_time_), &TIP::sendGoal, &tip);
 
-	tip.new_goal_pub = n.advertise<geometry_msgs::PointStamped>("new_global_goal", 1);
 	tip.traj_pub = n.advertise<nav_msgs::Path>("traj",1);
 	tip.tipData_pub = n.advertise<acl_planning::TIP>("tip_data",1);
 	tip.quad_goal_pub = n.advertise<acl_msgs::QuadGoal>("goal",1);
