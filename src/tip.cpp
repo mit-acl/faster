@@ -527,6 +527,8 @@ void TIP::sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d g
 	cost_queue_ = std::priority_queue<double, std::vector<double>, std::greater<double> > ();
 	cost_v_.clear();
 
+
+	// TODO: add check that the norm > 0
 	vector_2_goal_= goal-pose ;
 	vector_2_goal_.normalize();
 
