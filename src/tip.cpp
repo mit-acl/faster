@@ -140,10 +140,15 @@ void TIP::stateCB(const acl_msgs::ViconState& msg)
 
 	pose_ << msg.pose.position.x, msg.pose.position.y, msg.pose.position.z; 
 
-	qw2b_.w() = msg.pose.orientation.w;
-	qw2b_.vec() << -msg.pose.orientation.x,-msg.pose.orientation.y,-msg.pose.orientation.z;
+	// Make sure quaterion is normalized
+	geometry_msgs::Quaternion temp;
+	temp = msg.pose.orientation;
+	normalize(temp);
 
-	tf::quaternionMsgToTF(msg.pose.orientation, att_);
+	qw2b_.w() = temp.w;
+	qw2b_.vec() << -temp.x,-temp.y,-temp.z;
+
+	tf::quaternionMsgToTF(temp, att_);
 
 	// Check this
 	if (quad_status_.mode == quad_status_.NOT_FLYING){
@@ -535,15 +540,21 @@ void TIP::sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d g
 
  	for (int i=0; i < num_of_pnts_ ; i++){
 		vector_i_ << Goals.row(i).transpose();
-		angle_diff_ = acos(vector_i_.dot(vector_2_goal_body_));
 
-		angle_diff_last_ = acos(vector_i_.dot(vector_last_body_));
+		// Make sure dot product is within [-1 1] bounds for acos
+		double dot = vector_i_.dot(vector_2_goal_body_);
+		saturate(dot,-1,1);
+		angle_diff_ = acos(dot);
+
+		// Make sure dot product is within [-1 1] bounds for acos
+		dot = vector_i_.dot(vector_last_body_);
+		saturate(dot,-1,1);
+		angle_diff_last_ = acos(dot);
 
  		cost_i_ = pow(angle_diff_,2) + pow(angle_diff_last_,2);
 
  		cost_queue_.push(cost_i_);
  		cost_v_.push_back(cost_i_);
-
  	}
 
  	Eigen::MatrixXd Sorted_Goals_temp;
@@ -1160,4 +1171,13 @@ void TIP::angle_wrap(double& diff)
     if (diff < 0)
         diff += 2*M_PI;
     diff -= M_PI;
+}
+
+void TIP::normalize(geometry_msgs::Quaternion &q)
+{
+	double root = std::sqrt(q.w*q.w + q.x*q.x + q.y*q.y + q.z*q.z);
+	q.w = q.w/root;
+	q.x = q.x/root;
+	q.y = q.y/root;
+	q.z = q.z/root;
 }
