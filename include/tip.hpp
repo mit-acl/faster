@@ -83,6 +83,7 @@ public:
 	void sync_times(Eigen::Vector4d x0, double tmax, double vf, std::vector<double>& tf, Eigen::Matrix4d& X_switch);
 	void angle_wrap(double& diff);
 	void normalize(geometry_msgs::Quaternion &q);
+	void yaw(double diff, acl_msgs::QuadGoal &quad_goal);
 
 private:
 

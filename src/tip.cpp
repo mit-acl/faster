@@ -211,10 +211,7 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 			// Only yaw if the vehicle is at right speed
 			if (X_.row(1).norm() <= (v_+0.1*v_max_) && X_.row(1).norm() >= (v_-0.1*v_max_)){
 				yawing_ = true;
-				saturate(diff,-plan_eval_time_*r_max_,plan_eval_time_*r_max_);
-				if (diff>0) quad_goal_.dyaw =  r_max_;
-				else        quad_goal_.dyaw = -r_max_;
-				quad_goal_.yaw+=diff;
+				yaw(diff,quad_goal_);
 			}				
 			else{
 				yawing_=false;
@@ -240,10 +237,7 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 
 		if (!stop_ && dist_2_goal_ < goal_radius_ && X_.row(1).norm()==0){
 			if(fabs(diff)>0.01){
-				saturate(diff,-plan_eval_time_*r_max_,plan_eval_time_*r_max_);
-				if (diff>0) quad_goal_.dyaw =  r_max_;
-				else        quad_goal_.dyaw = -r_max_;
-				quad_goal_.yaw+=diff;
+				yaw(diff,quad_goal_);
 			}
 			else
 				quad_goal_.dyaw = 0;
@@ -270,7 +264,6 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 	quad_goal_.header.frame_id = "world";
 	quad_goal_pub.publish(quad_goal_);
 }
-
 
 void TIP::eventCB(const acl_msgs::QuadFlightEvent& msg)
 {
@@ -323,10 +316,7 @@ void TIP::eventCB(const acl_msgs::QuadFlightEvent& msg)
 		double diff = heading_ - quad_goal_.yaw;
 		angle_wrap(diff);
 		while(std::abs(diff)>0.001){
-			saturate(diff,-0.002*r_max_,0.002*r_max_);
-			if (diff>0) quad_goal_.dyaw =  r_max_;
-			else        quad_goal_.dyaw = -r_max_;
-			quad_goal_.yaw+=diff;	
+			yaw(diff,quad_goal_);
 			diff = heading_ - quad_goal_.yaw;
 			ros::Duration(0.002).sleep();
 		}
@@ -1197,4 +1187,12 @@ void TIP::normalize(geometry_msgs::Quaternion &q)
 	q.x = q.x/root;
 	q.y = q.y/root;
 	q.z = q.z/root;
+}
+
+
+void TIP::yaw(double diff, acl_msgs::QuadGoal &quad_goal){
+	saturate(diff,-plan_eval_time_*r_max_,plan_eval_time_*r_max_);
+	if (diff>0) quad_goal.dyaw =  r_max_;
+	else        quad_goal.dyaw = -r_max_;
+	quad_goal.yaw+=diff;
 }
