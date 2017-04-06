@@ -118,10 +118,11 @@ void TIP::modeCB(const acl_msgs::QuadMode& msg)
 }
 
 
-void TIP::global_goalCB(const geometry_msgs::PointStamped& msg)
+void TIP::global_goalCB(const acl_msgs::QuadWaypoint& msg)
 {
 	goal_ << msg.point.x, msg.point.y, msg.point.z;
 	heading_ = atan2(goal_(1)-X_(0,1),goal_(0)-X_(0,0));
+	final_heading_ = msg.heading;
 }
 
 void TIP::stateCB(const acl_msgs::ViconState& msg)
@@ -232,6 +233,20 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 				gen_new_traj_ = true;
 		 		ROS_INFO_THROTTLE(1.0,"stopping");
 			}
+		}
+
+		diff = final_heading_ - quad_goal_.yaw;
+		angle_wrap(diff);
+
+		if (!stop_ && dist_2_goal_ < goal_radius_ && X_.row(1).norm()==0){
+			if(fabs(diff)>0.01){
+				saturate(diff,-plan_eval_time_*r_max_,plan_eval_time_*r_max_);
+				if (diff>0) quad_goal_.dyaw =  r_max_;
+				else        quad_goal_.dyaw = -r_max_;
+				quad_goal_.yaw+=diff;
+			}
+			else
+				quad_goal_.dyaw = 0;
 		}
 
 		tE_ = ros::Time::now().toSec() - t0_;
