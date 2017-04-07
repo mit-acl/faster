@@ -256,10 +256,10 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 			else if (e_stop_){v_=0; quad_status_.mode = quad_status_.FLYING;}
 			else if (can_reach_goal_) {v_ = v_max_; gen_new_traj_ = true;}
 		}
+		yaw_ = quad_goal_.yaw;
 	}
 
 	eigen2quadGoal(X_,quad_goal_);
-	yaw_ = quad_goal_.yaw;
 	quad_goal_.header.stamp = ros::Time::now();
 	quad_goal_.header.frame_id = "world";
 	quad_goal_pub.publish(quad_goal_);
