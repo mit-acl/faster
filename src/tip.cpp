@@ -705,7 +705,7 @@ void TIP::collision_check(Eigen::MatrixXd X, double buff, double v, bool& can_re
 
 			}
 			// Check if the min distance is the current goal
-			else if (distance_traveled_ > sensor_distance_){
+			else if (distance_traveled_ > sensor_distance_ || distance_traveled_ > goal_distance_){
 				// If traj is not within z bounds then it's not valid
 				if (X_prop_(0,2) < z_min_ || X_prop_(0,2) > z_max_){
 			    	can_reach_goal = false;
