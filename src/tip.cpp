@@ -164,8 +164,8 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 		gen_new_traj_ = false;
 		v_plan_ = v_;
 		mtx.lock();
-		if (stop_) get_traj(X_,local_goal_,v_,t_xf_,t_yf_,t_zf_,Xf_switch_,Yf_switch_,Zf_switch_,true);
-		else get_traj(X_,local_goal_,v_,t_xf_,t_yf_,t_zf_,Xf_switch_,Yf_switch_,Zf_switch_,false);
+		if (stop_) get_traj(X_,local_goal_,v_,t_xf_,t_yf_,t_zf_,Xf_switch_,Yf_switch_,Zf_switch_,stop_);
+		else get_traj(X_,local_goal_,v_,t_xf_,t_yf_,t_zf_,Xf_switch_,Yf_switch_,Zf_switch_,stop_);
 		mtx.unlock();
 		t0_ = ros::Time::now().toSec() - plan_eval_time_;
 	}
