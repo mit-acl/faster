@@ -47,6 +47,7 @@ public:
 	TIP();
 
 	double plan_eval_time_ ;
+	int ntree_ = 50;
 
 	ros::Publisher traj_pub, goal_pub, new_goal_pub, quad_goal_pub, tipData_pub;
 
@@ -114,6 +115,7 @@ private:
 
 	std::vector<pcl::KdTreeFLANN<pcl::PointXYZ>> trees_;
 	int c = 0;
+	bool virgin_;
 	// // // // //
 	// Ros var initialization
 	// geometry_msgs::PoseArray goal_points_ros_ ;

@@ -1,6 +1,6 @@
 #include "tip.hpp"
 
-TIP::TIP() : tf_listener_(tf_buffer_), trees_(50) {
+TIP::TIP() : tf_listener_(tf_buffer_), trees_(ntree_) {
 
 	std::string name = ros::this_node::getNamespace();
 	// Erase slashes
@@ -74,6 +74,7 @@ TIP::TIP() : tf_listener_(tf_buffer_), trees_(50) {
 	v_ = v_max_;
 	yaw_ = 0;
 
+	virgin_ = true;
 	yawing_ = false;
 	stop_ = false;
 	still_clear_ = true;
@@ -202,6 +203,7 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 		double diff = heading_ - quad_goal_.yaw;
 		angle_wrap(diff);
 
+		// std::cout << "diff: " << diff << " stop: " << stop_ << " yawing: " << yawing_ << std::endl;
 		if(fabs(diff)>0.02 && !stop_ && dist_2_goal_ > goal_radius_){
 			if (!yawing_){
 				if (fabs(diff)>M_PI/2 || X_.row(1).norm()==0.0) {v_ = 0; gen_new_traj_=true;}
@@ -221,6 +223,9 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 			v_ = v_max_;
 			quad_goal_.dyaw=0;
 			yawing_ = false;
+		}
+		else {
+			quad_goal_.dyaw = 0;
 		} 	
 
 		if (!stop_ && X_.row(1).norm() > 0){
@@ -232,9 +237,9 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 			}
 		}
 
+		// Desired heading at waypoint
 		diff = final_heading_ - quad_goal_.yaw;
 		angle_wrap(diff);
-
 		if (!stop_ && dist_2_goal_ < goal_radius_ && X_.row(1).norm()==0){
 			if(fabs(diff)>0.01){
 				yaw(diff,quad_goal_);
@@ -252,6 +257,7 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 		if (X_.row(1).norm() == 0 && stop_){
 			// We're done	
 			stop_ = false;
+			yawing_ = false;
 			if (dist_2_goal_ < goal_radius_){v_ = 0;}
 			else if (e_stop_){v_=0; quad_status_.mode = quad_status_.FLYING;}
 			else if (can_reach_goal_) {v_ = v_max_; gen_new_traj_ = true;}
@@ -365,12 +371,17 @@ void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 		// Build k-d tree
 		kdtree_.setInputCloud(cloud_);
 
-		if (c<50){
+		if (c < ntree_ && virgin_){
 			trees_[c] = kdtree_;
 			c++;
-			std::cout << c << std::endl;
+			if (c%ntree_==0) virgin_ = false;
 		}
-		
+		else {
+			if (c%ntree_==0) c = 0;
+			trees_[c] = kdtree_;
+			c++;		
+		}
+
 		// Sort allowable final states
 		sort_ss(Goals_,X_.row(0).transpose(),goal_, last_goal_, Sorted_Goals_,v_los_);
 
@@ -456,8 +467,18 @@ void TIP::check_current_prim(Eigen::Matrix4d X0, Eigen::Matrix4d Y0, Eigen::Matr
 	std::vector<int> pointIdxNKNSearch(K_);
   	std::vector<float> pointNKNSquaredDistance(K_);
 
-  	kdtree_.nearestKSearch(searchPoint_, K_, pointIdxNKNSearch, pointNKNSquaredDistance);	
-    mean_distance_ = std::sqrt(std::accumulate(pointNKNSquaredDistance.begin(), pointNKNSquaredDistance.end(), 0.0f)/pointIdxNKNSearch.size());
+  	int iter;
+  	mean_distance_ = 100;
+  	double dist;
+  	if (virgin_) iter = c;
+  	else iter = ntree_;
+  	for (int i=0;i<iter;i++){
+	  	trees_[i].nearestKSearch(searchPoint_, K_, pointIdxNKNSearch, pointNKNSquaredDistance);	
+	    dist = std::sqrt(std::accumulate(pointNKNSquaredDistance.begin(), pointNKNSquaredDistance.end(), 0.0f)/pointIdxNKNSearch.size());
+	    if (dist < mean_distance_) {
+	    	mean_distance_ = dist; 
+	    }
+	}
 
     // If the obstacle is farther than safe distance or goal is within mean distance then we're good
     if (mean_distance_ > safe_distance_){
@@ -478,10 +499,18 @@ void TIP::check_current_prim(Eigen::Matrix4d X0, Eigen::Matrix4d Y0, Eigen::Matr
 			searchPoint_.y = X_prop_(0,1);
 			searchPoint_.z = X_prop_(0,2);
 
-		  	kdtree_.nearestKSearch(searchPoint_, K_, pointIdxNKNSearch, pointNKNSquaredDistance);	
-
-    		mean_distance_ = std::sqrt(std::accumulate(pointNKNSquaredDistance.begin(), pointNKNSquaredDistance.end(), 0.0f)/pointIdxNKNSearch.size());
-
+		  	int iter;
+		  	mean_distance_ = 100;
+		  	double dist;
+		  	if (virgin_) iter = c;
+		  	else iter = ntree_;
+		  	for (int i=0;i<iter;i++){
+			  	trees_[i].nearestKSearch(searchPoint_, K_, pointIdxNKNSearch, pointNKNSquaredDistance);	
+			    dist = std::sqrt(std::accumulate(pointNKNSquaredDistance.begin(), pointNKNSquaredDistance.end(), 0.0f)/pointIdxNKNSearch.size());
+			    if (dist < mean_distance_) {
+			    	mean_distance_ = dist; 
+			    }
+			}
     		distance_traveled_ = (X_prop_.row(0)-X.row(0)).norm();
 
     		// Check if the distance is less than our buffer
@@ -673,8 +702,20 @@ void TIP::collision_check(Eigen::MatrixXd X, double buff, double v, bool& can_re
 	std::vector<int> pointIdxNKNSearch(K_);
   	std::vector<float> pointNKNSquaredDistance(K_);
 
-  	kdtree_.nearestKSearch(searchPoint_, K_, pointIdxNKNSearch, pointNKNSquaredDistance);	
-    mean_distance_ = std::sqrt(std::accumulate(pointNKNSquaredDistance.begin(), pointNKNSquaredDistance.end(), 0.0f)/pointIdxNKNSearch.size());
+  	int iter;
+  	mean_distance_ = 100;
+  	double dist;
+  	if (virgin_) iter = c;
+  	else iter = ntree_;
+  	for (int i=0;i<iter;i++){
+	  	trees_[i].nearestKSearch(searchPoint_, K_, pointIdxNKNSearch, pointNKNSquaredDistance);	
+	    dist = std::sqrt(std::accumulate(pointNKNSquaredDistance.begin(), pointNKNSquaredDistance.end(), 0.0f)/pointIdxNKNSearch.size());
+	    if (dist < mean_distance_) {
+	    	mean_distance_ = dist; 
+	    }
+	}
+
+	// std::cout << "first dist: " << mean_distance_ << std::endl;
 
     // If the obstacle is farther than safe distance or goal is within mean distance then we're good
     if (mean_distance_ > sensor_distance_ || mean_distance_ > goal_distance_){
@@ -695,9 +736,17 @@ void TIP::collision_check(Eigen::MatrixXd X, double buff, double v, bool& can_re
 			searchPoint_.y = X_prop_(0,1);
 			searchPoint_.z = X_prop_(0,2);
 
-		  	kdtree_.nearestKSearch(searchPoint_, K_, pointIdxNKNSearch, pointNKNSquaredDistance);	
+		  	mean_distance_ = 100;
+		  	if (virgin_) iter = c;
+		  	else iter = ntree_;
+		  	for (int i=0;i<iter;i++){
+			  	trees_[i].nearestKSearch(searchPoint_, K_, pointIdxNKNSearch, pointNKNSquaredDistance);	
+			    dist = std::sqrt(std::accumulate(pointNKNSquaredDistance.begin(), pointNKNSquaredDistance.end(), 0.0f)/pointIdxNKNSearch.size());
+			    if (dist < mean_distance_) mean_distance_ = dist;
+			}
 
-    		mean_distance_ = std::sqrt(std::accumulate(pointNKNSquaredDistance.begin(), pointNKNSquaredDistance.end(), 0.0f)/pointIdxNKNSearch.size());
+			// std::cout << "second dist: " << mean_distance_ << std::endl;
+
 
     		distance_traveled_ = (X_prop_.row(0)-X.row(0)).norm();
 
