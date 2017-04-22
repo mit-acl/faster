@@ -111,6 +111,9 @@ private:
 	// KDTree<double> kd_tree_;
 	pcl::KdTreeFLANN<pcl::PointXYZ> kdtree_;
 	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_;
+
+	std::vector<pcl::KdTreeFLANN<pcl::PointXYZ>> trees_;
+	int c = 0;
 	// // // // //
 	// Ros var initialization
 	// geometry_msgs::PoseArray goal_points_ros_ ;

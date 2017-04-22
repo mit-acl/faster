@@ -1,6 +1,6 @@
 #include "tip.hpp"
 
-TIP::TIP() : tf_listener_(tf_buffer_) {
+TIP::TIP() : tf_listener_(tf_buffer_), trees_(50) {
 
 	std::string name = ros::this_node::getNamespace();
 	// Erase slashes
@@ -364,6 +364,12 @@ void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
  	if (i!=size && quad_status_.mode!=quad_status_.NOT_FLYING){
 		// Build k-d tree
 		kdtree_.setInputCloud(cloud_);
+
+		if (c<50){
+			trees_[c] = kdtree_;
+			c++;
+			std::cout << c << std::endl;
+		}
 		
 		// Sort allowable final states
 		sort_ss(Goals_,X_.row(0).transpose(),goal_, last_goal_, Sorted_Goals_,v_los_);
