@@ -3,7 +3,7 @@ debug: true
 # use_memory: true
 safe_distance: 1.5   # Smallest distance before obstacle is no longer viable segment
 sensor_distance: 3 # Primitives evaluated up to this distance
-mem_distance: 1
+mem_distance: 0.5
 buffer: 0.42        # 0.5 width of quad for collision checking
 
 # (x,y,z) goal
@@ -25,7 +25,7 @@ plan_eval: 0.01
 K: 10
 
 # Sensor horizontal FOV (deg)
-h_fov: 60
+h_fov: 50
 
 # Number of horizontal FOV discretization
 h_samples: 10
@@ -37,14 +37,14 @@ v_fov: 40
 v_samples: 8
 
 # Max yaw rate (rad/s)
-r_max: 2
+r_max: 1
 
 # Maximum tolerable jump in state estimate before replanning
 jump_thresh: 0.5
 
 # Min and max allowable z values 
 z_min: 0.2
-z_max: 3.0
+z_max: 1.5 
 
 # Goal buffer
 goal_radius: 0.5
