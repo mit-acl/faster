@@ -217,7 +217,7 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 		}
 		else {
 			if (!stop_ && (can_reach_goal_ || following_prim_) && dist_2_goal_ > goal_radius_) v_ = v_max_;
-			else v_ = 0;
+			// else v_ = 0;
 			quad_goal_.dyaw = 0;
 			yawing_ = false;
 		} 	
@@ -637,14 +637,15 @@ void TIP::sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d g
 void TIP::pick_ss(Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, bool& can_reach_goal)
 {
 	goal_index_ = 0;
-	can_reach_goal = false;
+	bool temp_reach_goal = false;
+	// can_reach_goal = false;
 
- 	while(!can_reach_goal && goal_index_ < Sorted_Goals.rows()){
+ 	while(!temp_reach_goal && goal_index_ < Sorted_Goals.rows()){
  		// Tranform temp local goal to world frame
  		Eigen::Vector4d temp_local_goal_aug;
  		temp_local_goal_aug << qw2b_.conjugate()._transformVector(Sorted_Goals.block(goal_index_,0,1,3).transpose()), Sorted_Goals(goal_index_,3);
 
-		collision_check(X,buffer_,v_max_,can_reach_goal,temp_local_goal_aug); 	
+		collision_check(X,buffer_,v_max_,temp_reach_goal,temp_local_goal_aug); 	
 
 		// Update cost
 		Sorted_Goals(goal_index_,3) = temp_local_goal_aug(3);
@@ -656,12 +657,14 @@ void TIP::pick_ss(Eigen::MatrixXd Sorted_Goals, Eigen::MatrixXd X, bool& can_rea
 	min_cost_prim_ = Sorted_Goals.col(3).minCoeff(&index);
 	double min_cost = min_cost_prim_;
 
- 	if (!can_reach_goal) {	
+ 	if (!temp_reach_goal) {	
  		if (min_cost!=inf){
  			goal_index_ = index+1;
- 			can_reach_goal = true;
+ 			temp_reach_goal = true;
  		} 
  	}
+
+ 	can_reach_goal = temp_reach_goal;
 
  	if(can_reach_goal){
  		goal_index_--;
