@@ -203,29 +203,23 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 		double diff = heading_ - quad_goal_.yaw;
 		angle_wrap(diff);
 
-		// std::cout << "diff: " << diff << " stop: " << stop_ << " yawing: " << yawing_ << std::endl;
 		if(fabs(diff)>0.02 && !stop_ && dist_2_goal_ > goal_radius_){
 			if (!yawing_){
 				if (fabs(diff)>M_PI/2 || X_.row(1).norm()==0.0) {v_ = 0; gen_new_traj_=true;}
-				else if (!stop_ && can_reach_goal_) {v_ = v_max_;}
+				else if (can_reach_goal_ || following_prim_) {v_ = v_max_;}
 				else {v_ = 0; gen_new_traj_ = true;}
 			}
 			// Only yaw if the vehicle is at right speed
 			if (X_.row(1).norm() <= (v_+0.1*v_max_) && X_.row(1).norm() >= (v_-0.1*v_max_)){
 				yawing_ = true;
 				yaw(diff,quad_goal_);
-			}				
-			else{
-				yawing_=false;
-			}
-		}
-		else if (!stop_ && dist_2_goal_ > goal_radius_ && can_reach_goal_) {
-			v_ = v_max_;
-			quad_goal_.dyaw=0;
-			yawing_ = false;
+			}	
 		}
 		else {
+			if (!stop_ && (can_reach_goal_ || following_prim_) && dist_2_goal_ > goal_radius_) v_ = v_max_;
+			else v_ = 0;
 			quad_goal_.dyaw = 0;
+			yawing_ = false;
 		} 	
 
 		if (!stop_ && X_.row(1).norm() > 0){
@@ -242,10 +236,13 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 		angle_wrap(diff);
 		if (!stop_ && dist_2_goal_ < goal_radius_ && X_.row(1).norm()==0){
 			if(fabs(diff)>0.01){
+				yawing_ = true;
 				yaw(diff,quad_goal_);
 			}
-			else
+			else{
+				yawing_ = false;
 				quad_goal_.dyaw = 0;
+			}
 		}
 
 		tE_ = ros::Time::now().toSec() - t0_;
@@ -371,15 +368,17 @@ void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 		// Build k-d tree
 		kdtree_.setInputCloud(cloud_);
 
-		if (c < ntree_ && virgin_){
-			trees_[c] = kdtree_;
-			c++;
-			if (c%ntree_==0) virgin_ = false;
-		}
-		else {
-			if (c%ntree_==0) c = 0;
-			trees_[c] = kdtree_;
-			c++;		
+		if (!stop_ && (X_.row(1).norm()>0 || yawing_)){
+			if (c < ntree_ && virgin_){
+				trees_[c] = kdtree_;
+				c++;
+				if (c%ntree_==0) virgin_ = false;
+			}
+			else {
+				if (c%ntree_==0) c = 0;
+				trees_[c] = kdtree_;
+				c++;		
+			}
 		}
 
 		// Sort allowable final states
