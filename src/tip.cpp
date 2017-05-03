@@ -217,7 +217,6 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 		}
 		else {
 			if (!stop_ && (can_reach_goal_ || following_prim_) && dist_2_goal_ > goal_radius_) v_ = v_max_;
-			// else v_ = 0;
 			quad_goal_.dyaw = 0;
 			yawing_ = false;
 		} 	
@@ -312,19 +311,6 @@ void TIP::eventCB(const acl_msgs::QuadFlightEvent& msg)
 			gen_new_traj_ = true;
 		}
 		ROS_INFO_THROTTLE(1.0,"Landing");
-	}
-	// Initializing
-	else if (msg.mode == msg.INIT && quad_status_.mode == quad_status_.FLYING){
-		e_stop_ = false;
-		double diff = heading_ - quad_goal_.yaw;
-		angle_wrap(diff);
-		while(std::abs(diff)>0.001){
-			yaw(diff,quad_goal_);
-			diff = heading_ - quad_goal_.yaw;
-			ros::Duration(0.002).sleep();
-		}
-		quad_goal_.dyaw = 0;
-		ROS_INFO("Initialized");
 	}
 	// GO!!!!
 	else if (msg.mode == msg.START && quad_status_.mode == quad_status_.FLYING){
