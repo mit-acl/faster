@@ -7,12 +7,12 @@ TIP::TIP() : tf_listener_(tf_buffer_), trees_(ntree_) {
 	name.erase(0,2);
 
 	// Should be read as param
-	ros::param::get("~debug",debug_);
-	ros::param::get("~use_memory",use_memory_);
-	ros::param::get("~safe_distance",safe_distance_);
-	ros::param::get("~buffer",buffer_);
-	ros::param::get("~sensor_distance",sensor_distance_);
-	ros::param::get("~mem_distance",mem_distance_);
+	ros::param::param<bool>("~debug",debug_,true);
+	ros::param::param<bool>("~use_memory",use_memory_,true);
+	ros::param::param<double>("~safe_distance",safe_distance_,2.0);
+	ros::param::param<double>("~buffer",buffer_,0.5);
+	ros::param::param<double>("~sensor_distance",sensor_distance_,4.0);
+	ros::param::param<double>("~mem_distance",mem_distance_,1.5);
 
 
 	last_goal_ = Eigen::Vector3d::Zero();
@@ -22,9 +22,9 @@ TIP::TIP() : tf_listener_(tf_buffer_), trees_(ntree_) {
 	X_stop_ = Eigen::MatrixXd::Zero(4,3);
 	XE_ = Eigen::MatrixXd::Zero(4,3);
 
-	ros::param::get("~goal_x",goal_(0));
-	ros::param::get("~goal_y",goal_(1));
-	ros::param::get("~goal_z",goal_(2));
+	ros::param::param<double>("~goal_x",goal_(0),0.0);
+	ros::param::param<double>("~goal_y",goal_(1),0.0);
+	ros::param::param<double>("~goal_z",goal_(2),0.0);
 
 	heading_ = atan2(goal_(1),goal_(0));
 	angle_2_last_goal_ = heading_;
@@ -32,29 +32,29 @@ TIP::TIP() : tf_listener_(tf_buffer_), trees_(ntree_) {
 	last_goal_ << goal_;
 	local_goal_ << goal_;
 
-	ros::param::get("cntrl/spinup_time",spinup_time_);
-	ros::param::get("~max_speed",v_max_);
+	ros::param::param<double>("cntrl/spinup_time",spinup_time_,2.5);
+	ros::param::param<double>("~max_speed",v_max_,2);
 
-	ros::param::get("~jerk",j_max_);
-	ros::param::get("~accel",a_max_);
-	ros::param::get("~accel_stop",a_stop_);
+	ros::param::param<double>("~jerk",j_max_,10);
+	ros::param::param<double>("~accel",a_max_,5);
+	ros::param::param<double>("~accel_stop",a_stop_,5);
 
-	ros::param::get("~plan_eval",plan_eval_time_);
+	ros::param::param<double>("~plan_eval",plan_eval_time_,0.01);
 
-	ros::param::get("~K",K_);
+	ros::param::param<int>("~K",K_,10);
 
-	ros::param::get("~h_fov",h_fov_);
-	ros::param::get("~h_samples",h_samples_);
-	ros::param::get("~v_fov",v_fov_);
-	ros::param::get("~v_samples",v_samples_);
+	ros::param::param<double>("~h_fov",h_fov_,60.0);
+	ros::param::param<int>("~h_samples",h_samples_,10);
+	ros::param::param<double>("~v_fov",v_fov_,45.0);
+	ros::param::param<int>("~v_samples",v_samples_,8);
 
-	ros::param::get("~r_max",r_max_);
-	ros::param::get("~jump_thresh",jump_thresh_);
+	ros::param::param<double>("~r_max",r_max_,1.0);
+	ros::param::param<double>("~jump_thresh",jump_thresh_,0.5);
 
-	ros::param::get("~z_min",z_min_);
-	ros::param::get("~z_max",z_max_);
+	ros::param::param<double>("~z_min",z_min_,0.2);
+	ros::param::param<double>("~z_max",z_max_,1.5);
 
-	ros::param::get("~goal_radius",goal_radius_);
+	ros::param::param<double>("~goal_radius",goal_radius_,0.5);
 
 	h_fov_ = h_fov_*M_PI/180;
 	v_fov_ = v_fov_*M_PI/180;
