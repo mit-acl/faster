@@ -47,7 +47,7 @@ public:
 	TIP();
 
 	double plan_eval_time_ ;
-	int ntree_=10;
+	int ntree_=1;
 
 	ros::Publisher traj_pub, goal_pub, new_goal_pub, quad_goal_pub, tipData_pub;
 

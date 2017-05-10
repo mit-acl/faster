@@ -42,6 +42,9 @@ TIP::TIP() : tf_listener_(tf_buffer_),trees_(ntree_) {
 	ros::param::param<double>("~plan_eval",plan_eval_time_,0.01);
 
 	ros::param::param<int>("~K",K_,10);
+	ros::param::param<int>("~N_pcl",ntree_,10);
+
+	trees_.resize(ntree_);
 
 	ros::param::param<double>("~h_fov",h_fov_,60.0);
 	ros::param::param<int>("~h_samples",h_samples_,10);

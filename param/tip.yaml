@@ -2,7 +2,7 @@
 debug: true
 # use_memory: true
 safe_distance: 1.5   # Smallest distance before obstacle is no longer viable segment
-sensor_distance: 3 # Primitives evaluated up to this distance
+sensor_distance: 5 # Primitives evaluated up to this distance
 mem_distance: 1.25
 buffer: 0.5        # 0.5 width of quad for collision checking
 
@@ -24,7 +24,7 @@ plan_eval: 0.01
 # Number of samples from k-d tree to find obstacle 
 K: 10
 
-N_pcl: 10
+N_pcl: 20
 
 # Sensor horizontal FOV (deg)
 h_fov: 60
