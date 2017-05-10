@@ -175,7 +175,7 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 	}
 
 	if (quad_status_.mode == quad_status_.TAKEOFF){
-		takeoff(X_(0,2));
+		takeoff(X_);
 		if (X_(0,2) == goal_(2)) first = false;
 		if (first){
 			t0 = ros::Time::now().toSec();
@@ -1170,10 +1170,15 @@ void TIP::eigen2quadGoal(Eigen::MatrixXd Xc, acl_msgs::QuadGoal& quad_goal)
 
 
 
-void TIP::takeoff(double& z)
+void TIP::takeoff(Eigen::MatrixXd& X)
 {
-	z+=0.003;
-	saturate(z,-0.1,goal_(2));
+	if (X(0,2)<goal_(2)){
+		X(0,2)+=0.005;
+		X(1,2) = 0.5;
+	}
+	else X(1,2) = 0;
+	saturate(X(0,2),-0.1,goal_(2));
+	ros::Duration(0.01).sleep();
 }
 
 

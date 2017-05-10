@@ -225,7 +225,7 @@ private:
 
 	//## Logging and Debugging Functions
 
-	void takeoff(double& z);
+	void takeoff(Eigen::MatrixXd& X);
 	void land(double& z);
 	
 };
