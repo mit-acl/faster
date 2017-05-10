@@ -4,7 +4,7 @@ debug: true
 safe_distance: 1.5   # Smallest distance before obstacle is no longer viable segment
 sensor_distance: 3 # Primitives evaluated up to this distance
 mem_distance: 1.25
-buffer: 0.4        # 0.5 width of quad for collision checking
+buffer: 0.5        # 0.5 width of quad for collision checking
 
 # (x,y,z) goal
 goal_x: 0.0
@@ -14,7 +14,7 @@ goal_z: 0.75
 # Flight params
 max_speed: 3
 
-jerk: 15 
+jerk: 10 
 accel: 8.0
 accel_stop: 8.0
 
@@ -23,6 +23,8 @@ plan_eval: 0.01
 
 # Number of samples from k-d tree to find obstacle 
 K: 10
+
+N_pcl: 10
 
 # Sensor horizontal FOV (deg)
 h_fov: 60

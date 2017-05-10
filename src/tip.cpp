@@ -1,6 +1,6 @@
 #include "tip.hpp"
 
-TIP::TIP() : tf_listener_(tf_buffer_), trees_(ntree_) {
+TIP::TIP() : tf_listener_(tf_buffer_),trees_(ntree_) {
 
 	std::string name = ros::this_node::getNamespace();
 	// Erase slashes
@@ -173,9 +173,23 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 
 	if (quad_status_.mode == quad_status_.TAKEOFF){
 		takeoff(X_(0,2));
-		if (X_(0,2) == goal_(2)){
-			quad_status_.mode = quad_status_.GO;
-			ROS_INFO("Take-off Complete. GO mode engaged!");
+		if (X_(0,2) == goal_(2)) first = false;
+		if (first){
+			t0 = ros::Time::now().toSec();
+		}
+		else {
+			double t = ros::Time::now().toSec();
+			t -= t0;
+			X_(0,2) = goal_(2) + 0.1*cos(2*M_PI*t);
+			X_(1,2) = -0.1*2*M_PI*sin(2*M_PI*t);
+			X_(2,2) = -0.1*2*M_PI*2*M_PI*cos(2*M_PI*t);
+			if (t>4.0){
+				X_(0,2) = goal_(2);
+				X_(1,2) = 0;
+				X_(2,2) = 0;
+				quad_status_.mode = quad_status_.GO;
+				ROS_INFO("Take-off Complete. GO mode engaged!");
+			}
 		}
 	}
 
@@ -338,33 +352,14 @@ void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
  	// Convert pcl
 	convert2pcl(msg,cloud_);
 
-	int size = cloud_->points.size();
-	int i;
-	int count = 0;
-	for(i=0;i<size;i++){
-		// nan is the only number that doesn't equal itself -- John Carter
-		if (cloud_->points[i].x == cloud_->points[i].x){
-			count++;
-			// Ensure there are enough good points to perform collision detection
-			if (count > K_) break;
-		}
-	}
+	checkpcl(cloud_,cloud_empty_);
 
- 	if (i!=size && quad_status_.mode!=quad_status_.NOT_FLYING){
+ 	if (!cloud_empty_ && quad_status_.mode!=quad_status_.NOT_FLYING){
+ 		if (c==0) update_tree(cloud_,trees_);
+
 		// Build k-d tree
-		kdtree_.setInputCloud(cloud_);
-
 		if (!stop_ && (X_.row(1).norm()>0 || yawing_)){
-			if (c < ntree_ && virgin_){
-				trees_[c] = kdtree_;
-				c++;
-				if (c%ntree_==0) virgin_ = false;
-			}
-			else {
-				if (c%ntree_==0) c = 0;
-				trees_[c] = kdtree_;
-				c++;		
-			}
+			update_tree(cloud_,trees_);
 		}
 
 		// Sort allowable final states
@@ -439,7 +434,7 @@ void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 
 void TIP::check_current_prim(Eigen::Matrix4d X0, Eigen::Matrix4d Y0, Eigen::Matrix4d Z0, std::vector<double> t_x, std::vector<double> t_y, std::vector<double> t_z, double t, Eigen::MatrixXd X, bool& clear)
 {
-	clear = false;
+	bool temp_clear = false;
 	collision_detected_ = false;
 
 	X_prop_ = Eigen::MatrixXd::Zero(4,3);
@@ -453,28 +448,34 @@ void TIP::check_current_prim(Eigen::Matrix4d X0, Eigen::Matrix4d Y0, Eigen::Matr
   	std::vector<float> pointNKNSquaredDistance(K_);
 
   	int iter;
+  	if (virgin_) iter = c-1;
+  	else iter = trees_.size()-1;
   	mean_distance_ = 100;
   	double dist;
-  	if (virgin_) iter = c;
-  	else iter = ntree_;
-  	for (int i=0;i<iter;i++){
+  	for (int i=iter;i>-1;i--){
 	  	trees_[i].nearestKSearch(searchPoint_, K_, pointIdxNKNSearch, pointNKNSquaredDistance);	
 	    dist = std::sqrt(std::accumulate(pointNKNSquaredDistance.begin(), pointNKNSquaredDistance.end(), 0.0f)/pointIdxNKNSearch.size());
 	    if (dist < mean_distance_) {
 	    	mean_distance_ = dist; 
 	    }
+	    if (mean_distance_<buffer_){
+    		temp_clear = false;
+    		collision_detected_ = true;
+    		break;
+    	}
 	}
 
     // If the obstacle is farther than safe distance or goal is within mean distance then we're good
     if (mean_distance_ > safe_distance_){
-    	clear = true;
+    	temp_clear = true;
     }
+
     // Something else is closer, need to prop to next time step
-	else{
+	else if (!collision_detected_){
 		// evaluate at time required to travel d_min
 		t_ = std::max(buffer_/v_max_,mean_distance_/v_max_) + t;
 
-		while (!collision_detected_ && !clear){
+		while (!collision_detected_ && !temp_clear){
 
 			mtx.lock();
 			eval_trajectory(X0,Y0,Z0,t_x,t_y,t_z,t_,X_prop_);
@@ -484,14 +485,16 @@ void TIP::check_current_prim(Eigen::Matrix4d X0, Eigen::Matrix4d Y0, Eigen::Matr
 			searchPoint_.y = X_prop_(0,1);
 			searchPoint_.z = X_prop_(0,2);
 
-		  	int iter;
 		  	mean_distance_ = 100;
 		  	double dist;
-		  	if (virgin_) iter = c;
-		  	else iter = ntree_;
-		  	for (int i=0;i<iter;i++){
+		  	for (int i=iter;i>-1;i--){
 			  	trees_[i].nearestKSearch(searchPoint_, K_, pointIdxNKNSearch, pointNKNSquaredDistance);	
 			    dist = std::sqrt(std::accumulate(pointNKNSquaredDistance.begin(), pointNKNSquaredDistance.end(), 0.0f)/pointIdxNKNSearch.size());
+			    if (dist<buffer_){
+			    	collision_detected_ = true;
+					temp_clear = false;
+		    		break;
+			    }
 			    if (dist < mean_distance_) {
 			    	mean_distance_ = dist; 
 			    }
@@ -501,11 +504,11 @@ void TIP::check_current_prim(Eigen::Matrix4d X0, Eigen::Matrix4d Y0, Eigen::Matr
     		// Check if the distance is less than our buffer
 			if (mean_distance_ < buffer_){
 				collision_detected_ = true;
-				clear = false;
+				temp_clear = false;
 			}
 			// Check if the min distance is the current goal
 			else if (distance_traveled_ > safe_distance_){
-					clear = true;
+					temp_clear = true;
 					distance_traveled_ = sensor_distance_;
 			}			
 			// Neither have happened so propogate again
@@ -514,6 +517,7 @@ void TIP::check_current_prim(Eigen::Matrix4d X0, Eigen::Matrix4d Y0, Eigen::Matr
 			}
 		}
 	}
+	clear = temp_clear;
 }
 
 
@@ -690,16 +694,21 @@ void TIP::collision_check(Eigen::MatrixXd X, double buff, double v, bool& can_re
 	std::vector<int> pointIdxNKNSearch(K_);
   	std::vector<float> pointNKNSquaredDistance(K_);
 
-  	int iter;
+	int iter;
+  	if (virgin_) iter = c-1;
+  	else iter = trees_.size()-1;
   	mean_distance_ = 100;
   	double dist;
-  	if (virgin_) iter = c;
-  	else iter = ntree_;
-  	for (int i=0;i<iter;i++){
+  	for (int i=iter;i>-1;i--){
 	  	trees_[i].nearestKSearch(searchPoint_, K_, pointIdxNKNSearch, pointNKNSquaredDistance);	
 	    dist = std::sqrt(std::accumulate(pointNKNSquaredDistance.begin(), pointNKNSquaredDistance.end(), 0.0f)/pointIdxNKNSearch.size());
 	    if (dist < mean_distance_) {
 	    	mean_distance_ = dist; 
+	    }
+	    if (dist<buff){
+	    	can_reach_goal = false;
+    		local_goal_aug(3) = inf;
+    		break;
 	    }
 	}
 
@@ -708,6 +717,10 @@ void TIP::collision_check(Eigen::MatrixXd X, double buff, double v, bool& can_re
     // If the obstacle is farther than safe distance or goal is within mean distance then we're good
     if (mean_distance_ > sensor_distance_ || mean_distance_ > goal_distance_){
     	can_reach_goal = true;
+    }
+    else if (mean_distance_ < buff){
+    	can_reach_goal = false;
+    	local_goal_aug(3) = inf;
     }
     // Something else is closer, need to prop to next time step
 	else{
@@ -725,16 +738,19 @@ void TIP::collision_check(Eigen::MatrixXd X, double buff, double v, bool& can_re
 			searchPoint_.z = X_prop_(0,2);
 
 		  	mean_distance_ = 100;
-		  	if (virgin_) iter = c;
-		  	else iter = ntree_;
-		  	for (int i=0;i<iter;i++){
+		  	double dist;
+		  	for (int i=iter;i>-1;i--){
 			  	trees_[i].nearestKSearch(searchPoint_, K_, pointIdxNKNSearch, pointNKNSquaredDistance);	
 			    dist = std::sqrt(std::accumulate(pointNKNSquaredDistance.begin(), pointNKNSquaredDistance.end(), 0.0f)/pointIdxNKNSearch.size());
-			    if (dist < mean_distance_) mean_distance_ = dist;
+			    if (dist < mean_distance_) {
+			    	mean_distance_ = dist; 
+			    }
+			    if (dist<buff){
+			    	can_reach_goal = false;
+		    		local_goal_aug(3) = inf;
+		    		break;
+			    }
 			}
-
-			// std::cout << "second dist: " << mean_distance_ << std::endl;
-
 
     		distance_traveled_ = (X_prop_.row(0)-X.row(0)).norm();
 
@@ -1238,4 +1254,33 @@ void TIP::yaw(double diff, acl_msgs::QuadGoal &quad_goal){
 	if (diff>0) quad_goal.dyaw =  r_max_;
 	else        quad_goal.dyaw = -r_max_;
 	quad_goal.yaw+=diff;
+}
+
+void TIP::checkpcl(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, bool& cloud_empty){
+	int size = cloud->points.size();
+	int i;
+	int count = 0;
+	cloud_empty = true;
+	for(i=0;i<size;i++){
+		// nan is the only number that doesn't equal itself -- John Carter
+		if (cloud->points[i].x == cloud->points[i].x){
+			count++;
+			// Ensure there are enough good points to perform collision detection
+			if (count > K_) {cloud_empty=false;break;}
+		}
+	}
+}
+
+void TIP::update_tree(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, std::vector<pcl::KdTreeFLANN<pcl::PointXYZ>> &trees){
+	kdtree_.setInputCloud(cloud);
+	if (c < ntree_ && virgin_){
+		trees[c] = kdtree_;
+		c++;
+		if (c%ntree_==0) virgin_ = false;
+	}
+	else {
+		if (c%ntree_==0) c = 0;
+		trees[c] = kdtree_;
+		c++;		
+	}
 }

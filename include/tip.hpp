@@ -47,7 +47,7 @@ public:
 	TIP();
 
 	double plan_eval_time_ ;
-	int ntree_ = 60;
+	int ntree_=10;
 
 	ros::Publisher traj_pub, goal_pub, new_goal_pub, quad_goal_pub, tipData_pub;
 
@@ -85,6 +85,8 @@ public:
 	void angle_wrap(double& diff);
 	void normalize(geometry_msgs::Quaternion &q);
 	void yaw(double diff, acl_msgs::QuadGoal &quad_goal);
+	void checkpcl(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, bool& cloud_empty);
+	void update_tree(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, std::vector<pcl::KdTreeFLANN<pcl::PointXYZ>> &trees);
 
 private:
 
@@ -102,7 +104,7 @@ private:
 	double inf, z_min_, z_max_, v_plan_, mem_distance_, goal_radius_, final_heading_;
 
 	int num_ = 50, K_, goal_index_, num_of_pnts_, h_samples_, v_samples_, count2 ;
-	bool debug_, can_reach_goal_, collision_detected_, gen_new_traj_, stop_, can_reach_global_goal_, yawing_, following_prim_, v_los_, use_memory_, still_clear_, e_stop_;
+	bool debug_, can_reach_goal_, collision_detected_, gen_new_traj_, stop_, can_reach_global_goal_, yawing_, following_prim_, v_los_, use_memory_, still_clear_, e_stop_, cloud_empty_;
 	
 
 	std::ostringstream errorMsg, warnMsg;
@@ -115,7 +117,8 @@ private:
 
 	std::vector<pcl::KdTreeFLANN<pcl::PointXYZ>> trees_;
 	int c = 0;
-	bool virgin_;
+	bool virgin_, first = true;
+	double t0;
 	// // // // //
 	// Ros var initialization
 	// geometry_msgs::PoseArray goal_points_ros_ ;
