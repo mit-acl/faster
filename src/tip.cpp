@@ -176,24 +176,28 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 
 	if (quad_status_.mode == quad_status_.TAKEOFF){
 		takeoff(X_);
-		if (X_(0,2) == goal_(2)) first = false;
-		if (first){
-			t0 = ros::Time::now().toSec();
-		}
-		else {
-			double t = ros::Time::now().toSec();
-			t -= t0;
-			X_(0,2) = goal_(2) + 0.1*cos(2*M_PI*t);
-			X_(1,2) = -0.1*2*M_PI*sin(2*M_PI*t);
-			X_(2,2) = -0.1*2*M_PI*2*M_PI*cos(2*M_PI*t);
-			if (t>4.0){
-				X_(0,2) = goal_(2);
-				X_(1,2) = 0;
-				X_(2,2) = 0;
-				quad_status_.mode = quad_status_.GO;
-				ROS_INFO("Take-off Complete. GO mode engaged!");
-			}
-		}
+		if (X_(0,2) == goal_(2)){
+			quad_status_.mode = quad_status_.GO;
+			ROS_INFO("Take-off Complete. GO mode engaged!");
+		} 
+		// first = false;
+		// if (first){
+		// 	t0 = ros::Time::now().toSec();
+		// }
+		// else {
+		// 	double t = ros::Time::now().toSec();
+		// 	t -= t0;
+		// 	X_(0,2) = goal_(2) + 0.1*cos(2*M_PI*t);
+		// 	X_(1,2) = -0.1*2*M_PI*sin(2*M_PI*t);
+		// 	X_(2,2) = -0.1*2*M_PI*2*M_PI*cos(2*M_PI*t);
+		// 	if (t>4.0){
+		// 		X_(0,2) = goal_(2);
+		// 		X_(1,2) = 0;
+		// 		X_(2,2) = 0;
+		// 		quad_status_.mode = quad_status_.GO;
+		// 		ROS_INFO("Take-off Complete. GO mode engaged!");
+		// 	}
+		// }
 	}
 
 	else if (quad_status_.mode == quad_status_.LAND){
