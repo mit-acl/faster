@@ -176,7 +176,7 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 
 	if (quad_status_.mode == quad_status_.TAKEOFF){
 		takeoff(X_);
-		if (X_(0,2) == goal_(2)){
+		if (X_(0,2) == goal_(2) && fabs(goal_(2)-pose_(2))<0.1){
 			quad_status_.mode = quad_status_.GO;
 			ROS_INFO("Take-off Complete. GO mode engaged!");
 		} 
