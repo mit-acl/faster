@@ -1165,7 +1165,7 @@ void TIP::update_tree(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, std::vector<pcl
 		if (c%ntree_==0) virgin_ = false;
 	}
 	else {
-		int eval = c;
+		int eval = c-1;
 		if (c%ntree_==0) {c = 0; eval = ntree_;}
 		if (ros::WallTime::now().toSec()-tree_times_[eval]>time_min_)
 		{
