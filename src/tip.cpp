@@ -578,7 +578,7 @@ void TIP::sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d g
 		saturate(dot,-1,1);
 		angle_diff_last_ = acos(dot);
 
- 		cost_i_ = pow(angle_diff_,2) + pow(angle_diff_last_,2);
+ 		cost_i_ = pow(angle_diff_,2) + 0.05*pow(angle_diff_last_,2);
 
  		cost_queue_.push(cost_i_);
  		cost_v_.push_back(cost_i_);
