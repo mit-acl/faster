@@ -1,9 +1,9 @@
 # Params for TIP planner
 debug: true
 # use_memory: true
-safe_distance: 1.5   # Smallest distance before obstacle is no longer viable segment
-sensor_distance: 5 # Primitives evaluated up to this distance
-mem_distance: 1.25
+safe_distance: 2   # Smallest distance before obstacle is no longer viable segment
+sensor_distance: 3 # Primitives evaluated up to this distance
+mem_distance: 0.75
 buffer: 0.5        # 0.5 width of quad for collision checking
 
 # (x,y,z) goal
@@ -26,7 +26,7 @@ K: 10
 
 N_pcl: 5
 
-time_min: 2
+time_min: 1
 
 # Sensor horizontal FOV (deg)
 h_fov: 60

@@ -132,7 +132,7 @@ void TIP::pubClouds()
 	sensor_msgs::PointCloud2 ros_cloud;
 	int iter;
 	if (virgin_) iter = c;
-	else iter = ntree_;
+	else iter = ntree_+1;
 
 	pcl::PointCloud<pcl::PointXYZ> all_clouds;
 

@@ -45,10 +45,11 @@ TIP::TIP() : tf_listener_(tf_buffer_),trees_(ntree_) {
 	ros::param::param<int>("~N_pcl",ntree_,10);
 	ros::param::param<double>("~time_min",time_min_,1.0);
 
-	trees_.resize(ntree_);
+	// ntree_+1 to include the most recent pcl
+	trees_.resize(ntree_+1);
+	clouds_.resize(ntree_+1);
 	tree_times_.resize(ntree_);
 	tree_times_[0] = 0;
-	clouds_.resize(ntree_);
 
 	ros::param::param<double>("~h_fov",h_fov_,60.0);
 	ros::param::param<int>("~h_samples",h_samples_,10);
@@ -1155,6 +1156,8 @@ void TIP::update_tree(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, std::vector<pcl
 	if (c < ntree_ && virgin_){
 		int eval;
 		if (c==0) eval = 0;
+		trees[ntree_] = kdtree_;
+		clouds_[ntree_] = cloud;
 		if (ros::WallTime::now().toSec()-tree_times_[eval]>time_min_)
 		{
 			clouds_[c] = cloud;
@@ -1165,6 +1168,8 @@ void TIP::update_tree(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, std::vector<pcl
 		if (c%ntree_==0) virgin_ = false;
 	}
 	else {
+		trees[ntree_] = kdtree_;
+		clouds_[ntree_] = cloud;
 		int eval = c-1;
 		if (c%ntree_==0) {c = 0; eval = ntree_;}
 		if (ros::WallTime::now().toSec()-tree_times_[eval]>time_min_)
