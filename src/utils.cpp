@@ -92,6 +92,38 @@ void TIP::checkpcl(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, bool& cloud_empty)
 	}
 }
 
+void TIP::update_tree(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, std::vector<pcl::KdTreeFLANN<pcl::PointXYZ>> &trees){
+	kdtree_.setInputCloud(cloud);
+
+	if (c < ntree_ && virgin_){
+		int eval;
+		if (c==0) eval = 0;
+		trees[ntree_] = kdtree_;
+		clouds_[ntree_] = cloud;
+		if (ros::WallTime::now().toSec()-tree_times_[eval]>time_min_)
+		{
+			clouds_[c] = cloud;
+			trees[c] = kdtree_;
+			tree_times_[c] = ros::WallTime::now().toSec();
+			c++;
+		}
+		if (c%ntree_==0) virgin_ = false;
+	}
+	else {
+		trees[ntree_] = kdtree_;
+		clouds_[ntree_] = cloud;
+		int eval = c-1;
+		if (c%ntree_==0) {c = 0; eval = ntree_;}
+		if (ros::WallTime::now().toSec()-tree_times_[eval]>time_min_)
+		{
+			clouds_[c] = cloud;
+			trees[c] = kdtree_;
+			tree_times_[c] = ros::WallTime::now().toSec();
+			c++;		
+		}
+	}
+}
+
 void TIP::convert2ROS()
 {
 	// Trajectory

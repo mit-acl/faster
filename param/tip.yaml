@@ -16,7 +16,7 @@ max_speed: 3
 
 jerk: 10 
 accel: 5.0
-accel_stop: 5.0
+accel_stop: 8.0
 
 # Trajectory evaluation rate
 plan_eval: 0.01
