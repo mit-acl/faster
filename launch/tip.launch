@@ -18,6 +18,7 @@
 		<remap from="~traj" to="traj"/>
 		<remap from="~tip_data" to="tip_data"/>
 		<remap from="~goal" to="goal" />
+		<remap from="~clouds" to="clouds"/>	
 	</node>
 
 	<group if="$(arg bag)">

@@ -43,8 +43,12 @@ TIP::TIP() : tf_listener_(tf_buffer_),trees_(ntree_) {
 
 	ros::param::param<int>("~K",K_,10);
 	ros::param::param<int>("~N_pcl",ntree_,10);
+	ros::param::param<double>("~time_min",time_min_,1.0);
 
 	trees_.resize(ntree_);
+	tree_times_.resize(ntree_);
+	tree_times_[0] = 0;
+	clouds_.resize(ntree_);
 
 	ros::param::param<double>("~h_fov",h_fov_,60.0);
 	ros::param::param<int>("~h_samples",h_samples_,10);
@@ -180,24 +184,6 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 			quad_status_.mode = quad_status_.GO;
 			ROS_INFO("Take-off Complete. GO mode engaged!");
 		} 
-		// first = false;
-		// if (first){
-		// 	t0 = ros::Time::now().toSec();
-		// }
-		// else {
-		// 	double t = ros::Time::now().toSec();
-		// 	t -= t0;
-		// 	X_(0,2) = goal_(2) + 0.1*cos(2*M_PI*t);
-		// 	X_(1,2) = -0.1*2*M_PI*sin(2*M_PI*t);
-		// 	X_(2,2) = -0.1*2*M_PI*2*M_PI*cos(2*M_PI*t);
-		// 	if (t>4.0){
-		// 		X_(0,2) = goal_(2);
-		// 		X_(1,2) = 0;
-		// 		X_(2,2) = 0;
-		// 		quad_status_.mode = quad_status_.GO;
-		// 		ROS_INFO("Take-off Complete. GO mode engaged!");
-		// 	}
-		// }
 	}
 
 	else if (quad_status_.mode == quad_status_.LAND){
@@ -408,6 +394,7 @@ void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 		 	dist_trav_last_ = 0;
 			last_prim_cost_ = min_cost_prim_ ;
 	 	}
+
 	 	// std::cout << "Latency (ms): " << 1000*(traj_gen_ - msg_received_) << std::endl;		
 	 }
 	else {
@@ -435,6 +422,7 @@ void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
  	if(debug_){
  		convert2ROS();
  		pubROS();
+ 		pubClouds();
  	} 	
  } 	
 
@@ -1130,50 +1118,6 @@ void TIP::eval_trajectory(Eigen::Matrix4d X_switch, Eigen::Matrix4d Y_switch, Ei
 
 }
 
-
-void TIP::convert2pcl(const sensor_msgs::PointCloud2ConstPtr msg,pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_out)
-{ 	
-	geometry_msgs::TransformStamped tf_body;
-    sensor_msgs::PointCloud2 msg_out;
-	try {
-	  tf_body = tf_buffer_.lookupTransform("world", msg->header.frame_id,ros::Time(0.0));
-	} catch (tf2::TransformException &ex) {
-	  ROS_ERROR("%s", ex.what());
-	  return;
-	}
-
-	tf2::doTransform(*msg, msg_out, tf_body);
-
-	pcl::PCLPointCloud2* cloud2 = new pcl::PCLPointCloud2; 
-	pcl_conversions::toPCL(msg_out, *cloud2);
-	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
-	pcl::fromPCLPointCloud2(*cloud2,*cloud);
-
-	cloud_out = cloud;
-	delete cloud2;
-}
-
-
-void TIP::eigen2quadGoal(Eigen::MatrixXd Xc, acl_msgs::QuadGoal& quad_goal)
-{
- 	quad_goal_.pos.x   = Xc(0,0);
- 	quad_goal_.vel.x   = Xc(1,0);
- 	quad_goal_.accel.x = Xc(2,0);
- 	quad_goal_.jerk.x  = Xc(3,0);
-
- 	quad_goal_.pos.y   = Xc(0,1);
- 	quad_goal_.vel.y   = Xc(1,1);
- 	quad_goal_.accel.y = Xc(2,1);
- 	quad_goal_.jerk.y  = Xc(3,1);
-
- 	quad_goal_.pos.z   = Xc(0,2);
- 	quad_goal_.vel.z   = Xc(1,2);
- 	quad_goal_.accel.z = Xc(2,2);
- 	quad_goal_.jerk.z  = Xc(3,2);
- }
-
-
-
 void TIP::takeoff(Eigen::MatrixXd& X)
 {
 	if (X(0,2)<goal_(2)){
@@ -1198,69 +1142,6 @@ void TIP::land(double& z)
 	}
 }
 
-void TIP::saturate(double &var, double min, double max)
-{
-	if (var < min){
-		var = min;
-	}
-	else if (var > max){
-		var = max;
-	}
-}
-
-void TIP::convert2ROS()
-{
-	// Trajectory
-	traj_ros_.poses.clear();
-	traj_ros_.header.stamp = ros::Time::now();
-	traj_ros_.header.frame_id = "world";
-
-	Xf_eval_ = Xf_switch_;
-	Yf_eval_ = Yf_switch_;
-	Zf_eval_ = Zf_switch_;
-	t_xf_e_ = t_xf_;
-	t_yf_e_ = t_yf_;
-	t_zf_e_ = t_zf_;
-
-	dt_ = sensor_distance_/v_max_/num_;
-	t_ = 0;
-	XE_ << X_;
-	for(int i=0; i<num_; i++){
-		mtx.lock();
-		eval_trajectory(Xf_eval_,Yf_eval_,Zf_eval_,t_xf_e_,t_yf_e_,t_zf_e_,t_,XE_);
-		mtx.unlock();
-		temp_path_point_ros_.pose.position.x = XE_(0,0);
-		temp_path_point_ros_.pose.position.y = XE_(0,1);
-		temp_path_point_ros_.pose.position.z = XE_(0,2);
-		t_+=dt_;
-		traj_ros_.poses.push_back(temp_path_point_ros_);
-	}
- }
-
-void TIP::pubROS()
-{
-	traj_pub.publish(traj_ros_);
-	tipData_pub.publish(tipData_);
-}
-
-void TIP::angle_wrap(double& diff)
-{
-	diff =  fmod(diff+M_PI,2*M_PI);
-    if (diff < 0)
-        diff += 2*M_PI;
-    diff -= M_PI;
-}
-
-void TIP::normalize(geometry_msgs::Quaternion &q)
-{
-	double root = std::sqrt(q.w*q.w + q.x*q.x + q.y*q.y + q.z*q.z);
-	q.w = q.w/root;
-	q.x = q.x/root;
-	q.y = q.y/root;
-	q.z = q.z/root;
-}
-
-
 void TIP::yaw(double diff, acl_msgs::QuadGoal &quad_goal){
 	saturate(diff,-plan_eval_time_*r_max_,plan_eval_time_*r_max_);
 	if (diff>0) quad_goal.dyaw =  r_max_;
@@ -1268,31 +1149,30 @@ void TIP::yaw(double diff, acl_msgs::QuadGoal &quad_goal){
 	quad_goal.yaw+=diff;
 }
 
-void TIP::checkpcl(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, bool& cloud_empty){
-	int size = cloud->points.size();
-	int i;
-	int count = 0;
-	cloud_empty = true;
-	for(i=0;i<size;i++){
-		// nan is the only number that doesn't equal itself -- John Carter
-		if (cloud->points[i].x == cloud->points[i].x){
-			count++;
-			// Ensure there are enough good points to perform collision detection
-			if (count > K_) {cloud_empty=false;break;}
-		}
-	}
-}
-
 void TIP::update_tree(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, std::vector<pcl::KdTreeFLANN<pcl::PointXYZ>> &trees){
 	kdtree_.setInputCloud(cloud);
+
 	if (c < ntree_ && virgin_){
-		trees[c] = kdtree_;
-		c++;
+		int eval;
+		if (c==0) eval = 0;
+		if (ros::WallTime::now().toSec()-tree_times_[eval]>time_min_)
+		{
+			clouds_[c] = cloud;
+			trees[c] = kdtree_;
+			tree_times_[c] = ros::WallTime::now().toSec();
+			c++;
+		}
 		if (c%ntree_==0) virgin_ = false;
 	}
 	else {
-		if (c%ntree_==0) c = 0;
-		trees[c] = kdtree_;
-		c++;		
+		int eval = c;
+		if (c%ntree_==0) {c = 0; eval = ntree_;}
+		if (ros::WallTime::now().toSec()-tree_times_[eval]>time_min_)
+		{
+			clouds_[c] = cloud;
+			trees[c] = kdtree_;
+			tree_times_[c] = ros::WallTime::now().toSec();
+			c++;		
+		}
 	}
 }

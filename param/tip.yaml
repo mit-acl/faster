@@ -15,8 +15,8 @@ goal_z: 0.75
 max_speed: 3
 
 jerk: 10 
-accel: 8.0
-accel_stop: 8.0
+accel: 5.0
+accel_stop: 5.0
 
 # Trajectory evaluation rate
 plan_eval: 0.01
@@ -24,7 +24,9 @@ plan_eval: 0.01
 # Number of samples from k-d tree to find obstacle 
 K: 10
 
-N_pcl: 1
+N_pcl: 5
+
+time_min: 2
 
 # Sensor horizontal FOV (deg)
 h_fov: 60

@@ -49,7 +49,7 @@ public:
 	double plan_eval_time_ ;
 	int ntree_=1;
 
-	ros::Publisher traj_pub, goal_pub, new_goal_pub, quad_goal_pub, tipData_pub;
+	ros::Publisher traj_pub, goal_pub, new_goal_pub, quad_goal_pub, tipData_pub, clouds_pub;
 
 
 	void pclCB(const sensor_msgs::PointCloud2ConstPtr& msg);
@@ -87,6 +87,9 @@ public:
 	void yaw(double diff, acl_msgs::QuadGoal &quad_goal);
 	void checkpcl(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, bool& cloud_empty);
 	void update_tree(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, std::vector<pcl::KdTreeFLANN<pcl::PointXYZ>> &trees);
+	void convert2rospcl(pcl::PointCloud<pcl::PointXYZ> cloud, sensor_msgs::PointCloud2 &ros_cloud);
+
+	void pubClouds();
 
 private:
 
@@ -116,7 +119,10 @@ private:
 	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_;
 
 	std::vector<pcl::KdTreeFLANN<pcl::PointXYZ>> trees_;
+	std::vector<double> tree_times_;
+	std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clouds_;
 	int c = 0;
+	double time_min_ ;
 	bool virgin_, first = true;
 	double t0;
 	// // // // //

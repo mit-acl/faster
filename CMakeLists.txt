@@ -45,7 +45,7 @@ catkin_package(INCLUDE_DIRS include CATKIN_DEPENDS message_runtime std_msgs geom
 
 include_directories(include ${catkin_INCLUDE_DIRS})
 
-add_executable(tip_planner src/main.cpp src/tip.cpp )
+add_executable(tip_planner src/main.cpp src/tip.cpp src/utils.cpp)
 add_dependencies(tip_planner ${catkin_EXPORTED_TARGETS})
 target_link_libraries(tip_planner ${catkin_LIBRARIES})
 
