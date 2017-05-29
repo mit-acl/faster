@@ -199,7 +199,6 @@ private:
 	Eigen::MatrixXd Sorted_Goals_;
 	Eigen::MatrixXd X_prop_;
 	Eigen::MatrixXd X_stop_;
- 	Eigen::MatrixXd proj_goals_ ;
 
 	Eigen::Vector4d x0_;
 	Eigen::Vector4d y0_;

@@ -216,8 +216,6 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 		if(fabs(diff)>0.02 && !stop_ && dist_2_goal_ > goal_radius_){
 			if (!yawing_){
 				if (fabs(diff)>M_PI/2 || X_.row(1).norm()==0.0) {v_ = 0; gen_new_traj_=true;}
-				else if (can_reach_goal_ || following_prim_) {v_ = v_max_;}
-				else {v_ = 0; gen_new_traj_ = true;}
 			}
 			// Only yaw if the vehicle is at right speed
 			if (X_.row(1).norm() <= (v_+0.1*v_max_) && X_.row(1).norm() >= (v_-0.1*v_max_)){
@@ -226,6 +224,7 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 			}	
 		}
 		else {
+			// Could be spot for picking new speed
 			if (!stop_ && (can_reach_goal_ || following_prim_) && dist_2_goal_ > goal_radius_) v_ = v_max_;
 			quad_goal_.dyaw = 0;
 			yawing_ = false;
@@ -436,7 +435,6 @@ void TIP::sample_ss(Eigen::MatrixXd& Goals)
 	phi_.setLinSpaced(v_samples_,-v_fov_/2,v_fov_/2);
 
 	Goals = Eigen::MatrixXd::Zero((h_samples_)*(v_samples_),3);
-	proj_goals_ = Eigen::MatrixXd::Zero(Goals_.rows(),Goals_.cols());
  	Eigen::VectorXd x;
  	Eigen::VectorXd y;
  	Eigen::VectorXd z;
@@ -449,7 +447,6 @@ void TIP::sample_ss(Eigen::MatrixXd& Goals)
 	for(int j=0; j < v_samples_; j++){
 		for (int i=0; i < h_samples_; i++){
 			Goals.row(k) << cos(theta_(i))*cos(phi_(j)), sin(theta_(i))*cos(phi_(j)), sin(phi_(j));
-			proj_goals_.row(k) << x(k),y(i),z(j);
 			k++;
 		}
 	}
@@ -479,15 +476,12 @@ void TIP::sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d g
 		vector_i_ = qw2b_.conjugate()._transformVector(vector_i_);
 
 		Eigen::Vector2d vector_i_xy = vector_i_.head(2);
-		Eigen::Vector2d vector_i_xz;
-		vector_i_xz << vector_i_(0), vector_i_(2);
+		Eigen::Vector2d vector_i_xz(vector_i_(0), vector_i_(2));
 
-		Eigen::Vector2d vector_goal_xz;
-		vector_goal_xz << vector_2_goal_(0), vector_2_goal_(2);
+		Eigen::Vector2d vector_goal_xz(vector_2_goal_(0), vector_2_goal_(2));
 		vector_goal_xz.normalize();
 
-		Eigen::Vector2d vector_goal_xy;
-		vector_goal_xy << vector_2_goal_(0), vector_2_goal_(1);
+		Eigen::Vector2d vector_goal_xy(vector_2_goal_(0), vector_2_goal_(1));
 		vector_goal_xy.normalize();
 
 		vector_i_xy.normalize();

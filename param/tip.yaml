@@ -53,6 +53,6 @@ z_max: 3.0
 # Goal buffer
 goal_radius: 0.5
 
-# 2D vs 3D weight
-W: 0.25
+# 2D vs 3D weight (>1 => penaltize 3D)
+W: 5
     
