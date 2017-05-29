@@ -104,7 +104,7 @@ private:
 	double angle_i_, r_goal_, spinup_time_, heading_, j_max_, a_max_, a_stop_, t0_, r_max_;
 	double dist_trav_last_, dist_safe_last_, last_prim_cost_, min_cost_prim_;
 	double jump_thresh_, bias_x_, bias_y_, bias_z_;
-	double inf, z_min_, z_max_, v_plan_, mem_distance_, goal_radius_, final_heading_;
+	double inf, z_min_, z_max_, v_plan_, mem_distance_, goal_radius_, final_heading_, W_;
 
 	int num_ = 50, K_, goal_index_, num_of_pnts_, h_samples_, v_samples_, count2 ;
 	bool debug_, can_reach_goal_, collision_detected_, gen_new_traj_, stop_, can_reach_global_goal_, yawing_, following_prim_, v_los_, use_memory_, still_clear_, e_stop_, cloud_empty_;
@@ -215,13 +215,12 @@ private:
 
 	Eigen::Vector3d vector_2_goal_;
 	Eigen::Vector3d vector_2_goal_body_;
-	Eigen::Vector3d vector_last_body_;
+	Eigen::Vector3d vector_last_;
 	Eigen::Vector3d vector_i_;
 
 	Eigen::Vector3d temp_local_goal_;
 
 	Eigen::Quaterniond qw2b_;
-	Eigen::Quaterniond qb2w_;
 
 	Eigen::VectorXd theta_, phi_;
 
