@@ -214,9 +214,8 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 		angle_wrap(diff);
 
 		if(fabs(diff)>0.02 && !stop_ && dist_2_goal_ > goal_radius_){
-			if (!yawing_){
-				if (fabs(diff)>M_PI/2 || X_.row(1).norm()==0.0) {v_ = 0; gen_new_traj_=true;}
-			}
+			if (!yawing_ && (fabs(diff)>M_PI/2 || X_.row(1).norm()==0.0)) {v_ = 0; gen_new_traj_=true;}
+			
 			// Only yaw if the vehicle is at right speed
 			if (X_.row(1).norm() <= (v_+0.1*v_max_) && X_.row(1).norm() >= (v_-0.1*v_max_)){
 				yawing_ = true;
@@ -382,7 +381,7 @@ void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 			if (!can_reach_goal_ && !stop_ && quad_status_.mode==quad_status_.GO && X_.row(1).norm()>0){
 		 		// Need to stop!!!
 		 		v_ = 0;
-		 		stop_ = true;
+		 		// stop_ = true;
 		 		ROS_ERROR_THROTTLE(1.0,"Emergency stop -- no feasible path");
 		 	}
 		 	// else if (v_los_ && !stop_ && !yawing_) v_ = v_max_;
