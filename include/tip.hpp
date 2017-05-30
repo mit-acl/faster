@@ -120,9 +120,9 @@ private:
 	std::vector<pcl::KdTreeFLANN<pcl::PointXYZ>> trees_;
 	std::vector<double> tree_times_;
 	std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clouds_;
-	int c = 0;
+	int c = 0, c_search=-1;
 	double time_min_ ;
-	bool virgin_, first = true, stuck_;
+	bool virgin_, first = true, stuck_, search_;
 	double t0, t_stuck;
 	// // // // //
 	// Ros var initialization

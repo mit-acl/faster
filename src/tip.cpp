@@ -95,6 +95,7 @@ TIP::TIP() : tf_listener_(tf_buffer_),trees_(ntree_) {
 	following_prim_ = false;
 	e_stop_ = false;
 	stuck_ = false;
+	search_ = false;
 
 	quad_status_.mode = quad_status_.NOT_FLYING;
 
@@ -135,7 +136,8 @@ void TIP::modeCB(const acl_msgs::QuadMode& msg)
 void TIP::global_goalCB(const acl_msgs::QuadWaypoint& msg)
 {
 	goal_ << msg.point.x, msg.point.y, msg.point.z;
-	heading_ = atan2(goal_(1)-X_(0,1),goal_(0)-X_(0,0));
+	// heading_ = atan2(goal_(1)-X_(0,1),goal_(0)-X_(0,0));
+	heading_ = atan2(local_goal_(1),local_goal_(0));
 	final_heading_ = msg.heading;
 }
 
@@ -214,8 +216,15 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 	else if (quad_status_.mode == quad_status_.GO){		
 		dist_2_goal_ = (goal_.head(2) - X_.row(0).transpose().head(2)).norm();
 	
-		double diff = heading_ - quad_goal_.yaw;
+		double diff = heading_ - quad_goal_.yaw; 
 		angle_wrap(diff);
+
+		// if (X_.row(2).norm()>2){diff=0;}
+
+		// if (search_){
+		// 	quad_goal_.yaw += 0.01;
+		// 	diff = 0;
+		// }		
 
 		if(fabs(diff)>0.02 && !stop_ && dist_2_goal_ > goal_radius_){
 			if (!yawing_ && (fabs(diff)>M_PI/2 || X_.row(1).norm()==0.0)) {v_ = 0; gen_new_traj_=true;}
@@ -228,12 +237,19 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 		}
 		else {
 			// Could be spot for picking new speed
-			if (!stop_ && (can_reach_goal_ || following_prim_) && dist_2_goal_ > goal_radius_) {v_ = v_max_; stuck_=false;}
-			// else if (!stop_ && !can_reach_goal_ && dist_2_goal_>goal_radius_) {
-			// 	ROS_INFO_THROTTLE(1.0,"stuck");
-			// 	if (!stuck_) {stuck_=true; t_stuck = ros::Time::now().toSec();}
-			// 	if (ros::Time::now().toSec()-t_stuck>2) {v_max_ = 0.1; safe_distance_= 0.4;}
-			// }
+			if (!stop_ && (can_reach_goal_ || following_prim_) && dist_2_goal_ > goal_radius_) {v_ = v_max_; stuck_=false; search_=false;}
+			else if (!stop_ && !can_reach_goal_ && dist_2_goal_>goal_radius_) {
+				ROS_INFO_THROTTLE(1.0,"stuck");
+				if (!stuck_) {stuck_=true; t_stuck = ros::Time::now().toSec();}
+				if (ros::Time::now().toSec()-t_stuck>2 && !search_){
+					search_ = true;
+					if (c_search==-1) c_search = 1;
+					else c_search =-1;
+					ROS_INFO("Search");
+					// v_max_ = 0.1; 
+					// safe_distance_= 0.4;
+				}
+			}
 			quad_goal_.dyaw = 0;
 			yawing_ = false;
 		} 	
