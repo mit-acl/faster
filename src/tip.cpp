@@ -384,7 +384,6 @@ void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 		 		// stop_ = true;
 		 		ROS_ERROR_THROTTLE(1.0,"Emergency stop -- no feasible path");
 		 	}
-		 	// else if (v_los_ && !stop_ && !yawing_) v_ = v_max_;
 			
 		 	gen_new_traj_ = true;
 		 	pose_last_mp_ = X_.row(0).transpose();
@@ -500,7 +499,7 @@ void TIP::sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d g
 		saturate(dot,-1,1);
 		angle_diff_last_ = acos(dot);
 
- 		cost_i_ = pow(a_d_xy,2) + W_*pow(a_d_xz,2) + 0.05*pow(angle_diff_last_,2);
+ 		cost_i_ = pow(a_d_xy,2) + pow(W_*a_d_xz,2) + 0.05*pow(angle_diff_last_,2);
 
  		cost_queue_.push(cost_i_);
  		cost_v_.push_back(cost_i_);
