@@ -35,6 +35,8 @@ TIP::TIP() : tf_listener_(tf_buffer_),trees_(ntree_) {
 	ros::param::param<double>("cntrl/spinup_time",spinup_time_,2.5);
 	ros::param::param<double>("~max_speed",v_max_,2);
 
+	v_max_org_ = v_max_;
+
 	ros::param::param<double>("~jerk",j_max_,10);
 	ros::param::param<double>("~accel",a_max_,5);
 	ros::param::param<double>("~accel_stop",a_stop_,5);
@@ -92,6 +94,7 @@ TIP::TIP() : tf_listener_(tf_buffer_),trees_(ntree_) {
 	can_reach_goal_ = false;
 	following_prim_ = false;
 	e_stop_ = false;
+	stuck_ = false;
 
 	quad_status_.mode = quad_status_.NOT_FLYING;
 
@@ -191,8 +194,9 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 
 	else if (quad_status_.mode == quad_status_.LAND){
 		if (X_.row(1).norm() == 0){
-			land(X_(0,2));
-			if (X_(0,2) == -0.1){
+			land(X_);
+			if (X_(0,2) == 0){
+				X_(1,2) = 0;
 				quad_status_.mode = quad_status_.NOT_FLYING;
 				quad_goal_.cut_power = true;
 				ROS_INFO("Landing Complete");
@@ -224,7 +228,12 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 		}
 		else {
 			// Could be spot for picking new speed
-			if (!stop_ && (can_reach_goal_ || following_prim_) && dist_2_goal_ > goal_radius_) v_ = v_max_;
+			if (!stop_ && (can_reach_goal_ || following_prim_) && dist_2_goal_ > goal_radius_) {v_ = v_max_; stuck_=false;}
+			// else if (!stop_ && !can_reach_goal_ && dist_2_goal_>goal_radius_) {
+			// 	ROS_INFO_THROTTLE(1.0,"stuck");
+			// 	if (!stuck_) {stuck_=true; t_stuck = ros::Time::now().toSec();}
+			// 	if (ros::Time::now().toSec()-t_stuck>2) {v_max_ = 0.1; safe_distance_= 0.4;}
+			// }
 			quad_goal_.dyaw = 0;
 			yawing_ = false;
 		} 	
@@ -262,8 +271,7 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 			// We're done	
 			stop_ = false;
 			yawing_ = false;
-			if (dist_2_goal_ < goal_radius_){v_ = 0;}
-			else if (e_stop_){v_=0; quad_status_.mode = quad_status_.FLYING;}
+			if (e_stop_){v_=0; quad_status_.mode = quad_status_.FLYING;}
 			else if (can_reach_goal_) {v_ = v_max_; gen_new_traj_ = true;}
 		}
 		yaw_ = quad_goal_.yaw;
@@ -349,6 +357,7 @@ void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 	checkpcl(cloud_,cloud_empty_);
 
  	if (!cloud_empty_ && quad_status_.mode!=quad_status_.NOT_FLYING){
+ 		
  		if (c==0) update_tree(cloud_,trees_);
 
 		// Build k-d tree
@@ -937,16 +946,12 @@ void TIP::takeoff(Eigen::MatrixXd& X)
 }
 
 
-void TIP::land(double& z)
+void TIP::land(Eigen::MatrixXd& X)
 {
-	if (z > 0.4){
-		z-=0.005;
-		saturate(z,-0.1,goal_(2));
-	}
-	else{
-		z-=0.005;
-		saturate(z,-0.1,goal_(2));
-	}
+	X(0,2)-=0.005;
+	X(1,2) = -0.5;
+	saturate(X(0,2),0,goal_(2));
+	ros::Duration(0.01).sleep();	
 }
 
 void TIP::yaw(double diff, acl_msgs::QuadGoal &quad_goal){

@@ -97,11 +97,10 @@ private:
     tf2_ros::TransformListener tf_listener_;
 
 	double yaw_, dist_2_goal_, angle_2_goal_, msg_received_, cost_, cost_i_, angle_diff_, angle_diff_last_, safe_distance_, sensor_distance_, min_cost_, buffer_;
-	double vfx_, vfy_, vfz_, t_, tE_, dt_, tf_, r_, d_min_, tx_, ty_, tz_, v_, v_max_;
+	double vfx_, vfy_, vfz_, t_, tE_, dt_, tf_, r_, d_min_, tx_, ty_, tz_, v_, v_max_, v_max_org_;
 	double traj_gen_, t_stop_, d_stop_, d_goal_;
 	double h_fov_, v_fov_, angle_2_last_goal_, current_angle_2_local_goal_, mean_distance_, goal_distance_, distance_traveled_, local_goal_angle_ ;
-	double tE_prev_;
-	double angle_i_, r_goal_, spinup_time_, heading_, j_max_, a_max_, a_stop_, t0_, r_max_;
+	double tE_prev_, angle_i_, r_goal_, spinup_time_, heading_, j_max_, a_max_, a_stop_, t0_, r_max_;
 	double dist_trav_last_, dist_safe_last_, last_prim_cost_, min_cost_prim_;
 	double jump_thresh_, bias_x_, bias_y_, bias_z_;
 	double inf, z_min_, z_max_, v_plan_, mem_distance_, goal_radius_, final_heading_, W_;
@@ -123,8 +122,8 @@ private:
 	std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clouds_;
 	int c = 0;
 	double time_min_ ;
-	bool virgin_, first = true;
-	double t0;
+	bool virgin_, first = true, stuck_;
+	double t0, t_stuck;
 	// // // // //
 	// Ros var initialization
 	// geometry_msgs::PoseArray goal_points_ros_ ;
@@ -230,7 +229,7 @@ private:
 	//## Logging and Debugging Functions
 
 	void takeoff(Eigen::MatrixXd& X);
-	void land(double& z);
+	void land(Eigen::MatrixXd& X);
 	
 };
 
