@@ -136,8 +136,6 @@ void TIP::modeCB(const acl_msgs::QuadMode& msg)
 void TIP::global_goalCB(const acl_msgs::QuadWaypoint& msg)
 {
 	goal_ << msg.point.x, msg.point.y, msg.point.z;
-	// heading_ = atan2(goal_(1)-X_(0,1),goal_(0)-X_(0,0));
-	heading_ = atan2(local_goal_(1),local_goal_(0));
 	final_heading_ = msg.heading;
 }
 
@@ -188,17 +186,17 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 
 	if (quad_status_.mode == quad_status_.TAKEOFF){
 		takeoff(X_);
-		if (X_(0,2) == goal_(2) && fabs(goal_(2)-pose_(2))<0.1){
+		if (X_(0,2) == goal_(2) && fabs(goal_(2)-pose_(2))<0.2){
 			quad_status_.mode = quad_status_.GO;
 			ROS_INFO("Take-off Complete. GO mode engaged!");
 		} 
 	}
 
 	else if (quad_status_.mode == quad_status_.LAND){
-		if (X_.row(1).norm() == 0){
+		// Make sure vx and vy are zero before landing
+		if (X_.row(1).head(2).norm() == 0){
 			land(X_);
 			if (X_(0,2) == 0){
-				X_(1,2) = 0;
 				quad_status_.mode = quad_status_.NOT_FLYING;
 				quad_goal_.cut_power = true;
 				ROS_INFO("Landing Complete");
@@ -216,6 +214,10 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 	else if (quad_status_.mode == quad_status_.GO){		
 		dist_2_goal_ = (goal_.head(2) - X_.row(0).transpose().head(2)).norm();
 	
+
+		if (X_.row(1).norm()==0) heading_ = atan2(goal_(1)-X_(0,1),goal_(0)-X_(0,0));
+		else heading_ = atan2(local_goal_(1),local_goal_(0));
+
 		double diff = heading_ - quad_goal_.yaw; 
 		angle_wrap(diff);
 
@@ -227,8 +229,7 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 		// }		
 
 		if(fabs(diff)>0.02 && !stop_ && dist_2_goal_ > goal_radius_){
-			if (!yawing_ && (fabs(diff)>M_PI/2 || X_.row(1).norm()==0.0)) {v_ = 0; gen_new_traj_=true;}
-			
+			if (!yawing_ && (fabs(diff)>M_PI/2 || X_.row(1).norm()==0.0)) {v_ = 0; gen_new_traj_=true;}			
 			// Only yaw if the vehicle is at right speed
 			if (X_.row(1).norm() <= (v_+0.1*v_max_) && X_.row(1).norm() >= (v_-0.1*v_max_)){
 				yawing_ = true;
@@ -287,8 +288,9 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 			// We're done	
 			stop_ = false;
 			yawing_ = false;
-			if (e_stop_){v_=0; quad_status_.mode = quad_status_.FLYING;}
-			else if (can_reach_goal_) {v_ = v_max_; gen_new_traj_ = true;}
+			v_=0;
+			if (e_stop_){quad_status_.mode = quad_status_.FLYING;}
+			else if (can_reach_goal_ && dist_2_goal_ > goal_radius_) {v_ = v_max_; gen_new_traj_ = true;}
 		}
 		yaw_ = quad_goal_.yaw;
 	}
@@ -952,12 +954,10 @@ void TIP::eval_trajectory(Eigen::Matrix4d X_switch, Eigen::Matrix4d Y_switch, Ei
 
 void TIP::takeoff(Eigen::MatrixXd& X)
 {
-	if (X(0,2)<goal_(2)){
-		X(0,2)+=0.005;
-		X(1,2) = 0.5;
-	}
-	else X(1,2) = 0;
+	X(0,2)+=0.005;
+	X(1,2) = 0.5;
 	saturate(X(0,2),-0.1,goal_(2));
+	if (X(0,2)==goal_(2)) X_(1,2) = 0;
 	ros::Duration(0.01).sleep();
 }
 
@@ -967,6 +967,7 @@ void TIP::land(Eigen::MatrixXd& X)
 	X(0,2)-=0.005;
 	X(1,2) = -0.5;
 	saturate(X(0,2),0,goal_(2));
+	if (X(0,2)==0) X_(1,2) = 0;
 	ros::Duration(0.01).sleep();	
 }
 

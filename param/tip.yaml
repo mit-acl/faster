@@ -1,9 +1,9 @@
 # Params for TIP planner
 debug: true
 # use_memory: true
-safe_distance: 1.5   # Smallest distance before obstacle is no longer viable segment
-sensor_distance: 5 # Primitives evaluated up to this distance
-mem_distance: 0.75
+safe_distance: 3   # Smallest distance before obstacle is no longer viable segment
+sensor_distance: 6 # Primitives evaluated up to this distance
+mem_distance: 1.5
 buffer: 0.4        # 0.5 width of quad for collision checking
 
 # (x,y,z) goal
@@ -12,7 +12,7 @@ goal_y: -5.0
 goal_z: 0.75
 
 # Flight params
-max_speed: 3
+max_speed: 5
 
 jerk: 10 
 accel: 8.0
