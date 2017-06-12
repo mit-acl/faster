@@ -955,7 +955,7 @@ void TIP::eval_trajectory(Eigen::Matrix4d X_switch, Eigen::Matrix4d Y_switch, Ei
 void TIP::takeoff(Eigen::MatrixXd& X)
 {
 	X(0,2)+=0.005;
-	X(1,2) = 0.5;
+	X(1,2) = 0.0;
 	saturate(X(0,2),-0.1,goal_(2));
 	if (X(0,2)==goal_(2)) X_(1,2) = 0;
 	ros::Duration(0.01).sleep();
@@ -965,7 +965,7 @@ void TIP::takeoff(Eigen::MatrixXd& X)
 void TIP::land(Eigen::MatrixXd& X)
 {
 	X(0,2)-=0.005;
-	X(1,2) = -0.5;
+	X(1,2) = -0.0;
 	saturate(X(0,2),0,goal_(2));
 	if (X(0,2)==0) X_(1,2) = 0;
 	ros::Duration(0.01).sleep();	
