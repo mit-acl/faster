@@ -4,10 +4,10 @@
 	<arg name="bag" default="false"/>
 	<arg name="memory" default="true"/>
 
-	<node ns="$(arg quad)" name="tip_planner" pkg="acl_planning" type="tip_planner" output="screen" clear_params="true">
+	<node ns="$(arg quad)" name="tip" pkg="tip" type="tip" output="screen" clear_params="true">
         <param name="~use_memory" value="$(arg memory)" type="bool"/>
 
-		<rosparam file="$(find acl_planning)/param/tip.yaml" command="load"/>
+		<rosparam file="$(find tip)/param/tip.yaml" command="load"/>
 
 		<remap from="~vicon" to="state_estimate"/>
 		<remap from="~event" to="event" />

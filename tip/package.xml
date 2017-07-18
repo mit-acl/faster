@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package>
-  <name>acl_planning</name>
+  <name>tip</name>
   <version>0.0.0</version>
-  <description>The acl_planning package</description>
+  <description>The tip package</description>
 
   <!-- One maintainer tag required, multiple allowed, one person per tag --> 
   <!-- Example:  -->

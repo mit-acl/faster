@@ -29,7 +29,7 @@ int main(int argc, char **argv)
 	ros::Timer sendGoalTimer = n.createTimer(ros::Duration(tip.plan_eval_time_), &TIP::sendGoal, &tip);
 
 	tip.traj_pub = n.advertise<nav_msgs::Path>("traj",1);
-	tip.tipData_pub = n.advertise<acl_planning::TIP>("tip_data",1);
+	tip.tipData_pub = n.advertise<tip::TIP>("tip_data",1);
 	tip.quad_goal_pub = n.advertise<acl_msgs::QuadGoal>("goal",1);
 	tip.clouds_pub = n.advertise<sensor_msgs::PointCloud2>("clouds",1);
 

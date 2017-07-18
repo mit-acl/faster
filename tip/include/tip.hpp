@@ -24,7 +24,7 @@
 #include "acl_msgs/QuadMode.h"
 #include "acl_msgs/FloatStamped.h"
 #include "acl_msgs/QuadWaypoint.h"
-#include "acl_planning/TIP.h"
+#include "tip/TIP.h"
 
 #include <pcl_ros/point_cloud.h>
 #include "pcl_ros/transforms.h"
@@ -131,7 +131,7 @@ private:
 	geometry_msgs::Pose temp_goal_point_ros_;
 	geometry_msgs::PoseStamped temp_path_point_ros_;
 	nav_msgs::Path traj_ros_;
-	acl_planning::TIP tipData_;
+	tip::TIP tipData_;
 
 	acl_msgs::QuadGoal quad_goal_;
 	acl_msgs::QuadState quad_status_;
