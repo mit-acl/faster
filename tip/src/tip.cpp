@@ -311,9 +311,7 @@ void TIP::eventCB(const acl_msgs::QuadFlightEvent& msg)
 		quad_goal_.pos.y = pose_(1);
 		quad_goal_.pos.z = pose_(2);
 
-		X_(0,0) = pose_(0);
-		X_(0,1) = pose_(1);
-		X_(0,2) = pose_(2);
+		
 
 		quad_goal_.vel.x = 0;
 		quad_goal_.vel.y = 0;
@@ -328,6 +326,9 @@ void TIP::eventCB(const acl_msgs::QuadFlightEvent& msg)
 		ROS_INFO("Taking off");
 
 		quad_status_.mode = quad_status_.TAKEOFF; 
+		X_(0,0) = pose_(0);
+		X_(0,1) = pose_(1);
+		X_(0,2) = pose_(2)+0.5;
 	}
 	// Emergency kill
 	else if (msg.mode == msg.KILL && quad_status_.mode != quad_status_.NOT_FLYING){
