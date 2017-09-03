@@ -9,7 +9,7 @@
 
 		<rosparam file="$(find tip)/param/tip.yaml" command="load"/>
 
-		<remap from="~vicon" to="state_estimate"/>
+		<remap from="~state" to="state"/>
 		<remap from="~event" to="event" />
 		<remap from="~global_goal" to="global_goal" />
 		<remap from="~camera/cloud" to="camera/cloud"/>	

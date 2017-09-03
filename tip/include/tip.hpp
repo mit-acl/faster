@@ -17,7 +17,7 @@
 #include <Eigen/Dense>
 
 // custom messages
-#include "acl_msgs/ViconState.h"
+#include "acl_msgs/State.h"
 #include "acl_msgs/QuadGoal.h"
 #include "acl_msgs/QuadState.h"
 #include "acl_msgs/QuadFlightEvent.h"
@@ -53,7 +53,7 @@ public:
 
 
 	void pclCB(const sensor_msgs::PointCloud2ConstPtr& msg);
-	void stateCB(const acl_msgs::ViconState& msg);
+	void stateCB(const acl_msgs::State& msg);
 	void global_goalCB(const acl_msgs::QuadWaypoint& msg);
 	void eventCB(const acl_msgs::QuadFlightEvent& msg);
 	void modeCB(const acl_msgs::QuadMode& msg);

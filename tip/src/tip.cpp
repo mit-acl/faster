@@ -139,25 +139,26 @@ void TIP::global_goalCB(const acl_msgs::QuadWaypoint& msg)
 	final_heading_ = msg.heading;
 }
 
-void TIP::stateCB(const acl_msgs::ViconState& msg)
+void TIP::stateCB(const acl_msgs::State& msg)
 {
 	// Check if estimate jumped 
-	if (sqrt(pow(pose_(0)-msg.pose.position.x,2) + pow(pose_(1)- msg.pose.position.y,2) + pow(pose_(2)- msg.pose.position.z,2)) > jump_thresh_){
-		ROS_WARN("Jump Detected -- magnitude: %0.3f",sqrt(pow(pose_(0)-msg.pose.position.x,2) + pow(pose_(1)- msg.pose.position.y,2) + pow(pose_(2)- msg.pose.position.z,2)));
+	if (sqrt(pow(pose_(0)-msg.pos.x,2) + pow(pose_(1)- msg.pos.y,2) + pow(pose_(2)- msg.pos.z,2)) > jump_thresh_){
+		ROS_WARN("Jump Detected -- magnitude: %0.3f",sqrt(pow(pose_(0)-msg.pos.x,2) + pow(pose_(1)- msg.pos.y,2) + pow(pose_(2)- msg.pos.z,2)));
 		if (quad_status_.mode == quad_status_.GO){
-			bias_x_ = msg.pose.position.x-pose_(0);
-			bias_y_ = msg.pose.position.y-pose_(1);
-			bias_z_ = msg.pose.position.z-pose_(2);
+			bias_x_ = msg.pos.x-pose_(0);
+			bias_y_ = msg.pos.y-pose_(1);
+			bias_z_ = msg.pos.z-pose_(2);
 			X_.row(0) << X_(0,0)+bias_x_,X_(0,1)+bias_y_,X_(0,2)+bias_z_;
 			gen_new_traj_ = true;
 		}
 	}
 
-	pose_ << msg.pose.position.x, msg.pose.position.y, msg.pose.position.z; 
+	pose_ << msg.pos.x, msg.pos.y, msg.pos.z; 
+
 
 	// Make sure quaterion is normalized
 	geometry_msgs::Quaternion temp;
-	temp = msg.pose.orientation;
+	temp = msg.quat;
 	normalize(temp);
 
 	qw2b_.w() = temp.w;
@@ -168,7 +169,7 @@ void TIP::stateCB(const acl_msgs::ViconState& msg)
 	// Check this
 	if (quad_status_.mode == quad_status_.NOT_FLYING){
 		X_.row(0) << pose_.transpose();
-		yaw_ = tf::getYaw(msg.pose.orientation);
+		yaw_ = tf::getYaw(msg.quat);
 	}
 }
 
@@ -540,6 +541,9 @@ void TIP::sort_ss(Eigen::MatrixXd Goals, Eigen::Vector3d pose, Eigen::Vector3d g
 
 		it_ = std::find(cost_v_.begin(),cost_v_.end(),min_cost_);
 		goal_index_ = it_ - cost_v_.begin();
+
+		if (goal_index_ == Goals.rows()) goal_index_=Goals.rows()-1;
+
 		Sorted_Goals_temp.row(i) << Goals.row(goal_index_), min_cost_;
 
 		cost_queue_.pop();

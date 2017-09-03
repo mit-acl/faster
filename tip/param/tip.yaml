@@ -8,11 +8,11 @@ buffer: 0.4        # 0.5 width of quad for collision checking
 
 # (x,y,z) goal
 goal_x: 0.0
-goal_y: -5.0
+goal_y: -50.0
 goal_z: 0.75
 
 # Flight params
-max_speed: 3
+max_speed: 5.0
 
 jerk: 10 
 accel: 8.0

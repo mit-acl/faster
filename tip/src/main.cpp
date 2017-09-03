@@ -11,7 +11,7 @@ int main(int argc, char **argv)
 	TIP tip;
 
 	// initialize listener callback for state estimate
-	ros::Subscriber vic_pose = n.subscribe("vicon", 1, &TIP::stateCB, &tip);
+	ros::Subscriber vic_pose = n.subscribe("state", 1, &TIP::stateCB, &tip);
 	
 	// initialize listener callback for pointcloud
 	ros::Subscriber sub_pcl = n.subscribe("camera/cloud", 1, &TIP::pclCB, &tip);
