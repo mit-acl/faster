@@ -68,6 +68,14 @@ TIP::TIP() : tf_listener_(tf_buffer_),trees_(ntree_) {
 	
 	ros::param::param<double>("~W",W_,0.5);
 
+	ros::param::param<double>("~p_min",p_min_,0.5);
+	ros::param::param<double>("~p_max",p_max_,2.0);
+	ros::param::param<double>("~p_dot",p_dot_,10);
+
+	p_dot_*=plan_eval_time_;
+
+	P_.data = p_min_;
+
 	h_fov_ = h_fov_*M_PI/180;
 	v_fov_ = v_fov_*M_PI/180;
 
@@ -215,9 +223,9 @@ void TIP::sendGoal(const ros::TimerEvent& e)
 	else if (quad_status_.mode == quad_status_.GO){		
 		dist_2_goal_ = (goal_.head(2) - X_.row(0).transpose().head(2)).norm();
 	
-
-		if (X_.row(1).norm()==0) heading_ = atan2(goal_(1)-X_(0,1),goal_(0)-X_(0,0));
-		else heading_ = atan2(local_goal_(1),local_goal_(0));
+		heading_ = atan2(goal_(1)-X_(0,1),goal_(0)-X_(0,0));
+		// if (X_.row(1).norm()==0) heading_ = atan2(goal_(1)-X_(0,1),goal_(0)-X_(0,0));
+		// else heading_ = atan2(local_goal_(1),local_goal_(0));
 
 		double diff = heading_ - quad_goal_.yaw; 
 		angle_wrap(diff);
@@ -420,6 +428,28 @@ void TIP::pclCB(const sensor_msgs::PointCloud2ConstPtr& msg)
 		 	dist_trav_last_ = 0;
 			last_prim_cost_ = min_cost_prim_ ;
 	 	}
+
+	 	static int counter = 0;
+
+	 	double p_temp = P_.data;
+	 	if (!following_prim_ && min_cost_prim_==0){
+	 		// ROS_INFO("Expand BL");
+	 		counter++;
+	 		if (counter > 30){
+		 		p_temp += p_dot_;
+		 		saturate(p_temp,p_min_,p_max_);
+	 		}
+	 	}
+	 	else{
+	 		if (min_cost_prim_!=0)	counter = 0;
+	 		p_temp -= p_dot_;
+	 		saturate(p_temp,p_min_,p_max_);
+	 	}
+	 	
+	 	P_.data = p_temp;
+	 	P_.header.stamp = ros::Time::now();
+
+	 	buffer_ = 0.3+P_.data/3.0;
 
 	 	// std::cout << "Latency (ms): " << 1000*(traj_gen_ - msg_received_) << std::endl;		
 	 }

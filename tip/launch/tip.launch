@@ -19,6 +19,7 @@
 		<remap from="~tip_data" to="tip_data"/>
 		<remap from="~goal" to="goal" />
 		<remap from="~clouds" to="clouds"/>	
+		<remap from="~boundary_layer" to="boundary_layer"/>	
 	</node>
 
 	<group if="$(arg bag)">

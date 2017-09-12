@@ -157,6 +157,7 @@ void TIP::pubROS()
 {
 	traj_pub.publish(traj_ros_);
 	tipData_pub.publish(tipData_);	
+	bl_pub.publish(P_);
 }
 
 void TIP::pubClouds()

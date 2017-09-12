@@ -1,15 +1,15 @@
 # Params for TIP planner
 debug: true
 # use_memory: true
-safe_distance: 1.5   # Smallest distance before obstacle is no longer viable segment
-sensor_distance: 3 # Primitives evaluated up to this distance
-mem_distance: 0.75
+safe_distance: 3.0   # Smallest distance before obstacle is no longer viable segment
+sensor_distance: 7.0 # Primitives evaluated up to this distance
+mem_distance: 2.9
 buffer: 0.4        # 0.5 width of quad for collision checking
 
 # (x,y,z) goal
-goal_x: 0.0
-goal_y: -50.0
-goal_z: 0.75
+goal_x: 50.0
+goal_y: 0.0
+goal_z: 1.0
 
 # Flight params
 max_speed: 5.0
@@ -50,8 +50,13 @@ jump_thresh: 0.5
 z_min: 0.2
 z_max: 2.0
 
+# Min and max allowable BL values 
+p_min: 0.5
+p_max: 2.0
+p_dot: 1
+
 # Goal buffer
-goal_radius: 0.5
+goal_radius: 1.0
 
 # 2D vs 3D weight (>1 => penaltize 3D)
 W: 5

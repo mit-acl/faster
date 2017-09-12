@@ -32,6 +32,7 @@ int main(int argc, char **argv)
 	tip.tipData_pub = n.advertise<tip::TIP>("tip_data",1);
 	tip.quad_goal_pub = n.advertise<acl_msgs::QuadGoal>("goal",1);
 	tip.clouds_pub = n.advertise<sensor_msgs::PointCloud2>("clouds",1);
+	tip.bl_pub = n.advertise<acl_msgs::FloatStamped>("boundary_layer",1);
 
 	// run the code
 	// start asynchronous spinner
