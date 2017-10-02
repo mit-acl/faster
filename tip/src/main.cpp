@@ -11,7 +11,7 @@ int main(int argc, char **argv)
 	TIP tip;
 
 	// initialize listener callback for state estimate
-	ros::Subscriber vic_pose = n.subscribe("vicon", 1, &TIP::stateCB, &tip);
+	ros::Subscriber vic_pose = n.subscribe("state", 1, &TIP::stateCB, &tip);
 	
 	// initialize listener callback for pointcloud
 	ros::Subscriber sub_pcl = n.subscribe("camera/cloud", 1, &TIP::pclCB, &tip);
@@ -21,18 +21,18 @@ int main(int argc, char **argv)
 
 	// initialize listener callback for global goal
 	ros::Subscriber global_goal_sub = n.subscribe("global_goal", 1, &TIP::global_goalCB, &tip);
-	
+
+	// initialize listener callback for system mode
+	ros::Subscriber mode_sub = n.subscribe("mode", 1, &TIP::modeCB, &tip);	
 
 	// SendCmd timer
 	ros::Timer sendGoalTimer = n.createTimer(ros::Duration(tip.plan_eval_time_), &TIP::sendGoal, &tip);
 
-	tip.new_goal_pub = n.advertise<geometry_msgs::PointStamped>("new_global_goal", 1);
-	tip.int_goal_pub = n.advertise<sensor_msgs::PointCloud>("int_goal", 1);
-	tip.last_goal_pub = n.advertise<geometry_msgs::PointStamped>("last_global_goal",1);
 	tip.traj_pub = n.advertise<nav_msgs::Path>("traj",1);
-	tip.latency_pub = n.advertise<acl_system::FloatStamped>("latency",1);
-
-	tip.quad_goal_pub = n.advertise<acl_system::QuadGoal>("goal",1);
+	tip.tipData_pub = n.advertise<tip::TIP>("tip_data",1);
+	tip.quad_goal_pub = n.advertise<acl_msgs::QuadGoal>("goal",1);
+	tip.clouds_pub = n.advertise<sensor_msgs::PointCloud2>("clouds",1);
+	tip.bl_pub = n.advertise<acl_msgs::FloatStamped>("boundary_layer",1);
 
 	// run the code
 	// start asynchronous spinner
