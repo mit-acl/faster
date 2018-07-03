@@ -1,0 +1,53 @@
+<launch>
+  <arg name="debug" default="false"/>
+  <arg name="dt" default="0.2"/>
+  <arg name="max_num" default="-1"/>
+  <!--<arg name="debug_valgrind" default="false"/>-->
+
+  <arg name="prefix" value="" unless="$(arg debug)"/>
+  <arg name="prefix" value="gdb -ex run --args" if="$(arg debug)"/>
+
+  <node pkg="mpl_test_node"
+    type="test_primitive_cloud"
+    name="test_primitive"
+    launch-prefix="$(arg prefix)"
+    output="screen">
+    <remap from="~pose" to="/move_base_simple/goal"/>
+    <param name="file" value="$(find mpl_test_node)/maps/office/office.bag"/>
+    <param name="topic" value="/cloud"/>
+    <!-- Set start and goal -->
+    <param name="start_x" value="8.0"/>
+    <param name="start_y" value="13.0"/>
+    <param name="start_z" value="1.3"/>
+    <param name="start_vx" value="0.0"/>
+    <param name="start_vy" value="0.0"/>
+    <param name="start_vz" value="0.0"/>
+    <param name="goal_x" value="28.5"/>
+    <param name="goal_y" value="14.0"/>
+    <param name="goal_z" value="1.3"/>
+    <!-- Set range -->
+    <param name="origin_x" value="6.0"/>
+    <param name="origin_y" value="12.0"/>
+    <param name="origin_z" value="0.0"/>
+    <param name="range_x" value="25.0"/>
+    <param name="range_y" value="5.0"/>
+    <param name="range_z" value="1.5"/>
+    <!-- Set dynamic constraints -->
+    <param name="dt" value="$(arg dt)"/>
+    <param name="v_max" value="10.0"/>
+    <param name="a_max" value="10"/>
+    <param name="u_max" value="60.0"/>
+    <!--<param name="t_max" value="$(eval dt*10)"/>-->
+    <param name="t_max" value="-1"/>
+    <param name="use_3d" value="false"/>
+    <param name="use_prior" value="false"/>
+    <param name="use_acc" value="true"/>
+    <param name="use_jrk" value="false"/>
+    <param name="num" value="2"/>  <!-- umax/num will be the increment in the discretization of u -->
+    <param name="w" value="10000"/>
+    <param name="epsilon" value="2"/>
+    <param name="max_num" value="$(arg max_num)"/>
+    <param name="robot_r" value="0.5"/>
+  </node>
+
+</launch>

@@ -1,0 +1,44 @@
+<launch>
+  <arg name="debug" default="false"/>
+  <arg name="replan" default="true"/>
+  <!--<arg name="debug_valgrind" default="false"/>-->
+
+  <arg name="prefix" value="" unless="$(arg debug)"/>
+  <arg name="prefix" value="gdb -ex run --args" if="$(arg debug)"/>
+
+  <node pkg="mpl_test_node"
+    type="test_primitive_replan"
+    name="test_primitive"
+    launch-prefix="$(arg prefix)"
+    output="screen">
+    <remap from="~pose" to="/move_base_simple/goal"/>
+    <remap from="~subtree" to="/subtree"/>
+    <remap from="~replan" to="/replan"/>
+    <remap from="~add_cloud" to="/add_cloud"/>
+    <remap from="~clear_cloud" to="/clear_cloud"/>
+    <param name="file" value="$(find mpl_test_node)/maps/simple/simple.bag"/>
+    <param name="map_name" value="/voxel_map"/>
+    <param name="cloud_name" value="/cloud"/>
+    <!-- Set start and goal -->
+    <param name="start_x" value="14.5"/>
+    <param name="start_y" value="2.4"/>
+    <param name="start_z" value="0.025"/>
+    <param name="start_vx" value="1.0"/>
+    <param name="start_vy" value="1.0"/>
+    <param name="start_vz" value="0.0"/>
+    <param name="start_ax" value="0.0"/>
+    <param name="start_ay" value="0.0"/>
+    <param name="start_az" value="0.0"/>
+    <param name="goal_x" value="12.0"/>
+    <param name="goal_y" value="15.0"/>
+    <param name="goal_z" value="0.025"/>
+    <!-- Set dynamic constraints -->
+    <param name="v_max" value="2.0"/>
+    <param name="a_max" value="1.0"/>
+    <param name="dt" value="1"/>
+    <param name="ndt" value="8"/>
+    <param name="max_num" value="-1"/>
+    <param name="replan" value="$(arg replan)"/>
+  </node>
+
+</launch>

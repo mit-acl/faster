@@ -1,0 +1,8 @@
+<launch>
+  <node pkg="rviz"
+    type="rviz"
+    name="rviz"
+    args="-d $(find decomp_test_node)/launch/test.rviz"/>
+
+</launch>
+

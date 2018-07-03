@@ -1,0 +1,12 @@
+<launch>
+  <node pkg="decomp_test_node"
+    type="test_seed_decomp"
+    name="test_decomp"
+    output="screen">
+    <param name="bag_file" value="$(find decomp_test_node)/data/iss_obs.bag"/>
+    <param name="bag_topic" value="/obs_points"/>
+    <param name="bag_marker" value="/mob/mapper/zones"/>
+    <param name="seed_file" value="$(find decomp_test_node)/data/seeds.txt"/>
+  </node>
+
+</launch>

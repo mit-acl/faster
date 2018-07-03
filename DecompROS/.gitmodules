@@ -1,0 +1,3 @@
+[submodule "DecompUtil"]
+	path = DecompUtil
+	url = https://github.com/sikang/DecompUtil.git

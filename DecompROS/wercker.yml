@@ -1,0 +1,27 @@
+box: osrf/ros:kinetic-desktop-full
+
+build:
+  steps:
+    - script:
+      name: initialize git submodules
+      code: |
+        git submodule update --init --recursive
+    - script:
+      name: install dependencies
+      code: |
+        sudo apt-get update
+        rosdep update
+        rosdep install --from-paths . --ignore-src -y -r --as-root apt:false
+    - script:
+      name: build
+      code: |
+        cd ..
+        mkdir -p catkin_ws/src
+        mv source catkin_ws/src/
+        cd catkin_ws/src
+        git clone https://github.com/catkin/catkin_simple.git
+        catkin_init_workspace
+        cd ..
+        export ROS_PARALLEL_JOBS='-j4 -l4' # Limit parallel jobs
+        catkin_make_isolated -DCMAKE_BUILD_TYPE=Release
+

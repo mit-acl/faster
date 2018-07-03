@@ -1,0 +1,9 @@
+<launch>
+  <arg name="test" default="map_generator"/>
+
+  <node pkg="rviz"
+    type="rviz"
+    name="rviz"
+    output="screen"
+    args="-d $(find mpl_test_node)/launch/$(arg test)/test.rviz"/>
+</launch>
