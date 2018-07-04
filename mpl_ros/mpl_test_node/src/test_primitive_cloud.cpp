@@ -6,6 +6,8 @@
 #include <decomp_ros_utils/data_ros_utils.h>
 
 #include "sensor_msgs/PointCloud2.h"
+#include <sensor_msgs/point_cloud_conversion.h>
+#include "acl_msgs/ViconState.h"
 
 using namespace MPL;
 
@@ -82,92 +84,94 @@ public:
 
   // start and goal variables
   double start_x, start_y, start_z;
-  double start_vx, start_vy, start_vz;
+  double start_vx = 0, start_vy = 0, start_vz = 0;
+  double start_ax = 0, start_ay = 0, start_az = 0;
   double goal_x, goal_y, goal_z;
   bool use_acc, use_jrk;
 
   Waypoint3 goal;
   Waypoint3 start;
 
+  ros::Time t0;
+
   // Read prior traj
   std::string traj_file_name, traj_topic_name;
   bool use_prior;
 
-  void callback(const sensor_msgs::PointCloud2ConstPtr& msg);
+  void pclCB(const sensor_msgs::PointCloud2ConstPtr& msg);
+  void poseCB(const acl_msgs::ViconState::ConstPtr& pose_ptr);
   void read_map();
   void initialize_planner();
   void execute_planner();
   void publish_stuff();
 };
 
-void sub_pcl_plan_class::callback(const sensor_msgs::PointCloud2ConstPtr& msg)
+void sub_pcl_plan_class::poseCB(const acl_msgs::ViconState::ConstPtr& pose_ptr)
 {
-  ROS_INFO("Recived\n");
+  if (pose_ptr->has_pose)
+  {
+    // start of the trajectory--> current position of the drone
+    start_x = pose_ptr->pose.position.x;
+    start_y = pose_ptr->pose.position.y;
+    start_z = pose_ptr->pose.position.z;
+
+    // range --> box centered in the drone, with dimensions dim
+    origin(0) = (pose_ptr->pose.position.x) - dim(0) / 2;
+    origin(1) = (pose_ptr->pose.position.y) - dim(1) / 2;
+    origin(2) = (pose_ptr->pose.position.z) - dim(2) / 2;
+
+    // TODO: change this: goal of the trajectory--> current position of the drone +10 in x
+    goal_x = pose_ptr->pose.position.x + 10;
+    goal_y = pose_ptr->pose.position.y;
+    goal_z = pose_ptr->pose.position.z;
+  }
+
+  if (pose_ptr->has_twist)
+  {
+    start_vx = pose_ptr->twist.linear.x;
+    start_vy = pose_ptr->twist.linear.y;
+    start_vz = pose_ptr->twist.linear.z;
+  }
+
+  if (pose_ptr->has_accel && use_acc == true)
+  {
+    start_ax = pose_ptr->accel.x;
+    start_ay = pose_ptr->accel.y;
+    start_az = pose_ptr->accel.z;
+  }
+}
+
+void sub_pcl_plan_class::pclCB(const sensor_msgs::PointCloud2ConstPtr& pcl2_msg)
+{
+  if (pcl2_msg->width == 0 || pcl2_msg->height == 0)  // Point Cloud is empty (happens at the beginning)
+  {
+    return;
+  }
+
+  sensor_msgs::convertPointCloud2ToPointCloud(*pcl2_msg, map);
+  cloud_pub.publish(map);
+
+  t0 = ros::Time::now();
+  initialize_planner();
+  execute_planner();
+  publish_stuff();
 }
 
 void sub_pcl_plan_class::read_map()
 {
-  ros::Time t0 = ros::Time::now();
+  // ros::Time t0 = ros::Time::now();
   // Read map from bag file
   map = read_bag<sensor_msgs::PointCloud>(file_name, topic_name, 0).back();
   cloud_pub.publish(map);
-  ROS_INFO("Takes %f sec to set up map!", (ros::Time::now() - t0).toSec());
-}
-
-void sub_pcl_plan_class::publish_stuff()
-{
-  // Publish location of start and goal
-  sensor_msgs::PointCloud sg_cloud;
-  sg_cloud.header.frame_id = "map";
-  geometry_msgs::Point32 pt1, pt2;
-  pt1.x = start_x, pt1.y = start_y, pt1.z = start_z;
-  pt2.x = goal_x, pt2.y = goal_y, pt2.z = goal_z;
-  sg_cloud.points.push_back(pt1), sg_cloud.points.push_back(pt2);
-  sg_pub.publish(sg_cloud);
-
-  // Publish expanded nodes
-  sensor_msgs::PointCloud ps = vec_to_cloud(planner_->getCloseSet());
-  ps.header.frame_id = "map";
-  ps_pub.publish(ps);
-}
-
-void sub_pcl_plan_class::execute_planner()
-{
-  ros::Time t0 = ros::Time::now();
-  bool valid = planner_->plan(start, goal);
-  if (!valid)
-  {
-    ROS_WARN("Failed! Takes %f sec for planning, expand [%zu] nodes", (ros::Time::now() - t0).toSec(),
-             planner_->getCloseSet().size());
-  }
-  else
-  {
-    ROS_INFO("Succeed! Takes %f sec for planning, expand [%zu] nodes", (ros::Time::now() - t0).toSec(),
-             planner_->getCloseSet().size());
-
-    // Publish trajectory
-    auto traj = planner_->getTraj();
-    planning_ros_msgs::Trajectory traj_msg = toTrajectoryROSMsg(traj);
-    traj_msg.header.frame_id = "map";
-    traj_pub.publish(traj_msg);
-
-    printf("================== Traj -- total J(1): %f, J(2): %F, J(3): %f, total time: %f\n", traj.J(1), traj.J(2),
-           traj.J(3), traj.getTotalTime());
-
-    vec_Ellipsoid Es = sample_ellipsoids(traj, Vec3f(robot_radius, robot_radius, 0.1), 50);
-    decomp_ros_msgs::Ellipsoids es_msg = DecompROS::ellipsoids_to_ros(Es);
-    es_msg.header.frame_id = "map";
-    es_pub.publish(es_msg);
-
-    max_attitude(traj, 1000);
-  }
+  // ROS_INFO("Takes %f sec to set up map!", (ros::Time::now() - t0).toSec());
 }
 
 void sub_pcl_plan_class::initialize_planner()
 {
   // Initialize planner
 
-  planner_.reset(new MPCloudUtil(true));
+  planner_.reset(new MPCloudUtil(false));  // true if you want verbose
+
   planner_->setMap(cloud_to_vec(map), robot_radius, origin, dim);  // Set collision checking function
                                                                    // cloud_to_vec transfroms a poincloud to a vector
   planner_->setEpsilon(epsilon);                                   // Set greedy param (default equal to 1)
@@ -182,10 +186,10 @@ void sub_pcl_plan_class::initialize_planner()
 
   start.pos = Vec3f(start_x, start_y, start_z);
   start.vel = Vec3f(start_vx, start_vy, start_vz);
-  start.acc = Vec3f(0, 0, 0);
+  start.acc = Vec3f(start_ax, start_ay, start_az);
   start.jrk = Vec3f(0, 0, 0);
-  start.use_pos = true;
-  start.use_vel = true;
+  start.use_pos = true;  // pos is always a state
+  start.use_vel = true;  // vel is always a state
   start.use_acc = use_acc;
   start.use_jrk = use_jrk;
 
@@ -235,16 +239,63 @@ void sub_pcl_plan_class::initialize_planner()
   // planner_->setMode(num, use_3d, start); // Set discretization with 1 and efforts
 }
 
+void sub_pcl_plan_class::execute_planner()
+{
+  bool valid = planner_->plan(start, goal);
+  if (!valid)
+  {
+    ROS_WARN("Failed! Planned in %.1f ms, expanded [%zu] nodes", (ros::Time::now() - t0).toSec() * 1000,
+             planner_->getCloseSet().size());
+  }
+  else
+  {
+    ROS_INFO("Succeed! Planned in %.1f ms, expanded [%zu] nodes", (ros::Time::now() - t0).toSec() * 1000,
+             planner_->getCloseSet().size());
+
+    // Publish trajectory
+    auto traj = planner_->getTraj();
+    planning_ros_msgs::Trajectory traj_msg = toTrajectoryROSMsg(traj);
+    traj_msg.header.frame_id = "world";
+    traj_pub.publish(traj_msg);
+
+    // printf("================== Traj -- total J(1): %f, J(2): %F, J(3): %f, total time: %f\n", traj.J(1), traj.J(2),
+    // traj.J(3), traj.getTotalTime());
+
+    vec_Ellipsoid Es = sample_ellipsoids(traj, Vec3f(robot_radius, robot_radius, 0.1), 50);
+    decomp_ros_msgs::Ellipsoids es_msg = DecompROS::ellipsoids_to_ros(Es);
+    es_msg.header.frame_id = "world";
+    es_pub.publish(es_msg);
+
+    max_attitude(traj, 1000);
+  }
+}
+
+void sub_pcl_plan_class::publish_stuff()
+{
+  // Publish location of start and goal
+  sensor_msgs::PointCloud sg_cloud;
+  sg_cloud.header.frame_id = "world";
+  geometry_msgs::Point32 pt1, pt2;
+  pt1.x = start_x, pt1.y = start_y, pt1.z = start_z;
+  pt2.x = goal_x, pt2.y = goal_y, pt2.z = goal_z;
+  sg_cloud.points.push_back(pt1), sg_cloud.points.push_back(pt2);
+  sg_pub.publish(sg_cloud);
+
+  // Publish expanded nodes
+  sensor_msgs::PointCloud ps = vec_to_cloud(planner_->getCloseSet());
+  ps.header.frame_id = "world";
+  ps_pub.publish(ps);
+}
+
 int main(int argc, char** argv)
 {
   ros::init(argc, argv, "test");
   ros::NodeHandle nh("~");
-  sub_pcl_plan_class sub_pcl_plan_objeto(nh);
+  sub_pcl_plan_class sub_pcl_plan_object(nh);
 
-  sub_pcl_plan_objeto.read_map();
-  sub_pcl_plan_objeto.initialize_planner();
-  sub_pcl_plan_objeto.execute_planner();
-  sub_pcl_plan_objeto.publish_stuff();
+  ros::Subscriber sub_pcl = nh.subscribe("occup_grid", 1, &sub_pcl_plan_class::pclCB, &sub_pcl_plan_object);
+  ros::Subscriber sub_pose = nh.subscribe("drone_pose", 1, &sub_pcl_plan_class::poseCB, &sub_pcl_plan_object);
+
   ros::spin();
 
   return 0;
