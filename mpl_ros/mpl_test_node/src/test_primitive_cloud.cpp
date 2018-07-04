@@ -133,12 +133,12 @@ void sub_pcl_plan_class::poseCB(const acl_msgs::ViconState::ConstPtr& pose_ptr)
     start_vz = pose_ptr->twist.linear.z;
   }
 
-  if (pose_ptr->has_accel && use_acc == true)
-  {
-    start_ax = pose_ptr->accel.x;
-    start_ay = pose_ptr->accel.y;
-    start_az = pose_ptr->accel.z;
-  }
+  /*  if (pose_ptr->has_accel && use_acc == true)
+    {
+      start_ax = pose_ptr->accel.x;
+      start_ay = pose_ptr->accel.y;
+      start_az = pose_ptr->accel.z;
+    }*/
 }
 
 void sub_pcl_plan_class::pclCB(const sensor_msgs::PointCloud2ConstPtr& pcl2_msg)

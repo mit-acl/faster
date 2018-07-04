@@ -37,9 +37,9 @@
     <param name="origin_x" value="6.0"/>
     <param name="origin_y" value="12.0"/>
     <param name="origin_z" value="0.0"/>
-    <param name="range_x" value="40.0"/>  <!--TODO: set these values to the same ones as the mappper?? 25-->
-    <param name="range_y" value="40.0"/>   <!--5-->
-    <param name="range_z" value="5.5"/>   <!--1.5-->
+    <param name="range_x" value="25.0"/>  <!--TODO: set these values to the same ones as the mappper?? 25    40-->
+    <param name="range_y" value="25.0"/>   <!--5   40-->
+    <param name="range_z" value="5"/>   <!--1.5   5.5-->
     <!-- Set dynamic constraints -->
     <param name="dt" value="$(arg dt)"/>
     <param name="v_max" value="10.0"/>
@@ -48,12 +48,12 @@
     <!--<param name="t_max" value="$(eval dt*10)"/>-->
     <param name="t_max" value="-1"/>
     <param name="use_3d" value="false"/>
-    <param name="use_prior" value="false"/>
+    <param name="use_prior" value="true"/>
     <param name="use_acc" value="true"/>   <!--true if accel is a state (i.e. true if input=jerk or higher, false otherwise) -->
     <param name="use_jrk" value="false"/>  <!--true if jerk is a state  (i.e. true if input=snap or higher, false otherwise) -->
-    <param name="num" value="2"/>  <!-- umax/num will be the increment in the discretization of u -->
+    <param name="num" value="2"/>  <!-- 2umax/num will be the increment in the discretization of u -->
     <param name="w" value="10000"/>
-    <param name="epsilon" value="2"/>
+    <param name="epsilon" value="10"/>  <!--The lower, the slower the planner works-->
     <param name="max_num" value="$(arg max_num)"/>
     <param name="robot_r" value="0.5"/>
   </node>
