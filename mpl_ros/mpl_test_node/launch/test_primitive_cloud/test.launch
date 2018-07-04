@@ -45,10 +45,11 @@
     <param name="v_max" value="10.0"/>
     <param name="a_max" value="10"/>
     <param name="u_max" value="60.0"/>
+    <param name="u_max_z" value="100.0"/>
     <!--<param name="t_max" value="$(eval dt*10)"/>-->
     <param name="t_max" value="-1"/>
-    <param name="use_3d" value="false"/>
-    <param name="use_prior" value="true"/>
+    <param name="use_3d" value="true"/> <!-- if it's false, it won't work when v_initial_z is high, and the goal is in z=z_actual -->
+    <param name="use_prior" value="true"/> <!-- if true it works faster I think-->
     <param name="use_acc" value="true"/>   <!--true if accel is a state (i.e. true if input=jerk or higher, false otherwise) -->
     <param name="use_jrk" value="false"/>  <!--true if jerk is a state  (i.e. true if input=snap or higher, false otherwise) -->
     <param name="num" value="2"/>  <!-- 2umax/num will be the increment in the discretization of u -->
