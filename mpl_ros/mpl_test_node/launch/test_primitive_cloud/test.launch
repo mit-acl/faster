@@ -3,7 +3,7 @@
   <arg name="quad" default="SQ01s"/>
 
   <arg name="debug" default="false"/>
-  <arg name="dt" default="0.2"/>
+  <arg name="dt" default="0.3"/>
   <arg name="max_num" default="-1"/>
   <!--<arg name="debug_valgrind" default="false"/>-->
 
@@ -57,7 +57,7 @@
     <param name="epsilon" value="10"/>  <!--The lower, the slower the planner works-->
     <param name="max_num" value="$(arg max_num)"/>
     <param name="robot_r" value="0.5"/>
-    <param name="robot_h" value="0.5"/>
+    <param name="robot_h" value="0.4"/>
 
   </node>
 

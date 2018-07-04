@@ -122,7 +122,7 @@ void sub_pcl_plan_class::poseCB(const acl_msgs::ViconState::ConstPtr& pose_ptr)
     origin(2) = (pose_ptr->pose.position.z) - dim(2) / 2;
 
     // TODO: change this: goal of the trajectory--> current position of the drone +10 in x
-    goal_x = pose_ptr->pose.position.x + 10;
+    goal_x = pose_ptr->pose.position.x + 6;
     goal_y = pose_ptr->pose.position.y;
     goal_z = pose_ptr->pose.position.z;
   }
