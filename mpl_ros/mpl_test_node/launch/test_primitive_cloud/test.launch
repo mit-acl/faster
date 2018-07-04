@@ -17,7 +17,7 @@
     launch-prefix="$(arg prefix)"
     output="screen">
 
-    <remap from="~occup_grid" to="global_mapper_ros/occupancy_grid"/>
+    <remap from="~occup_grid" to="global_mapper_ros/occupancy_grid"/> <!--Input PointCloud-->
     <remap from="~drone_pose" to="vicon"/>
     <remap from="~pose" to="/move_base_simple/goal"/>
     <param name="file" value="$(find mpl_test_node)/maps/office/office.bag"/>
@@ -52,11 +52,13 @@
     <param name="use_prior" value="true"/> <!-- if true it works faster I think-->
     <param name="use_acc" value="true"/>   <!--true if accel is a state (i.e. true if input=jerk or higher, false otherwise) -->
     <param name="use_jrk" value="false"/>  <!--true if jerk is a state  (i.e. true if input=snap or higher, false otherwise) -->
-    <param name="num" value="2"/>  <!-- 2umax/num will be the increment in the discretization of u -->
+    <param name="num" value="2"/>  <!-- umax/num will be the increment in the discretization of u -->
     <param name="w" value="10000"/>
     <param name="epsilon" value="10"/>  <!--The lower, the slower the planner works-->
     <param name="max_num" value="$(arg max_num)"/>
     <param name="robot_r" value="0.5"/>
+    <param name="robot_h" value="0.5"/>
+
   </node>
 
 </launch>

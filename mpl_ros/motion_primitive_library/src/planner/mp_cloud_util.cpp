@@ -4,12 +4,12 @@ using namespace MPL;
 
 MPCloudUtil::MPCloudUtil(bool verbose) : MPBaseUtil<3>::MPBaseUtil()
 {
-  planner_verbose_= verbose;
-  if(planner_verbose_)
+  planner_verbose_ = verbose;
+  if (planner_verbose_)
     printf(ANSI_COLOR_CYAN "[MPCloudUtil] PLANNER VERBOSE ON\n" ANSI_COLOR_RESET);
 }
 
-void MPCloudUtil::setMap(const vec_Vec3f& obs, decimal_t r, const Vec3f& ori, const Vec3f& dim) {
-  ENV_.reset(new MPL::env_cloud(obs, r, ori, dim));
+void MPCloudUtil::setMap(const vec_Vec3f& obs, decimal_t r, decimal_t h, const Vec3f& ori, const Vec3f& dim)
+{
+  ENV_.reset(new MPL::env_cloud(obs, r, h, ori, dim));
 }
-

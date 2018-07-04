@@ -10,12 +10,12 @@
  */
 class MPCloudUtil : public MPBaseUtil<3>
 {
-  public:
-    /**
-     * @brief Simple constructor
-     * @param verbose enable print out
-     */
-    MPCloudUtil(bool verbose);
-    ///Set map util
-    void setMap(const vec_Vec3f& obs, decimal_t r, const Vec3f& ori, const Vec3f& dim);
+public:
+  /**
+   * @brief Simple constructor
+   * @param verbose enable print out
+   */
+  MPCloudUtil(bool verbose);
+  /// Set map util
+  void setMap(const vec_Vec3f& obs, decimal_t r, decimal_t h, const Vec3f& ori, const Vec3f& dim);
 };

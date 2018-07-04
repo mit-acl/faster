@@ -34,6 +34,7 @@ public:
     nh.param("range_y", dim(1), 0.0);
     nh.param("range_z", dim(2), 0.0);
     nh.param("robot_r", robot_radius, 0.5);
+    nh.param("robot_h", robot_height, 0.1);
     nh.param("dt", dt, 1.0);
     nh.param("epsilon", epsilon, 1.0);
     nh.param("v_max", v_max, -1.0);
@@ -75,7 +76,7 @@ public:
   // read map
   sensor_msgs::PointCloud map;
 
-  double robot_radius;
+  double robot_radius, robot_height;
   Vec3f origin, dim;
   double dt, v_max, a_max, w, epsilon, t_max;
   double u_max_z, u_max;
@@ -172,15 +173,16 @@ void sub_pcl_plan_class::initialize_planner()
 
   planner_.reset(new MPCloudUtil(false));  // true if you want verbose
 
-  planner_->setMap(cloud_to_vec(map), robot_radius, origin, dim);  // Set collision checking function
-                                                                   // cloud_to_vec transfroms a poincloud to a vector
-  planner_->setEpsilon(epsilon);                                   // Set greedy param (default equal to 1)
-  planner_->setVmax(v_max);                                        // Set max velocity
-  planner_->setAmax(a_max);                                        // Set max acceleration
-  planner_->setUmax(u_max);                                        // Set max control
-  planner_->setTmax(t_max);                                        // Set max time
-  planner_->setDt(dt);                                             // Set dt for each primitive
-  planner_->setW(w);                                               // Set w for each primitive
+  planner_->setMap(cloud_to_vec(map), robot_radius, robot_height, origin,
+                   dim);              // Set collision checking function
+                                      // cloud_to_vec transfroms a poincloud to a vector
+  planner_->setEpsilon(epsilon);      // Set greedy param (default equal to 1)
+  planner_->setVmax(v_max);           // Set max velocity
+  planner_->setAmax(a_max);           // Set max acceleration
+  planner_->setUmax(u_max);           // Set max control
+  planner_->setTmax(t_max);           // Set max time
+  planner_->setDt(dt);                // Set dt for each primitive
+  planner_->setW(w);                  // Set w for each primitive
   planner_->setMaxNum(max_num);       // Set maximum allowed expansion, -1 means no limitation
   planner_->setTol(2.0, 2.0, 100.0);  // Tolerance for goal region
 
@@ -261,7 +263,7 @@ void sub_pcl_plan_class::execute_planner()
     // printf("================== Traj -- total J(1): %f, J(2): %F, J(3): %f, total time: %f\n", traj.J(1), traj.J(2),
     // traj.J(3), traj.getTotalTime());
 
-    vec_Ellipsoid Es = sample_ellipsoids(traj, Vec3f(robot_radius, robot_radius, 0.1), 50);
+    vec_Ellipsoid Es = sample_ellipsoids(traj, Vec3f(robot_radius, robot_radius, robot_height), 50);
     decomp_ros_msgs::Ellipsoids es_msg = DecompROS::ellipsoids_to_ros(Es);
     es_msg.header.frame_id = "world";
     es_pub.publish(es_msg);
