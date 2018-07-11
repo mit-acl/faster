@@ -66,22 +66,23 @@ public:
     // ws_.push_back(curr);
     for (int i = 0; i < (int)U_.size(); i++)
     {
-      Primitive3 pr(curr, U_[i], dt_);
-      Waypoint3 tn = pr.evaluate(dt_);
+      Primitive3 pr(curr, U_[i], dt_);  // Primitive obtained applying the input U_[i] to the current node
+      Waypoint3 tn = pr.evaluate(dt_);  // State in that primitive when t=dt
       if (pr.valid_vel(v_max_) && pr.valid_acc(a_max_))
-      {
-        bool valid = map_util_->isFree(pr);
+      {  // Aqui se podria anadir lo que yo quiero (planear hasta una distancia con jerk y hasta otra con accel??)
+        bool valid = map_util_->isFree(pr);  // if that state is collision free
         if (valid)
         {
-          // primitives_.push_back(pr);
-          tn.use_pos = curr.use_pos;
+          if (tn.pos)
+            // primitives_.push_back(pr);
+            tn.use_pos = curr.use_pos;
           tn.use_vel = curr.use_vel;
           tn.use_acc = curr.use_acc;
           tn.use_jrk = curr.use_jrk;
 
-          succ.push_back(tn);
-          succ_idx.push_back(state_to_idx(tn));
-          succ_cost.push_back(pr.J(wi_) + w_ * dt_);
+          succ.push_back(tn);                         // insert that state to the end of the vector succ
+          succ_idx.push_back(state_to_idx(tn));       // insert its index
+          succ_cost.push_back(pr.J(wi_) + w_ * dt_);  // and its cost
           action_idx.push_back(i);
         }
       }

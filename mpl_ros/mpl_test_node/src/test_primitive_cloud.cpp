@@ -213,7 +213,7 @@ void sub_pcl_plan_class::initialize_planner()
       prior_traj_pub.publish(prior_traj);
       if (use_prior)
       {
-        planner_->setPriorTrajectory(toTrajectory3(prior_traj));
+        planner_->setPriorTrajectory(toTrajectory3(prior_traj));  // Prior trajectory is planned with input=vel
         goal.use_acc = false;
         goal.use_jrk = false;
       }
