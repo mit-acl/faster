@@ -133,7 +133,15 @@ decimal_t GraphSearch<Dim>::Astar(const Waypoint<Dim>& start_coord, Key start_ke
     std::vector<decimal_t> succ_cost;
     std::vector<int> succ_act_id;
 
-    ENV->get_succ(currNode_ptr->coord, succ_coord, succ_key, succ_cost, succ_act_id);
+    bool low = false;
+    double distance_to_origin = (start_coord.pos - currNode_ptr->coord.pos).norm();
+    if (distance_to_origin > 5)
+    {
+      low = true;
+      ENV->set_wi(1);  // input=vel
+    }
+
+    ENV->get_succ(currNode_ptr->coord, succ_coord, succ_key, succ_cost, succ_act_id, low);
 
     // Process successors (satisfy dynamic constraints but might hit obstacles)
     for (unsigned s = 0; s < succ_coord.size(); ++s)
@@ -317,10 +325,11 @@ decimal_t GraphSearch<Dim>::LPAstar(const Waypoint<Dim>& start_coord, Key start_
     std::vector<int> succ_act_id = currNode_ptr->succ_action_id;
 
     bool explored = false;
+    bool low = false;
     if (currNode_ptr->succ_hashkey.empty())
     {
       explored = true;
-      ENV->get_succ(currNode_ptr->coord, succ_coord, succ_key, succ_cost, succ_act_id);
+      ENV->get_succ(currNode_ptr->coord, succ_coord, succ_key, succ_cost, succ_act_id, low);
       currNode_ptr->succ_coord.resize(succ_coord.size());
       currNode_ptr->succ_hashkey.resize(succ_coord.size());
       currNode_ptr->succ_action_id.resize(succ_coord.size());
