@@ -16,6 +16,7 @@
 
 		<!-- Publications -->
 		<remap from="~traj" to="traj"/>
+		<remap from="~trajs_sphere" to="trajs_sphere"/>
 		<remap from="~goal" to="goal" />
 		<remap from="~setpoint" to="setpoint" />
 
