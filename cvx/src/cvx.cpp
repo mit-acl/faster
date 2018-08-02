@@ -5,6 +5,7 @@
 
 #include <stdio.h>
 #include <math.h>
+#include <algorithm>
 
 CVX::CVX(ros::NodeHandle nh) : nh_(nh)
 {
@@ -84,6 +85,8 @@ void CVX::goalCB(const acl_msgs::TermGoal& msg)
 
     int i_phi = 0;
     int i_theta = 0;
+
+    double ms_to_solve_trjs = 0;
     for (double phi = phi0 - d_phi / 2; i_phi <= n_phi; phi = phi + d_phi / n_phi)
     {
       i_phi++;
@@ -96,12 +99,16 @@ void CVX::goalCB(const acl_msgs::TermGoal& msg)
         xf_sphere[1] = r * sin(theta) * sin(phi) + state_.pos.y;
         xf_sphere[2] = r * cos(theta) + state_.pos.z;
 
+        double then = ros::Time::now().toSec();
         genNewTraj(u_max_, xf_sphere);  // Now X_ has the stuff
+        ms_to_solve_trjs += 1000 * (ros::Time::now().toSec() - then);
 
         // trajs_sphere.markers.push_back(createMarkerLineStrip(X_));  // add marker to array
         createMarkerSetOfArrows(X_, &trajs_sphere);
       }
     }
+
+    ROS_WARN("TOTAL SOLVE TIME trajs in sphere: %0.2f ms", ms_to_solve_trjs);
 
     pub_trajs_sphere_.publish(trajs_sphere);
 
@@ -238,7 +245,8 @@ void CVX::interpInput(double dt, double xf[], double u0[], double x0[], double**
 double CVX::callOptimizer(double u_max, double x0[], double xf[])
 {
   bool converged = false;
-  double dt = 0.025;
+  // TODO: Set initial dt as a function of xf, x0 and u_max. Be careful because u_max can be accel, jerk,...
+  double dt = 0.08;
   double** x;
 
   while (!converged)
@@ -447,49 +455,6 @@ void CVX::pubTraj(Eigen::MatrixXd X)
   pub_traj_.publish(traj);
 }
 
-visualization_msgs::Marker CVX::createMarkerLineStrip(Eigen::MatrixXd X)
-{
-  static int markerID = 0;
-  markerID++;
-  visualization_msgs::Marker m;
-  m.id = markerID;
-  m.color.r = 0.5;
-  m.color.g = 0.7;
-  m.color.b = 1;
-  m.color.a = 1;
-  m.scale.x = 0.01;
-  /*m.pose.position.x = 1;
-  m.pose.position.y = 2;
-  m.pose.position.z = 5;
-  m.pose.orientation.x = 0.0;
-  m.pose.orientation.y = 0.0;
-  m.pose.orientation.z = 0.0;
-  m.pose.orientation.w = 1.0;*/
-
-  m.header.frame_id = "world";
-  m.header.stamp = ros::Time::now();
-
-  geometry_msgs::Point p;
-  p.x = 5;
-  p.y = 9;
-  p.z = 7;
-
-  for (int i = 0; i < X.rows(); i++)  // Push all the points that will be in the linestrip
-  {
-    geometry_msgs::Point p;
-    p.x = X(i, 0);
-    p.y = X(i, 1);
-    p.z = X(i, 2);
-    m.points.push_back(p);
-  }
-
-  // m.ns = "RAVEN_wall";
-  m.type = visualization_msgs::Marker::LINE_STRIP;
-  m.action = visualization_msgs::Marker::ADD;
-  // m.lifetime = ros::Duration(5);  // 3 second duration
-  return m;
-}
-
 void CVX::createMarkerSetOfArrows(Eigen::MatrixXd X, visualization_msgs::MarkerArray* trajs_sphere)
 {
   geometry_msgs::Point p_last;
@@ -543,3 +508,49 @@ void CVX::clearMarkerSetOfArrows()
 
   pub_trajs_sphere_.publish(tmp);
 }
+
+/*
+visualization_msgs::Marker CVX::createMarkerLineStrip(Eigen::MatrixXd X)
+{
+  static int markerID = 0;
+  markerID++;
+  visualization_msgs::Marker m;
+  m.id = markerID;
+  m.color.r = 0.5;
+  m.color.g = 0.7;
+  m.color.b = 1;
+  m.color.a = 1;
+  m.scale.x = 0.01;
+  m.pose.position.x = 1;
+  m.pose.position.y = 2;
+  m.pose.position.z = 5;
+  m.pose.orientation.x = 0.0;
+  m.pose.orientation.y = 0.0;
+  m.pose.orientation.z = 0.0;
+  m.pose.orientation.w = 1.0;
+
+  m.header.frame_id = "world";
+  m.header.stamp = ros::Time::now();
+
+  geometry_msgs::Point p;
+  p.x = 5;
+  p.y = 9;
+  p.z = 7;
+
+  for (int i = 0; i < X.rows(); i++)  // Push all the points that will be in the linestrip
+  {
+    geometry_msgs::Point p;
+    p.x = X(i, 0);
+    p.y = X(i, 1);
+    p.z = X(i, 2);
+    m.points.push_back(p);
+  }
+
+  // m.ns = "RAVEN_wall";
+  m.type = visualization_msgs::Marker::LINE_STRIP;
+  m.action = visualization_msgs::Marker::ADD;
+  // m.lifetime = ros::Duration(5);  // 3 second duration
+  return m;
+}
+
+*/
