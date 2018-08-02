@@ -3,6 +3,8 @@
 
 #include "visualization_msgs/Marker.h"
 #include "visualization_msgs/MarkerArray.h"
+#include <sensor_msgs/point_cloud_conversion.h>
+#include <pcl/kdtree/kdtree_flann.h>
 
 #include <Eigen/Dense>
 
@@ -33,6 +35,8 @@ private:
   visualization_msgs::Marker createMarkerLineStrip(Eigen::MatrixXd X);
   void createMarkerSetOfArrows(Eigen::MatrixXd X, visualization_msgs::MarkerArray* trajs_sphere);
   void clearMarkerSetOfArrows();
+  void mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg);
+  bool trajIsFree(Eigen::MatrixXd X);
 
   visualization_msgs::Marker setpoint_;
   acl_msgs::QuadGoal quadGoal_;
@@ -47,6 +51,7 @@ private:
   ros::Subscriber sub_goal_;
   ros::Subscriber sub_state_;
   ros::Subscriber sub_mode_;
+  ros::Subscriber sub_map_;
   ros::Timer pubGoalTimer_;
 
   Eigen::MatrixXd U_, X_;
@@ -55,4 +60,6 @@ private:
   int N_ = 20;
   int markerID_;
   int markerID_last_;
+  pcl::KdTreeFLANN<pcl::PointXYZ> kdtree_map_;
+  bool kdtree_map_initialized_ = 0;
 };

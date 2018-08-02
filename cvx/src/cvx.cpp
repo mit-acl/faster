@@ -2,10 +2,13 @@
 #include "geometry_msgs/PointStamped.h"
 #include "nav_msgs/Path.h"
 #include "visualization_msgs/MarkerArray.h"
+#include <pcl_conversions/pcl_conversions.h>
+#include <pcl/kdtree/kdtree.h>
 
 #include <stdio.h>
 #include <math.h>
 #include <algorithm>
+#include <vector>
 
 CVX::CVX(ros::NodeHandle nh) : nh_(nh)
 {
@@ -21,6 +24,7 @@ CVX::CVX(ros::NodeHandle nh) : nh_(nh)
   sub_goal_ = nh_.subscribe("term_goal", 1, &CVX::goalCB, this);
   sub_mode_ = nh_.subscribe("flightmode", 1, &CVX::modeCB, this);
   sub_state_ = nh_.subscribe("state", 1, &CVX::stateCB, this);
+  sub_map_ = nh_.subscribe("occup_grid", 1, &CVX::mapCB, this);
 
   pubGoalTimer_ = nh_.createTimer(ros::Duration(0.01), &CVX::pubCB, this);
 
@@ -457,6 +461,8 @@ void CVX::pubTraj(Eigen::MatrixXd X)
 
 void CVX::createMarkerSetOfArrows(Eigen::MatrixXd X, visualization_msgs::MarkerArray* trajs_sphere)
 {
+  bool isFree = trajIsFree(X);
+
   geometry_msgs::Point p_last;
   p_last.x = state_.pos.x;
   p_last.y = state_.pos.y;
@@ -468,10 +474,21 @@ void CVX::createMarkerSetOfArrows(Eigen::MatrixXd X, visualization_msgs::MarkerA
     m.type = visualization_msgs::Marker::ARROW;
     m.action = visualization_msgs::Marker::ADD;
     m.id = markerID_;
-    m.color.r = 0.5;
-    m.color.g = 0.7;
-    m.color.b = 1;
-    m.color.a = 1;
+    if (isFree)
+    {
+      m.color.r = 0.5;
+      m.color.g = 0.7;
+      m.color.b = 1;
+      m.color.a = 1;
+    }
+    else
+    {
+      m.color.r = 1;
+      m.color.g = 0;
+      m.color.b = 0;
+      m.color.a = 1;
+    }
+
     m.scale.x = 0.02;
     m.scale.y = 0.04;
     // m.scale.z = 1;
@@ -507,6 +524,69 @@ void CVX::clearMarkerSetOfArrows()
   }
 
   pub_trajs_sphere_.publish(tmp);
+}
+
+std::vector<int> v_kdtree_new_pcls_;
+
+/*void CVX::pclCB()
+{
+  pcl::KdTreeFLANN<pcl::PointXYZ> kdtree_tmp;
+  kdtree_tmp.setInputCloud(msg);
+  v_kdtree_new_pcls_.push_back(kdtree_tmp); // vector that has all the kdtrees of the new point clouds
+}*/
+
+void CVX::mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
+{
+  if (pcl2ptr_msg->width == 0 || pcl2ptr_msg->height == 0)  // Point Cloud is empty (this happens at the beginning)
+  {
+    return;
+  }
+
+  pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr(new pcl::PointCloud<pcl::PointXYZ>);
+
+  pcl::fromROSMsg(*pcl2ptr_msg, *pclptr);
+
+  // reset v_kdtree_new_pcls_;
+  kdtree_map_.setInputCloud(pclptr);
+  kdtree_map_initialized_ = 1;
+}
+
+bool CVX::trajIsFree(Eigen::MatrixXd X)
+{
+  if (!kdtree_map_initialized_)
+  {
+    return true;
+  }
+  float radius_drone = 0.2;  // TODO: this should be a parameter
+
+  // TODO: this cloud should be a subset of the entire cloud, not all the cloud (faster?)
+
+  for (int i = 0; i < X.rows(); i = i + 1)  // Sample (a subset of) the points in the trajectory
+  {
+    pcl::PointXYZ searchPoint(X(i, 0), X(i, 1), X(i, 2));
+    std::vector<int> pointIdxRadiusSearch;
+    std::vector<float> pointRadiusSquaredDistance;
+
+    // TODO: maybe nearestKSearch is faster
+
+    /*    // Search for collision in all the new point clouds
+        for (std::vector<pcl::KdTreeFLANN<pcl::PointXYZ>>::iterator it = v_kdtree_new_pcls_.begin();
+             it != v_kdtree_new_pcls_.end(); ++it)
+        {
+          // If there is at least one neigbour inside the radius=radius_drone
+          if ((*it).radiusSearch(searchPoint, radius_drone, pointIdxRadiusSearch, pointRadiusSquaredDistance) > 0)
+          {
+            return false;  // if we model the drone as an sphere, I'm done (there is a collision)
+          }
+        }*/
+
+    // Search for collision in the map
+    if (kdtree_map_.radiusSearch(searchPoint, radius_drone, pointIdxRadiusSearch, pointRadiusSquaredDistance) > 0)
+    {
+      return false;  // if we model the drone as an sphere, I'm done (there is a collision)
+    }
+  }
+  return true;
 }
 
 /*
