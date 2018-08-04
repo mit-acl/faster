@@ -1,9 +1,13 @@
+// Authors: Jesus Tordesillas and Brett T. Lopez
+// Date: August 2018
 #include "cvx.hpp"
 #include "geometry_msgs/PointStamped.h"
 #include "nav_msgs/Path.h"
 #include "visualization_msgs/MarkerArray.h"
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/kdtree/kdtree.h>
+
+#include <tf2_sensor_msgs/tf2_sensor_msgs.h>
 
 #include <stdio.h>
 #include <math.h>
@@ -25,6 +29,7 @@ CVX::CVX(ros::NodeHandle nh) : nh_(nh)
   sub_mode_ = nh_.subscribe("flightmode", 1, &CVX::modeCB, this);
   sub_state_ = nh_.subscribe("state", 1, &CVX::stateCB, this);
   sub_map_ = nh_.subscribe("occup_grid", 1, &CVX::mapCB, this);
+  sub_pcl_ = nh_.subscribe("pcloud", 1, &CVX::pclCB, this);
 
   pubGoalTimer_ = nh_.createTimer(ros::Duration(0.01), &CVX::pubCB, this);
 
@@ -61,7 +66,25 @@ CVX::CVX(ros::NodeHandle nh) : nh_(nh)
   markerID_ = 0;
   markerID_last_ = 0;
 
-  ROS_INFO("Initialized");
+  name_drone_ = ros::this_node::getNamespace();
+  name_drone_.erase(0, 2);  // Erase slashes
+
+  tfListener = new tf2_ros::TransformListener(tf_buffer_);
+  // wait for body transform to be published before initializing
+  ROS_INFO("Waiting for world to camera transform...");
+  while (true)
+  {
+    try
+    {
+      tf_buffer_.lookupTransform("world", name_drone_ + "/camera", ros::Time::now(), ros::Duration(0.5));  //
+      break;
+    }
+    catch (tf2::TransformException& ex)
+    {
+      // nothing
+    }
+  }
+  ROS_INFO("Planner initialized");
 }
 
 void CVX::goalCB(const acl_msgs::TermGoal& msg)
@@ -72,7 +95,7 @@ void CVX::goalCB(const acl_msgs::TermGoal& msg)
     double xf[6] = { msg.pos.x, msg.pos.y, msg.pos.z, msg.vel.x, msg.vel.y, msg.vel.z };
 
     // Sample positions in an sphere using spherical coordinates
-    double r = 2;     // radius of the sphere
+    double r = 8;     // radius of the sphere
     int n_phi = 6;    // Number of samples in phi.
     int n_theta = 6;  // Number of samples in theta.
     double d_theta = 3.14 / 2;
@@ -91,6 +114,7 @@ void CVX::goalCB(const acl_msgs::TermGoal& msg)
     int i_theta = 0;
 
     double ms_to_solve_trjs = 0;
+    double then_cchecking = ros::Time::now().toSec();
     for (double phi = phi0 - d_phi / 2; i_phi <= n_phi; phi = phi + d_phi / n_phi)
     {
       i_phi++;
@@ -102,7 +126,7 @@ void CVX::goalCB(const acl_msgs::TermGoal& msg)
         xf_sphere[0] = r * sin(theta) * cos(phi) + state_.pos.x;
         xf_sphere[1] = r * sin(theta) * sin(phi) + state_.pos.y;
         xf_sphere[2] = r * cos(theta) + state_.pos.z;
-
+        // TODO: ignore the trajectory if xf_sphere[2]<0 (below the ground)??
         double then = ros::Time::now().toSec();
         genNewTraj(u_max_, xf_sphere);  // Now X_ has the stuff
         ms_to_solve_trjs += 1000 * (ros::Time::now().toSec() - then);
@@ -112,7 +136,9 @@ void CVX::goalCB(const acl_msgs::TermGoal& msg)
       }
     }
 
+    double ms_cchecking = 1000 * (ros::Time::now().toSec() - then_cchecking) - ms_to_solve_trjs;
     ROS_WARN("TOTAL SOLVE TIME trajs in sphere: %0.2f ms", ms_to_solve_trjs);
+    ROS_WARN("TOTAL SOLVE TIME Col.Checking+Create Markers: %0.2f ms", ms_cchecking);
 
     pub_trajs_sphere_.publish(trajs_sphere);
 
@@ -130,14 +156,14 @@ void CVX::genNewTraj(double u_max, double xf[])
   double then = ros::Time::now().toSec();
   // Call optimizer
   double dt = callOptimizer(u_max, x0, xf);
-  ROS_WARN("solve time: %0.2f ms", 1000 * (ros::Time::now().toSec() - then));
+  // ROS_WARN("solve time: %0.2f ms", 1000 * (ros::Time::now().toSec() - then));
 
   double** x = get_state();
   double** u = get_control();
 
   then = ros::Time::now().toSec();
   interpInput(dt, xf, u0, x0, u, x, U_, X_);
-  ROS_WARN("interp time: %0.2f ms", 1000 * (ros::Time::now().toSec() - then));
+  // ROS_WARN("interp time: %0.2f ms", 1000 * (ros::Time::now().toSec() - then));
 
   replan_ = true;
   optimized_ = true;
@@ -250,7 +276,7 @@ double CVX::callOptimizer(double u_max, double x0[], double xf[])
 {
   bool converged = false;
   // TODO: Set initial dt as a function of xf, x0 and u_max. Be careful because u_max can be accel, jerk,...
-  double dt = 0.08;
+  double dt = 0.2;  // 0.08
   double** x;
 
   while (!converged)
@@ -270,7 +296,7 @@ double CVX::callOptimizer(double u_max, double x0[], double xf[])
       dt += 0.025;
   }
 
-  ROS_INFO("converged, dt = %0.2f", dt);
+  // ROS_INFO("converged, dt = %0.2f", dt);
 
   return dt;
 }
@@ -461,12 +487,15 @@ void CVX::pubTraj(Eigen::MatrixXd X)
 
 void CVX::createMarkerSetOfArrows(Eigen::MatrixXd X, visualization_msgs::MarkerArray* trajs_sphere)
 {
+  double then_cchecking = ros::Time::now().toSec();
   bool isFree = trajIsFree(X);
-
+  double ms_cchecking = 1000 * (ros::Time::now().toSec() - then_cchecking);
+  // ROS_WARN("Col.Checking 1 traj: %0.2f ms", ms_cchecking);
   geometry_msgs::Point p_last;
   p_last.x = state_.pos.x;
   p_last.y = state_.pos.y;
   p_last.z = state_.pos.z;
+  // TODO: change the 10 below
   for (int i = 0; i < X.rows(); i = i + 10)  // Push (a subset of) the points in the trajectory
   {
     markerID_++;
@@ -506,8 +535,6 @@ void CVX::createMarkerSetOfArrows(Eigen::MatrixXd X, visualization_msgs::MarkerA
   }
 
   markerID_last_ = markerID_;
-
-  // m.ns = "RAVEN_wall";
   // m.lifetime = ros::Duration(5);  // 3 second duration
 }
 
@@ -526,14 +553,31 @@ void CVX::clearMarkerSetOfArrows()
   pub_trajs_sphere_.publish(tmp);
 }
 
-std::vector<int> v_kdtree_new_pcls_;
-
-/*void CVX::pclCB()
+void CVX::pclCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 {
-  pcl::KdTreeFLANN<pcl::PointXYZ> kdtree_tmp;
-  kdtree_tmp.setInputCloud(msg);
-  v_kdtree_new_pcls_.push_back(kdtree_tmp); // vector that has all the kdtrees of the new point clouds
-}*/
+  if (pcl2ptr_msg->width == 0 || pcl2ptr_msg->height == 0)  // Point Cloud is empty
+  {
+    return;
+  }
+  geometry_msgs::TransformStamped transformStamped;
+  sensor_msgs::PointCloud2Ptr pcl2ptr_msg_transformed(new sensor_msgs::PointCloud2());
+  try
+  {
+    transformStamped = tf_buffer_.lookupTransform("world", name_drone_ + "/camera", ros::Time(0));
+    tf2::doTransform(*pcl2ptr_msg, *pcl2ptr_msg_transformed, transformStamped);
+
+    pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::fromROSMsg(*pcl2ptr_msg_transformed, *pclptr);
+    kdTreeStamped my_kdTreeStamped;
+    my_kdTreeStamped.kdTree.setInputCloud(pclptr);
+    my_kdTreeStamped.time = pcl2ptr_msg->header.stamp;
+    v_kdtree_new_pcls_.push_back(my_kdTreeStamped);
+  }
+  catch (tf2::TransformException& ex)
+  {
+    ROS_WARN("%s", ex.what());
+  }
+}
 
 void CVX::mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 {
@@ -543,10 +587,17 @@ void CVX::mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
   }
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr(new pcl::PointCloud<pcl::PointXYZ>);
-
   pcl::fromROSMsg(*pcl2ptr_msg, *pclptr);
 
-  // reset v_kdtree_new_pcls_;
+  for (unsigned i = 0; i < v_kdtree_new_pcls_.size(); ++i)
+  {
+    if (v_kdtree_new_pcls_[i].time <= pcl2ptr_msg->header.stamp)  // if the map already contains that point cloud...
+    {
+      v_kdtree_new_pcls_.erase(v_kdtree_new_pcls_.begin() + i);  // ...erase that point cloud from the vector
+      i = i - 1;  // Needed because I'm changing the vector inside the loop
+    }
+  }
+
   kdtree_map_.setInputCloud(pclptr);
   kdtree_map_initialized_ = 1;
 }
@@ -555,12 +606,12 @@ bool CVX::trajIsFree(Eigen::MatrixXd X)
 {
   if (!kdtree_map_initialized_)
   {
+    ROS_WARN("Run the mapper");
     return true;
   }
   float radius_drone = 0.2;  // TODO: this should be a parameter
 
   // TODO: this cloud should be a subset of the entire cloud, not all the cloud (faster?)
-
   for (int i = 0; i < X.rows(); i = i + 1)  // Sample (a subset of) the points in the trajectory
   {
     pcl::PointXYZ searchPoint(X(i, 0), X(i, 1), X(i, 2));
@@ -569,16 +620,18 @@ bool CVX::trajIsFree(Eigen::MatrixXd X)
 
     // TODO: maybe nearestKSearch is faster
 
-    /*    // Search for collision in all the new point clouds
-        for (std::vector<pcl::KdTreeFLANN<pcl::PointXYZ>>::iterator it = v_kdtree_new_pcls_.begin();
-             it != v_kdtree_new_pcls_.end(); ++it)
-        {
-          // If there is at least one neigbour inside the radius=radius_drone
-          if ((*it).radiusSearch(searchPoint, radius_drone, pointIdxRadiusSearch, pointRadiusSquaredDistance) > 0)
-          {
-            return false;  // if we model the drone as an sphere, I'm done (there is a collision)
-          }
-        }*/
+    // Search for collision in all the new point clouds
+    // TODO: maybe I could check collision only against some of the new point clouds, not all of them.
+    // TODO: change the -1 in the line below
+    for (unsigned i = v_kdtree_new_pcls_.size() - 1; i < v_kdtree_new_pcls_.size(); ++i)
+    {
+      // printf("Comprobando %d\n", i);
+      if (v_kdtree_new_pcls_[i].kdTree.radiusSearch(searchPoint, radius_drone, pointIdxRadiusSearch,
+                                                    pointRadiusSquaredDistance) > 0)
+      {
+        return false;  // if we model the drone as an sphere, I'm done (there is a collision)
+      }
+    }
 
     // Search for collision in the map
     if (kdtree_map_.radiusSearch(searchPoint, radius_drone, pointIdxRadiusSearch, pointRadiusSquaredDistance) > 0)
@@ -586,51 +639,7 @@ bool CVX::trajIsFree(Eigen::MatrixXd X)
       return false;  // if we model the drone as an sphere, I'm done (there is a collision)
     }
   }
-  return true;
+  return true;  // this traj is free
 }
 
-/*
-visualization_msgs::Marker CVX::createMarkerLineStrip(Eigen::MatrixXd X)
-{
-  static int markerID = 0;
-  markerID++;
-  visualization_msgs::Marker m;
-  m.id = markerID;
-  m.color.r = 0.5;
-  m.color.g = 0.7;
-  m.color.b = 1;
-  m.color.a = 1;
-  m.scale.x = 0.01;
-  m.pose.position.x = 1;
-  m.pose.position.y = 2;
-  m.pose.position.z = 5;
-  m.pose.orientation.x = 0.0;
-  m.pose.orientation.y = 0.0;
-  m.pose.orientation.z = 0.0;
-  m.pose.orientation.w = 1.0;
-
-  m.header.frame_id = "world";
-  m.header.stamp = ros::Time::now();
-
-  geometry_msgs::Point p;
-  p.x = 5;
-  p.y = 9;
-  p.z = 7;
-
-  for (int i = 0; i < X.rows(); i++)  // Push all the points that will be in the linestrip
-  {
-    geometry_msgs::Point p;
-    p.x = X(i, 0);
-    p.y = X(i, 1);
-    p.z = X(i, 2);
-    m.points.push_back(p);
-  }
-
-  // m.ns = "RAVEN_wall";
-  m.type = visualization_msgs::Marker::LINE_STRIP;
-  m.action = visualization_msgs::Marker::ADD;
-  // m.lifetime = ros::Duration(5);  // 3 second duration
-  return m;
-}
-
-*/
+// TODO: the mapper receives a depth map and converts it to a point cloud. Why not receiving directly the point cloud?

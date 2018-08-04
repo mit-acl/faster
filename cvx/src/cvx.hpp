@@ -5,6 +5,8 @@
 #include "visualization_msgs/MarkerArray.h"
 #include <sensor_msgs/point_cloud_conversion.h>
 #include <pcl/kdtree/kdtree_flann.h>
+#include <tf2_ros/transform_listener.h>
+#include <tf2_ros/buffer.h>
 
 #include <Eigen/Dense>
 
@@ -12,6 +14,12 @@
 #include <acl_msgs/QuadGoal.h>
 #include <acl_msgs/QuadFlightMode.h>
 #include <acl_msgs/TermGoal.h>
+
+struct kdTreeStamped
+{
+  pcl::KdTreeFLANN<pcl::PointXYZ> kdTree;
+  ros::Time time;
+};
 
 class CVX
 {
@@ -36,6 +44,7 @@ private:
   void createMarkerSetOfArrows(Eigen::MatrixXd X, visualization_msgs::MarkerArray* trajs_sphere);
   void clearMarkerSetOfArrows();
   void mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg);
+  void pclCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg);
   bool trajIsFree(Eigen::MatrixXd X);
 
   visualization_msgs::Marker setpoint_;
@@ -52,7 +61,12 @@ private:
   ros::Subscriber sub_state_;
   ros::Subscriber sub_mode_;
   ros::Subscriber sub_map_;
+  ros::Subscriber sub_pcl_;
   ros::Timer pubGoalTimer_;
+
+  tf2_ros::Buffer tf_buffer_;
+  tf2_ros::TransformListener* tfListener;
+  std::string name_drone_;
 
   Eigen::MatrixXd U_, X_;
   bool replan_, optimized_, use_ff_;
@@ -60,6 +74,8 @@ private:
   int N_ = 20;
   int markerID_;
   int markerID_last_;
-  pcl::KdTreeFLANN<pcl::PointXYZ> kdtree_map_;
+  pcl::KdTreeFLANN<pcl::PointXYZ> kdtree_map_;  // kdtree of the point cloud of the map
   bool kdtree_map_initialized_ = 0;
+  // vector that has all the kdtrees of the pclouds not included in the map:
+  std::vector<kdTreeStamped> v_kdtree_new_pcls_;
 };
