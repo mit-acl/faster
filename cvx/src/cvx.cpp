@@ -1,5 +1,14 @@
 // Authors: Jesus Tordesillas and Brett T. Lopez
 // Date: August 2018
+
+// TODO: compile cvxgen with the option -03 (see
+// https://stackoverflow.com/questions/19689014/gcc-difference-between-o3-and-os   and
+// https://cvxgen.com/docs/c_interface.html)
+
+// TODO: update gcc to the latest version (see https://cvxgen.com/docs/c_interface.html)
+
+// TODO: use the gpu versions of the pcl functions
+
 #include "cvx.hpp"
 #include "geometry_msgs/PointStamped.h"
 #include "nav_msgs/Path.h"
@@ -94,6 +103,7 @@ void CVX::goalCB(const acl_msgs::TermGoal& msg)
   {
     double xf[6] = { msg.pos.x, msg.pos.y, msg.pos.z, msg.vel.x, msg.vel.y, msg.vel.z };
 
+    // TODO: these should be parameters
     // Sample positions in an sphere using spherical coordinates
     double r = 8;     // radius of the sphere
     int n_phi = 6;    // Number of samples in phi.
@@ -643,3 +653,45 @@ bool CVX::trajIsFree(Eigen::MatrixXd X)
 }
 
 // TODO: the mapper receives a depth map and converts it to a point cloud. Why not receiving directly the point cloud?
+
+// TODO: maybe clustering the point cloud is better for the potential field (instead of adding an obstacle in every
+// point of the point cloud)
+// g is the goal, x is the point on which I'd like to compute the force=-gradient(potential)
+Eigen::Vector3d CVX::computeForce(Eigen::Vector3d x, Eigen::Vector3d g)
+{
+  double k_att = 2;
+  double k_rep = 0.01;
+  double d0 = 30;  // (m). Change between quadratic and linear potential (between linear and constant force)
+  double rho = 3;  // if the obstacle is further than rho, its f_rep=0
+
+  Eigen::Vector3d f_rep(0, 0, 0);
+  Eigen::Vector3d f_att(0, 0, 0);
+
+  // Compute attractive force
+  float d_goal = (g - x).norm();  // distance to the goal
+  if (d_goal <= d0)
+  {
+    f_att = -k_att * (x - g);
+  }
+  else
+  {
+    f_att = -d0 * k_att * (x - g) / d_goal;
+  }
+
+  // Compute repulsive force
+  std::vector<int> id;                 // pointIdxRadiusSearch
+  std::vector<float> sd;               // pointRadiusSquaredDistance
+  pcl::PointXYZ sp(x[0], x[1], x[2]);  // searchPoint=x
+  pcl::KdTree<pcl::PointXYZ>::PointCloudConstPtr cloud_ptr = kdtree_map_.getInputCloud();
+  if (kdtree_map_.radiusSearch(sp, rho, id, sd) > 0)  // if further, f_rep=f_rep+0
+  {
+    for (size_t i = 0; i < id.size(); ++i)
+    {
+      Eigen::Vector3d obs(cloud_ptr->points[id[i]].x, cloud_ptr->points[id[i]].y, cloud_ptr->points[id[i]].z);
+      double d_obst = sqrt(sd[i]);
+      f_rep = f_rep + k_rep * (1 / d_obst - 1 / rho) * (pow(1 / d_obst, 2)) * (x - obs) / d_obst;
+    }
+  }
+
+  return f_att + f_rep;
+}

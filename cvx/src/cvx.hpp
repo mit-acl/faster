@@ -46,6 +46,7 @@ private:
   void mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg);
   void pclCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg);
   bool trajIsFree(Eigen::MatrixXd X);
+  Eigen::Vector3d computeForce(Eigen::Vector3d x, Eigen::Vector3d g);
 
   visualization_msgs::Marker setpoint_;
   acl_msgs::QuadGoal quadGoal_;
