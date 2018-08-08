@@ -34,6 +34,7 @@ private:
   void stateCB(const acl_msgs::State& msg);
   void modeCB(const acl_msgs::QuadFlightMode& msg);
   void pubCB(const ros::TimerEvent& e);
+  void replanCB(const ros::TimerEvent& e);
 
   double callOptimizer(double u_max, double x0[], double xf[]);
   int checkConvergence(double xf[], double xf_opt[]);
@@ -47,23 +48,29 @@ private:
   void pclCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg);
   bool trajIsFree(Eigen::MatrixXd X);
   Eigen::Vector3d computeForce(Eigen::Vector3d x, Eigen::Vector3d g);
+  std_msgs::ColorRGBA color(int id);
+  Eigen::Vector3d createForceArrow(Eigen::Vector3d x, Eigen::Vector3d f_att, Eigen::Vector3d f_rep,
+                                   visualization_msgs::MarkerArray* forces);
 
   visualization_msgs::Marker setpoint_;
   acl_msgs::QuadGoal quadGoal_;
   acl_msgs::QuadFlightMode flight_mode_;
   acl_msgs::State state_;
+  acl_msgs::TermGoal term_goal_;
 
   ros::NodeHandle nh_;
   ros::Publisher pub_goal_;
   ros::Publisher pub_traj_;
   ros::Publisher pub_setpoint_;
   ros::Publisher pub_trajs_sphere_;
+  ros::Publisher pub_forces_;
   ros::Subscriber sub_goal_;
   ros::Subscriber sub_state_;
   ros::Subscriber sub_mode_;
   ros::Subscriber sub_map_;
   ros::Subscriber sub_pcl_;
   ros::Timer pubGoalTimer_;
+  ros::Timer pubGoalReplan_;
 
   tf2_ros::Buffer tf_buffer_;
   tf2_ros::TransformListener* tfListener;
@@ -79,4 +86,5 @@ private:
   bool kdtree_map_initialized_ = 0;
   // vector that has all the kdtrees of the pclouds not included in the map:
   std::vector<kdTreeStamped> v_kdtree_new_pcls_;
+  bool replanning_needed_ = true;
 };
