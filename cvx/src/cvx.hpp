@@ -76,7 +76,9 @@ private:
   tf2_ros::TransformListener* tfListener;
   std::string name_drone_;
 
-  Eigen::MatrixXd U_, X_;
+  Eigen::MatrixXd U_, X_;  // Contains the intepolated input/states that will be sent to the drone
+  Eigen::MatrixXd U_temp_,
+      X_temp_;  // Contains the intepolated input/states of a traj. If the traj. is free, it will be copied to U_, X_
   bool replan_, optimized_, use_ff_;
   double u_min_, u_max_, z_start_, spinup_time_, z_land_;
   int N_ = 20;

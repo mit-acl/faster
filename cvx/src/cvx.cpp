@@ -202,10 +202,12 @@ void CVX::replanCB(const ros::TimerEvent& e)
       xf_sphere[0] = p2[0];
       xf_sphere[1] = p2[1];
       xf_sphere[2] = p2[2];
-      genNewTraj(u_max_, xf_sphere);  // Now X_ has the stuff
+      genNewTraj(u_max_, xf_sphere);  // Now X_temp_ has the stuff
       createMarkerSetOfArrows(X_, &trajs_sphere);
-      if (trajIsFree(X_))
+      if (trajIsFree(X_temp_))
       {
+        X_ = X_temp_;
+        U_ = U_temp_;
         found_it = 1;
         double dist_end_traj_to_goal =
             sqrt(pow(term_goal_.pos.x - xf_sphere[0], 2) + pow(term_goal_.pos.y - xf_sphere[1], 2) +
@@ -220,43 +222,6 @@ void CVX::replanCB(const ros::TimerEvent& e)
   }
 
   pub_trajs_sphere_.publish(trajs_sphere);
-
-  /*  double xf[6] = { term_goal_.pos.x, term_goal_.pos.y, term_goal_.pos.z,
-                     term_goal_.vel.x, term_goal_.vel.y, term_goal_.vel.z };
-    genNewTraj(u_max_, xf);  // Now X_ has the stuff*/
-
-  /*  for (double phi = phi0; i_phi <= n_phi && !found_it; phi = phi + d_phi / n_phi)
-    {
-      i_phi++;
-      i_theta = 0;
-      for (double theta = theta0; i_theta <= n_theta && !found_it; theta = theta + d_theta / n_theta)
-      {
-        i_theta++;
-        double xf_sphere[6] = { 0, 0, 0, 0, 0, 0 };
-        xf_sphere[0] = r * sin(theta) * cos(phi) + state_.pos.x;
-        xf_sphere[1] = r * sin(theta) * sin(phi) + state_.pos.y;
-        xf_sphere[2] = r * cos(theta) + state_.pos.z;
-        if (xf_sphere[2] < 0)  // If below the ground, discard
-        {
-          break;
-        }
-
-        // TODO: also "negative" angles
-        genNewTraj(u_max_, xf_sphere);  // Now X_ has the stuff
-        if (trajIsFree(X_))
-        {
-          found_it = 1;
-          double dist_end_traj_to_goal =
-              sqrt(pow(term_goal_.pos.x - xf_sphere[0], 2) + pow(term_goal_.pos.y - xf_sphere[1], 2) +
-                   pow(term_goal_.pos.z - xf_sphere[2], 2));
-          if (dist_end_traj_to_goal < GOAL_RADIUS)
-          {  // I've found a free path that ends in the goal --> no more replanning (to avoid oscillations when reaching
-            // the goal)
-            replanning_needed_ = false;
-          }
-        }
-      }
-    }*/
 }
 
 void CVX::genNewTraj(double u_max, double xf[])
@@ -275,7 +240,7 @@ void CVX::genNewTraj(double u_max, double xf[])
   double** u = get_control();
 
   then = ros::Time::now().toSec();
-  interpInput(dt, xf, u0, x0, u, x, U_, X_);
+  interpInput(dt, xf, u0, x0, u, x, U_temp_, X_temp_);
   ROS_WARN("interp time: %0.2f ms", 1000 * (ros::Time::now().toSec() - then));
 
   replan_ = true;
@@ -1049,3 +1014,40 @@ void CVX::goalCB(const acl_msgs::TermGoal& msg)
   double xf[6] = { term_goal_.pos.x, term_goal_.pos.y, term_goal_.pos.z,
                    term_goal_.vel.x, term_goal_.vel.y, term_goal_.vel.z };
   genNewTraj(u_max_, xf);  // Now X_ has the stuff*/
+
+/*  double xf[6] = { term_goal_.pos.x, term_goal_.pos.y, term_goal_.pos.z,
+                     term_goal_.vel.x, term_goal_.vel.y, term_goal_.vel.z };
+    genNewTraj(u_max_, xf);  // Now X_ has the stuff*/
+
+/*  for (double phi = phi0; i_phi <= n_phi && !found_it; phi = phi + d_phi / n_phi)
+  {
+    i_phi++;
+    i_theta = 0;
+    for (double theta = theta0; i_theta <= n_theta && !found_it; theta = theta + d_theta / n_theta)
+    {
+      i_theta++;
+      double xf_sphere[6] = { 0, 0, 0, 0, 0, 0 };
+      xf_sphere[0] = r * sin(theta) * cos(phi) + state_.pos.x;
+      xf_sphere[1] = r * sin(theta) * sin(phi) + state_.pos.y;
+      xf_sphere[2] = r * cos(theta) + state_.pos.z;
+      if (xf_sphere[2] < 0)  // If below the ground, discard
+      {
+        break;
+      }
+
+      // TODO: also "negative" angles
+      genNewTraj(u_max_, xf_sphere);  // Now X_ has the stuff
+      if (trajIsFree(X_))
+      {
+        found_it = 1;
+        double dist_end_traj_to_goal =
+            sqrt(pow(term_goal_.pos.x - xf_sphere[0], 2) + pow(term_goal_.pos.y - xf_sphere[1], 2) +
+                 pow(term_goal_.pos.z - xf_sphere[2], 2));
+        if (dist_end_traj_to_goal < GOAL_RADIUS)
+        {  // I've found a free path that ends in the goal --> no more replanning (to avoid oscillations when reaching
+          // the goal)
+          replanning_needed_ = false;
+        }
+      }
+    }
+  }*/
