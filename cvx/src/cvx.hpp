@@ -42,7 +42,7 @@ private:
   void interpInput(double dt, double xf[], double u0[], double x0[], double** u, double** x, Eigen::MatrixXd& U,
                    Eigen::MatrixXd& X);
   visualization_msgs::Marker createMarkerLineStrip(Eigen::MatrixXd X);
-  void createMarkerSetOfArrows(Eigen::MatrixXd X, visualization_msgs::MarkerArray* trajs_sphere);
+  void createMarkerSetOfArrows(Eigen::MatrixXd X, bool isFree);
   void clearMarkerSetOfArrows();
   void mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg);
   void pclCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg);
@@ -51,6 +51,8 @@ private:
   std_msgs::ColorRGBA color(int id);
   Eigen::Vector3d createForceArrow(Eigen::Vector3d x, Eigen::Vector3d f_att, Eigen::Vector3d f_rep,
                                    visualization_msgs::MarkerArray* forces);
+
+  float solvePolyOrder2(Eigen::Vector3f coeff);
 
   visualization_msgs::Marker setpoint_;
   acl_msgs::QuadGoal quadGoal_;
@@ -76,17 +78,20 @@ private:
   tf2_ros::TransformListener* tfListener;
   std::string name_drone_;
 
+  visualization_msgs::MarkerArray trajs_sphere_;  // all the trajectories generated in the sphere
+  int markerID_ = 0;
+  int markerID_last_ = 0;
+
   Eigen::MatrixXd U_, X_;  // Contains the intepolated input/states that will be sent to the drone
   Eigen::MatrixXd U_temp_,
       X_temp_;  // Contains the intepolated input/states of a traj. If the traj. is free, it will be copied to U_, X_
   bool replan_, optimized_, use_ff_;
   double u_min_, u_max_, z_start_, spinup_time_, z_land_;
   int N_ = 20;
-  int markerID_;
-  int markerID_last_;
   pcl::KdTreeFLANN<pcl::PointXYZ> kdtree_map_;  // kdtree of the point cloud of the map
   bool kdtree_map_initialized_ = 0;
   // vector that has all the kdtrees of the pclouds not included in the map:
   std::vector<kdTreeStamped> v_kdtree_new_pcls_;
   bool replanning_needed_ = true;
+  bool goal_click_initialized_ = false;
 };

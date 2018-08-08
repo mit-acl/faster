@@ -9,6 +9,7 @@
 // TODO: update gcc to the latest version (see https://cvxgen.com/docs/c_interface.html)
 
 // TODO: use the gpu versions of the pcl functions
+// TODO: https://eigen.tuxfamily.org/dox/TopicCUDA.html
 
 #include "cvx.hpp"
 #include "geometry_msgs/PointStamped.h"
@@ -28,7 +29,8 @@
 #define RED 1
 #define GREEN 2
 #define BLUE 3
-#define YELLOW 4
+#define BLUE_LIGHT 4
+#define YELLOW 5
 
 #define DC 0.01           //(seconds) Duration for the interpolation=Value of the timer pubGoal
 #define GOAL_RADIUS 0.2   //(m) Drone has arrived to the goal when distance_to_goal<GOAL_RADIUS
@@ -91,7 +93,6 @@ CVX::CVX(ros::NodeHandle nh) : nh_(nh)
   term_goal_.pos.z = 0;
 
   markerID_ = 0;
-  markerID_last_ = 0;
 
   name_drone_ = ros::this_node::getNamespace();
   name_drone_.erase(0, 2);  // Erase slashes
@@ -118,13 +119,20 @@ void CVX::goalCB(const acl_msgs::TermGoal& msg)
 {
   term_goal_ = msg;
   replanning_needed_ = true;
+  goal_click_initialized_ = true;
 }
 
 void CVX::replanCB(const ros::TimerEvent& e)
 {
+  clearMarkerSetOfArrows();
   if (!kdtree_map_initialized_)
   {
     ROS_WARN("Run the mapper");
+    return;
+  }
+  if (!goal_click_initialized_)
+  {
+    ROS_WARN("Click a goal to start replanning");
     return;
   }
   // printf("In replan CB\n");
@@ -132,20 +140,9 @@ void CVX::replanCB(const ros::TimerEvent& e)
   double dist_to_goal = sqrt(pow(term_goal_.pos.x - state_.pos.x, 2) + pow(term_goal_.pos.y - state_.pos.y, 2) +
                              pow(term_goal_.pos.z - state_.pos.z, 2));
 
-  if (dist_to_goal < GOAL_RADIUS)
-  {
-    return;  // no replan if I'm in the goal
-  }
-
   // TODO: r_sphere_max should be a parameter
   double r_sphere_max = 4.0;
   double r = std::min(dist_to_goal, r_sphere_max);  // radius of the sphere
-  int n_phi = 6;                                    // Number of samples in phi.
-  int n_theta = 6;                                  // Number of samples in theta.
-  double d_theta = 3.14 / 2;
-  double d_phi = 3.14 / 2;
-  int i_phi = 0;
-  int i_theta = 0;
   Eigen::Vector3d curr_pos(state_.pos.x, state_.pos.y, state_.pos.z);
   Eigen::Vector3d term_goal(term_goal_.pos.x, term_goal_.pos.y, term_goal_.pos.z);
 
@@ -154,9 +151,9 @@ void CVX::replanCB(const ros::TimerEvent& e)
   // attractive force
   Eigen::Vector3d force = computeForce(curr_pos, term_goal);
 
-  if (replanning_needed_ == false)
+  if (replanning_needed_ == false || dist_to_goal < GOAL_RADIUS)
   {
-    printf("Not replanning needed\n");
+    // printf("No replanning needed\n");
     return;
   }
 
@@ -164,27 +161,15 @@ void CVX::replanCB(const ros::TimerEvent& e)
   double theta0 = acos(z / (sqrt(x * x + y * y + z * z)));
   double phi0 = atan2(y, x);
 
-  visualization_msgs::MarkerArray trajs_sphere;  // all the trajectories generated in the sphere
-  markerID_ = 0;
-  clearMarkerSetOfArrows();
-
   bool found_it = 0;
-
-  /*  double xx = term_goal[0] - state_.pos.x, yy = term_goal[1] - state_.pos.y,
-           zz = term_goal[2] - state_.pos.z;  // x,y,z of the goal with respecto to the current pos
-    theta0 = acos(zz / (sqrt(xx * xx + yy * yy + zz * zz)));
-    phi0 = atan2(yy, xx);*/
 
   Eigen::AngleAxis<float> rot_z(phi0, Eigen::Vector3f::UnitZ());
   Eigen::AngleAxis<float> rot_y(theta0, Eigen::Vector3f::UnitY());
-
-  // std::vector<Eigen::Vector3d> s_points;  // sampled points
 
   for (double theta = 0; theta <= 3.14 / 2 && !found_it; theta = theta + 3.14 / 10)
   {
     for (double phi = 0; phi <= 2 * 3.14 && !found_it; phi = phi + 3.14 / 10)
     {
-      printf("Dentro\n");
       Eigen::Vector3f p1, p2;
       p1[0] = r * sin(theta) * cos(phi);
       p1[1] = r * sin(theta) * sin(phi);
@@ -196,18 +181,19 @@ void CVX::replanCB(const ros::TimerEvent& e)
       {
         continue;
       }
-      // s_points.push_back(p2);
 
       double xf_sphere[6] = { 0, 0, 0, 0, 0, 0 };
       xf_sphere[0] = p2[0];
       xf_sphere[1] = p2[1];
       xf_sphere[2] = p2[2];
       genNewTraj(u_max_, xf_sphere);  // Now X_temp_ has the stuff
-      createMarkerSetOfArrows(X_, &trajs_sphere);
-      if (trajIsFree(X_temp_))
+      bool isFree = trajIsFree(X_temp_);
+      createMarkerSetOfArrows(X_temp_, isFree);
+      if (isFree)
       {
         X_ = X_temp_;
         U_ = U_temp_;
+        pubTraj(X_);
         found_it = 1;
         double dist_end_traj_to_goal =
             sqrt(pow(term_goal_.pos.x - xf_sphere[0], 2) + pow(term_goal_.pos.y - xf_sphere[1], 2) +
@@ -220,8 +206,11 @@ void CVX::replanCB(const ros::TimerEvent& e)
       }
     }
   }
-
-  pub_trajs_sphere_.publish(trajs_sphere);
+  if (!found_it)
+  {
+    ROS_ERROR("Unable to find a free traj");
+  }
+  pub_trajs_sphere_.publish(trajs_sphere_);
 }
 
 void CVX::genNewTraj(double u_max, double xf[])
@@ -234,21 +223,20 @@ void CVX::genNewTraj(double u_max, double xf[])
   double then = ros::Time::now().toSec();
   // Call optimizer
   double dt = callOptimizer(u_max, x0, xf);
-  ROS_WARN("solve time: %0.2f ms", 1000 * (ros::Time::now().toSec() - then));
+  // ROS_WARN("solve time: %0.2f ms", 1000 * (ros::Time::now().toSec() - then));
 
   double** x = get_state();
   double** u = get_control();
 
   then = ros::Time::now().toSec();
   interpInput(dt, xf, u0, x0, u, x, U_temp_, X_temp_);
-  ROS_WARN("interp time: %0.2f ms", 1000 * (ros::Time::now().toSec() - then));
+  // ROS_WARN("interp time: %0.2f ms", 1000 * (ros::Time::now().toSec() - then));
 
   replan_ = true;
   optimized_ = true;
   // ROS_INFO("%0.2f %0.2f %0.2f", x[N_-1][0], x[N_-1][1], x[N_-1][2]);
   // ROS_INFO("%0.2f %0.2f %0.2f", X(X.rows()-1,0), X(X.rows()-1,1), X(X.rows()-1,2));
 
-  pubTraj(X_);
   // pubTraj(x);
 }
 
@@ -352,9 +340,20 @@ void CVX::interpInput(double dt, double xf[], double u0[], double x0[], double**
 
 double CVX::callOptimizer(double u_max, double x0[], double xf[])
 {
+  printf("u_max=%f\n", u_max);
   bool converged = false;
-  // TODO: Set initial dt as a function of xf, x0 and u_max. Be careful because u_max can be accel, jerk,...
-  double dt = 0.17;  // 0.025
+  // TODO: Be careful because u_max can be accel, jerk,...
+  float accel = copysign(1, xf - x0) * u_max;
+  float v0x = x0[3];
+  float v0y = x0[4];
+  float v0z = x0[5];
+  float tx = solvePolyOrder2(Eigen::Vector3f(0.5 * accel, v0x, x0[0] - xf[0]));  // Solve equation xf=x0+v0t+0.5*a*t^2
+  float ty = solvePolyOrder2(Eigen::Vector3f(0.5 * accel, v0y, x0[1] - xf[1]));
+  float tz = solvePolyOrder2(Eigen::Vector3f(0.5 * accel, v0z, x0[2] - xf[2]));
+  float dt_found = std::min({ tx, ty, tz }) / N_;
+  ROS_INFO("dt I found= %0.2f", dt_found);
+
+  double dt = 0.025;  // 0.025
   double** x;
 
   while (!converged)
@@ -564,37 +563,29 @@ void CVX::pubTraj(Eigen::MatrixXd X)
   pub_traj_.publish(traj);
 }
 
-void CVX::createMarkerSetOfArrows(Eigen::MatrixXd X, visualization_msgs::MarkerArray* trajs_sphere)
+void CVX::createMarkerSetOfArrows(Eigen::MatrixXd X, bool isFree)
 {
-  double then_cchecking = ros::Time::now().toSec();
-  bool isFree = trajIsFree(X);
-  double ms_cchecking = 1000 * (ros::Time::now().toSec() - then_cchecking);
-  // ROS_WARN("Col.Checking 1 traj: %0.2f ms", ms_cchecking);
   geometry_msgs::Point p_last;
-  p_last.x = state_.pos.x;
-  p_last.y = state_.pos.y;
-  p_last.z = state_.pos.z;
+
+  p_last.x = X(0, 0);
+  p_last.y = X(0, 1);
+  p_last.z = X(0, 2);
   // TODO: change the 10 below
-  for (int i = 0; i < X.rows(); i = i + 10)  // Push (a subset of) the points in the trajectory
+  for (int i = 1; i < X.rows(); i = i + 10)  // Push (a subset of) the points in the trajectory
   {
     markerID_++;
     visualization_msgs::Marker m;
     m.type = visualization_msgs::Marker::ARROW;
     m.action = visualization_msgs::Marker::ADD;
     m.id = markerID_;
+    m.ns = "ns";
     if (isFree)
     {
-      m.color.r = 0.5;
-      m.color.g = 0.7;
-      m.color.b = 1;
-      m.color.a = 1;
+      m.color = color(BLUE_LIGHT);
     }
     else
     {
-      m.color.r = 1;
-      m.color.g = 0;
-      m.color.b = 0;
-      m.color.a = 1;
+      m.color = color(RED);
     }
 
     m.scale.x = 0.02;
@@ -609,27 +600,26 @@ void CVX::createMarkerSetOfArrows(Eigen::MatrixXd X, visualization_msgs::MarkerA
     p.z = X(i, 2);
     m.points.push_back(p_last);
     m.points.push_back(p);
-    (*trajs_sphere).markers.push_back(m);
+    // std::cout << "pushing marker\n" << m << std::endl;
+    trajs_sphere_.markers.push_back(m);
     p_last = p;
   }
-
-  markerID_last_ = markerID_;
   // m.lifetime = ros::Duration(5);  // 3 second duration
 }
 
 void CVX::clearMarkerSetOfArrows()
 {
-  visualization_msgs::MarkerArray tmp;
-  for (int i = markerID_; i <= 1000; i++)
-  {
-    visualization_msgs::Marker m;
-    m.type = visualization_msgs::Marker::ARROW;
-    m.action = visualization_msgs::Marker::DELETE;
-    m.id = i;
-    tmp.markers.push_back(m);
-  }
+  trajs_sphere_.markers.clear();  // trajs_sphere_ has no elements now
 
-  pub_trajs_sphere_.publish(tmp);
+  visualization_msgs::Marker m;
+  m.type = visualization_msgs::Marker::ARROW;
+  m.action = visualization_msgs::Marker::DELETEALL;
+  m.id = 0;
+  trajs_sphere_.markers.push_back(m);
+
+  pub_trajs_sphere_.publish(trajs_sphere_);
+  trajs_sphere_.markers.clear();  // trajs_sphere_ is ready to insert in it the "add" markers
+  markerID_ = 0;
 }
 
 void CVX::pclCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
@@ -843,6 +833,11 @@ std_msgs::ColorRGBA CVX::color(int id)
   blue.g = 0;
   blue.b = 1;
   blue.a = 1;
+  std_msgs::ColorRGBA blue_light;
+  blue_light.r = 0.5;
+  blue_light.g = 0.7;
+  blue_light.b = 1;
+  blue_light.a = 1;
   std_msgs::ColorRGBA green;
   green.r = 0;
   green.g = 1;
@@ -857,15 +852,54 @@ std_msgs::ColorRGBA CVX::color(int id)
   {
     case RED:
       return red;
+      break;
     case BLUE:
       return blue;
+      break;
+    case BLUE_LIGHT:
+      return blue_light;
+      break;
     case GREEN:
       return green;
+      break;
     case YELLOW:
       return yellow;
+      break;
+    default:
+      ROS_ERROR("COLOR NOT DEFINED");
   }
 }
 
+// coeff is from highest degree to lowest degree. Returns the smallest positive real solution. Returns a BIG number if a
+// root is imaginary or if it's negative
+float CVX::solvePolyOrder2(Eigen::Vector3f coeff)
+{
+  std::cout << "Solving*********************\n" << coeff << std::endl;
+  float a = coeff[2];
+  float b = coeff[1];
+  float c = coeff[0];
+  float dis = b * b - 4 * a * c;
+  printf("dis= %f\n", dis);
+  if (dis >= 0)
+  {
+    float x1 = (-b - sqrt(dis)) / (2 * a);
+    float x2 = (-b + sqrt(dis)) / (2 * a);
+    printf("x1= %f\n", x1);
+    printf("x2= %f\n", x2);
+    if (x1 > 0)
+    {
+      printf("Solution=%f\n", x1);
+      return x1;
+    }
+    if (x2 > 0)
+    {
+      printf("Solution=%f\n", x2);
+      return x2;
+    }
+  }
+  ROS_ERROR("No solution found to the equation");
+  return std::numeric_limits<float>::max();
+}
 /*
 void CVX::goalCB(const acl_msgs::TermGoal& msg)
 {
@@ -1051,3 +1085,8 @@ void CVX::goalCB(const acl_msgs::TermGoal& msg)
       }
     }
   }*/
+
+/*  double xx = term_goal[0] - state_.pos.x, yy = term_goal[1] - state_.pos.y,
+         zz = term_goal[2] - state_.pos.z;  // x,y,z of the goal with respecto to the current pos
+  theta0 = acos(zz / (sqrt(xx * xx + yy * yy + zz * zz)));
+  phi0 = atan2(yy, xx);*/
