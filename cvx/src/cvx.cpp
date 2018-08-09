@@ -11,6 +11,12 @@
 // TODO: use the gpu versions of the pcl functions
 // TODO: https://eigen.tuxfamily.org/dox/TopicCUDA.html
 
+// TODO: how to tackle unknown space
+
+// TODO: yaw should be pointing to the velocity vector? Or maybe to the place with more unknown space?
+
+// TODO: First of all, try with an straight line to the goal
+
 #include "cvx.hpp"
 #include "geometry_msgs/PointStamped.h"
 #include "nav_msgs/Path.h"
@@ -124,6 +130,8 @@ void CVX::goalCB(const acl_msgs::TermGoal& msg)
 
 void CVX::replanCB(const ros::TimerEvent& e)
 {
+  printf("InreplanCB\n");
+  double t0replanCB = ros::Time::now().toSec();
   clearMarkerSetOfArrows();
   if (!kdtree_map_initialized_)
   {
@@ -165,6 +173,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   Eigen::AngleAxis<float> rot_z(phi0, Eigen::Vector3f::UnitZ());
   Eigen::AngleAxis<float> rot_y(theta0, Eigen::Vector3f::UnitY());
+
+  // printf("planning from quadGoal_ %0.2f\n", quadGoal_.pos.x);
 
   for (double theta = 0; theta <= 3.14 / 2 && !found_it; theta = theta + 3.14 / 10)
   {
@@ -211,6 +221,9 @@ void CVX::replanCB(const ros::TimerEvent& e)
     ROS_ERROR("Unable to find a free traj");
   }
   pub_trajs_sphere_.publish(trajs_sphere_);
+
+  // ROS_WARN("solve time: %0.2f ms", 1000 * (ros::Time::now().toSec() - then));
+  printf("*******Time in replanCB %0.2f ms\n", 1000 * (ros::Time::now().toSec() - t0replanCB));
 }
 
 void CVX::genNewTraj(double u_max, double xf[])
@@ -376,7 +389,7 @@ double CVX::callOptimizer(double u_max, double x0[], double xf[])
       dt += 0.025;
   }
 
-  ROS_INFO("Iterations = %d\n", i);
+  // ROS_INFO("Iterations = %d\n", i);
   // ROS_INFO("converged, dt = %0.2f", dt);
   // printf("difference= %0.2f\n", dt - dt_initial);
 
@@ -431,7 +444,8 @@ void CVX::stateCB(const acl_msgs::State& msg)
 
 void CVX::pubCB(const ros::TimerEvent& e)
 {
-  // printf("InpubCB\n");
+  double t0pubCB = ros::Time::now().toSec();
+  printf("########InpubCB\n");
   if (flight_mode_.mode == flight_mode_.LAND)
   {
     double d = sqrt(pow(quadGoal_.pos.z - z_land_, 2));
@@ -510,6 +524,8 @@ void CVX::pubCB(const ros::TimerEvent& e)
     quadGoal_.cut_power = true;
   }
 
+  // printf("publishing quadGoal_ %0.2f\n", quadGoal_.pos.x);
+
   pub_goal_.publish(quadGoal_);
 
   // Pub setpoint maker
@@ -518,6 +534,7 @@ void CVX::pubCB(const ros::TimerEvent& e)
   setpoint_.pose.position.y = quadGoal_.pos.y;
   setpoint_.pose.position.z = quadGoal_.pos.z;
   pub_setpoint_.publish(setpoint_);
+  printf("#######Time in pubCB %0.2f ms\n", 1000 * (ros::Time::now().toSec() - t0pubCB));
 }
 
 void CVX::pubTraj(double** x)
@@ -879,7 +896,7 @@ std_msgs::ColorRGBA CVX::color(int id)
 // root is imaginary or if it's negative
 float CVX::solvePolyOrder2(Eigen::Vector3f coeff)
 {
-  std::cout << "solving\n" << coeff << std::endl;
+  // std::cout << "solving\n" << coeff << std::endl;
   float a = coeff[0];
   float b = coeff[1];
   float c = coeff[2];
