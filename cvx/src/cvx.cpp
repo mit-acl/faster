@@ -340,26 +340,29 @@ void CVX::interpInput(double dt, double xf[], double u0[], double x0[], double**
 
 double CVX::callOptimizer(double u_max, double x0[], double xf[])
 {
-  printf("u_max=%f\n", u_max);
   bool converged = false;
-  // TODO: Be careful because u_max can be accel, jerk,...
-  float accel = copysign(1, xf - x0) * u_max;
+  // TODO: Be careful because u_max can be accel, jerk,...Also, there may be constraints in vel_max if input is accel
+  float accelx = copysign(1, xf[0] - x0[0]) * u_max;
+  float accely = copysign(1, xf[1] - x0[1]) * u_max;
+  float accelz = copysign(1, xf[2] - x0[2]) * u_max;
   float v0x = x0[3];
   float v0y = x0[4];
   float v0z = x0[5];
-  float tx = solvePolyOrder2(Eigen::Vector3f(0.5 * accel, v0x, x0[0] - xf[0]));  // Solve equation xf=x0+v0t+0.5*a*t^2
-  float ty = solvePolyOrder2(Eigen::Vector3f(0.5 * accel, v0y, x0[1] - xf[1]));
-  float tz = solvePolyOrder2(Eigen::Vector3f(0.5 * accel, v0z, x0[2] - xf[2]));
-  float dt_found = std::min({ tx, ty, tz }) / N_;
-  ROS_INFO("dt I found= %0.2f", dt_found);
+  float tx = solvePolyOrder2(Eigen::Vector3f(0.5 * accelx, v0x, x0[0] - xf[0]));  // Solve equation xf=x0+v0t+0.5*a*t^2
+  float ty = solvePolyOrder2(Eigen::Vector3f(0.5 * accely, v0y, x0[1] - xf[1]));
+  float tz = solvePolyOrder2(Eigen::Vector3f(0.5 * accelz, v0z, x0[2] - xf[2]));
+  float dt_initial = std::max({ tx, ty, tz }) / N_;
+  // ROS_INFO("dt I found= %0.2f", dt_found);
 
-  double dt = 0.025;  // 0.025
+  double dt = dt_initial;  // 0.025
   double** x;
+  int i = 0;
 
   while (!converged)
   {
     load_default_data(dt, u_max, x0, xf);
     int r = optimize();
+    i = i + 1;
     if (r == 1)
     {
       x = get_state();
@@ -373,7 +376,9 @@ double CVX::callOptimizer(double u_max, double x0[], double xf[])
       dt += 0.025;
   }
 
-  ROS_INFO("converged, dt = %0.2f", dt);
+  ROS_INFO("Iterations = %d\n", i);
+  // ROS_INFO("converged, dt = %0.2f", dt);
+  // printf("difference= %0.2f\n", dt - dt_initial);
 
   return dt;
 }
@@ -874,26 +879,22 @@ std_msgs::ColorRGBA CVX::color(int id)
 // root is imaginary or if it's negative
 float CVX::solvePolyOrder2(Eigen::Vector3f coeff)
 {
-  std::cout << "Solving*********************\n" << coeff << std::endl;
-  float a = coeff[2];
+  std::cout << "solving\n" << coeff << std::endl;
+  float a = coeff[0];
   float b = coeff[1];
-  float c = coeff[0];
+  float c = coeff[2];
   float dis = b * b - 4 * a * c;
-  printf("dis= %f\n", dis);
   if (dis >= 0)
   {
     float x1 = (-b - sqrt(dis)) / (2 * a);
     float x2 = (-b + sqrt(dis)) / (2 * a);
-    printf("x1= %f\n", x1);
-    printf("x2= %f\n", x2);
+
     if (x1 > 0)
     {
-      printf("Solution=%f\n", x1);
       return x1;
     }
     if (x2 > 0)
     {
-      printf("Solution=%f\n", x2);
       return x2;
     }
   }
