@@ -39,6 +39,7 @@
 #define BLUE 3
 #define BLUE_LIGHT 4
 #define YELLOW 5
+#define ORANGE_TRANS 6
 
 #define DC 0.01           //(seconds) Duration for the interpolation=Value of the timer pubGoal
 #define GOAL_RADIUS 0.2   //(m) Drone has arrived to the goal when distance_to_goal<GOAL_RADIUS
@@ -55,6 +56,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB) : nh_(nh), nh_replan_
   pub_setpoint_ = nh_.advertise<visualization_msgs::Marker>("setpoint", 1);
   pub_trajs_sphere_ = nh_.advertise<visualization_msgs::MarkerArray>("trajs_sphere", 1);
   pub_forces_ = nh_.advertise<visualization_msgs::MarkerArray>("forces", 1);
+  pub_actual_traj_ = nh_.advertise<visualization_msgs::Marker>("actual_traj", 1);
 
   sub_goal_ = nh_.subscribe("term_goal", 1, &CVX::goalCB, this);
   sub_mode_ = nh_.subscribe("flightmode", 1, &CVX::modeCB, this);
@@ -89,10 +91,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB) : nh_(nh), nh_replan_
   setpoint_.scale.x = 0.35;
   setpoint_.scale.y = 0.35;
   setpoint_.scale.z = 0.35;
-  setpoint_.color.a = 0.7;  // Don't forget to set the alpha!
-  setpoint_.color.r = 1.0;
-  setpoint_.color.g = 0.5;
-  setpoint_.color.b = 0.0;
+  setpoint_.color = color(ORANGE_TRANS);
 
   initialize_optimizer();
 
@@ -120,6 +119,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB) : nh_(nh), nh_replan_
       // nothing
     }
   }
+  clearMarkerActualTraj();
   ROS_INFO("Planner initialized");
 }
 
@@ -128,6 +128,7 @@ void CVX::goalCB(const acl_msgs::TermGoal& msg)
   term_goal_ = msg;
   replanning_needed_ = true;
   goal_click_initialized_ = true;
+  clearMarkerActualTraj();
 }
 
 void CVX::replanCB(const ros::TimerEvent& e)
@@ -435,6 +436,8 @@ void CVX::stateCB(const acl_msgs::State& msg)
     z_start_ = msg.pos.z;
     z_start_ = std::max(0.0, z_start_);
   }
+
+  pubActualTraj();
 }
 
 void CVX::pubCB(const ros::TimerEvent& e)
@@ -521,7 +524,7 @@ void CVX::pubCB(const ros::TimerEvent& e)
 
   pub_goal_.publish(quadGoal_);
 
-  // Pub setpoint maker
+  // Pub setpoint maker.  setpoint_ is the last quadGoal sent to the drone
   setpoint_.header.stamp = ros::Time::now();
   setpoint_.pose.position.x = quadGoal_.pos.x;
   setpoint_.pose.position.y = quadGoal_.pos.y;
@@ -622,6 +625,19 @@ void CVX::createMarkerSetOfArrows(Eigen::MatrixXd X, bool isFree)
   // m.lifetime = ros::Duration(5);  // 3 second duration
 }
 
+void CVX::clearMarkerActualTraj()
+{
+  visualization_msgs::Marker m;
+  m.type = visualization_msgs::Marker::ARROW;
+  m.action = visualization_msgs::Marker::DELETEALL;
+  m.id = 0;
+  m.scale.x = 0.02;
+  m.scale.y = 0.04;
+  m.scale.z = 1;
+  pub_actual_traj_.publish(m);
+  actual_trajID_ = 0;
+}
+
 void CVX::clearMarkerSetOfArrows()
 {
   trajs_sphere_.markers.clear();  // trajs_sphere_ has no elements now
@@ -630,6 +646,7 @@ void CVX::clearMarkerSetOfArrows()
   m.type = visualization_msgs::Marker::ARROW;
   m.action = visualization_msgs::Marker::DELETEALL;
   m.id = 0;
+
   trajs_sphere_.markers.push_back(m);
 
   pub_trajs_sphere_.publish(trajs_sphere_);
@@ -700,6 +717,8 @@ void CVX::mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
   mtx.unlock();
 }
 
+// TODO: check also against unkown space? Be careful because with the new points cloud I may have information of
+// previously-unknown voxels
 bool CVX::trajIsFree(Eigen::MatrixXd X)
 {
   mtx.lock();
@@ -750,7 +769,7 @@ Eigen::Vector3d CVX::computeForce(Eigen::Vector3d x, Eigen::Vector3d g)
   double k_att = 2;
   double k_rep = 2;
   double d0 = 5;   // (m). Change between quadratic and linear potential (between linear and constant force)
-  double rho = 3;  // (m). If the obstacle is further than rho, its f_rep=0
+  double rho = 5;  // (m). If the obstacle is further than rho, its f_rep=0
 
   Eigen::Vector3d f_rep(0, 0, 0);
   Eigen::Vector3d f_att(0, 0, 0);
@@ -876,6 +895,11 @@ std_msgs::ColorRGBA CVX::color(int id)
   yellow.g = 1;
   yellow.b = 0;
   yellow.a = 1;
+  std_msgs::ColorRGBA orange_trans;  // orange transparent
+  orange_trans.r = 1;
+  orange_trans.g = 0.5;
+  orange_trans.b = 0;
+  orange_trans.a = 0.7;
   switch (id)
   {
     case RED:
@@ -892,6 +916,9 @@ std_msgs::ColorRGBA CVX::color(int id)
       break;
     case YELLOW:
       return yellow;
+      break;
+    case ORANGE_TRANS:
+      return orange_trans;
       break;
     default:
       ROS_ERROR("COLOR NOT DEFINED");
@@ -923,6 +950,57 @@ float CVX::solvePolyOrder2(Eigen::Vector3f coeff)
   }
   ROS_ERROR("No solution found to the equation");
   return std::numeric_limits<float>::max();
+}
+
+geometry_msgs::Point CVX::pointOrigin()
+{
+  geometry_msgs::Point tmp;
+  tmp.x = 0;
+  tmp.y = 0;
+  tmp.z = 0;
+  return tmp;
+}
+
+geometry_msgs::Point CVX::eigen2point(Eigen::Vector3d vector)
+{
+  geometry_msgs::Point tmp;
+  tmp.x = vector[0];
+  tmp.y = vector[1];
+  tmp.z = vector[2];
+  return tmp;
+}
+
+void CVX::pubActualTraj()
+{
+  static geometry_msgs::Point p_last = pointOrigin();
+
+  Eigen::Vector3d act_pos(state_.pos.x, state_.pos.y, state_.pos.z);
+  Eigen::Vector3d t_goal(term_goal_.pos.x, term_goal_.pos.y, term_goal_.pos.z);
+  float dist_to_goal = (t_goal - act_pos).norm();
+
+  if (dist_to_goal < 2 * GOAL_RADIUS)
+  {
+    return;
+  }
+
+  visualization_msgs::Marker m;
+  m.type = visualization_msgs::Marker::ARROW;
+  m.action = visualization_msgs::Marker::ADD;
+  m.id = actual_trajID_;
+  actual_trajID_++;
+  m.color = color(GREEN);
+  m.scale.x = 0.02;
+  m.scale.y = 0.04;
+  m.scale.z = 1;
+  m.header.stamp = ros::Time::now();
+  m.header.frame_id = "world";
+
+  geometry_msgs::Point p;
+  p = eigen2point(act_pos);
+  m.points.push_back(p_last);
+  m.points.push_back(p);
+  pub_actual_traj_.publish(m);
+  p_last = p;
 }
 /*
 void CVX::goalCB(const acl_msgs::TermGoal& msg)

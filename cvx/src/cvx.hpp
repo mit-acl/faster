@@ -47,6 +47,7 @@ private:
   visualization_msgs::Marker createMarkerLineStrip(Eigen::MatrixXd X);
   void createMarkerSetOfArrows(Eigen::MatrixXd X, bool isFree);
   void clearMarkerSetOfArrows();
+  void clearMarkerActualTraj();
   void mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg);
   void pclCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg);
   bool trajIsFree(Eigen::MatrixXd X);
@@ -56,6 +57,9 @@ private:
                                    visualization_msgs::MarkerArray* forces);
 
   float solvePolyOrder2(Eigen::Vector3f coeff);
+  geometry_msgs::Point pointOrigin();
+  geometry_msgs::Point eigen2point(Eigen::Vector3d vector);
+  void pubActualTraj();
 
   visualization_msgs::Marker setpoint_;
   acl_msgs::QuadGoal quadGoal_;
@@ -71,6 +75,7 @@ private:
   ros::Publisher pub_setpoint_;
   ros::Publisher pub_trajs_sphere_;
   ros::Publisher pub_forces_;
+  ros::Publisher pub_actual_traj_;
   ros::Subscriber sub_goal_;
   ros::Subscriber sub_state_;
   ros::Subscriber sub_mode_;
@@ -86,7 +91,7 @@ private:
   visualization_msgs::MarkerArray trajs_sphere_;  // all the trajectories generated in the sphere
   int markerID_ = 0;
   int markerID_last_ = 0;
-
+  int actual_trajID_ = 0;
   Eigen::MatrixXd U_, X_;  // Contains the intepolated input/states that will be sent to the drone
   Eigen::MatrixXd U_temp_,
       X_temp_;  // Contains the intepolated input/states of a traj. If the traj. is free, it will be copied to U_, X_
