@@ -8,12 +8,15 @@
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/buffer.h>
 
+#include <atomic>
+
 #include <Eigen/Dense>
 
 #include <acl_msgs/State.h>
 #include <acl_msgs/QuadGoal.h>
 #include <acl_msgs/QuadFlightMode.h>
 #include <acl_msgs/TermGoal.h>
+#include <mutex>
 
 struct kdTreeStamped
 {
@@ -24,7 +27,7 @@ struct kdTreeStamped
 class CVX
 {
 public:
-  CVX(ros::NodeHandle nh);
+  CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB);
 
 private:
   // class methods
@@ -61,6 +64,8 @@ private:
   acl_msgs::TermGoal term_goal_;
 
   ros::NodeHandle nh_;
+  ros::NodeHandle nh_replan_CB_;
+
   ros::Publisher pub_goal_;
   ros::Publisher pub_traj_;
   ros::Publisher pub_setpoint_;
@@ -94,4 +99,6 @@ private:
   std::vector<kdTreeStamped> v_kdtree_new_pcls_;
   bool replanning_needed_ = true;
   bool goal_click_initialized_ = false;
+
+  std::mutex mtx;
 };

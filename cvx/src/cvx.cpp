@@ -17,6 +17,8 @@
 
 // TODO: First of all, try with an straight line to the goal
 
+// TODO: Quiz'a puedo anadir al potential field otra fuerza que me aleje de los sitios por los cuales ya he pasado?
+
 #include "cvx.hpp"
 #include "geometry_msgs/PointStamped.h"
 #include "nav_msgs/Path.h"
@@ -42,7 +44,7 @@
 #define GOAL_RADIUS 0.2   //(m) Drone has arrived to the goal when distance_to_goal<GOAL_RADIUS
 #define DRONE_RADIUS 0.3  //(m) Used for collision checking
 
-CVX::CVX(ros::NodeHandle nh) : nh_(nh)
+CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB) : nh_(nh), nh_replan_CB_(nh_replan_CB)
 {
   replan_ = false;
   optimized_ = false;
@@ -62,7 +64,7 @@ CVX::CVX(ros::NodeHandle nh) : nh_(nh)
 
   pubGoalTimer_ = nh_.createTimer(ros::Duration(DC), &CVX::pubCB, this);
 
-  pubGoalReplan_ = nh_.createTimer(ros::Duration(3 * DC), &CVX::replanCB, this);
+  pubGoalReplan_ = nh_replan_CB_.createTimer(ros::Duration(3 * DC), &CVX::replanCB, this);
 
   bool ff;
   ros::param::param<bool>("~use_ff", ff, false);
@@ -130,8 +132,7 @@ void CVX::goalCB(const acl_msgs::TermGoal& msg)
 
 void CVX::replanCB(const ros::TimerEvent& e)
 {
-  printf("InreplanCB\n");
-  double t0replanCB = ros::Time::now().toSec();
+  // double t0replanCB = ros::Time::now().toSec();
   clearMarkerSetOfArrows();
   if (!kdtree_map_initialized_)
   {
@@ -143,7 +144,6 @@ void CVX::replanCB(const ros::TimerEvent& e)
     ROS_WARN("Click a goal to start replanning");
     return;
   }
-  // printf("In replan CB\n");
 
   double dist_to_goal = sqrt(pow(term_goal_.pos.x - state_.pos.x, 2) + pow(term_goal_.pos.y - state_.pos.y, 2) +
                              pow(term_goal_.pos.z - state_.pos.z, 2));
@@ -157,8 +157,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
   // TODO: I'm using only the direction of the force, but not the magnitude. Could I use the magnitude?
   // TODO: If I'm only using the direction of the force, not sure if quadratic+linear separation is needed in the
   // attractive force
-  Eigen::Vector3d force = computeForce(curr_pos, term_goal);
 
+  Eigen::Vector3d force = computeForce(curr_pos, term_goal);
   if (replanning_needed_ == false || dist_to_goal < GOAL_RADIUS)
   {
     // printf("No replanning needed\n");
@@ -173,8 +173,6 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   Eigen::AngleAxis<float> rot_z(phi0, Eigen::Vector3f::UnitZ());
   Eigen::AngleAxis<float> rot_y(theta0, Eigen::Vector3f::UnitY());
-
-  // printf("planning from quadGoal_ %0.2f\n", quadGoal_.pos.x);
 
   for (double theta = 0; theta <= 3.14 / 2 && !found_it; theta = theta + 3.14 / 10)
   {
@@ -203,6 +201,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
       {
         X_ = X_temp_;
         U_ = U_temp_;
+        replan_ = true;
         pubTraj(X_);
         found_it = 1;
         double dist_end_traj_to_goal =
@@ -223,7 +222,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   pub_trajs_sphere_.publish(trajs_sphere_);
 
   // ROS_WARN("solve time: %0.2f ms", 1000 * (ros::Time::now().toSec() - then));
-  printf("*******Time in replanCB %0.2f ms\n", 1000 * (ros::Time::now().toSec() - t0replanCB));
+  // printf("Time in replanCB %0.2f ms\n", 1000 * (ros::Time::now().toSec() - t0replanCB));
 }
 
 void CVX::genNewTraj(double u_max, double xf[])
@@ -237,7 +236,6 @@ void CVX::genNewTraj(double u_max, double xf[])
   // Call optimizer
   double dt = callOptimizer(u_max, x0, xf);
   // ROS_WARN("solve time: %0.2f ms", 1000 * (ros::Time::now().toSec() - then));
-
   double** x = get_state();
   double** u = get_control();
 
@@ -245,11 +243,9 @@ void CVX::genNewTraj(double u_max, double xf[])
   interpInput(dt, xf, u0, x0, u, x, U_temp_, X_temp_);
   // ROS_WARN("interp time: %0.2f ms", 1000 * (ros::Time::now().toSec() - then));
 
-  replan_ = true;
   optimized_ = true;
   // ROS_INFO("%0.2f %0.2f %0.2f", x[N_-1][0], x[N_-1][1], x[N_-1][2]);
   // ROS_INFO("%0.2f %0.2f %0.2f", X(X.rows()-1,0), X(X.rows()-1,1), X(X.rows()-1,2));
-
   // pubTraj(x);
 }
 
@@ -366,7 +362,6 @@ double CVX::callOptimizer(double u_max, double x0[], double xf[])
   float tz = solvePolyOrder2(Eigen::Vector3f(0.5 * accelz, v0z, x0[2] - xf[2]));
   float dt_initial = std::max({ tx, ty, tz }) / N_;
   // ROS_INFO("dt I found= %0.2f", dt_found);
-
   double dt = dt_initial;  // 0.025
   double** x;
   int i = 0;
@@ -444,8 +439,8 @@ void CVX::stateCB(const acl_msgs::State& msg)
 
 void CVX::pubCB(const ros::TimerEvent& e)
 {
-  double t0pubCB = ros::Time::now().toSec();
-  printf("########InpubCB\n");
+  // double t0pubCB = ros::Time::now().toSec();
+
   if (flight_mode_.mode == flight_mode_.LAND)
   {
     double d = sqrt(pow(quadGoal_.pos.z - z_land_, 2));
@@ -468,7 +463,6 @@ void CVX::pubCB(const ros::TimerEvent& e)
   quadGoal_.jerk.x = 0;
   quadGoal_.jerk.y = 0;
   quadGoal_.jerk.z = 0;
-
   if (quadGoal_.cut_power && (flight_mode_.mode == flight_mode_.TAKEOFF || flight_mode_.mode == flight_mode_.GO))
   {
     double then = ros::Time::now().toSec();
@@ -482,14 +476,13 @@ void CVX::pubCB(const ros::TimerEvent& e)
       pub_goal_.publish(quadGoal_);
     }
   }
-
   static int k = 0;
   if (optimized_ && flight_mode_.mode != flight_mode_.NOT_FLYING && flight_mode_.mode != flight_mode_.KILL)
   {
     quadGoal_.cut_power = false;
     if (replan_)
     {
-      k = 0;
+      k = 0;  // Start again publishing the waypoints in X_ from the first row
       replan_ = false;
     }
 
@@ -534,7 +527,7 @@ void CVX::pubCB(const ros::TimerEvent& e)
   setpoint_.pose.position.y = quadGoal_.pos.y;
   setpoint_.pose.position.z = quadGoal_.pos.z;
   pub_setpoint_.publish(setpoint_);
-  printf("#######Time in pubCB %0.2f ms\n", 1000 * (ros::Time::now().toSec() - t0pubCB));
+  // printf("#########Time in pubCB %0.2f ms\n", 1000 * (ros::Time::now().toSec() - t0pubCB));
 }
 
 void CVX::pubTraj(double** x)
@@ -673,7 +666,9 @@ void CVX::pclCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
     kdTreeStamped my_kdTreeStamped;
     my_kdTreeStamped.kdTree.setInputCloud(pclptr);
     my_kdTreeStamped.time = pcl2ptr_msg->header.stamp;
+    mtx.lock();
     v_kdtree_new_pcls_.push_back(my_kdTreeStamped);
+    mtx.unlock();
   }
   catch (tf2::TransformException& ex)
   {
@@ -687,7 +682,7 @@ void CVX::mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
   {
     return;
   }
-
+  mtx.lock();
   pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::fromROSMsg(*pcl2ptr_msg, *pclptr);
 
@@ -699,41 +694,49 @@ void CVX::mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
       i = i - 1;  // Needed because I'm changing the vector inside the loop
     }
   }
+
   kdtree_map_.setInputCloud(pclptr);
   kdtree_map_initialized_ = 1;
+  mtx.unlock();
 }
 
 bool CVX::trajIsFree(Eigen::MatrixXd X)
 {
+  mtx.lock();
   // TODO: this cloud should be a subset of the entire cloud, not all the cloud (faster?)
+  bool isFree = true;
   for (int i = 0; i < X.rows(); i = i + 1)  // Sample (a subset of) the points in the trajectory
   {
     pcl::PointXYZ searchPoint(X(i, 0), X(i, 1), X(i, 2));
     std::vector<int> pointIdxRadiusSearch;
     std::vector<float> pointRadiusSquaredDistance;
 
+    // TODO: implement smart check
     // TODO: maybe nearestKSearch is faster
 
-    // Search for collision in all the new point clouds
+    // Check collision in all the new point clouds
     // TODO: maybe I could check collision only against some of the new point clouds, not all of them.
     // TODO: change the -1 in the line below
-    for (unsigned i = v_kdtree_new_pcls_.size() - 1; i < v_kdtree_new_pcls_.size(); ++i)
+
+    unsigned novale = v_kdtree_new_pcls_.size() - 1;
+    for (unsigned i = v_kdtree_new_pcls_.size() - 1; i < v_kdtree_new_pcls_.size() && i >= 0; ++i)
     {
-      // printf("Comprobando %d\n", i);
       if (v_kdtree_new_pcls_[i].kdTree.radiusSearch(searchPoint, DRONE_RADIUS, pointIdxRadiusSearch,
                                                     pointRadiusSquaredDistance) > 0)
       {
-        return false;  // if we model the drone as an sphere, I'm done (there is a collision)
+        isFree = false;  // if we model the drone as an sphere, I'm done (there is a collision)
       }
     }
 
-    // Search for collision in the map
+    // Check collision in the map
+
     if (kdtree_map_.radiusSearch(searchPoint, DRONE_RADIUS, pointIdxRadiusSearch, pointRadiusSquaredDistance) > 0)
     {
-      return false;  // if we model the drone as an sphere, I'm done (there is a collision)
+      isFree = false;  // if we model the drone as an sphere, I'm done (there is a collision)
     }
   }
-  return true;  // this traj is free
+  mtx.unlock();
+  return isFree;  // this traj is free
 }
 
 // TODO: the mapper receives a depth map and converts it to a point cloud. Why not receiving directly the point cloud?
@@ -767,7 +770,9 @@ Eigen::Vector3d CVX::computeForce(Eigen::Vector3d x, Eigen::Vector3d g)
   std::vector<int> id;                 // pointIdxRadiusSearch
   std::vector<float> sd;               // pointRadiusSquaredDistance
   pcl::PointXYZ sp(x[0], x[1], x[2]);  // searchPoint=x
+  mtx.lock();
   pcl::KdTree<pcl::PointXYZ>::PointCloudConstPtr cloud_ptr = kdtree_map_.getInputCloud();
+
   if (kdtree_map_.radiusSearch(sp, rho, id, sd) > 0)  // if further, f_rep=f_rep+0
   {
     for (size_t i = 0; i < id.size(); ++i)
@@ -781,6 +786,7 @@ Eigen::Vector3d CVX::computeForce(Eigen::Vector3d x, Eigen::Vector3d g)
       f_rep = f_rep + k_rep * (1 / d_obst - 1 / rho) * (pow(1 / d_obst, 2)) * (x - obs) / d_obst;
     }
   }
+  mtx.unlock();
 
   visualization_msgs::MarkerArray forces;
   createForceArrow(x, f_att, f_rep, &forces);
