@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>jps3d</name>
+  <version>1.0.0</version>
+  <description>The jps3d package</description>
+  <maintainer email="sikang@seas.upenn.edu">sikang</maintainer>
+
+  <license>BSD-3-Clause</license>
+
+  <export>
+    <build_type>cmake</build_type>
+  </export>
+
+</package>

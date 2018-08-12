@@ -18,6 +18,12 @@
 #include <acl_msgs/TermGoal.h>
 #include <mutex>
 
+// JPS3D includes
+#include "timer.hpp"
+#include "read_map.hpp"
+#include <jps_basis/data_utils.h>
+#include <jps_planner/jps_planner/jps_planner.h>
+
 struct kdTreeStamped
 {
   pcl::KdTreeFLANN<pcl::PointXYZ> kdTree;
@@ -60,6 +66,9 @@ private:
   geometry_msgs::Point pointOrigin();
   geometry_msgs::Point eigen2point(Eigen::Vector3d vector);
   void pubActualTraj();
+  void solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr);
+  void vectorOfVectors2MarkerArray(vec_Vecf<3> traj, visualization_msgs::MarkerArray* m_array);
+  void clearMarkerArray(visualization_msgs::MarkerArray* m_array);
 
   visualization_msgs::Marker setpoint_;
   acl_msgs::QuadGoal quadGoal_;
@@ -76,6 +85,7 @@ private:
   ros::Publisher pub_trajs_sphere_;
   ros::Publisher pub_forces_;
   ros::Publisher pub_actual_traj_;
+  ros::Publisher pub_path_jps_;
   ros::Subscriber sub_goal_;
   ros::Subscriber sub_state_;
   ros::Subscriber sub_mode_;
@@ -89,6 +99,7 @@ private:
   std::string name_drone_;
 
   visualization_msgs::MarkerArray trajs_sphere_;  // all the trajectories generated in the sphere
+  visualization_msgs::MarkerArray path_jps_;
   int markerID_ = 0;
   int markerID_last_ = 0;
   int actual_trajID_ = 0;
@@ -104,6 +115,10 @@ private:
   std::vector<kdTreeStamped> v_kdtree_new_pcls_;
   bool replanning_needed_ = true;
   bool goal_click_initialized_ = false;
+
+  int cells_x_;  // Number of cells of the map in X
+  int cells_y_;  // Number of cells of the map in Y
+  int cells_z_;  // Number of cells of the map in Z
 
   std::mutex mtx;
 };

@@ -34,6 +34,14 @@
 #include <algorithm>
 #include <vector>
 
+using namespace JPS;
+
+// TODO: This values should be the same as the global_mapper.yaml
+#define WDX 60    //[m] world dimension in x
+#define WDY 60    //[m] world dimension in y
+#define WDZ 6     //[m] world dimension in z
+#define RES 0.35  //[m]
+
 #define RED 1
 #define GREEN 2
 #define BLUE 3
@@ -57,6 +65,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB) : nh_(nh), nh_replan_
   pub_trajs_sphere_ = nh_.advertise<visualization_msgs::MarkerArray>("trajs_sphere", 1);
   pub_forces_ = nh_.advertise<visualization_msgs::MarkerArray>("forces", 1);
   pub_actual_traj_ = nh_.advertise<visualization_msgs::Marker>("actual_traj", 1);
+  pub_path_jps_ = nh_.advertise<visualization_msgs::MarkerArray>("path_jps", 1);
 
   sub_goal_ = nh_.subscribe("term_goal", 1, &CVX::goalCB, this);
   sub_mode_ = nh_.subscribe("flightmode", 1, &CVX::modeCB, this);
@@ -101,6 +110,10 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB) : nh_(nh), nh_replan_
 
   markerID_ = 0;
 
+  cells_x_ = (int)WDX / RES;
+  cells_y_ = (int)WDY / RES;
+  cells_z_ = (int)WDZ / RES;
+
   name_drone_ = ros::this_node::getNamespace();
   name_drone_.erase(0, 2);  // Erase slashes
 
@@ -121,6 +134,107 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB) : nh_(nh), nh_replan_
   }
   clearMarkerActualTraj();
   ROS_INFO("Planner initialized");
+}
+
+void CVX::solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr)
+{
+  // Create a map
+  const Vec3f start(state_.pos.x, state_.pos.y, state_.pos.z);
+  const Vec3f goal(term_goal_.pos.x, term_goal_.pos.y, term_goal_.pos.z);
+  const Vec3i dim2(cells_x_, cells_y_, cells_z_);  // set the number of cells in each dimension
+
+  const Vec3f center_map(state_.pos.x, state_.pos.y, state_.pos.z);  // position of the drone
+  // Read the pointcloud
+  MapReader<Vec3i, Vec3f> reader(pclptr, start, goal, dim2, RES, center_map, true);  // Map read
+
+  // store map in map_util
+  std::shared_ptr<VoxelMapUtil> map_util = std::make_shared<VoxelMapUtil>();
+  map_util->setMap(reader.origin(), reader.dim(), reader.data(), reader.resolution());
+
+  std::unique_ptr<JPSPlanner3D> planner_ptr(new JPSPlanner3D(true));  // Declare a planner
+
+  planner_ptr->setMapUtil(map_util);  // Set collision checking function
+  planner_ptr->updateMap();
+
+  Timer time_jps(true);
+  bool valid_jps = planner_ptr->plan(start, goal, 1, true);  // Plan from start to goal using JPS
+  double dt_jps = time_jps.Elapsed().count();
+  printf("JPS Planner takes: %f ms\n", dt_jps);
+  printf("JPS Path Distance: %f\n", total_distance3f(planner_ptr->getRawPath()));
+  printf("JPS Path: \n");
+  vec_Vecf<3> path_jps_vector = planner_ptr->getRawPath();
+
+  for (const auto& it : path_jps_vector)
+  {
+    std::cout << it.transpose() << std::endl;
+  }
+
+  clearMarkerArray(&path_jps_);
+  vectorOfVectors2MarkerArray(path_jps_vector, &path_jps_);
+  pub_path_jps_.publish(path_jps_);
+  /*
+ Timer time_astar(true);
+ bool valid_astar = planner_ptr->plan(start, goal, 1, false);  // Plan from start to goal using A*
+ double dt_astar = time_astar.Elapsed().count();
+ printf("AStar Planner takes: %f ms\n", dt_astar);
+ printf("AStar Path Distance: %f\n", total_distance3f(planner_ptr->getRawPath()));
+ printf("AStar Path: \n");
+ auto path_astar = planner_ptr->getRawPath();
+ for (const auto& it : path_astar)
+   std::cout << it.transpose() << std::endl;
+*/
+  return;
+}
+
+void CVX::clearMarkerArray(visualization_msgs::MarkerArray* m_array)
+{
+  (*m_array).markers.clear();
+  visualization_msgs::Marker m;
+  m.type = visualization_msgs::Marker::ARROW;
+  m.action = visualization_msgs::Marker::DELETEALL;
+  m.id = 0;
+  (*m_array).markers.push_back(m);
+  pub_path_jps_.publish(*m_array);
+  (*m_array).markers.clear();
+}
+
+void CVX::vectorOfVectors2MarkerArray(vec_Vecf<3> traj, visualization_msgs::MarkerArray* m_array)
+{
+  geometry_msgs::Point p_last = eigen2point(traj[0]);
+
+  bool skip = false;
+  int i = 50000;  // large enough to prevent conflict with other markers
+
+  for (const auto& it : traj)
+  {
+    i++;
+    if (skip)  // skip the first element
+    {
+      skip = true;
+      continue;
+    }
+
+    visualization_msgs::Marker m;
+    m.type = visualization_msgs::Marker::ARROW;
+    m.action = visualization_msgs::Marker::ADD;
+    m.id = i;
+    m.color = color(BLUE);
+    m.scale.x = 0.02;
+    m.scale.y = 0.04;
+    // m.scale.z = 1;
+
+    m.header.frame_id = "world";
+    m.header.stamp = ros::Time::now();
+    geometry_msgs::Point p = eigen2point(it);
+    /*    p.x = traj[i][0];
+        p.y = X(i, 1);
+        p.z = X(i, 2);*/
+    m.points.push_back(p_last);
+    m.points.push_back(p);
+    // std::cout << "pushing marker\n" << m << std::endl;
+    (*m_array).markers.push_back(m);
+    p_last = p;
+  }
 }
 
 void CVX::goalCB(const acl_msgs::TermGoal& msg)
@@ -712,6 +826,7 @@ void CVX::mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
     }
   }
 
+  solveJPS3D(pclptr);
   kdtree_map_.setInputCloud(pclptr);
   kdtree_map_initialized_ = 1;
   mtx.unlock();
