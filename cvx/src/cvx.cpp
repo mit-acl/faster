@@ -138,40 +138,49 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB) : nh_(nh), nh_replan_
 
 void CVX::solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr)
 {
+  printf("In solveJPSD\n");
   // Create a map
   const Vec3f start(state_.pos.x, state_.pos.y, state_.pos.z);
   const Vec3f goal(term_goal_.pos.x, term_goal_.pos.y, term_goal_.pos.z);
-  const Vec3i dim2(cells_x_, cells_y_, cells_z_);  // set the number of cells in each dimension
-
+  const Vec3i dim(cells_x_, cells_y_, cells_z_);  //  number of cells in each dimension
+  printf("In solveJPSD2\n");
   const Vec3f center_map(state_.pos.x, state_.pos.y, state_.pos.z);  // position of the drone
   // Read the pointcloud
-  MapReader<Vec3i, Vec3f> reader(pclptr, start, goal, dim2, RES, center_map, true);  // Map read
+  printf("In solveJPSD2.5\n");
+  MapReader<Vec3i, Vec3f> reader(pclptr, dim, RES, center_map);  // Map read
 
-  // store map in map_util
+  printf("In solveJPSD3\n");
+
   std::shared_ptr<VoxelMapUtil> map_util = std::make_shared<VoxelMapUtil>();
   map_util->setMap(reader.origin(), reader.dim(), reader.data(), reader.resolution());
+  printf("In solveJPSD3.5\n");
 
   std::unique_ptr<JPSPlanner3D> planner_ptr(new JPSPlanner3D(true));  // Declare a planner
-
+  printf("In solveJPSD5\n");
   planner_ptr->setMapUtil(map_util);  // Set collision checking function
   planner_ptr->updateMap();
 
+  printf("In solveJPSD6\n");
   Timer time_jps(true);
-  bool valid_jps = planner_ptr->plan(start, goal, 1, true);  // Plan from start to goal using JPS
-  double dt_jps = time_jps.Elapsed().count();
-  printf("JPS Planner takes: %f ms\n", dt_jps);
-  printf("JPS Path Distance: %f\n", total_distance3f(planner_ptr->getRawPath()));
-  printf("JPS Path: \n");
-  vec_Vecf<3> path_jps_vector = planner_ptr->getRawPath();
-
-  for (const auto& it : path_jps_vector)
+  bool valid_jps = planner_ptr->plan(
+      start, goal, 1, true);  // Plan from start to goal with heuristic weight=1, and using JPS (if false --> use A*)
+  printf("In solveJPSD6.5\n");
+  if (valid_jps == true)  // There is a solution
   {
-    std::cout << it.transpose() << std::endl;
-  }
+    double dt_jps = time_jps.Elapsed().count();
+    printf("JPS Planner takes: %f ms\n", dt_jps);
+    printf("JPS Path Distance: %f\n", total_distance3f(planner_ptr->getRawPath()));
+    printf("JPS Path: \n");
+    vec_Vecf<3> path_jps_vector = planner_ptr->getRawPath();
 
-  clearMarkerArray(&path_jps_);
-  vectorOfVectors2MarkerArray(path_jps_vector, &path_jps_);
-  pub_path_jps_.publish(path_jps_);
+    for (const auto& it : path_jps_vector)
+    {
+      std::cout << it.transpose() << std::endl;
+    }
+    path_jps_ = clearArrows();
+    vectorOfVectors2MarkerArray(path_jps_vector, &path_jps_);
+    pub_path_jps_.publish(path_jps_);
+  }
   /*
  Timer time_astar(true);
  bool valid_astar = planner_ptr->plan(start, goal, 1, false);  // Plan from start to goal using A*
@@ -186,20 +195,22 @@ void CVX::solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr)
   return;
 }
 
-void CVX::clearMarkerArray(visualization_msgs::MarkerArray* m_array)
+visualization_msgs::MarkerArray CVX::clearArrows()
 {
-  (*m_array).markers.clear();
+  visualization_msgs::MarkerArray tmp;
   visualization_msgs::Marker m;
   m.type = visualization_msgs::Marker::ARROW;
   m.action = visualization_msgs::Marker::DELETEALL;
   m.id = 0;
-  (*m_array).markers.push_back(m);
-  pub_path_jps_.publish(*m_array);
-  (*m_array).markers.clear();
+  tmp.markers.push_back(m);
+  pub_path_jps_.publish(tmp);
+  visualization_msgs::MarkerArray new_array;
+  return new_array;
 }
 
 void CVX::vectorOfVectors2MarkerArray(vec_Vecf<3> traj, visualization_msgs::MarkerArray* m_array)
 {
+  // printf("In vectorOfVectors2MarkerArray\n");
   geometry_msgs::Point p_last = eigen2point(traj[0]);
 
   bool skip = false;
@@ -239,6 +250,7 @@ void CVX::vectorOfVectors2MarkerArray(vec_Vecf<3> traj, visualization_msgs::Mark
 
 void CVX::goalCB(const acl_msgs::TermGoal& msg)
 {
+  // printf("In goalCB\n");
   term_goal_ = msg;
   replanning_needed_ = true;
   goal_click_initialized_ = true;
@@ -247,6 +259,7 @@ void CVX::goalCB(const acl_msgs::TermGoal& msg)
 
 void CVX::replanCB(const ros::TimerEvent& e)
 {
+  // printf("In replanCB\n");
   // double t0replanCB = ros::Time::now().toSec();
   clearMarkerSetOfArrows();
   if (!kdtree_map_initialized_)
@@ -342,6 +355,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
 void CVX::genNewTraj(double u_max, double xf[])
 {
+  // printf("In genNewTraj\n");
   double x0[6] = {
     quadGoal_.pos.x, quadGoal_.pos.y, quadGoal_.pos.z, quadGoal_.vel.x, quadGoal_.vel.y, quadGoal_.vel.z
   };
@@ -367,6 +381,7 @@ void CVX::genNewTraj(double u_max, double xf[])
 void CVX::interpInput(double dt, double xf[], double u0[], double x0[], double** u, double** x, Eigen::MatrixXd& U,
                       Eigen::MatrixXd& X)
 {
+  // printf("In interpInput\n");
   // linearly interpolate between control input from optimizer
   double dc = DC;
   int size = (int)(N_)*dt / dc;
@@ -464,6 +479,7 @@ void CVX::interpInput(double dt, double xf[], double u0[], double x0[], double**
 
 double CVX::callOptimizer(double u_max, double x0[], double xf[])
 {
+  // printf("In callOptimizer\n");
   bool converged = false;
   // TODO: Be careful because u_max can be accel, jerk,...Also, there may be constraints in vel_max if input is accel
   float accelx = copysign(1, xf[0] - x0[0]) * u_max;
@@ -508,6 +524,7 @@ double CVX::callOptimizer(double u_max, double x0[], double xf[])
 
 int CVX::checkConvergence(double xf[], double xf_opt[])
 {
+  // printf("In checkConvergence\n");
   int r = 0;
   float d = 0;
   float dv = 0;
@@ -531,6 +548,7 @@ int CVX::checkConvergence(double xf[], double xf_opt[])
 
 void CVX::modeCB(const acl_msgs::QuadFlightMode& msg)
 {
+  // printf("In modeCB\n");
   if (msg.mode == msg.LAND && flight_mode_.mode != flight_mode_.LAND)
   {
     double xf[6] = { quadGoal_.pos.x, quadGoal_.pos.y, z_land_, 0, 0, 0 };
@@ -541,6 +559,7 @@ void CVX::modeCB(const acl_msgs::QuadFlightMode& msg)
 
 void CVX::stateCB(const acl_msgs::State& msg)
 {
+  // printf("In stateCB\n");
   state_ = msg;
   // Stop updating when we get GO
   if (flight_mode_.mode == flight_mode_.NOT_FLYING || flight_mode_.mode == flight_mode_.KILL)
@@ -556,6 +575,8 @@ void CVX::stateCB(const acl_msgs::State& msg)
 
 void CVX::pubCB(const ros::TimerEvent& e)
 {
+  // printf("In pubCB\n");
+
   // double t0pubCB = ros::Time::now().toSec();
 
   if (flight_mode_.mode == flight_mode_.LAND)
@@ -649,6 +670,7 @@ void CVX::pubCB(const ros::TimerEvent& e)
 
 void CVX::pubTraj(double** x)
 {
+  // printf("In pubTraj\n");
   // Trajectory
   nav_msgs::Path traj;
   traj.poses.clear();
@@ -673,6 +695,8 @@ void CVX::pubTraj(double** x)
 
 void CVX::pubTraj(Eigen::MatrixXd X)
 {
+  //  printf("In pubTraj\n");
+
   // Trajectory
   nav_msgs::Path traj;
   traj.poses.clear();
@@ -697,6 +721,8 @@ void CVX::pubTraj(Eigen::MatrixXd X)
 
 void CVX::createMarkerSetOfArrows(Eigen::MatrixXd X, bool isFree)
 {
+  // printf("In createMarkerSetOfArrows\n");
+
   geometry_msgs::Point p_last;
 
   p_last.x = X(0, 0);
@@ -741,6 +767,8 @@ void CVX::createMarkerSetOfArrows(Eigen::MatrixXd X, bool isFree)
 
 void CVX::clearMarkerActualTraj()
 {
+  // printf("In clearMarkerActualTraj\n");
+
   visualization_msgs::Marker m;
   m.type = visualization_msgs::Marker::ARROW;
   m.action = visualization_msgs::Marker::DELETEALL;
@@ -754,6 +782,8 @@ void CVX::clearMarkerActualTraj()
 
 void CVX::clearMarkerSetOfArrows()
 {
+  // printf("In clearMarkerSetOfArrows\n");
+
   trajs_sphere_.markers.clear();  // trajs_sphere_ has no elements now
 
   visualization_msgs::Marker m;
@@ -770,6 +800,8 @@ void CVX::clearMarkerSetOfArrows()
 
 void CVX::pclCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 {
+  // printf("In pclCB\n");
+
   if (pcl2ptr_msg->width == 0 || pcl2ptr_msg->height == 0)  // Point Cloud is empty
   {
     return;
@@ -809,6 +841,8 @@ void CVX::pclCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 
 void CVX::mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 {
+  // printf("In mapCB\n");
+
   if (pcl2ptr_msg->width == 0 || pcl2ptr_msg->height == 0)  // Point Cloud is empty (this happens at the beginning)
   {
     return;
@@ -836,6 +870,8 @@ void CVX::mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 // previously-unknown voxels
 bool CVX::trajIsFree(Eigen::MatrixXd X)
 {
+  // printf("In trajIsFree\n");
+
   mtx.lock();
   // TODO: this cloud should be a subset of the entire cloud, not all the cloud (faster?)
   bool isFree = true;
@@ -852,6 +888,7 @@ bool CVX::trajIsFree(Eigen::MatrixXd X)
     // TODO: maybe I could check collision only against some of the new point clouds, not all of them.
     // TODO: change the -1 in the line below
 
+    // TODO: check that it is inside the voxel, (not inside a sphere) would be more accurate
     unsigned novale = v_kdtree_new_pcls_.size() - 1;
     for (unsigned i = v_kdtree_new_pcls_.size() - 1; i < v_kdtree_new_pcls_.size() && i >= 0; ++i)
     {
@@ -881,6 +918,8 @@ bool CVX::trajIsFree(Eigen::MatrixXd X)
 // g is the goal, x is the point on which I'd like to compute the force=-gradient(potential)
 Eigen::Vector3d CVX::computeForce(Eigen::Vector3d x, Eigen::Vector3d g)
 {
+  //  printf("In computeForce\n");
+
   double k_att = 2;
   double k_rep = 2;
   double d0 = 5;   // (m). Change between quadratic and linear potential (between linear and constant force)
@@ -933,6 +972,8 @@ Eigen::Vector3d CVX::computeForce(Eigen::Vector3d x, Eigen::Vector3d g)
 Eigen::Vector3d CVX::createForceArrow(Eigen::Vector3d x, Eigen::Vector3d f_att, Eigen::Vector3d f_rep,
                                       visualization_msgs::MarkerArray* forces)
 {
+  //  printf("In createForceArrow\n");
+
   const int ATT = 0;
   const int REP = 1;
   const int TOTAL = 2;
@@ -1044,6 +1085,8 @@ std_msgs::ColorRGBA CVX::color(int id)
 // root is imaginary or if it's negative
 float CVX::solvePolyOrder2(Eigen::Vector3f coeff)
 {
+  // printf("In solvePolyOrder2\n");
+
   // std::cout << "solving\n" << coeff << std::endl;
   float a = coeff[0];
   float b = coeff[1];
@@ -1087,6 +1130,8 @@ geometry_msgs::Point CVX::eigen2point(Eigen::Vector3d vector)
 
 void CVX::pubActualTraj()
 {
+  // printf("In pubActualTraj\n");
+
   static geometry_msgs::Point p_last = pointOrigin();
 
   Eigen::Vector3d act_pos(state_.pos.x, state_.pos.y, state_.pos.z);

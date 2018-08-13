@@ -68,7 +68,7 @@ private:
   void pubActualTraj();
   void solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr);
   void vectorOfVectors2MarkerArray(vec_Vecf<3> traj, visualization_msgs::MarkerArray* m_array);
-  void clearMarkerArray(visualization_msgs::MarkerArray* m_array);
+  visualization_msgs::MarkerArray clearArrows();
 
   visualization_msgs::Marker setpoint_;
   acl_msgs::QuadGoal quadGoal_;
