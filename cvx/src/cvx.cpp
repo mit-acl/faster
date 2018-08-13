@@ -171,7 +171,7 @@ void CVX::solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr)
     printf("JPS Planner takes: %f ms\n", dt_jps);
     printf("JPS Path Distance: %f\n", total_distance3f(planner_ptr->getRawPath()));
     printf("JPS Path: \n");
-    vec_Vecf<3> path_jps_vector = planner_ptr->getRawPath();
+    vec_Vecf<3> path_jps_vector = planner_ptr->getPath();
 
     for (const auto& it : path_jps_vector)
     {
