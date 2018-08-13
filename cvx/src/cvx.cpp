@@ -75,7 +75,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB) : nh_(nh), nh_replan_
 
   pubGoalTimer_ = nh_.createTimer(ros::Duration(DC), &CVX::pubCB, this);
 
-  pubGoalReplan_ = nh_replan_CB_.createTimer(ros::Duration(3 * DC), &CVX::replanCB, this);
+  pubGoalReplan_ = nh_replan_CB.createTimer(ros::Duration(3 * DC), &CVX::replanCB, this);
 
   bool ff;
   ros::param::param<bool>("~use_ff", ff, false);
@@ -138,48 +138,55 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB) : nh_(nh), nh_replan_
 
 void CVX::solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr)
 {
-  printf("In solveJPSD\n");
+  // printf("In solveJPSD\n");
   // Create a map
   const Vec3f start(state_.pos.x, state_.pos.y, state_.pos.z);
   const Vec3f goal(term_goal_.pos.x, term_goal_.pos.y, term_goal_.pos.z);
   const Vec3i dim(cells_x_, cells_y_, cells_z_);  //  number of cells in each dimension
-  printf("In solveJPSD2\n");
+  // printf("In solveJPSD2\n");
   const Vec3f center_map(state_.pos.x, state_.pos.y, state_.pos.z);  // position of the drone
   // Read the pointcloud
-  printf("In solveJPSD2.5\n");
+  // printf("In solveJPSD2.5\n");
   MapReader<Vec3i, Vec3f> reader(pclptr, dim, RES, center_map);  // Map read
 
-  printf("In solveJPSD3\n");
+  // printf("In solveJPSD3\n");
 
   std::shared_ptr<VoxelMapUtil> map_util = std::make_shared<VoxelMapUtil>();
   map_util->setMap(reader.origin(), reader.dim(), reader.data(), reader.resolution());
-  printf("In solveJPSD3.5\n");
+  // printf("In solveJPSD3.5\n");
 
   std::unique_ptr<JPSPlanner3D> planner_ptr(new JPSPlanner3D(true));  // Declare a planner
-  printf("In solveJPSD5\n");
+  // printf("In solveJPSD5\n");
   planner_ptr->setMapUtil(map_util);  // Set collision checking function
   planner_ptr->updateMap();
 
-  printf("In solveJPSD6\n");
+  // printf("In solveJPSD6\n");
   Timer time_jps(true);
   bool valid_jps = planner_ptr->plan(
       start, goal, 1, true);  // Plan from start to goal with heuristic weight=1, and using JPS (if false --> use A*)
-  printf("In solveJPSD6.5\n");
+  // printf("In solveJPSD6.5\n");
   if (valid_jps == true)  // There is a solution
   {
     double dt_jps = time_jps.Elapsed().count();
     printf("JPS Planner takes: %f ms\n", dt_jps);
-    printf("JPS Path Distance: %f\n", total_distance3f(planner_ptr->getRawPath()));
+    printf("JPS Path Distance: %f\n", total_distance3f(planner_ptr->getPath()));  // getRawPath() if you want the path
+                                                                                  // with more corners (not "cleaned")
     printf("JPS Path: \n");
-    vec_Vecf<3> path_jps_vector = planner_ptr->getPath();
+    vec_Vecf<3> path_jps_vector =
+        planner_ptr->getPath();  // getRawPath() if you want the path with more corners (not "cleaned")
 
+    // printf("Estoy aqui: \n");
     for (const auto& it : path_jps_vector)
     {
       std::cout << it.transpose() << std::endl;
     }
+    // printf("Estoy aqui2: \n");
     path_jps_ = clearArrows();
+    // printf("Estoy aqui3: \n");
     vectorOfVectors2MarkerArray(path_jps_vector, &path_jps_);
+    // printf("Estoy aqui4: \n");
     pub_path_jps_.publish(path_jps_);
+    // printf("Estoy aqui5: \n");
   }
   /*
  Timer time_astar(true);
@@ -192,6 +199,7 @@ void CVX::solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr)
  for (const auto& it : path_astar)
    std::cout << it.transpose() << std::endl;
 */
+  // printf("Out\n");
   return;
 }
 
@@ -330,6 +338,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
         X_ = X_temp_;
         U_ = U_temp_;
         replan_ = true;
+        optimized_ = true;
         pubTraj(X_);
         found_it = 1;
         double dist_end_traj_to_goal =
@@ -372,7 +381,6 @@ void CVX::genNewTraj(double u_max, double xf[])
   interpInput(dt, xf, u0, x0, u, x, U_temp_, X_temp_);
   // ROS_WARN("interp time: %0.2f ms", 1000 * (ros::Time::now().toSec() - then));
 
-  optimized_ = true;
   // ROS_INFO("%0.2f %0.2f %0.2f", x[N_-1][0], x[N_-1][1], x[N_-1][2]);
   // ROS_INFO("%0.2f %0.2f %0.2f", X(X.rows()-1,0), X(X.rows()-1,1), X(X.rows()-1,2));
   // pubTraj(x);
@@ -492,6 +500,11 @@ double CVX::callOptimizer(double u_max, double x0[], double xf[])
   float ty = solvePolyOrder2(Eigen::Vector3f(0.5 * accely, v0y, x0[1] - xf[1]));
   float tz = solvePolyOrder2(Eigen::Vector3f(0.5 * accelz, v0z, x0[2] - xf[2]));
   float dt_initial = std::max({ tx, ty, tz }) / N_;
+  if (dt_initial > std::numeric_limits<float>::max() -
+                       1)  // happens when there is no solution to the previous eq. -1 just to make sure
+  {
+    dt_initial = 0;
+  }
   // ROS_INFO("dt I found= %0.2f", dt_found);
   double dt = dt_initial;  // 0.025
   double** x;
@@ -589,6 +602,8 @@ void CVX::pubCB(const ros::TimerEvent& e)
     }
   }
 
+  // printf("In pubCB2\n");
+
   quadGoal_.header.stamp = ros::Time::now();
   quadGoal_.header.frame_id = "world";
 
@@ -601,6 +616,7 @@ void CVX::pubCB(const ros::TimerEvent& e)
   quadGoal_.jerk.x = 0;
   quadGoal_.jerk.y = 0;
   quadGoal_.jerk.z = 0;
+  // printf("In pubCB3\n");
   if (quadGoal_.cut_power && (flight_mode_.mode == flight_mode_.TAKEOFF || flight_mode_.mode == flight_mode_.GO))
   {
     double then = ros::Time::now().toSec();
@@ -614,6 +630,7 @@ void CVX::pubCB(const ros::TimerEvent& e)
       pub_goal_.publish(quadGoal_);
     }
   }
+  // printf("In pubCB4\n");
   static int k = 0;
   if (optimized_ && flight_mode_.mode != flight_mode_.NOT_FLYING && flight_mode_.mode != flight_mode_.KILL)
   {
@@ -624,14 +641,18 @@ void CVX::pubCB(const ros::TimerEvent& e)
       replan_ = false;
     }
 
+    // printf("In pubCB4.5\n");
     if (k < X_.rows())
     {
+      // printf("In pubCB4.7 arriba\n");
       quadGoal_.pos.x = X_(k, 0);
       quadGoal_.pos.y = X_(k, 1);
+      // printf("In pubCB4.7 arriba1.5\n");
       quadGoal_.pos.z = X_(k, 2);
       quadGoal_.vel.x = X_(k, 3);
       quadGoal_.vel.y = X_(k, 4);
       quadGoal_.vel.z = X_(k, 5);
+      // printf("In pubCB4.7 arriba2\n");
       quadGoal_.accel.x = use_ff_ * U_(k, 0);
       quadGoal_.accel.y = use_ff_ * U_(k, 1);
       quadGoal_.accel.z = use_ff_ * U_(k, 2);
@@ -640,8 +661,10 @@ void CVX::pubCB(const ros::TimerEvent& e)
       quadGoal_.jerk.z = use_ff_ * U_(k, 5);
       k++;
     }
+
     else
     {
+      // printf("In pubCB4.7 abajo\n");
       quadGoal_.pos.x = X_(X_.rows() - 1, 0);
       quadGoal_.pos.y = X_(X_.rows() - 1, 1);
       quadGoal_.pos.z = X_(X_.rows() - 1, 2);
@@ -654,7 +677,7 @@ void CVX::pubCB(const ros::TimerEvent& e)
   {
     quadGoal_.cut_power = true;
   }
-
+  // printf("In pubCB5\n");
   // printf("publishing quadGoal_ %0.2f\n", quadGoal_.pos.x);
 
   pub_goal_.publish(quadGoal_);
@@ -665,6 +688,7 @@ void CVX::pubCB(const ros::TimerEvent& e)
   setpoint_.pose.position.y = quadGoal_.pos.y;
   setpoint_.pose.position.z = quadGoal_.pos.z;
   pub_setpoint_.publish(setpoint_);
+  // printf("End pubCB\n");
   // printf("#########Time in pubCB %0.2f ms\n", 1000 * (ros::Time::now().toSec() - t0pubCB));
 }
 
@@ -695,7 +719,7 @@ void CVX::pubTraj(double** x)
 
 void CVX::pubTraj(Eigen::MatrixXd X)
 {
-  //  printf("In pubTraj\n");
+  // printf("In pubTraj\n");
 
   // Trajectory
   nav_msgs::Path traj;
@@ -848,22 +872,38 @@ void CVX::mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
     return;
   }
   mtx.lock();
+  // printf("In mapCB2\n");
   pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::fromROSMsg(*pcl2ptr_msg, *pclptr);
-
+  std::vector<int> index;
+  // TODO: there must be a better way to check this. It's here because (in the simulation) sometimes all the points
+  // are NaN (when the drone is on the ground and stuck moving randomly). If this is not done, the program breaks. I
+  // think it won't be needed in the real drone
+  // printf("In mapCB3\n");
+  pcl::removeNaNFromPointCloud(*pclptr, *pclptr, index);
+  if (pclptr->size() == 0)
+  {
+    return;
+  }
+  // printf("In mapCB4, size=%d\n", v_kdtree_new_pcls_.size());
   for (unsigned i = 0; i < v_kdtree_new_pcls_.size(); ++i)
   {
+    // printf("antes i=%d\n", i);
     if (v_kdtree_new_pcls_[i].time <= pcl2ptr_msg->header.stamp)  // if the map already contains that point cloud...
     {
       v_kdtree_new_pcls_.erase(v_kdtree_new_pcls_.begin() + i);  // ...erase that point cloud from the vector
       i = i - 1;  // Needed because I'm changing the vector inside the loop
     }
+    // printf("despues i=%d\n", i);
   }
-
+  // printf("below\n");
   solveJPS3D(pclptr);
+
   kdtree_map_.setInputCloud(pclptr);
   kdtree_map_initialized_ = 1;
+  // printf("pasado2\n");
   mtx.unlock();
+  // printf("pasado esto\n");
 }
 
 // TODO: check also against unkown space? Be careful because with the new points cloud I may have information of
@@ -918,7 +958,7 @@ bool CVX::trajIsFree(Eigen::MatrixXd X)
 // g is the goal, x is the point on which I'd like to compute the force=-gradient(potential)
 Eigen::Vector3d CVX::computeForce(Eigen::Vector3d x, Eigen::Vector3d g)
 {
-  //  printf("In computeForce\n");
+  // printf("In computeForce\n");
 
   double k_att = 2;
   double k_rep = 2;
@@ -1081,7 +1121,7 @@ std_msgs::ColorRGBA CVX::color(int id)
   }
 }
 
-// coeff is from highest degree to lowest degree. Returns the smallest positive real solution. Returns a BIG number if a
+// coeff is from highest degree to lowest degree. Returns the smallest positive real solution. Returns -1 if a
 // root is imaginary or if it's negative
 float CVX::solvePolyOrder2(Eigen::Vector3f coeff)
 {
