@@ -6,16 +6,21 @@ int main(int argc, char **argv)
   ros::init(argc, argv, "cvx");
   ros::NodeHandle nh("~");
   ros::NodeHandle nh_replan_CB("~");
-  ros::CallbackQueue custom_queue;
-  nh_replan_CB.setCallbackQueue(&custom_queue);
-  CVX cvx(nh, nh_replan_CB);
+  ros::NodeHandle nh_pub_CB("~");
+  ros::CallbackQueue custom_queue1;
+  ros::CallbackQueue custom_queue2;
+  nh_replan_CB.setCallbackQueue(&custom_queue1);
+  nh_pub_CB.setCallbackQueue(&custom_queue2);
+  CVX cvx(nh, nh_replan_CB, nh_pub_CB);
 
   // NOW THE CALLBACK replanCB is IN A DIFFERENT thread than the other callbacks.
 
   // TODO: I think one thread in the line below will be enough (and will have the same effect, becacuse there is only
   // one callback)
-  ros::AsyncSpinner spinner(0, &custom_queue);
-  spinner.start();  // start spinner of the custom queue
+  ros::AsyncSpinner spinner1(0, &custom_queue1);
+  ros::AsyncSpinner spinner2(0, &custom_queue2);
+  spinner1.start();  // start spinner of the custom queue 1
+  spinner2.start();  // start spinner of the custom queue 2
 
   ros::spin();  // spin the normal queue
 

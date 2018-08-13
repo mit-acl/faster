@@ -40,7 +40,7 @@ using namespace JPS;
 #define WDX 60    //[m] world dimension in x
 #define WDY 60    //[m] world dimension in y
 #define WDZ 6     //[m] world dimension in z
-#define RES 0.35  //[m]
+#define RES 0.35  //[m] cell dimension
 
 #define RED 1
 #define GREEN 2
@@ -53,7 +53,8 @@ using namespace JPS;
 #define GOAL_RADIUS 0.2   //(m) Drone has arrived to the goal when distance_to_goal<GOAL_RADIUS
 #define DRONE_RADIUS 0.3  //(m) Used for collision checking
 
-CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB) : nh_(nh), nh_replan_CB_(nh_replan_CB)
+CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pub_CB)
+  : nh_(nh), nh_replan_CB_(nh_replan_CB), nh_pub_CB_(nh_pub_CB)
 {
   replan_ = false;
   optimized_ = false;
@@ -73,9 +74,9 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB) : nh_(nh), nh_replan_
   sub_map_ = nh_.subscribe("occup_grid", 1, &CVX::mapCB, this);
   sub_pcl_ = nh_.subscribe("pcloud", 1, &CVX::pclCB, this);
 
-  pubGoalTimer_ = nh_.createTimer(ros::Duration(DC), &CVX::pubCB, this);
+  pubCBTimer_ = nh_pub_CB_.createTimer(ros::Duration(DC), &CVX::pubCB, this);
 
-  pubGoalReplan_ = nh_replan_CB.createTimer(ros::Duration(3 * DC), &CVX::replanCB, this);
+  replanCBTimer_ = nh_replan_CB.createTimer(ros::Duration(2 * DC), &CVX::replanCB, this);
 
   bool ff;
   ros::param::param<bool>("~use_ff", ff, false);
@@ -93,10 +94,10 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB) : nh_(nh), nh_replan_
   setpoint_.header.frame_id = "world";
   setpoint_.id = 0;
   setpoint_.type = visualization_msgs::Marker::SPHERE;
-  setpoint_.pose.orientation.x = 0.0;
-  setpoint_.pose.orientation.y = 0.0;
-  setpoint_.pose.orientation.z = 0.0;
-  setpoint_.pose.orientation.w = 1.0;
+  /*  setpoint_.pose.orientation.x = 0.0;
+    setpoint_.pose.orientation.y = 0.0;
+    setpoint_.pose.orientation.z = 0.0;
+    setpoint_.pose.orientation.w = 1.0;*/
   setpoint_.scale.x = 0.35;
   setpoint_.scale.y = 0.35;
   setpoint_.scale.z = 0.35;
@@ -155,7 +156,7 @@ void CVX::solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr)
   map_util->setMap(reader.origin(), reader.dim(), reader.data(), reader.resolution());
   // printf("In solveJPSD3.5\n");
 
-  std::unique_ptr<JPSPlanner3D> planner_ptr(new JPSPlanner3D(true));  // Declare a planner
+  std::unique_ptr<JPSPlanner3D> planner_ptr(new JPSPlanner3D(false));  // Declare a planner
   // printf("In solveJPSD5\n");
   planner_ptr->setMapUtil(map_util);  // Set collision checking function
   planner_ptr->updateMap();
@@ -168,18 +169,19 @@ void CVX::solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr)
   if (valid_jps == true)  // There is a solution
   {
     double dt_jps = time_jps.Elapsed().count();
-    printf("JPS Planner takes: %f ms\n", dt_jps);
-    printf("JPS Path Distance: %f\n", total_distance3f(planner_ptr->getPath()));  // getRawPath() if you want the path
-                                                                                  // with more corners (not "cleaned")
-    printf("JPS Path: \n");
+    // printf("JPS Planner takes: %f ms\n", dt_jps);
+    // printf("JPS Path Distance: %f\n", total_distance3f(planner_ptr->getPath()));  // getRawPath() if you want the
+    // path
+    // with more corners (not "cleaned")
+    // printf("JPS Path: \n");
     vec_Vecf<3> path_jps_vector =
         planner_ptr->getPath();  // getRawPath() if you want the path with more corners (not "cleaned")
 
     // printf("Estoy aqui: \n");
-    for (const auto& it : path_jps_vector)
-    {
-      std::cout << it.transpose() << std::endl;
-    }
+    /*    for (const auto& it : path_jps_vector)
+        {
+          std::cout << it.transpose() << std::endl;
+        }*/
     // printf("Estoy aqui2: \n");
     path_jps_ = clearArrows();
     // printf("Estoy aqui3: \n");
@@ -294,14 +296,16 @@ void CVX::replanCB(const ros::TimerEvent& e)
   // TODO: If I'm only using the direction of the force, not sure if quadratic+linear separation is needed in the
   // attractive force
 
-  Eigen::Vector3d force = computeForce(curr_pos, term_goal);
   if (replanning_needed_ == false || dist_to_goal < GOAL_RADIUS)
   {
     // printf("No replanning needed\n");
     return;
   }
 
-  double x = force[0], y = force[1], z = force[2];  // x,y,z of the goal with respecto to the current pos
+  // If you want the force to be the direction selector
+  Eigen::Vector3d force = computeForce(curr_pos, term_goal);
+  double x = force[0], y = force[1], z = force[2];
+
   double theta0 = acos(z / (sqrt(x * x + y * y + z * z)));
   double phi0 = atan2(y, x);
 
@@ -335,6 +339,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
       createMarkerSetOfArrows(X_temp_, isFree);
       if (isFree)
       {
+        printf("******Replanned!\n");
         X_ = X_temp_;
         U_ = U_temp_;
         replan_ = true;
@@ -364,11 +369,12 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
 void CVX::genNewTraj(double u_max, double xf[])
 {
+  printf("Replanning with x0= %f, %f, %f\n", nextQuadGoal_.pos.x, nextQuadGoal_.pos.y, nextQuadGoal_.pos.z);
+
   // printf("In genNewTraj\n");
-  double x0[6] = {
-    quadGoal_.pos.x, quadGoal_.pos.y, quadGoal_.pos.z, quadGoal_.vel.x, quadGoal_.vel.y, quadGoal_.vel.z
-  };
-  double u0[3] = { quadGoal_.accel.x, quadGoal_.accel.y, quadGoal_.accel.z };
+  double x0[6] = { nextQuadGoal_.pos.x, nextQuadGoal_.pos.y, nextQuadGoal_.pos.z,
+                   nextQuadGoal_.vel.x, nextQuadGoal_.vel.y, nextQuadGoal_.vel.z };
+  double u0[3] = { nextQuadGoal_.accel.x, nextQuadGoal_.accel.y, nextQuadGoal_.accel.z };
 
   double then = ros::Time::now().toSec();
   // Call optimizer
@@ -528,7 +534,7 @@ double CVX::callOptimizer(double u_max, double x0[], double xf[])
       dt += 0.025;
   }
 
-  // ROS_INFO("Iterations = %d\n", i);
+  ROS_INFO("Iterations = %d\n", i);
   // ROS_INFO("converged, dt = %0.2f", dt);
   // printf("difference= %0.2f\n", dt - dt_initial);
 
@@ -607,15 +613,14 @@ void CVX::pubCB(const ros::TimerEvent& e)
   quadGoal_.header.stamp = ros::Time::now();
   quadGoal_.header.frame_id = "world";
 
-  quadGoal_.vel.x = 0;
-  quadGoal_.vel.y = 0;
-  quadGoal_.vel.z = 0;
-  quadGoal_.accel.x = 0;
-  quadGoal_.accel.y = 0;
-  quadGoal_.accel.z = 0;
-  quadGoal_.jerk.x = 0;
-  quadGoal_.jerk.y = 0;
-  quadGoal_.jerk.z = 0;
+  quadGoal_.vel = vectorNull();
+  quadGoal_.accel = vectorNull();
+  quadGoal_.jerk = vectorNull();
+
+  nextQuadGoal_.vel = vectorNull();
+  nextQuadGoal_.accel = vectorNull();
+  nextQuadGoal_.jerk = vectorNull();
+
   // printf("In pubCB3\n");
   if (quadGoal_.cut_power && (flight_mode_.mode == flight_mode_.TAKEOFF || flight_mode_.mode == flight_mode_.GO))
   {
@@ -637,41 +642,24 @@ void CVX::pubCB(const ros::TimerEvent& e)
     quadGoal_.cut_power = false;
     if (replan_)
     {
+      printf("***Setting k=0!\n");
       k = 0;  // Start again publishing the waypoints in X_ from the first row
       replan_ = false;
     }
 
-    // printf("In pubCB4.5\n");
-    if (k < X_.rows())
-    {
-      // printf("In pubCB4.7 arriba\n");
-      quadGoal_.pos.x = X_(k, 0);
-      quadGoal_.pos.y = X_(k, 1);
-      // printf("In pubCB4.7 arriba1.5\n");
-      quadGoal_.pos.z = X_(k, 2);
-      quadGoal_.vel.x = X_(k, 3);
-      quadGoal_.vel.y = X_(k, 4);
-      quadGoal_.vel.z = X_(k, 5);
-      // printf("In pubCB4.7 arriba2\n");
-      quadGoal_.accel.x = use_ff_ * U_(k, 0);
-      quadGoal_.accel.y = use_ff_ * U_(k, 1);
-      quadGoal_.accel.z = use_ff_ * U_(k, 2);
-      quadGoal_.jerk.x = use_ff_ * U_(k, 3);
-      quadGoal_.jerk.y = use_ff_ * U_(k, 4);
-      quadGoal_.jerk.z = use_ff_ * U_(k, 5);
-      k++;
-    }
+    k = std::min(k, (int)(X_.rows() - 1));
+    int kp1 = std::min(k + 1, (int)(X_.rows() - 1));  // k plus one
 
-    else
-    {
-      // printf("In pubCB4.7 abajo\n");
-      quadGoal_.pos.x = X_(X_.rows() - 1, 0);
-      quadGoal_.pos.y = X_(X_.rows() - 1, 1);
-      quadGoal_.pos.z = X_(X_.rows() - 1, 2);
-      quadGoal_.vel.x = X_(X_.rows() - 1, 3);
-      quadGoal_.vel.y = X_(X_.rows() - 1, 4);
-      quadGoal_.vel.z = X_(X_.rows() - 1, 5);
-    }
+    quadGoal_.pos = getPos(k);
+    quadGoal_.vel = getVel(k);
+    quadGoal_.accel = (use_ff_) ? getAccel(k) : vectorNull();
+    quadGoal_.jerk = (use_ff_) ? getJerk(k) : vectorNull();
+
+    nextQuadGoal_.pos = getPos(kp1);
+    nextQuadGoal_.vel = getVel(kp1);
+    nextQuadGoal_.accel = (use_ff_) ? getAccel(kp1) : vectorNull();
+    nextQuadGoal_.jerk = (use_ff_) ? getJerk(kp1) : vectorNull();
+    k++;
   }
   else
   {
@@ -687,9 +675,46 @@ void CVX::pubCB(const ros::TimerEvent& e)
   setpoint_.pose.position.x = quadGoal_.pos.x;
   setpoint_.pose.position.y = quadGoal_.pos.y;
   setpoint_.pose.position.z = quadGoal_.pos.z;
+  printf("Publicando Goal=%f, %f, %f\n", quadGoal_.pos.x, quadGoal_.pos.y, quadGoal_.pos.z);
   pub_setpoint_.publish(setpoint_);
   // printf("End pubCB\n");
   // printf("#########Time in pubCB %0.2f ms\n", 1000 * (ros::Time::now().toSec() - t0pubCB));
+}
+
+geometry_msgs::Vector3 CVX::getPos(int i)
+{
+  geometry_msgs::Vector3 tmp;
+  tmp.x = X_(i, 0);
+  tmp.y = X_(i, 1);
+  tmp.z = X_(i, 2);
+  return tmp;
+}
+
+geometry_msgs::Vector3 CVX::getVel(int i)
+{
+  geometry_msgs::Vector3 tmp;
+  tmp.x = X_(i, 3);
+  tmp.y = X_(i, 4);
+  tmp.z = X_(i, 5);
+  return tmp;
+}
+
+geometry_msgs::Vector3 CVX::getAccel(int i)
+{
+  geometry_msgs::Vector3 tmp;
+  tmp.x = U_(i, 0);
+  tmp.y = U_(i, 1);
+  tmp.z = U_(i, 2);
+  return tmp;
+}
+
+geometry_msgs::Vector3 CVX::getJerk(int i)
+{
+  geometry_msgs::Vector3 tmp;
+  tmp.x = U_(i, 3);
+  tmp.y = U_(i, 4);
+  tmp.z = U_(i, 5);
+  return tmp;
 }
 
 void CVX::pubTraj(double** x)
@@ -1201,6 +1226,14 @@ void CVX::pubActualTraj()
   m.points.push_back(p);
   pub_actual_traj_.publish(m);
   p_last = p;
+}
+
+geometry_msgs::Vector3 CVX::vectorNull()
+{
+  geometry_msgs::Vector3 tmp;
+  tmp.x = 0;
+  tmp.y = 0;
+  tmp.z = 0;
 }
 /*
 void CVX::goalCB(const acl_msgs::TermGoal& msg)

@@ -33,7 +33,7 @@ struct kdTreeStamped
 class CVX
 {
 public:
-  CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB);
+  CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pub_CB);
 
 private:
   // class methods
@@ -69,15 +69,22 @@ private:
   void solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr);
   void vectorOfVectors2MarkerArray(vec_Vecf<3> traj, visualization_msgs::MarkerArray* m_array);
   visualization_msgs::MarkerArray clearArrows();
+  geometry_msgs::Vector3 vectorNull();
+  geometry_msgs::Vector3 getPos(int i);
+  geometry_msgs::Vector3 getVel(int i);
+  geometry_msgs::Vector3 getAccel(int i);
+  geometry_msgs::Vector3 getJerk(int i);
 
   visualization_msgs::Marker setpoint_;
   acl_msgs::QuadGoal quadGoal_;
+  acl_msgs::QuadGoal nextQuadGoal_;
   acl_msgs::QuadFlightMode flight_mode_;
   acl_msgs::State state_;
   acl_msgs::TermGoal term_goal_;
 
   ros::NodeHandle nh_;
   ros::NodeHandle nh_replan_CB_;
+  ros::NodeHandle nh_pub_CB_;
 
   ros::Publisher pub_goal_;
   ros::Publisher pub_traj_;
@@ -91,8 +98,8 @@ private:
   ros::Subscriber sub_mode_;
   ros::Subscriber sub_map_;
   ros::Subscriber sub_pcl_;
-  ros::Timer pubGoalTimer_;
-  ros::Timer pubGoalReplan_;
+  ros::Timer pubCBTimer_;
+  ros::Timer replanCBTimer_;
 
   tf2_ros::Buffer tf_buffer_;
   tf2_ros::TransformListener* tfListener;

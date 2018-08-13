@@ -2,7 +2,7 @@
 
 	<arg name="quad"/>
 
-	<node ns="$(arg quad)" name="cvx" pkg="cvx" type="cvx_node" output="screen" clear_params="true" launch-prefix="gdb -ex run --args">
+	<node ns="$(arg quad)" name="cvx" pkg="cvx" type="cvx_node" output="screen" clear_params="true">
 
         <param name="~u_max" value="2.0" type="double"/>
         <param name="~u_min" value="0.3" type="double"/>
