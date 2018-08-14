@@ -169,7 +169,7 @@ void CVX::solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr)
   if (valid_jps == true)  // There is a solution
   {
     double dt_jps = time_jps.Elapsed().count();
-    // printf("JPS Planner takes: %f ms\n", dt_jps);
+    printf("JPS Planner takes: %f ms\n", dt_jps);
     // printf("JPS Path Distance: %f\n", total_distance3f(planner_ptr->getPath()));  // getRawPath() if you want the
     // path
     // with more corners (not "cleaned")
@@ -177,6 +177,7 @@ void CVX::solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr)
     vec_Vecf<3> path_jps_vector =
         planner_ptr->getPath();  // getRawPath() if you want the path with more corners (not "cleaned")
 
+    directionJPS_ = path_jps_vector[1] - path_jps_vector[0];
     // printf("Estoy aqui: \n");
     /*    for (const auto& it : path_jps_vector)
         {
@@ -303,8 +304,11 @@ void CVX::replanCB(const ros::TimerEvent& e)
   }
 
   // If you want the force to be the direction selector
-  Eigen::Vector3d force = computeForce(curr_pos, term_goal);
-  double x = force[0], y = force[1], z = force[2];
+  // Eigen::Vector3d force = computeForce(curr_pos, term_goal);
+  // double x = force[0], y = force[1], z = force[2];
+
+  // If you want the JPS3D solution to be the direction selector
+  double x = directionJPS_[0], y = directionJPS_[1], z = directionJPS_[2];
 
   double theta0 = acos(z / (sqrt(x * x + y * y + z * z)));
   double phi0 = atan2(y, x);
@@ -1235,193 +1239,3 @@ geometry_msgs::Vector3 CVX::vectorNull()
   tmp.y = 0;
   tmp.z = 0;
 }
-/*
-void CVX::goalCB(const acl_msgs::TermGoal& msg)
-{
-  // Prevents race condition with lower accel landing
-  if (msg.pos.x != 0.0 || msg.pos.y != 0)
-  {
-    double xf[6] = { msg.pos.x, msg.pos.y, msg.pos.z, msg.vel.x, msg.vel.y, msg.vel.z };
-
-    // TODO: these should be parameters
-    // Sample positions in an sphere using spherical coordinates
-
-    double r = 8;     // radius of the sphere
-    int n_phi = 6;    // Number of samples in phi.
-    int n_theta = 6;  // Number of samples in theta.
-    double d_theta = 3.14 / 2;
-    double d_phi = 3.14 / 2;
-
-    double x = xf[0] - state_.pos.x, y = xf[1] - state_.pos.y,
-           z = xf[2] - state_.pos.z;  // x,y,z of the goal with respecto to the current pos
-    double theta0 = acos(z / (sqrt(x * x + y * y + z * z)));
-    double phi0 = atan2(y, x);
-
-    visualization_msgs::MarkerArray trajs_sphere;  // all the trajectories generated in the sphere
-    markerID_ = 0;
-    clearMarkerSetOfArrows();
-
-    int i_phi = 0;
-    int i_theta = 0;
-
-    double ms_to_solve_trjs = 0;
-    double then_cchecking = ros::Time::now().toSec();
-    for (double phi = phi0 - d_phi / 2; i_phi <= n_phi; phi = phi + d_phi / n_phi)
-    {
-      i_phi++;
-      i_theta = 0;
-      for (double theta = theta0 - d_theta / 2; i_theta <= n_theta; theta = theta + d_theta / n_theta)
-      {
-        i_theta++;
-        double xf_sphere[6] = { 0, 0, 0, 0, 0, 0 };
-        xf_sphere[0] = r * sin(theta) * cos(phi) + state_.pos.x;
-        xf_sphere[1] = r * sin(theta) * sin(phi) + state_.pos.y;
-        xf_sphere[2] = r * cos(theta) + state_.pos.z;
-        // TODO: ignore the trajectory if xf_sphere[2]<0 (below the ground)??
-        double then = ros::Time::now().toSec();
-        genNewTraj(u_max_, xf_sphere);  // Now X_ has the stuff
-        ms_to_solve_trjs += 1000 * (ros::Time::now().toSec() - then);
-
-        // trajs_sphere.markers.push_back(createMarkerLineStrip(X_));  // add marker to array
-        createMarkerSetOfArrows(X_, &trajs_sphere);
-      }
-    }
-
-    double ms_cchecking = 1000 * (ros::Time::now().toSec() - then_cchecking) - ms_to_solve_trjs;
-    ROS_WARN("TOTAL SOLVE TIME trajs in sphere: %0.2f ms", ms_to_solve_trjs);
-    ROS_WARN("TOTAL SOLVE TIME Col.Checking+Create Markers: %0.2f ms", ms_cchecking);
-
-    pub_trajs_sphere_.publish(trajs_sphere);
-
-
-    // genNewTraj(u_max_, xf);  // Now X_ has the stuff
-  }
-}*/
-
-/*
-  //////////////////////////////////////////////////////
-  if (replanning_needed_ == false)
-  {
-    printf("Not replanning needed\n");
-    return;
-  }
-  if (!kdtree_map_initialized_)
-  {
-    ROS_WARN("Run the mapper");
-    return;
-  }
-  // printf("In replan CB\n");
-
-  double dist_to_goal = sqrt(pow(term_goal_.pos.x - state_.pos.x, 2) + pow(term_goal_.pos.y - state_.pos.y, 2) +
-                             pow(term_goal_.pos.z - state_.pos.z, 2));
-
-  if (dist_to_goal < GOAL_RADIUS)
-  {
-    return;  // no replan if I'm in the goal
-  }
-
-  // TODO: r_sphere_max should be a parameter
-  double r_sphere_max = 4.0;
-  double r = std::min(dist_to_goal, r_sphere_max);  // radius of the sphere
-  int n_phi = 6;                                    // Number of samples in phi.
-  int n_theta = 6;                                  // Number of samples in theta.
-  double d_theta = 3.14 / 2;
-  double d_phi = 3.14 / 2;
-  int i_phi = 0;
-  int i_theta = 0;
-  Eigen::Vector3d curr_pos(state_.pos.x, state_.pos.y, state_.pos.z);
-  Eigen::Vector3d term_goal(term_goal_.pos.x, term_goal_.pos.y, term_goal_.pos.z);
-
-  // TODO: I'm using only the direction of the force, but not the magnitude. Could I use the magnitude?
-  // TODO: If I'm only using the direction of the force, not sure if quadratic+linear separation is needed in the
-  // attractive force
-  Eigen::Vector3d force = computeForce(curr_pos, term_goal);
-
-  double x = force[0], y = force[1], z = force[2];  // x,y,z of the goal with respecto to the current pos
-  double theta0 = acos(z / (sqrt(x * x + y * y + z * z)));
-  double phi0 = atan2(y, x);
-
-  visualization_msgs::MarkerArray trajs_sphere;  // all the trajectories generated in the sphere
-  markerID_ = 0;
-  clearMarkerSetOfArrows();
-
-  bool found_it = 0;
-
-  double xx = term_goal[0] - state_.pos.x, yy = term_goal[1] - state_.pos.y,
-         zz = term_goal[2] - state_.pos.z;  // x,y,z of the goal with respecto to the current pos
-  theta0 = acos(zz / (sqrt(xx * xx + yy * yy + zz * zz)));
-  phi0 = atan2(yy, xx);
-
-  Eigen::AngleAxis<float> rot_z(phi0, Eigen::Vector3f::UnitZ());
-  Eigen::AngleAxis<float> rot_y(theta0, Eigen::Vector3f::UnitY());
-
-  // std::vector<Eigen::Vector3d> s_points;  // sampled points
-
-  for (double theta = 0; theta <= 3.14 / 2 && !found_it; theta = theta + 3.14 / 10)
-  {
-    for (double phi = 0; phi <= 2 * 3.14 && !found_it; phi = phi + 3.14 / 10)
-    {
-      Eigen::Vector3f p1, p2;
-      p1[0] = r * sin(theta) * cos(phi);
-      p1[1] = r * sin(theta) * sin(phi);
-      p1[2] = r * cos(theta);
-      Eigen::Vector3f trans(state_.pos.x, state_.pos.y, state_.pos.z);
-      p2 = rot_z * rot_y * p1 + trans;
-      // s_points.push_back(p2);
-
-      double xf_sphere[6] = { 0, 0, 0, 0, 0, 0 };
-      xf_sphere[0] = p2[0];
-      xf_sphere[1] = p2[1];
-      xf_sphere[2] = p2[2];
-      genNewTraj(u_max_, xf_sphere);  // Now X_ has the stuff
-      createMarkerSetOfArrows(X_, &trajs_sphere);
-    }
-  }
-
-  pub_trajs_sphere_.publish(trajs_sphere);
-
-  double xf[6] = { term_goal_.pos.x, term_goal_.pos.y, term_goal_.pos.z,
-                   term_goal_.vel.x, term_goal_.vel.y, term_goal_.vel.z };
-  genNewTraj(u_max_, xf);  // Now X_ has the stuff*/
-
-/*  double xf[6] = { term_goal_.pos.x, term_goal_.pos.y, term_goal_.pos.z,
-                     term_goal_.vel.x, term_goal_.vel.y, term_goal_.vel.z };
-    genNewTraj(u_max_, xf);  // Now X_ has the stuff*/
-
-/*  for (double phi = phi0; i_phi <= n_phi && !found_it; phi = phi + d_phi / n_phi)
-  {
-    i_phi++;
-    i_theta = 0;
-    for (double theta = theta0; i_theta <= n_theta && !found_it; theta = theta + d_theta / n_theta)
-    {
-      i_theta++;
-      double xf_sphere[6] = { 0, 0, 0, 0, 0, 0 };
-      xf_sphere[0] = r * sin(theta) * cos(phi) + state_.pos.x;
-      xf_sphere[1] = r * sin(theta) * sin(phi) + state_.pos.y;
-      xf_sphere[2] = r * cos(theta) + state_.pos.z;
-      if (xf_sphere[2] < 0)  // If below the ground, discard
-      {
-        break;
-      }
-
-      // TODO: also "negative" angles
-      genNewTraj(u_max_, xf_sphere);  // Now X_ has the stuff
-      if (trajIsFree(X_))
-      {
-        found_it = 1;
-        double dist_end_traj_to_goal =
-            sqrt(pow(term_goal_.pos.x - xf_sphere[0], 2) + pow(term_goal_.pos.y - xf_sphere[1], 2) +
-                 pow(term_goal_.pos.z - xf_sphere[2], 2));
-        if (dist_end_traj_to_goal < GOAL_RADIUS)
-        {  // I've found a free path that ends in the goal --> no more replanning (to avoid oscillations when reaching
-          // the goal)
-          replanning_needed_ = false;
-        }
-      }
-    }
-  }*/
-
-/*  double xx = term_goal[0] - state_.pos.x, yy = term_goal[1] - state_.pos.y,
-         zz = term_goal[2] - state_.pos.z;  // x,y,z of the goal with respecto to the current pos
-  theta0 = acos(zz / (sqrt(xx * xx + yy * yy + zz * zz)));
-  phi0 = atan2(yy, xx);*/

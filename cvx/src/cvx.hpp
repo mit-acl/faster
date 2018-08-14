@@ -127,5 +127,7 @@ private:
   int cells_y_;  // Number of cells of the map in Y
   int cells_z_;  // Number of cells of the map in Z
 
+  Eigen::Vector3d directionJPS_;
+
   std::mutex mtx;
 };
