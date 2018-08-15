@@ -53,11 +53,13 @@ protected:
   Eigen::MatrixXd U_temp_;
   Eigen::MatrixXd X_temp_;
   double dt_;  // time step found by the solver
-  int N_ = 20;
+  int N_;
   double xf_[3 * INPUT_ORDER];
   double x0_[3 * INPUT_ORDER];
   double u0_[3];
-  double u_max_;
+  double v_max_;
+  double a_max_;
+  double j_max_;
 };
 
 //####Class SolverAccel
@@ -71,7 +73,7 @@ public:
   void set_x0(double x0[]);
   void set_u0(double u0[]);
   void set_xf(double xf[]);
-  void set_u_max(double u_max);
+  void set_max(double v_max, double a_max);
   void resetXandU();
 
 private:

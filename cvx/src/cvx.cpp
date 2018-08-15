@@ -60,6 +60,9 @@ using namespace JPS;
 #define STATE 0
 #define INPUT 1
 
+#define V_MAX 20
+#define A_MAX 2
+
 CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pub_CB)
   : nh_(nh), nh_replan_CB_(nh_replan_CB), nh_pub_CB_(nh_pub_CB)
 {
@@ -380,7 +383,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
             }*/
       solver_accel_.set_xf(xf_sphere);
       solver_accel_.set_x0(x0);
-      solver_accel_.set_u_max(u_max_);
+      solver_accel_.set_max(V_MAX, A_MAX);
       solver_accel_.set_u0(u0);
       solver_accel_.genNewTraj();
       U_temp_ = solver_accel_.getU();
@@ -420,9 +423,10 @@ void CVX::replanCB(const ros::TimerEvent& e)
   // printf("Time in replanCB %0.2f ms\n", 1000 * (ros::Time::now().toSec() - t0replanCB));
 }
 
-void SolverAccel::set_u_max(double u_max)
+void SolverAccel::set_max(double v_max, double a_max)
 {
-  u_max_ = u_max;
+  v_max_ = V_MAX;
+  a_max_ = A_MAX;
 }
 
 void SolverAccel::set_xf(double xf[])
@@ -494,6 +498,9 @@ void SolverAccel::genNewTraj()
 }
 SolverAccel::SolverAccel()
 {
+  v_max_ = 20;
+  a_max_ = 2;
+  N_ = 15;
   int size = (int)(N_)*dt_ / DC;
   X_temp_ = Eigen::MatrixXd::Zero(size, 6);
   U_temp_ = Eigen::MatrixXd::Zero(size, 6);
@@ -612,9 +619,9 @@ void SolverAccel::callOptimizer()
   // printf("In callOptimizer\n");
   bool converged = false;
   // TODO: Be careful because u_max can be accel, jerk,...Also, there may be constraints in vel_max if input is accel
-  float accelx = copysign(1, xf_[0] - x0_[0]) * u_max_;
-  float accely = copysign(1, xf_[1] - x0_[1]) * u_max_;
-  float accelz = copysign(1, xf_[2] - x0_[2]) * u_max_;
+  float accelx = copysign(1, xf_[0] - x0_[0]) * a_max_;
+  float accely = copysign(1, xf_[1] - x0_[1]) * a_max_;
+  float accelz = copysign(1, xf_[2] - x0_[2]) * a_max_;
   float v0x = x0_[3];
   float v0y = x0_[4];
   float v0z = x0_[5];
@@ -637,7 +644,7 @@ void SolverAccel::callOptimizer()
 
   while (!converged)
   {
-    Accel::load_default_data(dt, u_max_, x0_, xf_);
+    Accel::load_default_data(dt, v_max_, a_max_, x0_, xf_);
     int r = Accel::optimize();
     i = i + 1;
     if (r == 1)
@@ -690,7 +697,7 @@ void CVX::modeCB(const acl_msgs::QuadFlightMode& msg)
   if (msg.mode == msg.LAND && flight_mode_.mode != flight_mode_.LAND)
   {
     double xf[6] = { quadGoal_.pos.x, quadGoal_.pos.y, z_land_, 0, 0, 0 };
-    solver_accel_.set_u_max(u_min_);  // To land, I use u_min_
+    solver_accel_.set_max(V_MAX, A_MAX);  // TODO: To land, I use u_min_
     solver_accel_.set_xf(xf);
     solver_accel_.genNewTraj();
   }
