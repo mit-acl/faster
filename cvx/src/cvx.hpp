@@ -1,5 +1,4 @@
 #include "ros/ros.h"
-#include "solver.h"
 
 #include "visualization_msgs/Marker.h"
 #include "visualization_msgs/MarkerArray.h"
@@ -24,18 +23,69 @@
 #include <jps_basis/data_utils.h>
 #include <jps_planner/jps_planner/jps_planner.h>
 
+#define POS 0
+#define VEL 1
+#define ACCEL 2
+#define JERK 3
+
+namespace Accel  // When the input is acceleration
+{
+#include "solver_accel.h"
+}
+
 struct kdTreeStamped
 {
   pcl::KdTreeFLANN<pcl::PointXYZ> kdTree;
   ros::Time time;
 };
 
+//####Class Solver
+template <int INPUT_ORDER>
+class Solver
+{
+public:
+  void interpolate(int var, int input, double** u, double** x);
+  void obtainByDerivation(double** u, double** x);
+  Eigen::MatrixXd getX();
+  Eigen::MatrixXd getU();
+
+protected:
+  Eigen::MatrixXd U_temp_;
+  Eigen::MatrixXd X_temp_;
+  double dt_;  // time step found by the solver
+  int N_ = 20;
+  double xf_[3 * INPUT_ORDER];
+  double x0_[3 * INPUT_ORDER];
+  double u0_[3];
+  double u_max_;
+};
+
+//####Class SolverAccel
+class SolverAccel : public Solver<ACCEL>
+{
+public:
+  SolverAccel();
+  void genNewTraj();
+  void callOptimizer();
+  int checkConvergence(double xf_opt[]);
+  void set_x0(double x0[]);
+  void set_u0(double u0[]);
+  void set_xf(double xf[]);
+  void set_u_max(double u_max);
+  void resetXandU();
+
+private:
+};
+
+//####Class CVX
 class CVX
 {
 public:
   CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pub_CB);
 
 private:
+  SolverAccel solver_accel_;
+  int N_ = 20;
   // class methods
   void pubTraj(double** x);
   void pubTraj(Eigen::MatrixXd X);
@@ -45,17 +95,12 @@ private:
   void pubCB(const ros::TimerEvent& e);
   void replanCB(const ros::TimerEvent& e);
 
-  double callOptimizer(double u_max, double x0[], double xf[]);
-  int checkConvergence(double xf[], double xf_opt[]);
-  void genNewTraj(double u_max, double xf[]);
-  void interpInput(double dt, double xf[], double u0[], double x0[], double** u, double** x, Eigen::MatrixXd& U,
-                   Eigen::MatrixXd& X);
+  /*  void interpInput(double dt, double xf[], double u0[], double x0[], double** u, double** x, Eigen::MatrixXd& U,
+                     Eigen::MatrixXd& X);*/
 
   void interpBRETT(double dt, double xf[], double u0[], double x0[], double** u, double** x, Eigen::MatrixXd& U,
                    Eigen::MatrixXd& X);
 
-  void interpolate(int var, int input, double dt, double xf[], double u0[], double x0[], double** u, double** x);
-  void obtain_by_derivation(double dt, double xf[], double u0[], double x0[], double** u, double** x);
   visualization_msgs::Marker createMarkerLineStrip(Eigen::MatrixXd X);
   void createMarkerSetOfArrows(Eigen::MatrixXd X, bool isFree);
   void clearMarkerSetOfArrows();
@@ -68,7 +113,6 @@ private:
   Eigen::Vector3d createForceArrow(Eigen::Vector3d x, Eigen::Vector3d f_att, Eigen::Vector3d f_rep,
                                    visualization_msgs::MarkerArray* forces);
 
-  float solvePolyOrder2(Eigen::Vector3f coeff);
   geometry_msgs::Point pointOrigin();
   geometry_msgs::Point eigen2point(Eigen::Vector3d vector);
   void pubActualTraj();
@@ -121,7 +165,7 @@ private:
       X_temp_;  // Contains the intepolated input/states of a traj. If the traj. is free, it will be copied to U_, X_
   bool replan_, optimized_, use_ff_;
   double u_min_, u_max_, z_start_, spinup_time_, z_land_;
-  int N_ = 20;
+  // int N_ = 20;
   pcl::KdTreeFLANN<pcl::PointXYZ> kdtree_map_;  // kdtree of the point cloud of the map
   bool kdtree_map_initialized_ = 0;
   // vector that has all the kdtrees of the pclouds not included in the map:

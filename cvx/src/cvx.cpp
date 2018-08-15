@@ -34,6 +34,8 @@
 #include <algorithm>
 #include <vector>
 
+#include "utils.hpp"
+
 #include "mlinterp.hpp"
 
 using namespace JPS;
@@ -57,11 +59,6 @@ using namespace JPS;
 
 #define STATE 0
 #define INPUT 1
-
-#define POS 0
-#define VEL 1
-#define ACCEL 2
-#define JERK 3
 
 CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pub_CB)
   : nh_(nh), nh_replan_CB_(nh_replan_CB), nh_pub_CB_(nh_pub_CB)
@@ -113,7 +110,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   setpoint_.scale.z = 0.35;
   setpoint_.color = color(ORANGE_TRANS);
 
-  initialize_optimizer();
+  Accel::initialize_optimizer();
 
   term_goal_.pos = vectorNull();
 
@@ -356,9 +353,43 @@ void CVX::replanCB(const ros::TimerEvent& e)
       xf_sphere[0] = p2[0];
       xf_sphere[1] = p2[1];
       xf_sphere[2] = p2[2];
-      genNewTraj(u_max_, xf_sphere);  // Now X_temp_ has the stuff
+
+      double x0[6] = { nextQuadGoal_.pos.x, nextQuadGoal_.pos.y, nextQuadGoal_.pos.z,
+                       nextQuadGoal_.vel.x, nextQuadGoal_.vel.y, nextQuadGoal_.vel.z };
+      double u0[3] = { nextQuadGoal_.accel.x, nextQuadGoal_.accel.y, nextQuadGoal_.accel.z };
+
+      printf("x0   xf\n");
+      for (int i = 0; i < 6; i++)
+      {
+        printf("%f  %f\n", x0[i], xf_sphere[i]);
+      }
+      /*      printf("u0\n");
+            for (int i = 0; i < 3; i++)
+            {
+              printf("%f", u0[i]);
+            }
+            printf("xf_sphere\n");
+            for (int i = 0; i < 6; i++)
+            {
+              printf("%f\n", xf_sphere[i]);
+            }
+            printf("u_max_\n");
+            for (int i = 0; i < 6; i++)
+            {
+              printf("%f\n", u_max_);
+            }*/
+      solver_accel_.set_xf(xf_sphere);
+      solver_accel_.set_x0(x0);
+      solver_accel_.set_u_max(u_max_);
+      solver_accel_.set_u0(u0);
+      solver_accel_.genNewTraj();
+      U_temp_ = solver_accel_.getU();
+      X_temp_ = solver_accel_.getX();
+      // solver_accel_.genNewTraj(u_max_, xf_sphere);  // Now X_temp_ has the stuff
       bool isFree = trajIsFree(X_temp_);
+      // printf("Its free\n");
       createMarkerSetOfArrows(X_temp_, isFree);
+      // printf("Markers Created\n");
       if (isFree)
       {
         // printf("******Replanned!\n");
@@ -389,32 +420,62 @@ void CVX::replanCB(const ros::TimerEvent& e)
   // printf("Time in replanCB %0.2f ms\n", 1000 * (ros::Time::now().toSec() - t0replanCB));
 }
 
-void CVX::genNewTraj(double u_max, double xf[])
+void SolverAccel::set_u_max(double u_max)
 {
-  printf("Replanning with x0= %f, %f, %f\n", nextQuadGoal_.pos.x, nextQuadGoal_.pos.y, nextQuadGoal_.pos.z);
+  u_max_ = u_max;
+}
+
+void SolverAccel::set_xf(double xf[])
+{
+  for (int i = 0; i < 6; i++)
+  {
+    xf_[i] = xf[i];
+  }
+}
+
+void SolverAccel::set_x0(double x0[])
+{
+  for (int i = 0; i < 6; i++)
+  {
+    x0_[i] = x0[i];
+  }
+}
+
+void SolverAccel::set_u0(double u0[])
+{
+  for (int i = 0; i < 3; i++)
+  {
+    u0_[i] = u0[i];
+  }
+}
+
+void SolverAccel::genNewTraj()
+{
+  // printf("Replanning with x0= %f, %f, %f\n", nextQuadGoal_.pos.x, nextQuadGoal_.pos.y, nextQuadGoal_.pos.z);
 
   // printf("In genNewTraj\n");
-  double x0[6] = { nextQuadGoal_.pos.x, nextQuadGoal_.pos.y, nextQuadGoal_.pos.z,
-                   nextQuadGoal_.vel.x, nextQuadGoal_.vel.y, nextQuadGoal_.vel.z };
-  double u0[3] = { nextQuadGoal_.accel.x, nextQuadGoal_.accel.y, nextQuadGoal_.accel.z };
+  /*  */
 
   double then = ros::Time::now().toSec();
   // Call optimizer
-  double dt = callOptimizer(u_max, x0, xf);
+  callOptimizer();
   // ROS_WARN("solve time: %0.2f ms", 1000 * (ros::Time::now().toSec() - then));
-  double** x = get_state();
-  double** u = get_control();
-
+  double** x = Accel::get_state();
+  double** u = Accel::get_control();
   then = ros::Time::now().toSec();
+  // int size = (int)(N_)*dt_ / DC;
+  // U_temp_ = Eigen::MatrixXd::Zero(size, 6);
+  //  X_temp_ = Eigen::MatrixXd::Zero(size, 6);
 
-  int size = (int)(N_)*dt / DC;
-  U_temp_ = Eigen::MatrixXd::Zero(size, 6);
-  X_temp_ = Eigen::MatrixXd::Zero(size, 6);
-  interpolate(POS, ACCEL, dt, xf, u0, x0, u, x);    // interpolate POS when the input is acceleration*/
-  interpolate(VEL, ACCEL, dt, xf, u0, x0, u, x);    // ...
-  interpolate(ACCEL, ACCEL, dt, xf, u0, x0, u, x);  // ...
-  obtain_by_derivation(dt, xf, u0, x0, u, x);       // ...
-
+  resetXandU();
+  if (dt_ != 0)
+  {
+    // printf("Startint to Interpolate\n");
+    interpolate(POS, ACCEL, u, x);    // interpolate POS when the input is acceleration*/
+    interpolate(VEL, ACCEL, u, x);    // ...
+    interpolate(ACCEL, ACCEL, u, x);  // ...
+    obtainByDerivation(u, x);         // ...
+  }
   /*  printf("******MY INTERPOLATION\n");
     // std::cout << "X=\n" << X_temp_ << std::endl;
     std::cout << "U=\n" << U_temp_ << std::endl;
@@ -431,11 +492,33 @@ void CVX::genNewTraj(double u_max, double xf[])
   // ROS_INFO("%0.2f %0.2f %0.2f", X(X.rows()-1,0), X(X.rows()-1,1), X(X.rows()-1,2));
   // pubTraj(x);
 }
+SolverAccel::SolverAccel()
+{
+  int size = (int)(N_)*dt_ / DC;
+  X_temp_ = Eigen::MatrixXd::Zero(size, 6);
+  U_temp_ = Eigen::MatrixXd::Zero(size, 6);
+  for (int i = 0; i < 6; i++)
+  {
+    xf_[i] = 0;
+    x0_[i] = 0;
+  }
+}
+
+void SolverAccel::resetXandU()
+{
+  int size = (int)(N_)*dt_ / DC;
+  printf("entrando en reset, size=%d\n", size);
+  printf("entrando en reset, dt=%f\n", dt_);
+  U_temp_ = Eigen::MatrixXd::Zero(size, 6);
+  X_temp_ = Eigen::MatrixXd::Zero(size, 6);
+  printf("saliendo de reset\n");
+}
 
 // it obtains the variable with degree=degree_input+1
-void CVX::obtain_by_derivation(double dt, double xf[], double u0[], double x0[], double** u, double** x)
+template <int INPUT_ORDER>
+void Solver<INPUT_ORDER>::obtainByDerivation(double** u, double** x)
 {
-  int size = (int)(N_)*dt / DC;
+  int size = (int)(N_)*dt_ / DC;
   for (int i = 0; i < size - 1; i++)
   {
     U_temp_(i, 3) = (U_temp_(i + 1, 0) - U_temp_(i, 0)) / DC;
@@ -443,13 +526,25 @@ void CVX::obtain_by_derivation(double dt, double xf[], double u0[], double x0[],
     U_temp_(i, 5) = (U_temp_(i + 1, 2) - U_temp_(i, 2)) / DC;
   }
 }
+template <int INPUT_ORDER>
+Eigen::MatrixXd Solver<INPUT_ORDER>::getX()
+{
+  return X_temp_;
+}
 
+template <int INPUT_ORDER>
+Eigen::MatrixXd Solver<INPUT_ORDER>::getU()
+{
+  return U_temp_;
+}
+
+template <int INPUT_ORDER>
 // var is the type of variable to interpolate (POS=1, VEL=2, ACCEL=3,...)
-void CVX::interpolate(int var, int input, double dt, double xf[], double u0[], double x0[], double** u, double** x)
+void Solver<INPUT_ORDER>::interpolate(int var, int input, double** u, double** x)
 {
   int nxd = N_ + 1;  //+1 solo si estoy interpolando la input!!
   int nd[] = { nxd };
-  int ni = (int)(N_)*dt / DC;  // total number of points
+  int ni = (int)(N_)*dt_ / DC;  // total number of points
   double xd[nxd];
   double yd[nxd];
   double xi[ni];
@@ -467,20 +562,20 @@ void CVX::interpolate(int var, int input, double dt, double xf[], double u0[], d
     int column_x = axis + 3 * var;
     for (int i = 1; i < nxd; i++)
     {
-      xd[i] = i * dt;
+      xd[i] = i * dt_;
       yd[i] = (type_of_var == INPUT) ? u[i][axis] : x[i][column_x];
     }
 
     xd[0] = 0;
-    yd[0] = (type_of_var == INPUT) ? u0[axis] : x0[column_x];
+    yd[0] = (type_of_var == INPUT) ? u0_[axis] : x0_[column_x];
 
     /*    printf("ROJOS\n");
         for (int i = 0; i < nxd; i++)
         {
           printf("%f\n", yd[i]);
         }
-
-        printf("CVXGEN\n");
+*/
+    /*    printf("CVXGEN\n");
         for (int i = 1; i < N_; i++)
         {
           printf("%f  %f  %f\n", x[i][0], x[i][1], x[i][2]);
@@ -491,16 +586,20 @@ void CVX::interpolate(int var, int input, double dt, double xf[], double u0[], d
                      xd, xi   // Input axis (x)
     );
     // Force the last input to be 0, and the last state to be the final state:
-    yi[ni - 1] = (type_of_var == INPUT) ? 0 : xf[column_x];
+    yi[ni - 1] = (type_of_var == INPUT) ? 0 : xf_[column_x];
 
+    /*    printf("type_of_var=%d\n", type_of_var);
+        printf("type_of_var=%d\n", type_of_var);*/
     for (int n = 0; n < ni; ++n)
     {
       if (type_of_var == INPUT)
       {
+        // printf("assigning\n");
         U_temp_(n, axis) = yi[n];
       }
       if (type_of_var == STATE)
       {
+        // printf("assigning\n");
         X_temp_(n, column_x) = yi[n];
       }
       // printf("%f    %f\n", U(n, 0), yi[n]);
@@ -508,40 +607,43 @@ void CVX::interpolate(int var, int input, double dt, double xf[], double u0[], d
   }
 }
 
-double CVX::callOptimizer(double u_max, double x0[], double xf[])
+void SolverAccel::callOptimizer()
 {
   // printf("In callOptimizer\n");
   bool converged = false;
   // TODO: Be careful because u_max can be accel, jerk,...Also, there may be constraints in vel_max if input is accel
-  float accelx = copysign(1, xf[0] - x0[0]) * u_max;
-  float accely = copysign(1, xf[1] - x0[1]) * u_max;
-  float accelz = copysign(1, xf[2] - x0[2]) * u_max;
-  float v0x = x0[3];
-  float v0y = x0[4];
-  float v0z = x0[5];
-  float tx = solvePolyOrder2(Eigen::Vector3f(0.5 * accelx, v0x, x0[0] - xf[0]));  // Solve equation xf=x0+v0t+0.5*a*t^2
-  float ty = solvePolyOrder2(Eigen::Vector3f(0.5 * accely, v0y, x0[1] - xf[1]));
-  float tz = solvePolyOrder2(Eigen::Vector3f(0.5 * accelz, v0z, x0[2] - xf[2]));
+  float accelx = copysign(1, xf_[0] - x0_[0]) * u_max_;
+  float accely = copysign(1, xf_[1] - x0_[1]) * u_max_;
+  float accelz = copysign(1, xf_[2] - x0_[2]) * u_max_;
+  float v0x = x0_[3];
+  float v0y = x0_[4];
+  float v0z = x0_[5];
+  printf("x0_[0]=%f\n", x0_[0]);
+  printf("xf_[0]=%f\n", xf_[0]);
+  float tx =
+      solvePolyOrder2(Eigen::Vector3f(0.5 * accelx, v0x, x0_[0] - xf_[0]));  // Solve equation xf=x0+v0t+0.5*a*t^2
+  float ty = solvePolyOrder2(Eigen::Vector3f(0.5 * accely, v0y, x0_[1] - xf_[1]));
+  float tz = solvePolyOrder2(Eigen::Vector3f(0.5 * accelz, v0z, x0_[2] - xf_[2]));
   float dt_initial = std::max({ tx, ty, tz }) / N_;
-  if (dt_initial > std::numeric_limits<float>::max() -
-                       1)  // happens when there is no solution to the previous eq. -1 just to make sure
+  if (dt_initial > 100)  // happens when there is no solution to the previous eq.
   {
     dt_initial = 0;
   }
   // ROS_INFO("dt I found= %0.2f", dt_found);
   double dt = dt_initial;  // 0.025
+  ROS_INFO("empezando con, dt = %0.2f", dt);
   double** x;
   int i = 0;
 
   while (!converged)
   {
-    load_default_data(dt, u_max, x0, xf);
-    int r = optimize();
+    Accel::load_default_data(dt, u_max_, x0_, xf_);
+    int r = Accel::optimize();
     i = i + 1;
     if (r == 1)
     {
-      x = get_state();
-      int s = checkConvergence(xf, x[N_]);
+      x = Accel::get_state();
+      int s = checkConvergence(x[N_]);
       if (s == 1)
         converged = true;
       else
@@ -552,13 +654,13 @@ double CVX::callOptimizer(double u_max, double x0[], double xf[])
   }
 
   // ROS_INFO("Iterations = %d\n", i);
-  // ROS_INFO("converged, dt = %0.2f", dt);
+  ROS_INFO("converged, dt = %0.2f", dt);
   // printf("difference= %0.2f\n", dt - dt_initial);
-
-  return dt;
+  dt_ = dt;
+  // return dt;
 }
 
-int CVX::checkConvergence(double xf[], double xf_opt[])
+int SolverAccel::checkConvergence(double xf_opt[])
 {
   // printf("In checkConvergence\n");
   int r = 0;
@@ -567,8 +669,8 @@ int CVX::checkConvergence(double xf[], double xf_opt[])
 
   for (int i = 0; i < 3; i++)
   {
-    d += pow(xf[i] - xf_opt[i], 2);
-    dv += pow(xf[i + 3] - xf_opt[i + 3], 2);
+    d += pow(xf_[i] - xf_opt[i], 2);
+    dv += pow(xf_[i + 3] - xf_opt[i + 3], 2);
   }
 
   d = sqrt(d);
@@ -588,7 +690,9 @@ void CVX::modeCB(const acl_msgs::QuadFlightMode& msg)
   if (msg.mode == msg.LAND && flight_mode_.mode != flight_mode_.LAND)
   {
     double xf[6] = { quadGoal_.pos.x, quadGoal_.pos.y, z_land_, 0, 0, 0 };
-    genNewTraj(u_min_, xf);
+    solver_accel_.set_u_max(u_min_);  // To land, I use u_min_
+    solver_accel_.set_xf(xf);
+    solver_accel_.genNewTraj();
   }
   flight_mode_.mode = msg.mode;
 }
@@ -787,8 +891,9 @@ void CVX::pubTraj(Eigen::MatrixXd X)
 
 void CVX::createMarkerSetOfArrows(Eigen::MatrixXd X, bool isFree)
 {
-  // printf("In createMarkerSetOfArrows\n");
-
+  printf("In createMarkerSetOfArrows\n");
+  std::cout << "X=\n" << X << std::endl;
+  printf("PrintedX\n");
   geometry_msgs::Point p_last;
 
   p_last.x = X(0, 0);
@@ -1166,32 +1271,6 @@ std_msgs::ColorRGBA CVX::color(int id)
 
 // coeff is from highest degree to lowest degree. Returns the smallest positive real solution. Returns -1 if a
 // root is imaginary or if it's negative
-float CVX::solvePolyOrder2(Eigen::Vector3f coeff)
-{
-  // printf("In solvePolyOrder2\n");
-
-  // std::cout << "solving\n" << coeff << std::endl;
-  float a = coeff[0];
-  float b = coeff[1];
-  float c = coeff[2];
-  float dis = b * b - 4 * a * c;
-  if (dis >= 0)
-  {
-    float x1 = (-b - sqrt(dis)) / (2 * a);
-    float x2 = (-b + sqrt(dis)) / (2 * a);
-
-    if (x1 > 0)
-    {
-      return x1;
-    }
-    if (x2 > 0)
-    {
-      return x2;
-    }
-  }
-  ROS_ERROR("No solution found to the equation");
-  return std::numeric_limits<float>::max();
-}
 
 geometry_msgs::Point CVX::pointOrigin()
 {
