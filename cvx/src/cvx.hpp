@@ -50,6 +50,12 @@ private:
   void genNewTraj(double u_max, double xf[]);
   void interpInput(double dt, double xf[], double u0[], double x0[], double** u, double** x, Eigen::MatrixXd& U,
                    Eigen::MatrixXd& X);
+
+  void interpBRETT(double dt, double xf[], double u0[], double x0[], double** u, double** x, Eigen::MatrixXd& U,
+                   Eigen::MatrixXd& X);
+
+  void interpolate(int variable, double dt, double xf[], double u0[], double x0[], double** u, double** x,
+                   Eigen::MatrixXd& U, Eigen::MatrixXd& X);
   visualization_msgs::Marker createMarkerLineStrip(Eigen::MatrixXd X);
   void createMarkerSetOfArrows(Eigen::MatrixXd X, bool isFree);
   void clearMarkerSetOfArrows();

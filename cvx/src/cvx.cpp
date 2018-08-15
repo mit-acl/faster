@@ -34,13 +34,15 @@
 #include <algorithm>
 #include <vector>
 
+#include "mlinterp.hpp"
+
 using namespace JPS;
 
 // TODO: This values should be the same as the global_mapper.yaml
-#define WDX 60    //[m] world dimension in x
-#define WDY 60    //[m] world dimension in y
-#define WDZ 6     //[m] world dimension in z
-#define RES 0.35  //[m] cell dimension
+#define WDX 20    //[m] world dimension in x
+#define WDY 20    //[m] world dimension in y
+#define WDZ 4     //[m] world dimension in z
+#define RES 0.15  //[m] cell dimension
 
 #define RED 1
 #define GREEN 2
@@ -52,6 +54,9 @@ using namespace JPS;
 #define DC 0.01           //(seconds) Duration for the interpolation=Value of the timer pubGoal
 #define GOAL_RADIUS 0.2   //(m) Drone has arrived to the goal when distance_to_goal<GOAL_RADIUS
 #define DRONE_RADIUS 0.3  //(m) Used for collision checking
+
+#define STATE 0
+#define INPUT 1
 
 CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pub_CB)
   : nh_(nh), nh_replan_CB_(nh_replan_CB), nh_pub_CB_(nh_pub_CB)
@@ -105,9 +110,17 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
 
   initialize_optimizer();
 
-  term_goal_.pos.x = 0;
-  term_goal_.pos.y = 0;
-  term_goal_.pos.z = 0;
+  term_goal_.pos = vectorNull();
+
+  quadGoal_.pos = vectorNull();
+  quadGoal_.vel = vectorNull();
+  quadGoal_.accel = vectorNull();
+  quadGoal_.jerk = vectorNull();
+
+  nextQuadGoal_.pos = vectorNull();
+  nextQuadGoal_.vel = vectorNull();
+  nextQuadGoal_.accel = vectorNull();
+  nextQuadGoal_.jerk = vectorNull();
 
   markerID_ = 0;
 
@@ -139,7 +152,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
 
 void CVX::solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr)
 {
-  // printf("In solveJPSD\n");
+  printf("In solveJPSD\n");
   // Create a map
   const Vec3f start(state_.pos.x, state_.pos.y, state_.pos.z);
   const Vec3f goal(term_goal_.pos.x, term_goal_.pos.y, term_goal_.pos.z);
@@ -202,7 +215,7 @@ void CVX::solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr)
  for (const auto& it : path_astar)
    std::cout << it.transpose() << std::endl;
 */
-  // printf("Out\n");
+  printf("Out of solveJPSD\n");
   return;
 }
 
@@ -343,7 +356,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
       createMarkerSetOfArrows(X_temp_, isFree);
       if (isFree)
       {
-        printf("******Replanned!\n");
+        // printf("******Replanned!\n");
         X_ = X_temp_;
         U_ = U_temp_;
         replan_ = true;
@@ -388,7 +401,11 @@ void CVX::genNewTraj(double u_max, double xf[])
   double** u = get_control();
 
   then = ros::Time::now().toSec();
-  interpInput(dt, xf, u0, x0, u, x, U_temp_, X_temp_);
+
+  U_temp_ = Eigen::MatrixXd::Zero(size, 6);
+  X_temp_ = Eigen::MatrixXd::Zero(size, 6);
+  interpolate(INPUT, dt, xf, u0, x0, u, x);  // result saved in X_temp_ and U_temp_
+  interpolate(STATE, dt, xf, u0, x0, u, x);  // result saved in X_temp_ and U_temp_
   // ROS_WARN("interp time: %0.2f ms", 1000 * (ros::Time::now().toSec() - then));
 
   // ROS_INFO("%0.2f %0.2f %0.2f", x[N_-1][0], x[N_-1][1], x[N_-1][2]);
@@ -396,103 +413,49 @@ void CVX::genNewTraj(double u_max, double xf[])
   // pubTraj(x);
 }
 
-void CVX::interpInput(double dt, double xf[], double u0[], double x0[], double** u, double** x, Eigen::MatrixXd& U,
-                      Eigen::MatrixXd& X)
+void CVX::interpolate(int variable, double dt, double xf[], double u0[], double x0[], double** u, double** x)
 {
-  // printf("In interpInput\n");
-  // linearly interpolate between control input from optimizer
-  double dc = DC;
-  int size = (int)(N_)*dt / dc;
-  U = Eigen::MatrixXd::Zero(size, 6);
-  X = Eigen::MatrixXd::Zero(size, 6);
+  int nxd = N_ + 1;  //+1 solo si estoy interpolando la input!!
+  int nd[] = { nxd };
+  int ni = (int)(N_)*dt / dc;  // total number of points
+  double xd[nxd];
+  double yd[nxd];
+  double xi[ni];
+  double yi[ni];
 
-  int j = 1;
-  double s[3] = { (u[1][0] - u0[0]) / dt, (u[1][1] - u0[1]) / dt, (u[1][2] - u0[2]) / dt };
-
-  for (int i = 0; i < size; i++)
+  for (int n = 0; n < ni; ++n)
   {
-    if (i > 0 && dc * (i - 1) >= dt * (j))
-    {
-      j++;
-      s[0] = (u[j][0] - u[j - 1][0]) / dt;
-      s[1] = (u[j][1] - u[j - 1][1]) / dt;
-      s[2] = (u[j][2] - u[j - 1][2]) / dt;
-    }
-
-    if (j == 1)
-    {
-      U(i, 0) = s[0] * (dc * i) + u0[0];
-      U(i, 1) = s[1] * (dc * i) + u0[1];
-      U(i, 2) = s[2] * (dc * i) + u0[2];
-    }
-    else
-    {
-      U(i, 0) = s[0] * (dc * i - dt * (j - 1)) + u[j - 1][0];
-      U(i, 1) = s[1] * (dc * i - dt * (j - 1)) + u[j - 1][1];
-      U(i, 2) = s[2] * (dc * i - dt * (j - 1)) + u[j - 1][2];
-    }
+    xi[n] = n * DC;
   }
 
-  for (int i = 0; i < size - 1; i++)
+  for (int i = 1; i < nxd; i++)
   {
-    U(i, 3) = (U(i + 1, 0) - U(i, 0)) / dc;
-    U(i, 4) = (U(i + 1, 1) - U(i, 1)) / dc;
-    U(i, 5) = (U(i + 1, 2) - U(i, 2)) / dc;
+    xd[i] = i * dt;
+    yd[i] = (variable == INPUT) ? u[i][0] : x[i][0];
   }
+  xd[0] = 0;
+  yd[0] = (variable == INPUT) ? u0[0] : x0[0];
 
-  U.row(size - 1) << 0, 0, 0, 0, 0, 0;
+  mlinterp::interp(nd, ni,  // Number of points
+                   yd, yi,  // Output axis (y)
+                   xd, xi   // Input axis (x)
+  );
 
-  int k = 1;
-  double p[3] = { (x[1][0] - x0[0]) / dt, (x[1][1] - x0[1]) / dt, (x[1][2] - x0[2]) / dt };
-  double v[3] = { (x[1][3] - x0[3]) / dt, (x[1][4] - x0[4]) / dt, (x[1][5] - x0[5]) / dt };
+  yi[ni - 1] =
+      (variable == INPUT) ? 0 : xf[0];  // Force the last input to be 0, and the last state to be the final state
 
-  for (int i = 0; i < size; i++)
+  for (int n = 0; n < ni; ++n)
   {
-    if (i > 0 && dc * (i - 1) >= dt * k)
+    if (variable == INPUT)
     {
-      k++;
-      p[0] = (x[k][0] - x[k - 1][0]) / dt;
-      p[1] = (x[k][1] - x[k - 1][1]) / dt;
-      p[2] = (x[k][2] - x[k - 1][2]) / dt;
-      v[0] = (x[k][3] - x[k - 1][3]) / dt;
-      v[1] = (x[k][4] - x[k - 1][4]) / dt;
-      v[2] = (x[k][5] - x[k - 1][5]) / dt;
+      U_temp_(n, 0) = yi[n];
     }
-
-    if (k == 1)
+    if (variable == STATE)
     {
-      X(i, 0) = p[0] * (dc * i) + x0[0];
-      X(i, 1) = p[1] * (dc * i) + x0[1];
-      X(i, 2) = p[2] * (dc * i) + x0[2];
-      X(i, 3) = v[0] * (dc * i) + x0[3];
-      X(i, 4) = v[1] * (dc * i) + x0[4];
-      X(i, 5) = v[2] * (dc * i) + x0[5];
+      X_temp_(n, 0) = yi[n];
     }
-    else
-    {
-      X(i, 0) = p[0] * (dc * (i)-dt * (k - 1)) + x[k - 1][0];
-      X(i, 1) = p[1] * (dc * (i)-dt * (k - 1)) + x[k - 1][1];
-      X(i, 2) = p[2] * (dc * (i)-dt * (k - 1)) + x[k - 1][2];
-      X(i, 3) = v[0] * (dc * (i)-dt * (k - 1)) + x[k - 1][3];
-      X(i, 4) = v[1] * (dc * (i)-dt * (k - 1)) + x[k - 1][4];
-      X(i, 5) = v[2] * (dc * (i)-dt * (k - 1)) + x[k - 1][5];
-    }
+    // printf("%f    %f\n", U(n, 0), yi[n]);
   }
-
-  for (int i = 0; i < 6; i++)
-  {
-    X(size - 1, i) = xf[i];
-  }
-
-  // for (int i=1;i<21;i++){
-  //   ROS_INFO("%0.3f %0.3f %0.3f",x[i][0],x[i][3],u[i][0]);
-  // }
-
-  // std::cout << std::endl;
-
-  // for (int i=0;i<size;i++){
-  //   ROS_INFO("%0.3f %0.3f",X(i,0),X(i,3));
-  // }
 }
 
 double CVX::callOptimizer(double u_max, double x0[], double xf[])
@@ -538,7 +501,7 @@ double CVX::callOptimizer(double u_max, double x0[], double xf[])
       dt += 0.025;
   }
 
-  ROS_INFO("Iterations = %d\n", i);
+  // ROS_INFO("Iterations = %d\n", i);
   // ROS_INFO("converged, dt = %0.2f", dt);
   // printf("difference= %0.2f\n", dt - dt_initial);
 
@@ -679,7 +642,7 @@ void CVX::pubCB(const ros::TimerEvent& e)
   setpoint_.pose.position.x = quadGoal_.pos.x;
   setpoint_.pose.position.y = quadGoal_.pos.y;
   setpoint_.pose.position.z = quadGoal_.pos.z;
-  printf("Publicando Goal=%f, %f, %f\n", quadGoal_.pos.x, quadGoal_.pos.y, quadGoal_.pos.z);
+  // printf("Publicando Goal=%f, %f, %f\n", quadGoal_.pos.x, quadGoal_.pos.y, quadGoal_.pos.z);
   pub_setpoint_.publish(setpoint_);
   // printf("End pubCB\n");
   // printf("#########Time in pubCB %0.2f ms\n", 1000 * (ros::Time::now().toSec() - t0pubCB));
@@ -892,6 +855,7 @@ void CVX::pclCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
   }
 }
 
+// Occupied CB
 void CVX::mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 {
   // printf("In mapCB\n");
@@ -1238,4 +1202,93 @@ geometry_msgs::Vector3 CVX::vectorNull()
   tmp.x = 0;
   tmp.y = 0;
   tmp.z = 0;
+}
+
+void CVX::interpBRETT(double dt, double xf[], double u0[], double x0[], double** u, double** x, Eigen::MatrixXd& U,
+                      Eigen::MatrixXd& X)
+{
+  // printf("In interpInput\n");
+  // linearly interpolate between control input from optimizer
+  double dc = DC;
+  int size = (int)(N_)*dt / dc;
+  U = Eigen::MatrixXd::Zero(size, 6);
+  X = Eigen::MatrixXd::Zero(size, 6);
+
+  int j = 1;
+  double s[3] = { (u[1][0] - u0[0]) / dt, (u[1][1] - u0[1]) / dt, (u[1][2] - u0[2]) / dt };
+
+  for (int i = 0; i < size; i++)
+  {
+    if (i > 0 && dc * (i - 1) >= dt * (j))
+    {
+      j++;
+      s[0] = (u[j][0] - u[j - 1][0]) / dt;
+      s[1] = (u[j][1] - u[j - 1][1]) / dt;
+      s[2] = (u[j][2] - u[j - 1][2]) / dt;
+    }
+
+    if (j == 1)
+    {
+      U(i, 0) = s[0] * (dc * i) + u0[0];
+      U(i, 1) = s[1] * (dc * i) + u0[1];
+      U(i, 2) = s[2] * (dc * i) + u0[2];
+    }
+    else
+    {
+      U(i, 0) = s[0] * (dc * i - dt * (j - 1)) + u[j - 1][0];
+      U(i, 1) = s[1] * (dc * i - dt * (j - 1)) + u[j - 1][1];
+      U(i, 2) = s[2] * (dc * i - dt * (j - 1)) + u[j - 1][2];
+    }
+  }
+
+  for (int i = 0; i < size - 1; i++)
+  {
+    U(i, 3) = (U(i + 1, 0) - U(i, 0)) / dc;
+    U(i, 4) = (U(i + 1, 1) - U(i, 1)) / dc;
+    U(i, 5) = (U(i + 1, 2) - U(i, 2)) / dc;
+  }
+
+  U.row(size - 1) << 0, 0, 0, 0, 0, 0;
+
+  int k = 1;
+  double p[3] = { (x[1][0] - x0[0]) / dt, (x[1][1] - x0[1]) / dt, (x[1][2] - x0[2]) / dt };
+  double v[3] = { (x[1][3] - x0[3]) / dt, (x[1][4] - x0[4]) / dt, (x[1][5] - x0[5]) / dt };
+
+  for (int i = 0; i < size; i++)
+  {
+    if (i > 0 && dc * (i - 1) >= dt * k)
+    {
+      k++;
+      p[0] = (x[k][0] - x[k - 1][0]) / dt;
+      p[1] = (x[k][1] - x[k - 1][1]) / dt;
+      p[2] = (x[k][2] - x[k - 1][2]) / dt;
+      v[0] = (x[k][3] - x[k - 1][3]) / dt;
+      v[1] = (x[k][4] - x[k - 1][4]) / dt;
+      v[2] = (x[k][5] - x[k - 1][5]) / dt;
+    }
+
+    if (k == 1)
+    {
+      X(i, 0) = p[0] * (dc * i) + x0[0];
+      X(i, 1) = p[1] * (dc * i) + x0[1];
+      X(i, 2) = p[2] * (dc * i) + x0[2];
+      X(i, 3) = v[0] * (dc * i) + x0[3];
+      X(i, 4) = v[1] * (dc * i) + x0[4];
+      X(i, 5) = v[2] * (dc * i) + x0[5];
+    }
+    else
+    {
+      X(i, 0) = p[0] * (dc * (i)-dt * (k - 1)) + x[k - 1][0];
+      X(i, 1) = p[1] * (dc * (i)-dt * (k - 1)) + x[k - 1][1];
+      X(i, 2) = p[2] * (dc * (i)-dt * (k - 1)) + x[k - 1][2];
+      X(i, 3) = v[0] * (dc * (i)-dt * (k - 1)) + x[k - 1][3];
+      X(i, 4) = v[1] * (dc * (i)-dt * (k - 1)) + x[k - 1][4];
+      X(i, 5) = v[2] * (dc * (i)-dt * (k - 1)) + x[k - 1][5];
+    }
+  }
+
+  for (int i = 0; i < 6; i++)
+  {
+    X(size - 1, i) = xf[i];
+  }
 }
