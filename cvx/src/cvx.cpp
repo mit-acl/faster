@@ -58,6 +58,11 @@ using namespace JPS;
 #define STATE 0
 #define INPUT 1
 
+#define POS 0
+#define VEL 1
+#define ACCEL 2
+#define JERK 3
+
 CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pub_CB)
   : nh_(nh), nh_replan_CB_(nh_replan_CB), nh_pub_CB_(nh_pub_CB)
 {
@@ -402,10 +407,24 @@ void CVX::genNewTraj(double u_max, double xf[])
 
   then = ros::Time::now().toSec();
 
+  int size = (int)(N_)*dt / DC;
   U_temp_ = Eigen::MatrixXd::Zero(size, 6);
   X_temp_ = Eigen::MatrixXd::Zero(size, 6);
-  interpolate(INPUT, dt, xf, u0, x0, u, x);  // result saved in X_temp_ and U_temp_
-  interpolate(STATE, dt, xf, u0, x0, u, x);  // result saved in X_temp_ and U_temp_
+  interpolate(POS, ACCEL, dt, xf, u0, x0, u, x);    // interpolate POS when the input is acceleration*/
+  interpolate(VEL, ACCEL, dt, xf, u0, x0, u, x);    // ...
+  interpolate(ACCEL, ACCEL, dt, xf, u0, x0, u, x);  // ...
+  obtain_by_derivation(dt, xf, u0, x0, u, x);       // ...
+
+  /*  printf("******MY INTERPOLATION\n");
+    // std::cout << "X=\n" << X_temp_ << std::endl;
+    std::cout << "U=\n" << U_temp_ << std::endl;
+
+    printf("******BRETT'S INTERPOLATION\n");
+    U_temp_ = Eigen::MatrixXd::Zero(size, 6);
+    X_temp_ = Eigen::MatrixXd::Zero(size, 6);
+    interpBRETT(dt, xf, u0, x0, u, x, U_temp_, X_temp_);
+    // std::cout << "X=\n" << X_temp_ << std::endl;
+    std::cout << "U=\n" << U_temp_ << std::endl;*/
   // ROS_WARN("interp time: %0.2f ms", 1000 * (ros::Time::now().toSec() - then));
 
   // ROS_INFO("%0.2f %0.2f %0.2f", x[N_-1][0], x[N_-1][1], x[N_-1][2]);
@@ -413,48 +432,79 @@ void CVX::genNewTraj(double u_max, double xf[])
   // pubTraj(x);
 }
 
-void CVX::interpolate(int variable, double dt, double xf[], double u0[], double x0[], double** u, double** x)
+// it obtains the variable with degree=degree_input+1
+void CVX::obtain_by_derivation(double dt, double xf[], double u0[], double x0[], double** u, double** x)
+{
+  int size = (int)(N_)*dt / DC;
+  for (int i = 0; i < size - 1; i++)
+  {
+    U_temp_(i, 3) = (U_temp_(i + 1, 0) - U_temp_(i, 0)) / DC;
+    U_temp_(i, 4) = (U_temp_(i + 1, 1) - U_temp_(i, 1)) / DC;
+    U_temp_(i, 5) = (U_temp_(i + 1, 2) - U_temp_(i, 2)) / DC;
+  }
+}
+
+// var is the type of variable to interpolate (POS=1, VEL=2, ACCEL=3,...)
+void CVX::interpolate(int var, int input, double dt, double xf[], double u0[], double x0[], double** u, double** x)
 {
   int nxd = N_ + 1;  //+1 solo si estoy interpolando la input!!
   int nd[] = { nxd };
-  int ni = (int)(N_)*dt / dc;  // total number of points
+  int ni = (int)(N_)*dt / DC;  // total number of points
   double xd[nxd];
   double yd[nxd];
   double xi[ni];
   double yi[ni];
+  int type_of_var = (var < input) ? STATE : INPUT;
 
+  // printf("Tipo de variable=%d", type_of_var);
   for (int n = 0; n < ni; ++n)
   {
     xi[n] = n * DC;
   }
 
-  for (int i = 1; i < nxd; i++)
+  for (int axis = 0; axis < 3; axis++)  // var_x,var_y,var_z
   {
-    xd[i] = i * dt;
-    yd[i] = (variable == INPUT) ? u[i][0] : x[i][0];
-  }
-  xd[0] = 0;
-  yd[0] = (variable == INPUT) ? u0[0] : x0[0];
-
-  mlinterp::interp(nd, ni,  // Number of points
-                   yd, yi,  // Output axis (y)
-                   xd, xi   // Input axis (x)
-  );
-
-  yi[ni - 1] =
-      (variable == INPUT) ? 0 : xf[0];  // Force the last input to be 0, and the last state to be the final state
-
-  for (int n = 0; n < ni; ++n)
-  {
-    if (variable == INPUT)
+    int column_x = axis + 3 * var;
+    for (int i = 1; i < nxd; i++)
     {
-      U_temp_(n, 0) = yi[n];
+      xd[i] = i * dt;
+      yd[i] = (type_of_var == INPUT) ? u[i][axis] : x[i][column_x];
     }
-    if (variable == STATE)
+
+    xd[0] = 0;
+    yd[0] = (type_of_var == INPUT) ? u0[axis] : x0[column_x];
+
+    /*    printf("ROJOS\n");
+        for (int i = 0; i < nxd; i++)
+        {
+          printf("%f\n", yd[i]);
+        }
+
+        printf("CVXGEN\n");
+        for (int i = 1; i < N_; i++)
+        {
+          printf("%f  %f  %f\n", x[i][0], x[i][1], x[i][2]);
+        }*/
+
+    mlinterp::interp(nd, ni,  // Number of points
+                     yd, yi,  // Output axis (y)
+                     xd, xi   // Input axis (x)
+    );
+    // Force the last input to be 0, and the last state to be the final state:
+    yi[ni - 1] = (type_of_var == INPUT) ? 0 : xf[column_x];
+
+    for (int n = 0; n < ni; ++n)
     {
-      X_temp_(n, 0) = yi[n];
+      if (type_of_var == INPUT)
+      {
+        U_temp_(n, axis) = yi[n];
+      }
+      if (type_of_var == STATE)
+      {
+        X_temp_(n, column_x) = yi[n];
+      }
+      // printf("%f    %f\n", U(n, 0), yi[n]);
     }
-    // printf("%f    %f\n", U(n, 0), yi[n]);
   }
 }
 

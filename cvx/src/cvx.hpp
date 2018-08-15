@@ -54,8 +54,8 @@ private:
   void interpBRETT(double dt, double xf[], double u0[], double x0[], double** u, double** x, Eigen::MatrixXd& U,
                    Eigen::MatrixXd& X);
 
-  void interpolate(int variable, double dt, double xf[], double u0[], double x0[], double** u, double** x,
-                   Eigen::MatrixXd& U, Eigen::MatrixXd& X);
+  void interpolate(int var, int input, double dt, double xf[], double u0[], double x0[], double** u, double** x);
+  void obtain_by_derivation(double dt, double xf[], double u0[], double x0[], double** u, double** x);
   visualization_msgs::Marker createMarkerLineStrip(Eigen::MatrixXd X);
   void createMarkerSetOfArrows(Eigen::MatrixXd X, bool isFree);
   void clearMarkerSetOfArrows();
