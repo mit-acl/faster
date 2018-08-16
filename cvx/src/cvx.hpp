@@ -23,60 +23,13 @@
 #include <jps_basis/data_utils.h>
 #include <jps_planner/jps_planner/jps_planner.h>
 
-#define POS 0
-#define VEL 1
-#define ACCEL 2
-#define JERK 3
-
-namespace Accel  // When the input is acceleration
-{
-#include "solver_accel.h"
-}
+// Solvers includes
+#include "solvers/solvers.hpp"
 
 struct kdTreeStamped
 {
   pcl::KdTreeFLANN<pcl::PointXYZ> kdTree;
   ros::Time time;
-};
-
-//####Class Solver
-template <int INPUT_ORDER>
-class Solver
-{
-public:
-  void interpolate(int var, int input, double** u, double** x);
-  void obtainByDerivation(double** u, double** x);
-  Eigen::MatrixXd getX();
-  Eigen::MatrixXd getU();
-
-protected:
-  Eigen::MatrixXd U_temp_;
-  Eigen::MatrixXd X_temp_;
-  double dt_;  // time step found by the solver
-  int N_;
-  double xf_[3 * INPUT_ORDER];
-  double x0_[3 * INPUT_ORDER];
-  double u0_[3];
-  double v_max_;
-  double a_max_;
-  double j_max_;
-};
-
-//####Class SolverAccel
-class SolverAccel : public Solver<ACCEL>
-{
-public:
-  SolverAccel();
-  void genNewTraj();
-  void callOptimizer();
-  int checkConvergence(double xf_opt[]);
-  void set_x0(double x0[]);
-  void set_u0(double u0[]);
-  void set_xf(double xf[]);
-  void set_max(double v_max, double a_max);
-  void resetXandU();
-
-private:
 };
 
 //####Class CVX
@@ -182,4 +135,6 @@ private:
   Eigen::Vector3d directionJPS_;
 
   std::mutex mtx;
+
+  std::mutex mtx_goals;
 };
