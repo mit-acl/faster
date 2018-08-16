@@ -12,7 +12,7 @@ template <int INPUT_ORDER>
 class Solver
 {
 public:
-  void interpolate(int var, int input, double** u, double** x);
+  void interpolate(int var, double** u, double** x);
   void obtainByDerivation(double** u, double** x);
   Eigen::MatrixXd getX();
   Eigen::MatrixXd getU();
@@ -21,6 +21,10 @@ public:
   void set_xf(double xf[]);
   void resetXandU();
   void set_max(double max_values[INPUT_ORDER]);
+  bool checkConvergence(double xf_opt[3 * INPUT_ORDER]);
+  void genNewTraj();
+  void callOptimizer();
+  double getDTInitial();
 
 protected:
   Eigen::MatrixXd U_temp_;
@@ -40,9 +44,7 @@ class SolverAccel : public Solver<ACCEL>
 {
 public:
   SolverAccel();
-  void genNewTraj();
-  void callOptimizer();
-  int checkConvergence(double xf_opt[]);
+
   void interpBRETT(double dt, double xf[], double u0[], double x0[], double** u, double** x, Eigen::MatrixXd& U,
                    Eigen::MatrixXd& X);
 
@@ -133,8 +135,47 @@ void Solver<INPUT_ORDER>::set_max(double max_values[INPUT_ORDER])
 }
 
 template <int INPUT_ORDER>
+bool Solver<INPUT_ORDER>::checkConvergence(double xf_opt[3 * INPUT_ORDER])
+{
+  bool converged = false;
+  float d2 = 0;   // distance in position squared
+  float dv2 = 0;  // distance in velocity squared
+  float da2 = 0;  // distance in acceleration squared
+
+  switch (INPUT_ORDER)
+  {
+    case VEL:
+      for (int i = 0; i < 3; i++)
+      {
+        d2 += pow(xf_[i] - xf_opt[i], 2);
+      }
+      converged = (sqrt(d2) < 0.2) ? true : false;
+      break;
+    case ACCEL:
+      for (int i = 0; i < 3; i++)
+      {
+        d2 += pow(xf_[i] - xf_opt[i], 2);
+        dv2 += pow(xf_[i + 3] - xf_opt[i + 3], 2);
+      }
+      converged = (sqrt(d2) < 0.2 && sqrt(dv2) < 0.2) ? true : false;
+      break;
+    case JERK:
+      for (int i = 0; i < 3; i++)
+      {
+        d2 += pow(xf_[i] - xf_opt[i], 2);
+        dv2 += pow(xf_[i + 3] - xf_opt[i + 3], 2);
+        da2 += pow(xf_[i + 6] - xf_opt[i + 6], 2);
+      }
+      converged = (sqrt(d2) < 0.2 && sqrt(dv2) < 0.2 && sqrt(da2) < 0.2) ? true : false;
+      break;
+  }
+
+  return converged;
+}
+
+template <int INPUT_ORDER>
 // var is the type of variable to interpolate (POS=1, VEL=2, ACCEL=3,...)
-void Solver<INPUT_ORDER>::interpolate(int var, int input, double** u, double** x)
+void Solver<INPUT_ORDER>::interpolate(int var, double** u, double** x)
 {
   int nxd = N_ + 1;
   int nd[] = { nxd };
@@ -143,7 +184,7 @@ void Solver<INPUT_ORDER>::interpolate(int var, int input, double** u, double** x
   double yd[nxd];
   double xi[ni];
   double yi[ni];
-  int type_of_var = (var < input) ? STATE : INPUT;
+  int type_of_var = (var < INPUT_ORDER) ? STATE : INPUT;
 
   // printf("Tipo de variable=%d", type_of_var);
   for (int n = 0; n < ni; ++n)
@@ -199,6 +240,118 @@ void Solver<INPUT_ORDER>::interpolate(int var, int input, double** u, double** x
       // printf("%f    %f\n", U(n, 0), yi[n]);
     }
   }
+}
+
+template <int INPUT_ORDER>
+void Solver<INPUT_ORDER>::genNewTraj()
+{
+  callOptimizer();
+  resetXandU();
+  double** x;
+  double** u;
+  switch (INPUT_ORDER)
+  {
+    case VEL:
+      printf("Not implemented yet!");
+      // double** x = Vel::get_state();
+      // double** u = Vel::get_control();
+      // interpolate(POS, u, x);  // interpolate POS when the input is acceleration*/
+      // interpolate(VEL, u, x);  // ...
+      // obtainByDerivation(u, x);
+      break;
+    case ACCEL:
+      x = Accel::get_state();
+      u = Accel::get_control();
+      interpolate(POS, u, x);    // interpolate POS when the input is acceleration*/
+      interpolate(VEL, u, x);    // ...
+      interpolate(ACCEL, u, x);  // ...
+      obtainByDerivation(u, x);
+      break;
+    case JERK:
+      printf("Not implemented yet!");
+      // double** x = Jerk::get_state();
+      // double** u = Jerk::get_control();
+      // interpolate(POS, u, x);    // interpolate POS when the input is acceleration*/
+      // interpolate(VEL, u, x);    // ...
+      // interpolate(ACCEL, u, x);  // ...
+      // interpolate(Jerk, u, x);
+      break;
+  }
+}
+
+template <int INPUT_ORDER>
+void Solver<INPUT_ORDER>::callOptimizer()
+{
+  // printf("In callOptimizer\n");
+  bool converged = false;
+
+  // ROS_INFO("dt I found= %0.2f", dt_found);
+  double dt = getDTInitial();  // 0.025
+                               // ROS_INFO("empezando con, dt = %0.2f", dt);
+  double** x;
+  int i = 0;
+
+  while (!converged)
+  {
+    Accel::load_default_data(dt, v_max_, a_max_, x0_, xf_);
+    int r = Accel::optimize();
+    i = i + 1;
+    if (r == 1)
+    {
+      x = Accel::get_state();
+      bool s = checkConvergence(x[N_]);
+      if (s == 1)
+        converged = true;
+      else
+        dt += 0.025;
+    }
+    else
+      dt += 0.025;
+  }
+
+  // ROS_INFO("Iterations = %d\n", i);
+  // ROS_INFO("converged, dt = %0.2f", dt);
+  dt_ = dt;
+}
+
+template <int INPUT_ORDER>
+double Solver<INPUT_ORDER>::getDTInitial()
+{
+  double dt_initial;
+  switch (INPUT_ORDER)
+  {
+    case VEL:
+    {
+      printf("Not implemented yet!");
+      break;
+    }
+    case ACCEL:
+    {
+      // TODO: Be careful with constraints also in velocity?
+      float accelx = copysign(1, xf_[0] - x0_[0]) * a_max_;
+      float accely = copysign(1, xf_[1] - x0_[1]) * a_max_;
+      float accelz = copysign(1, xf_[2] - x0_[2]) * a_max_;
+      float v0x = x0_[3];
+      float v0y = x0_[4];
+      float v0z = x0_[5];
+      float tx =
+          solvePolyOrder2(Eigen::Vector3f(0.5 * accelx, v0x, x0_[0] - xf_[0]));  // Solve equation xf=x0+v0t+0.5*a*t^2
+      float ty = solvePolyOrder2(Eigen::Vector3f(0.5 * accely, v0y, x0_[1] - xf_[1]));
+      float tz = solvePolyOrder2(Eigen::Vector3f(0.5 * accelz, v0z, x0_[2] - xf_[2]));
+      dt_initial = std::max({ tx, ty, tz }) / N_;
+      if (dt_initial > 100)  // happens when there is no solution to the previous eq.
+      {
+        dt_initial = 0;
+      }
+      break;
+    }
+    case JERK:
+    {
+      printf("Not implemented yet!");
+      break;
+    }
+  }
+  return dt_initial;
 }
 
 #endif
