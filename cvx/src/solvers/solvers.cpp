@@ -34,27 +34,27 @@ void SolverAccel::genNewTraj()
   //  X_temp_ = Eigen::MatrixXd::Zero(size, 6);
 
   resetXandU();
-  // if (dt_ != 0)
-  //{
-  //  interpolate(POS, ACCEL, u, x);    // interpolate POS when the input is acceleration*/
-  // interpolate(VEL, ACCEL, u, x);    // ...
-  // interpolate(ACCEL, ACCEL, u, x);  // ...
-  // obtainByDerivation(u, x);         // ...
-  //}
+  if (dt_ != 0)
+  {
+    interpolate(POS, ACCEL, u, x);    // interpolate POS when the input is acceleration*/
+    interpolate(VEL, ACCEL, u, x);    // ...
+    interpolate(ACCEL, ACCEL, u, x);  // ...
+    obtainByDerivation(u, x);         // ...
+  }
   //  printf("******MY INTERPOLATION\n");
   // std::cout << "X=\n" << X_temp_ << std::endl;
   // std::cout << "U=\n" << U_temp_ << std::endl;
 
-  printf("*****CVXGEN\n");
-  for (int i = 1; i < 15; i++)
-  {
-    printf("%0.2f  %0.2f  %0.2f\n", x[i][3], x[i][4], x[i][5]);
-  }
+  /*  printf("*****CVXGEN\n");
+    for (int i = 1; i < 15; i++)
+    {
+      printf("%0.2f  %0.2f  %0.2f\n", x[i][3], x[i][4], x[i][5]);
+    }*/
 
   // printf("******BRETT'S INTERPOLATION\n");
   // U_temp_ = Eigen::MatrixXd::Zero(size, 6);
   // X_temp_ = Eigen::MatrixXd::Zero(size, 6);
-  interpBRETT(dt_, xf_, u0_, x0_, u, x, U_temp_, X_temp_);
+  // interpBRETT(dt_, xf_, u0_, x0_, u, x, U_temp_, X_temp_);
   // std::cout << "X=\n" << X_temp_ << std::endl;
   // std::cout << "U=\n" << U_temp_ << std::endl;
   // ROS_WARN("interp time: %0.2f ms", 1000 * (ros::Time::now().toSec() - then));
