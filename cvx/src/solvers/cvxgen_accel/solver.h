@@ -4,12 +4,14 @@
 /* CVXGEN, or solvers produced by CVXGEN, cannot be used for commercial */
 /* applications without prior written permission from Jacob Mattingley. */
 #ifdef __cplusplus
+namespace Accel
+{
 extern "C" {
 #endif
 /* Filename: solver.h. */
 /* Description: Header file with relevant definitions. */
-#ifndef SOLVER_H
-#define SOLVER_H
+#ifndef SOLVER_ACCEL_H
+#define SOLVER_ACCEL_H
 /* Uncomment the next line to remove all library dependencies. */
 /*#define ZERO_LIBRARY_MODE */
 #ifdef MATLAB_MEX_FILE
@@ -261,5 +263,6 @@ void reset_rand(void);
 #endif
 
 #ifdef __cplusplus
+}
 }
 #endif

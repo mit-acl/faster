@@ -20,6 +20,7 @@ int initialize_optimizer(void)
 
 int optimize(void)
 {
+  printf("in optimize accel\n");
   solve();
   // for(i=1;i<19;i++){
   // printf("%0.2f %0.2f %0.2f \n",vars.x[i][0],vars.x[i][3],vars.u[i][0]);
@@ -40,6 +41,7 @@ double** get_control(void)
 
 void load_default_data(double dt, double v_max, double a_max, double x0[], double xf[])
 {
+  printf("loading data accel\n");
   // double dt = 0.5;
   double q = 100000;
   params.xf[0] = xf[0];

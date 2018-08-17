@@ -39,8 +39,8 @@ public:
   CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pub_CB);
 
 private:
-  SolverAccel solver_accel_;
-  int N_ = 20;
+  Solver<ACCEL> solver_accel_;
+  Solver<JERK> solver_jerk_;
   // class methods
   void pubTraj(double** x);
   void pubTraj(Eigen::MatrixXd X);
@@ -64,17 +64,17 @@ private:
   void pclCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg);
   bool trajIsFree(Eigen::MatrixXd X);
   Eigen::Vector3d computeForce(Eigen::Vector3d x, Eigen::Vector3d g);
-  std_msgs::ColorRGBA color(int id);
+  // std_msgs::ColorRGBA color(int id);
   Eigen::Vector3d createForceArrow(Eigen::Vector3d x, Eigen::Vector3d f_att, Eigen::Vector3d f_rep,
                                    visualization_msgs::MarkerArray* forces);
 
-  geometry_msgs::Point pointOrigin();
-  geometry_msgs::Point eigen2point(Eigen::Vector3d vector);
+  // geometry_msgs::Point pointOrigin();
+  // geometry_msgs::Point eigen2point(Eigen::Vector3d vector);
   void pubActualTraj();
   void solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr);
   void vectorOfVectors2MarkerArray(vec_Vecf<3> traj, visualization_msgs::MarkerArray* m_array);
   visualization_msgs::MarkerArray clearArrows();
-  geometry_msgs::Vector3 vectorNull();
+  // geometry_msgs::Vector3 vectorNull();
   geometry_msgs::Vector3 getPos(int i);
   geometry_msgs::Vector3 getVel(int i);
   geometry_msgs::Vector3 getAccel(int i);

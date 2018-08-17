@@ -86,7 +86,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   setpoint_.scale.z = 0.35;
   setpoint_.color = color(ORANGE_TRANS);
 
-  Accel::initialize_optimizer();
+  Jerk::jerk_initialize_optimizer();
 
   term_goal_.pos = vectorNull();
 
@@ -325,39 +325,44 @@ void CVX::replanCB(const ros::TimerEvent& e)
         continue;
       }
 
-      double xf_sphere[6] = { 0, 0, 0, 0, 0, 0 };
-      xf_sphere[0] = p2[0];
-      xf_sphere[1] = p2[1];
-      xf_sphere[2] = p2[2];
+      // Solver ACCEL
+      /*      double xf_sphere[6] = { p2[0], p2[1], p2[2], 0, 0, 0 };
+            mtx_goals.lock();
+            double x0[6] = { nextQuadGoal_.pos.x, nextQuadGoal_.pos.y, nextQuadGoal_.pos.z,
+                             nextQuadGoal_.vel.x, nextQuadGoal_.vel.y, nextQuadGoal_.vel.z };
+            double u0[3] = { nextQuadGoal_.accel.x, nextQuadGoal_.accel.y, nextQuadGoal_.accel.z };
+            mtx_goals.unlock();
+            solver_accel_.set_xf(xf_sphere);
+            solver_accel_.set_x0(x0);
+            double max_values[2] = { V_MAX, A_MAX };
+            solver_accel_.set_max(max_values);
+            solver_accel_.set_u0(u0);
+            solver_accel_.genNewTraj();
+            U_temp_ = solver_accel_.getU();
+            X_temp_ = solver_accel_.getX();*/
 
+      // Solver JERK
+      double xf_sphere[9] = { p2[0], p2[1], p2[2], 0, 0, 0, 0, 0, 0 };
       mtx_goals.lock();
-      /*      ROS_INFO("Antes de asignar x0, nQG: %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", nextQuadGoal_.pos.x,
-                     nextQuadGoal_.pos.y, nextQuadGoal_.pos.z, nextQuadGoal_.vel.x, nextQuadGoal_.vel.y,
-         nextQuadGoal_.vel.z);*/
+      double x0[9] = { nextQuadGoal_.pos.x,   nextQuadGoal_.pos.y,   nextQuadGoal_.pos.z,
+                       nextQuadGoal_.vel.x,   nextQuadGoal_.vel.y,   nextQuadGoal_.vel.z,
+                       nextQuadGoal_.accel.x, nextQuadGoal_.accel.y, nextQuadGoal_.accel.z };
 
-      double x0[6] = { nextQuadGoal_.pos.x, nextQuadGoal_.pos.y, nextQuadGoal_.pos.z,
-                       nextQuadGoal_.vel.x, nextQuadGoal_.vel.y, nextQuadGoal_.vel.z };
-      double u0[3] = { nextQuadGoal_.accel.x, nextQuadGoal_.accel.y, nextQuadGoal_.accel.z };
+      double u0[3] = { nextQuadGoal_.jerk.x, nextQuadGoal_.jerk.y, nextQuadGoal_.jerk.z };
       mtx_goals.unlock();
-      printf("x0   xf\n");
-      for (int i = 0; i < 6; i++)
-      {
-        printf("%0.2f  %0.2f\n", x0[i], xf_sphere[i]);
-      }
+      solver_jerk_.set_xf(xf_sphere);
+      solver_jerk_.set_x0(x0);
+      double max_values[3] = { V_MAX, A_MAX, J_MAX };
+      solver_jerk_.set_max(max_values);
+      solver_jerk_.set_u0(u0);
+      printf("generando new Traj\n");
+      solver_jerk_.genNewTraj();
+      printf("generated\n");
+      U_temp_ = solver_jerk_.getU();
+      X_temp_ = solver_jerk_.getX();
 
-      solver_accel_.set_xf(xf_sphere);
-      solver_accel_.set_x0(x0);
-      double max_values[2] = { V_MAX, A_MAX };
-      solver_accel_.set_max(max_values);
-      solver_accel_.set_u0(u0);
-      solver_accel_.genNewTraj();
-      U_temp_ = solver_accel_.getU();
-      X_temp_ = solver_accel_.getX();
-      // solver_accel_.genNewTraj(u_max_, xf_sphere);  // Now X_temp_ has the stuff
       bool isFree = trajIsFree(X_temp_);
-      // printf("Its free\n");
       createMarkerSetOfArrows(X_temp_, isFree);
-      // printf("Markers Created\n");
       if (isFree)
       {
         // printf("******Replanned!\n");
@@ -393,11 +398,19 @@ void CVX::modeCB(const acl_msgs::QuadFlightMode& msg)
   // printf("In modeCB\n");
   if (msg.mode == msg.LAND && flight_mode_.mode != flight_mode_.LAND)
   {
-    double xf[6] = { quadGoal_.pos.x, quadGoal_.pos.y, z_land_, 0, 0, 0 };
-    double max_values[2] = { V_MAX, A_MAX };
-    solver_accel_.set_max(max_values);  // TODO: To land, I use u_min_
-    solver_accel_.set_xf(xf);
-    solver_accel_.genNewTraj();
+    /*    //Solver Accel
+        double xf[6] = { quadGoal_.pos.x, quadGoal_.pos.y, z_land_, 0, 0, 0 };
+        double max_values[2] = { V_MAX, A_MAX };
+        solver_accel_.set_max(max_values);  // TODO: To land, I use u_min_
+        solver_accel_.set_xf(xf);
+        solver_accel_.genNewTraj();*/
+
+    // Solver Jerk
+    double xf[9] = { quadGoal_.pos.x, quadGoal_.pos.y, z_land_, 0, 0, 0, 0, 0, 0 };
+    double max_values[3] = { V_MAX, A_MAX, J_MAX };
+    solver_jerk_.set_max(max_values);  // TODO: To land, I use u_min_
+    solver_jerk_.set_xf(xf);
+    solver_jerk_.genNewTraj();
   }
   flight_mode_.mode = msg.mode;
 }
@@ -421,9 +434,6 @@ void CVX::stateCB(const acl_msgs::State& msg)
 void CVX::pubCB(const ros::TimerEvent& e)
 {
   mtx_goals.lock();
-  // printf("In pubCB\n");
-
-  // double t0pubCB = ros::Time::now().toSec();
 
   if (flight_mode_.mode == flight_mode_.LAND)
   {
@@ -434,8 +444,6 @@ void CVX::pubCB(const ros::TimerEvent& e)
       flight_mode_.mode = flight_mode_.NOT_FLYING;
     }
   }
-
-  // printf("In pubCB2\n");
 
   quadGoal_.header.stamp = ros::Time::now();
   quadGoal_.header.frame_id = "world";
@@ -493,10 +501,10 @@ void CVX::pubCB(const ros::TimerEvent& e)
   }
 
   // printf("In pubCB5\n");
-  ROS_INFO("publishing quadGoal: %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", quadGoal_.pos.x, quadGoal_.pos.y,
-           quadGoal_.pos.z, quadGoal_.vel.x, quadGoal_.vel.y, quadGoal_.vel.z);
-  ROS_INFO("(y nextQuadGoal_): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", nextQuadGoal_.pos.x, nextQuadGoal_.pos.y,
-           nextQuadGoal_.pos.z, nextQuadGoal_.vel.x, nextQuadGoal_.vel.y, nextQuadGoal_.vel.z);
+  /*  ROS_INFO("publishing quadGoal: %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", quadGoal_.pos.x, quadGoal_.pos.y,
+             quadGoal_.pos.z, quadGoal_.vel.x, quadGoal_.vel.y, quadGoal_.vel.z);
+    ROS_INFO("(y nextQuadGoal_): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", nextQuadGoal_.pos.x, nextQuadGoal_.pos.y,
+             nextQuadGoal_.pos.z, nextQuadGoal_.vel.x, nextQuadGoal_.vel.y, nextQuadGoal_.vel.z);*/
 
   pub_goal_.publish(quadGoal_);
 
@@ -514,6 +522,7 @@ void CVX::pubCB(const ros::TimerEvent& e)
 
 geometry_msgs::Vector3 CVX::getPos(int i)
 {
+  int input_order = solver_jerk_.getOrder();
   geometry_msgs::Vector3 tmp;
   tmp.x = X_(i, 0);
   tmp.y = X_(i, 1);
@@ -523,28 +532,75 @@ geometry_msgs::Vector3 CVX::getPos(int i)
 
 geometry_msgs::Vector3 CVX::getVel(int i)
 {
+  int input_order = solver_jerk_.getOrder();
   geometry_msgs::Vector3 tmp;
-  tmp.x = X_(i, 3);
-  tmp.y = X_(i, 4);
-  tmp.z = X_(i, 5);
+  switch (input_order)
+  {
+    case VEL:
+      tmp.x = U_(i, 0);
+      tmp.y = U_(i, 1);
+      tmp.z = U_(i, 2);
+      break;
+    case ACCEL:
+      tmp.x = X_(i, 3);
+      tmp.y = X_(i, 4);
+      tmp.z = X_(i, 5);
+      break;
+    case JERK:
+      tmp.x = X_(i, 3);
+      tmp.y = X_(i, 4);
+      tmp.z = X_(i, 5);
+      break;
+  }
   return tmp;
 }
 
 geometry_msgs::Vector3 CVX::getAccel(int i)
 {
+  int input_order = solver_jerk_.getOrder();
   geometry_msgs::Vector3 tmp;
-  tmp.x = U_(i, 0);
-  tmp.y = U_(i, 1);
-  tmp.z = U_(i, 2);
+
+  switch (input_order)
+  {
+    case VEL:
+      tmp.x = U_(i, 3);
+      tmp.y = U_(i, 4);
+      tmp.z = U_(i, 5);
+      break;
+    case ACCEL:
+      tmp.x = U_(i, 0);
+      tmp.y = U_(i, 1);
+      tmp.z = U_(i, 2);
+    case JERK:
+      tmp.x = X_(i, 6);
+      tmp.y = X_(i, 7);
+      tmp.z = X_(i, 8);
+      break;
+  }
+
   return tmp;
 }
 
 geometry_msgs::Vector3 CVX::getJerk(int i)
 {
+  int input_order = solver_jerk_.getOrder();
   geometry_msgs::Vector3 tmp;
-  tmp.x = U_(i, 3);
-  tmp.y = U_(i, 4);
-  tmp.z = U_(i, 5);
+
+  switch (input_order)
+  {
+    case VEL:
+      printf("JERK is not available\n");
+      break;
+    case ACCEL:
+      tmp.x = U_(i, 3);
+      tmp.y = U_(i, 4);
+      tmp.z = U_(i, 5);
+    case JERK:
+      tmp.x = U_(i, 0);
+      tmp.y = U_(i, 1);
+      tmp.z = U_(i, 2);
+      break;
+  }
   return tmp;
 }
 
@@ -558,8 +614,8 @@ void CVX::pubTraj(double** x)
   traj.header.frame_id = "world";
 
   geometry_msgs::PoseStamped temp_path;
-
-  for (int i = 1; i < N_; i++)
+  int N = solver_jerk_.getN();
+  for (int i = 1; i < N; i++)
   {
     temp_path.pose.position.x = x[i][0];
     temp_path.pose.position.y = x[i][1];
@@ -920,84 +976,6 @@ Eigen::Vector3d CVX::createForceArrow(Eigen::Vector3d x, Eigen::Vector3d f_att, 
   }
 }
 
-std_msgs::ColorRGBA CVX::color(int id)
-{
-  std_msgs::ColorRGBA red;
-  red.r = 1;
-  red.g = 0;
-  red.b = 0;
-  red.a = 1;
-  std_msgs::ColorRGBA blue;
-  blue.r = 0;
-  blue.g = 0;
-  blue.b = 1;
-  blue.a = 1;
-  std_msgs::ColorRGBA blue_light;
-  blue_light.r = 0.5;
-  blue_light.g = 0.7;
-  blue_light.b = 1;
-  blue_light.a = 1;
-  std_msgs::ColorRGBA green;
-  green.r = 0;
-  green.g = 1;
-  green.b = 0;
-  green.a = 1;
-  std_msgs::ColorRGBA yellow;
-  yellow.r = 1;
-  yellow.g = 1;
-  yellow.b = 0;
-  yellow.a = 1;
-  std_msgs::ColorRGBA orange_trans;  // orange transparent
-  orange_trans.r = 1;
-  orange_trans.g = 0.5;
-  orange_trans.b = 0;
-  orange_trans.a = 0.7;
-  switch (id)
-  {
-    case RED:
-      return red;
-      break;
-    case BLUE:
-      return blue;
-      break;
-    case BLUE_LIGHT:
-      return blue_light;
-      break;
-    case GREEN:
-      return green;
-      break;
-    case YELLOW:
-      return yellow;
-      break;
-    case ORANGE_TRANS:
-      return orange_trans;
-      break;
-    default:
-      ROS_ERROR("COLOR NOT DEFINED");
-  }
-}
-
-// coeff is from highest degree to lowest degree. Returns the smallest positive real solution. Returns -1 if a
-// root is imaginary or if it's negative
-
-geometry_msgs::Point CVX::pointOrigin()
-{
-  geometry_msgs::Point tmp;
-  tmp.x = 0;
-  tmp.y = 0;
-  tmp.z = 0;
-  return tmp;
-}
-
-geometry_msgs::Point CVX::eigen2point(Eigen::Vector3d vector)
-{
-  geometry_msgs::Point tmp;
-  tmp.x = vector[0];
-  tmp.y = vector[1];
-  tmp.z = vector[2];
-  return tmp;
-}
-
 void CVX::pubActualTraj()
 {
   // printf("In pubActualTraj\n");
@@ -1031,12 +1009,4 @@ void CVX::pubActualTraj()
   m.points.push_back(p);
   pub_actual_traj_.publish(m);
   p_last = p;
-}
-
-geometry_msgs::Vector3 CVX::vectorNull()
-{
-  geometry_msgs::Vector3 tmp;
-  tmp.x = 0;
-  tmp.y = 0;
-  tmp.z = 0;
 }

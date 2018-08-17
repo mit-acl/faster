@@ -1,15 +1,26 @@
-/* Produced by CVXGEN, 2018-08-16 22:17:48 -0400.  */
+/* Produced by CVXGEN, 2018-08-16 18:14:51 -0400.  */
 /* CVXGEN is Copyright (C) 2006-2017 Jacob Mattingley, jem@cvxgen.com. */
 /* The code in this file is Copyright (C) 2006-2017 Jacob Mattingley. */
 /* CVXGEN, or solvers produced by CVXGEN, cannot be used for commercial */
 /* applications without prior written permission from Jacob Mattingley. */
+
+#define CONCATENATE_INPUT(x) jerk_##x
+
+#define optimize CONCATENATE_INPUT(optimize)
+#define get_state CONCATENATE_INPUT(get_state)
+#define get_control CONCATENATE_INPUT(get_control)
+#define load_default_data CONCATENATE_INPUT(load_default_data)
+#define initialize_optimizer CONCATENATE_INPUT(initialize_optimizer)
+
 #ifdef __cplusplus
+namespace Jerk
+{
 extern "C" {
 #endif
 /* Filename: solver.h. */
 /* Description: Header file with relevant definitions. */
-#ifndef SOLVER_JERK2_H
-#define SOLVER_JERK2_H
+#ifndef SOLVER_JERK_H
+#define SOLVER_JERK_H
 /* Uncomment the next line to remove all library dependencies. */
 /*#define ZERO_LIBRARY_MODE */
 #ifdef MATLAB_MEX_FILE
@@ -37,6 +48,8 @@ typedef struct Params_t
   double x_0[9];
   double B[27];
   double j_max[1];
+  double v_max[1];
+  double a_max[1];
   double *x[1];
 } Params;
 typedef struct Vars_t
@@ -64,39 +77,119 @@ typedef struct Vars_t
   double *t_10; /* 1 rows. */
   double *t_11; /* 1 rows. */
   double *u_10; /* 3 rows. */
+  double *t_12; /* 1 rows. */
+  double *t_13; /* 1 rows. */
   double *x_1;  /* 9 rows. */
+  double *t_14; /* 1 rows. */
+  double *t_15; /* 1 rows. */
+  double *t_16; /* 1 rows. */
+  double *t_17; /* 1 rows. */
   double *x_2;  /* 9 rows. */
+  double *t_18; /* 1 rows. */
+  double *t_19; /* 1 rows. */
+  double *t_20; /* 1 rows. */
+  double *t_21; /* 1 rows. */
   double *x_3;  /* 9 rows. */
+  double *t_22; /* 1 rows. */
+  double *t_23; /* 1 rows. */
+  double *t_24; /* 1 rows. */
+  double *t_25; /* 1 rows. */
   double *x_4;  /* 9 rows. */
+  double *t_26; /* 1 rows. */
+  double *t_27; /* 1 rows. */
+  double *t_28; /* 1 rows. */
+  double *t_29; /* 1 rows. */
   double *x_5;  /* 9 rows. */
+  double *t_30; /* 1 rows. */
+  double *t_31; /* 1 rows. */
+  double *t_32; /* 1 rows. */
+  double *t_33; /* 1 rows. */
   double *x_6;  /* 9 rows. */
+  double *t_34; /* 1 rows. */
+  double *t_35; /* 1 rows. */
+  double *t_36; /* 1 rows. */
+  double *t_37; /* 1 rows. */
   double *x_7;  /* 9 rows. */
+  double *t_38; /* 1 rows. */
+  double *t_39; /* 1 rows. */
+  double *t_40; /* 1 rows. */
+  double *t_41; /* 1 rows. */
   double *x_8;  /* 9 rows. */
+  double *t_42; /* 1 rows. */
+  double *t_43; /* 1 rows. */
+  double *t_44; /* 1 rows. */
+  double *t_45; /* 1 rows. */
   double *x_9;  /* 9 rows. */
+  double *t_46; /* 1 rows. */
+  double *t_47; /* 1 rows. */
+  double *t_48; /* 1 rows. */
+  double *t_49; /* 1 rows. */
+  double *t_50; /* 1 rows. */
+  double *t_51; /* 1 rows. */
+  double *t_52; /* 1 rows. */
+  double *t_53; /* 1 rows. */
+  double *t_54; /* 1 rows. */
+  double *t_55; /* 1 rows. */
+  double *t_56; /* 1 rows. */
+  double *t_57; /* 1 rows. */
+  double *t_58; /* 1 rows. */
+  double *t_59; /* 1 rows. */
+  double *t_60; /* 1 rows. */
+  double *t_61; /* 1 rows. */
+  double *t_62; /* 1 rows. */
+  double *t_63; /* 1 rows. */
+  double *t_64; /* 1 rows. */
+  double *t_65; /* 1 rows. */
+  double *t_66; /* 1 rows. */
+  double *t_67; /* 1 rows. */
+  double *t_68; /* 1 rows. */
+  double *t_69; /* 1 rows. */
+  double *t_70; /* 1 rows. */
+  double *t_71; /* 1 rows. */
+  double *t_72; /* 1 rows. */
+  double *t_73; /* 1 rows. */
+  double *t_74; /* 1 rows. */
+  double *t_75; /* 1 rows. */
+  double *t_76; /* 1 rows. */
+  double *t_77; /* 1 rows. */
+  double *t_78; /* 1 rows. */
+  double *t_79; /* 1 rows. */
+  double *t_80; /* 1 rows. */
+  double *t_81; /* 1 rows. */
+  double *t_82; /* 1 rows. */
+  double *t_83; /* 1 rows. */
+  double *t_84; /* 1 rows. */
+  double *t_85; /* 1 rows. */
+  double *t_86; /* 1 rows. */
+  double *t_87; /* 1 rows. */
+  double *t_88; /* 1 rows. */
+  double *t_89; /* 1 rows. */
+  double *t_90; /* 1 rows. */
+  double *t_91; /* 1 rows. */
   double *u[11];
   double *x[11];
 } Vars;
 typedef struct Workspace_t
 {
-  double h[77];
-  double s_inv[77];
-  double s_inv_z[77];
+  double h[277];
+  double s_inv[277];
+  double s_inv_z[277];
   double b[90];
-  double q[134];
-  double rhs[378];
-  double x[378];
+  double q[214];
+  double rhs[858];
+  double x[858];
   double *s;
   double *z;
   double *y;
-  double lhs_aff[378];
-  double lhs_cc[378];
-  double buffer[378];
-  double buffer2[378];
-  double KKT[1535];
-  double L[2479];
-  double d[378];
-  double v[378];
-  double d_inv[378];
+  double lhs_aff[858];
+  double lhs_cc[858];
+  double buffer[858];
+  double buffer2[858];
+  double KKT[2515];
+  double L[3337];
+  double d[858];
+  double v[858];
+  double d_inv[858];
   double gap;
   double optval;
   double ineq_resid_squared;
@@ -185,4 +278,10 @@ void reset_rand(void);
 #endif
 #ifdef __cplusplus
 }
+}
 #endif
+#undef optimize
+#undef get_state
+#undef get_control
+#undef load_default_data
+#undef initialize_optimizer
