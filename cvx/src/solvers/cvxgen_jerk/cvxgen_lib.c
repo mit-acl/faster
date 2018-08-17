@@ -6,7 +6,17 @@
 
 /* Filename: testsolver.c. */
 /* Description: Basic test harness for solver.c. */
+
 #include "solver.h"
+
+#define CONCATENATE_INPUT(x) jerk_##x
+
+#define optimize CONCATENATE_INPUT(optimize)
+#define get_state CONCATENATE_INPUT(get_state)
+#define get_control CONCATENATE_INPUT(get_control)
+#define load_default_data CONCATENATE_INPUT(load_default_data)
+#define initialize_optimizer CONCATENATE_INPUT(initialize_optimizer)
+
 Vars vars;
 Params params;
 Workspace work;
@@ -20,6 +30,7 @@ int initialize_optimizer(void)
 
 int optimize(void)
 {
+  printf("in optimize jerk\n");
   solve();
   // for(i=1;i<19;i++){
   // printf("%0.2f %0.2f %0.2f \n",vars.x[i][0],vars.x[i][3],vars.u[i][0]);
@@ -40,6 +51,7 @@ double** get_control(void)
 
 void load_default_data(double dt, double v_max, double a_max, double j_max, double x0[], double xf[])
 {
+  printf("loading data jerk\n");
   // double dt = 0.5;
   double q = 100000;
   params.xf[0] = xf[0];
@@ -270,3 +282,9 @@ void load_default_data(double dt, double v_max, double a_max, double j_max, doub
   params.a_max[0] = a_max;
   params.j_max[0] = j_max;
 }
+
+#undef optimize
+#undef get_state
+#undef get_control
+#undef load_default_data
+#undef initialize_optimizer

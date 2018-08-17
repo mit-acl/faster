@@ -6,6 +6,7 @@
 
 # Filename: Makefile.
 # Description: Basic Makefile.
+INPUT=jerk
 OPT = -Wall -Os 
 # libmath is needed for sqrt, which is used only for reporting the gap. Can
 # remove if desired for production solvers..
@@ -15,9 +16,10 @@ LDFLAGS= -shared
 CC = gcc
 .PHONY: all
 all: cvxgen_lib
-cvxgen_lib: solver.o matrix_support.o ldl.o cvxgen_lib.o util.o  
+cvxgen_lib: solver.o matrix_support.o ldl.o cvxgen_lib.o util.o 
 	gcc -shared -o libcvx.so cvxgen_lib.o solver.o util.o matrix_support.o ldl.o
-	mv libcvx.so ../cvxgen/libcvx_jerk.so && cp solver.h ../cvxgen && mv ../cvxgen/solver.h ../cvxgen/solver_jerk.h
+	 mv libcvx.so ../cvxgen/libcvx_$(INPUT).so && mv solver.h solver_$(INPUT).h && cp solver_$(INPUT).h ../cvxgen && mv solver_$(INPUT).h solver.h   
+
 
 # Include util.o for random functions and easy matrix printing.
 #cvxgen_lib: solver.o matrix_support.o ldl.o util.o cvxgen_lib.o

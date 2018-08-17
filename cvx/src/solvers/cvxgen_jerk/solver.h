@@ -3,13 +3,24 @@
 /* The code in this file is Copyright (C) 2006-2017 Jacob Mattingley. */
 /* CVXGEN, or solvers produced by CVXGEN, cannot be used for commercial */
 /* applications without prior written permission from Jacob Mattingley. */
+
+#define CONCATENATE_INPUT(x) jerk_##x
+
+#define optimize CONCATENATE_INPUT(optimize)
+#define get_state CONCATENATE_INPUT(get_state)
+#define get_control CONCATENATE_INPUT(get_control)
+#define load_default_data CONCATENATE_INPUT(load_default_data)
+#define initialize_optimizer CONCATENATE_INPUT(initialize_optimizer)
+
 #ifdef __cplusplus
+namespace Jerk
+{
 extern "C" {
 #endif
 /* Filename: solver.h. */
 /* Description: Header file with relevant definitions. */
-#ifndef SOLVER_H
-#define SOLVER_H
+#ifndef SOLVER_JERK_H
+#define SOLVER_JERK_H
 /* Uncomment the next line to remove all library dependencies. */
 /*#define ZERO_LIBRARY_MODE */
 #ifdef MATLAB_MEX_FILE
@@ -267,4 +278,10 @@ void reset_rand(void);
 #endif
 #ifdef __cplusplus
 }
+}
 #endif
+#undef optimize
+#undef get_state
+#undef get_control
+#undef load_default_data
+#undef initialize_optimizer
