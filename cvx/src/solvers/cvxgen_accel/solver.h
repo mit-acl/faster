@@ -4,8 +4,7 @@
 /* CVXGEN, or solvers produced by CVXGEN, cannot be used for commercial */
 /* applications without prior written permission from Jacob Mattingley. */
 #ifdef __cplusplus
-namespace Accel
-{
+
 extern "C" {
 #endif
 /* Filename: solver.h. */
@@ -242,13 +241,6 @@ void better_start(void);
 void fillrhs_start(void);
 long solve(void);
 
-/* Function definitions in testsolver.c: */
-int initialize_optimizer(void);
-int optimize(void);
-void load_default_data(double dt, double v_max, double a_max, double x0[], double xf[]);
-double **get_state(void);
-double **get_control(void);
-
 /* Function definitions in util.c: */
 void tic(void);
 float toc(void);
@@ -264,5 +256,5 @@ void reset_rand(void);
 
 #ifdef __cplusplus
 }
-}
+
 #endif

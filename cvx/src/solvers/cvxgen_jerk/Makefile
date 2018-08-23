@@ -18,7 +18,7 @@ CC = gcc
 all: cvxgen_lib
 cvxgen_lib: solver.o matrix_support.o ldl.o cvxgen_lib.o util.o 
 	gcc -shared -o libcvx.so cvxgen_lib.o solver.o util.o matrix_support.o ldl.o
-	 mv libcvx.so ../cvxgen/libcvx_$(INPUT).so && mv solver.h solver_$(INPUT).h && cp solver_$(INPUT).h ../cvxgen && mv solver_$(INPUT).h solver.h   
+	 mv libcvx.so ../cvxgen/libcvx_$(INPUT).so && cp interface_$(INPUT).h ../cvxgen    
 
 
 # Include util.o for random functions and easy matrix printing.

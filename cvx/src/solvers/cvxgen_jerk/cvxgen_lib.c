@@ -8,27 +8,22 @@
 /* Description: Basic test harness for solver.c. */
 
 #include "solver.h"
+#include "interface_jerk.h"
 
 #define CONCATENATE_INPUT(x) jerk_##x
-
-#define optimize CONCATENATE_INPUT(optimize)
-#define get_state CONCATENATE_INPUT(get_state)
-#define get_control CONCATENATE_INPUT(get_control)
-#define load_default_data CONCATENATE_INPUT(load_default_data)
-#define initialize_optimizer CONCATENATE_INPUT(initialize_optimizer)
 
 Vars vars;
 Params params;
 Workspace work;
 Settings settings;
 
-int initialize_optimizer(void)
+int CONCATENATE_INPUT(initialize_optimizer)(void)
 {
   set_defaults();
   setup_indexing();
 }
 
-int optimize(void)
+int CONCATENATE_INPUT(optimize)(void)
 {
   printf("in optimize jerk\n");
   solve();
@@ -39,17 +34,17 @@ int optimize(void)
   return work.converged;
 }
 
-double** get_state(void)
+double** CONCATENATE_INPUT(get_state)(void)
 {
   return vars.x;
 }
 
-double** get_control(void)
+double** CONCATENATE_INPUT(get_control)(void)
 {
   return vars.u;
 }
 
-void load_default_data(double dt, double v_max, double a_max, double j_max, double x0[], double xf[])
+void CONCATENATE_INPUT(load_default_data)(double dt, double v_max, double a_max, double j_max, double x0[], double xf[])
 {
   printf("loading data jerk\n");
   // double dt = 0.5;
@@ -283,8 +278,4 @@ void load_default_data(double dt, double v_max, double a_max, double j_max, doub
   params.j_max[0] = j_max;
 }
 
-#undef optimize
-#undef get_state
-#undef get_control
-#undef load_default_data
-#undef initialize_optimizer
+#undef CONCATENATE_INPUT

@@ -11,9 +11,15 @@
 /*namespace Jerk  // When the input is jerk
 {
   */
+namespace jerk
+{
+#include "cvxgen/interface_jerk.h"
+}
 
-#include "cvxgen/solver_jerk.h"
-
+namespace accel
+{
+#include "cvxgen/interface_accel.h"
+}
 /*
 }*/
 //####Class Solver
@@ -70,11 +76,11 @@ Solver<INPUT_ORDER>::Solver()
       break;
     case ACCEL:
       printf("not implemented yet\n");
-      // accel_initialize_optimizer();
+      // accel::accel_initialize_optimizer();
       N_ = 15;
       break;
     case JERK:
-      jerk_initialize_optimizer();
+      jerk::jerk_initialize_optimizer();
       N_ = 10;
       break;
   }
@@ -307,16 +313,16 @@ void Solver<INPUT_ORDER>::genNewTraj()
       break;
     case ACCEL:
       printf("Not implemented yet!");
-      // x = Accel::get_state();
-      // u = Accel::get_control();
+      // x = accel::accel_get_state();
+      // u = accel::accel_get_control();
       interpolate(POS, u, x);    // interpolate POS
       interpolate(VEL, u, x);    // ...
       interpolate(ACCEL, u, x);  // ...
       obtainByDerivation(u, x);
       break;
     case JERK:
-      x = jerk_get_state();
-      u = jerk_get_control();
+      x = jerk::jerk_get_state();
+      u = jerk::jerk_get_control();
       interpolate(POS, u, x);    // interpolate POS
       interpolate(VEL, u, x);    // ...
       interpolate(ACCEL, u, x);  // ...
@@ -340,14 +346,14 @@ void Solver<INPUT_ORDER>::callOptimizer()
   while (!converged)
   {
     // printf("Loading default data!\n");
-    jerk_load_default_data(dt, v_max_, a_max_, j_max_, x0_, xf_);
-    int r = jerk_optimize();
+    jerk::jerk_load_default_data(dt, v_max_, a_max_, j_max_, x0_, xf_);
+    int r = jerk::jerk_optimize();
     i = i + 1;
     if (r == 1)
     {
       // printf("***N=%d\n", N_);
 
-      x = jerk_get_state();
+      x = jerk::jerk_get_state();
       /*      for (i = 1; i <= N_; i++)
             {
               printf("%f, %f, %f, %f, %f, %f, %f, %f, %f\n", x[i][0], x[i][1], x[i][2], x[i][3], x[i][4], x[i][5],
