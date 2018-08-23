@@ -86,8 +86,6 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   setpoint_.scale.z = 0.35;
   setpoint_.color = color(ORANGE_TRANS);
 
-  Jerk::jerk_initialize_optimizer();
-
   term_goal_.pos = vectorNull();
 
   quadGoal_.pos = vectorNull();

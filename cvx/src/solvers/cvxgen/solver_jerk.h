@@ -13,8 +13,6 @@
 #define initialize_optimizer CONCATENATE_INPUT(initialize_optimizer)
 
 #ifdef __cplusplus
-namespace Jerk
-{
 extern "C" {
 #endif
 /* Filename: solver.h. */
@@ -277,7 +275,6 @@ void reset_rand(void);
 
 #endif
 #ifdef __cplusplus
-}
 }
 #endif
 #undef optimize

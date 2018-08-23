@@ -65,12 +65,16 @@ Solver<INPUT_ORDER>::Solver()
   {
     case VEL:
       printf("not implemented yet\n");
+      // vel_initialize_optimizer();
       // N_=;
       break;
     case ACCEL:
+      printf("not implemented yet\n");
+      // accel_initialize_optimizer();
       N_ = 15;
       break;
     case JERK:
+      jerk_initialize_optimizer();
       N_ = 10;
       break;
   }
@@ -175,12 +179,12 @@ bool Solver<INPUT_ORDER>::checkConvergence(double xf_opt[3 * INPUT_ORDER])
   float dv2 = 0;  // distance in velocity squared
   float da2 = 0;  // distance in acceleration squared
 
-  printf("checking convergence\n");
-  printf("xf_=\n");
-  for (int i = 0; i < 9; i++)
-  {
-    printf("xf_opt[i]=%0.2f,   xf_[i]=%0.2f\n", xf_opt[i], xf_[i]);
-  }
+  /*  printf("checking convergence\n");
+    printf("xf_=\n");
+    for (int i = 0; i < 9; i++)
+    {
+      printf("xf_opt[i]=%0.2f,   xf_[i]=%0.2f\n", xf_opt[i], xf_[i]);
+    }*/
   switch (INPUT_ORDER)
   {
     case VEL:
@@ -205,7 +209,7 @@ bool Solver<INPUT_ORDER>::checkConvergence(double xf_opt[3 * INPUT_ORDER])
         dv2 += pow(xf_[i + 3] - xf_opt[i + 3], 2);
         da2 += pow(xf_[i + 6] - xf_opt[i + 6], 2);
       }
-      printf("d2=%f, dv2=%f, da2=%f\n", d2, dv2, da2);
+      // printf("d2=%f, dv2=%f, da2=%f\n", d2, dv2, da2);
       // sleep(2);  // TODO: remove this
       converged = (sqrt(d2) < 0.2 && sqrt(dv2) < 0.2 && 1) ? true : false;
       break;
@@ -286,9 +290,8 @@ void Solver<INPUT_ORDER>::interpolate(int var, double** u, double** x)
 template <int INPUT_ORDER>
 void Solver<INPUT_ORDER>::genNewTraj()
 {
-  printf("In genNewTraj\n");
+  // printf("In genNewTraj\n");
   callOptimizer();
-  printf("Optimizer called\n");
   resetXandU();
   double** x;
   double** u;
@@ -312,8 +315,8 @@ void Solver<INPUT_ORDER>::genNewTraj()
       obtainByDerivation(u, x);
       break;
     case JERK:
-      x = Jerk::jerk_get_state();
-      u = Jerk::jerk_get_control();
+      x = jerk_get_state();
+      u = jerk_get_control();
       interpolate(POS, u, x);    // interpolate POS
       interpolate(VEL, u, x);    // ...
       interpolate(ACCEL, u, x);  // ...
@@ -329,27 +332,27 @@ void Solver<INPUT_ORDER>::callOptimizer()
   bool converged = false;
 
   // ROS_INFO("dt I found= %0.2f", dt_found);
-  double dt = 0;  // 0.025
-                  // ROS_INFO("empezando con, dt = %0.2f", dt);
+  double dt = getDTInitial();  // 0.025
+                               // ROS_INFO("empezando con, dt = %0.2f", dt);
   double** x;
   int i = 0;
 
   while (!converged)
   {
-    printf("Loading default data!\n");
-    Jerk::jerk_load_default_data(dt, v_max_, a_max_, j_max_, x0_, xf_);
-    int r = Jerk::jerk_optimize();
+    // printf("Loading default data!\n");
+    jerk_load_default_data(dt, v_max_, a_max_, j_max_, x0_, xf_);
+    int r = jerk_optimize();
     i = i + 1;
     if (r == 1)
     {
-      printf("***N=%d\n", N_);
+      // printf("***N=%d\n", N_);
 
-      x = Jerk::jerk_get_state();
-      for (i = 1; i <= N_; i++)
-      {
-        printf("%f, %f, %f, %f, %f, %f, %f, %f, %f\n", x[i][0], x[i][1], x[i][2], x[i][3], x[i][4], x[i][5], x[i][6],
-               x[i][7], x[i][8]);
-      }
+      x = jerk_get_state();
+      /*      for (i = 1; i <= N_; i++)
+            {
+              printf("%f, %f, %f, %f, %f, %f, %f, %f, %f\n", x[i][0], x[i][1], x[i][2], x[i][3], x[i][4], x[i][5],
+         x[i][6], x[i][7], x[i][8]);
+            }*/
       bool s = checkConvergence(x[N_]);
       if (s == 1)
         converged = true;
@@ -361,7 +364,7 @@ void Solver<INPUT_ORDER>::callOptimizer()
       dt += 0.025;
     }
   }
-  // ROS_INFO("Iterations = %d\n", i);
+  ROS_INFO("Iterations = %d\n", i);
   // ROS_INFO("converged, dt = %0.2f", dt);
   dt_ = dt;
 }
