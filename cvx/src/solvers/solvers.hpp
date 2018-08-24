@@ -3,22 +3,11 @@
 #include <Eigen/Dense>
 #include "../utils.hpp"
 #include "mlinterp.hpp"
-/*namespace Accel  // When the input is acceleration
-{
-#include "cvxgen/solver_accel.h"
-}*/
-
-/*namespace Jerk  // When the input is jerk
-{
-  */
 
 #include "cvxgen/interface_jerk.h"
 
 #include "cvxgen/interface_accel.h"
 
-/*
-}*/
-//####Class Solver
 template <int INPUT_ORDER>
 class Solver
 {
@@ -71,7 +60,6 @@ Solver<INPUT_ORDER>::Solver()
       // N_=;
       break;
     case ACCEL:
-      printf("not implemented yet\n");
       accel_initialize_optimizer();
       N_ = 15;
       break;
@@ -308,9 +296,8 @@ void Solver<INPUT_ORDER>::genNewTraj()
       // obtainByDerivation(u, x);
       break;
     case ACCEL:
-      printf("Not implemented yet!");
-      // x = accel::accel_get_state();
-      // u = accel::accel_get_control();
+      x = accel_get_state();
+      u = accel_get_control();
       interpolate(POS, u, x);    // interpolate POS
       interpolate(VEL, u, x);    // ...
       interpolate(ACCEL, u, x);  // ...
@@ -338,59 +325,11 @@ void Solver<INPUT_ORDER>::callOptimizer()
                                // ROS_INFO("empezando con, dt = %0.2f", dt);
   double** x;
   int i = 0;
-
-  while (!converged)
+  int r = 0;
+  while (1)
   {
-    // printf("Loading default data!\n");
-    jerk_load_default_data(dt, v_max_, a_max_, j_max_, x0_, xf_);
-    int r = jerk_optimize();
     i = i + 1;
-    if (r == 1)
-    {
-      // printf("***N=%d\n", N_);
-
-      x = jerk_get_state();
-      /*      for (i = 1; i <= N_; i++)
-            {
-              printf("%f, %f, %f, %f, %f, %f, %f, %f, %f\n", x[i][0], x[i][1], x[i][2], x[i][3], x[i][4], x[i][5],
-         x[i][6], x[i][7], x[i][8]);
-            }*/
-      bool s = checkConvergence(x[N_]);
-      if (s == 1)
-        converged = true;
-      else
-        dt += 0.025;
-    }
-    else
-    {
-      dt += 0.025;
-    }
-  }
-  ROS_INFO("Iterations = %d\n", i);
-  // ROS_INFO("converged, dt = %0.2f", dt);
-  dt_ = dt;
-}
-
-/*template <int INPUT_ORDER>
-void Solver<INPUT_ORDER>::callOptimizer()
-{
-  // printf("In callOptimizer\n");
-  bool converged = false;
-  printf("before getDTInitial\n");
-  // ROS_INFO("dt I found= %0.2f", dt_found);
-  double dt = getDTInitial();  // 0.025
-                               // ROS_INFO("empezando con, dt = %0.2f", dt);
-  double** x;
-  int i = 0;
-  printf("In callOptimizer, dt initial=%f\n", dt);
-  for (int i = 0; i < 9; i++)
-  {
-    printf("x0[i]=%0.2f,   xf[i]=%0.2f\n", x0_[i], xf_[i]);
-  }
-  printf("v_max_=%f, a_max_=%f, j_max_=%f\n", v_max_, a_max_, j_max_);
-  while (!converged)
-  {
-    int r;
+    // printf("Loading default data!\n");
     switch (INPUT_ORDER)
     {
       case VEL:
@@ -400,55 +339,37 @@ void Solver<INPUT_ORDER>::callOptimizer()
       }
       case ACCEL:
       {
-        Accel::load_default_data(dt, v_max_, a_max_, x0_, xf_);
-        r = Accel::optimize();
+        accel_load_default_data(dt, v_max_, a_max_, x0_, xf_);
+        r = accel_optimize();
+        if (r == 1)
+        {
+          x = accel_get_state();
+          converged = checkConvergence(x[N_]);
+        }
         break;
       }
       case JERK:
       {
-        // printf("loading data, dt=%f\n", dt);
-        Jerk::load_default_data(dt, v_max_, a_max_, j_max_, x0_, xf_);
-        r = Jerk::optimize();
+        jerk_load_default_data(dt, v_max_, a_max_, j_max_, x0_, xf_);
+        r = jerk_optimize();
+        if (r == 1)
+        {
+          x = jerk_get_state();
+          converged = checkConvergence(x[N_]);
+        }
         break;
       }
     }
-
-    i = i + 1;
-    if (r == 1)
+    if (converged == 1)
     {
-      switch (INPUT_ORDER)
-      {
-        case VEL:
-        {
-          printf("Not implemented\n");
-          break;
-        }
-        case ACCEL:
-        {
-          x = Accel::get_state();
-          break;
-        }
-        case JERK:
-        {
-          x = Jerk::get_state();
-          break;
-        }
-      }
-      printf("N_=%d", N_);
-      bool s = checkConvergence(x[N_]);
-      if (s == 1)
-        converged = true;
-      else
-        dt += 0.025;
+      break;
     }
-    else
-      dt += 0.025;
-  }*/
-
-// ROS_INFO("Iterations = %d\n", i);
-// ROS_INFO("converged, dt = %0.2f", dt);
-/*dt_ = dt;
-}*/
+    dt += 0.025;
+  }
+  ROS_INFO("Iterations = %d\n", i);
+  // ROS_INFO("converged, dt = %0.2f", dt);
+  dt_ = dt;
+}
 
 template <int INPUT_ORDER>
 double Solver<INPUT_ORDER>::getDTInitial()

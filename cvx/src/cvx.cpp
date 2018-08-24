@@ -324,40 +324,40 @@ void CVX::replanCB(const ros::TimerEvent& e)
       }
 
       // Solver ACCEL
-      /*      double xf_sphere[6] = { p2[0], p2[1], p2[2], 0, 0, 0 };
-            mtx_goals.lock();
-            double x0[6] = { nextQuadGoal_.pos.x, nextQuadGoal_.pos.y, nextQuadGoal_.pos.z,
-                             nextQuadGoal_.vel.x, nextQuadGoal_.vel.y, nextQuadGoal_.vel.z };
-            double u0[3] = { nextQuadGoal_.accel.x, nextQuadGoal_.accel.y, nextQuadGoal_.accel.z };
-            mtx_goals.unlock();
-            solver_accel_.set_xf(xf_sphere);
-            solver_accel_.set_x0(x0);
-            double max_values[2] = { V_MAX, A_MAX };
-            solver_accel_.set_max(max_values);
-            solver_accel_.set_u0(u0);
-            solver_accel_.genNewTraj();
-            U_temp_ = solver_accel_.getU();
-            X_temp_ = solver_accel_.getX();*/
+      double xf_sphere[6] = { p2[0], p2[1], p2[2], 0, 0, 0 };
+      mtx_goals.lock();
+      double x0[6] = { nextQuadGoal_.pos.x, nextQuadGoal_.pos.y, nextQuadGoal_.pos.z,
+                       nextQuadGoal_.vel.x, nextQuadGoal_.vel.y, nextQuadGoal_.vel.z };
+      double u0[3] = { nextQuadGoal_.accel.x, nextQuadGoal_.accel.y, nextQuadGoal_.accel.z };
+      mtx_goals.unlock();
+      solver_accel_.set_xf(xf_sphere);
+      solver_accel_.set_x0(x0);
+      double max_values[2] = { V_MAX, A_MAX };
+      solver_accel_.set_max(max_values);
+      solver_accel_.set_u0(u0);
+      solver_accel_.genNewTraj();
+      U_temp_ = solver_accel_.getU();
+      X_temp_ = solver_accel_.getX();
 
       // Solver JERK
-      double xf_sphere[9] = { p2[0], p2[1], p2[2], 0, 0, 0, 0, 0, 0 };
-      mtx_goals.lock();
-      double x0[9] = { nextQuadGoal_.pos.x,   nextQuadGoal_.pos.y,   nextQuadGoal_.pos.z,
-                       nextQuadGoal_.vel.x,   nextQuadGoal_.vel.y,   nextQuadGoal_.vel.z,
-                       nextQuadGoal_.accel.x, nextQuadGoal_.accel.y, nextQuadGoal_.accel.z };
+      /*      double xf_sphere[9] = { p2[0], p2[1], p2[2], 0, 0, 0, 0, 0, 0 };
+            mtx_goals.lock();
+            double x0[9] = { nextQuadGoal_.pos.x,   nextQuadGoal_.pos.y,   nextQuadGoal_.pos.z,
+                             nextQuadGoal_.vel.x,   nextQuadGoal_.vel.y,   nextQuadGoal_.vel.z,
+                             nextQuadGoal_.accel.x, nextQuadGoal_.accel.y, nextQuadGoal_.accel.z };
 
-      double u0[3] = { nextQuadGoal_.jerk.x, nextQuadGoal_.jerk.y, nextQuadGoal_.jerk.z };
-      mtx_goals.unlock();
-      solver_jerk_.set_xf(xf_sphere);
-      solver_jerk_.set_x0(x0);
-      double max_values[3] = { V_MAX, A_MAX, J_MAX };
-      solver_jerk_.set_max(max_values);
-      solver_jerk_.set_u0(u0);
-      printf("generando new Traj\n");
-      solver_jerk_.genNewTraj();
-      printf("generated\n");
-      U_temp_ = solver_jerk_.getU();
-      X_temp_ = solver_jerk_.getX();
+            double u0[3] = { nextQuadGoal_.jerk.x, nextQuadGoal_.jerk.y, nextQuadGoal_.jerk.z };
+            mtx_goals.unlock();
+            solver_jerk_.set_xf(xf_sphere);
+            solver_jerk_.set_x0(x0);
+            double max_values[3] = { V_MAX, A_MAX, J_MAX };
+            solver_jerk_.set_max(max_values);
+            solver_jerk_.set_u0(u0);
+            printf("generando new Traj\n");
+            solver_jerk_.genNewTraj();
+            printf("generated\n");
+            U_temp_ = solver_jerk_.getU();
+            X_temp_ = solver_jerk_.getX();*/
 
       bool isFree = trajIsFree(X_temp_);
       createMarkerSetOfArrows(X_temp_, isFree);
@@ -396,19 +396,19 @@ void CVX::modeCB(const acl_msgs::QuadFlightMode& msg)
   // printf("In modeCB\n");
   if (msg.mode == msg.LAND && flight_mode_.mode != flight_mode_.LAND)
   {
-    /*    //Solver Accel
-        double xf[6] = { quadGoal_.pos.x, quadGoal_.pos.y, z_land_, 0, 0, 0 };
-        double max_values[2] = { V_MAX, A_MAX };
-        solver_accel_.set_max(max_values);  // TODO: To land, I use u_min_
-        solver_accel_.set_xf(xf);
-        solver_accel_.genNewTraj();*/
+    // Solver Accel
+    double xf[6] = { quadGoal_.pos.x, quadGoal_.pos.y, z_land_, 0, 0, 0 };
+    double max_values[2] = { V_MAX, A_MAX };
+    solver_accel_.set_max(max_values);  // TODO: To land, I use u_min_
+    solver_accel_.set_xf(xf);
+    solver_accel_.genNewTraj();
 
     // Solver Jerk
-    double xf[9] = { quadGoal_.pos.x, quadGoal_.pos.y, z_land_, 0, 0, 0, 0, 0, 0 };
-    double max_values[3] = { V_MAX, A_MAX, J_MAX };
-    solver_jerk_.set_max(max_values);  // TODO: To land, I use u_min_
-    solver_jerk_.set_xf(xf);
-    solver_jerk_.genNewTraj();
+    /*    double xf[9] = { quadGoal_.pos.x, quadGoal_.pos.y, z_land_, 0, 0, 0, 0, 0, 0 };
+        double max_values[3] = { V_MAX, A_MAX, J_MAX };
+        solver_jerk_.set_max(max_values);  // TODO: To land, I use u_min_
+        solver_jerk_.set_xf(xf);
+        solver_jerk_.genNewTraj();*/
   }
   flight_mode_.mode = msg.mode;
 }
@@ -520,7 +520,7 @@ void CVX::pubCB(const ros::TimerEvent& e)
 
 geometry_msgs::Vector3 CVX::getPos(int i)
 {
-  int input_order = solver_jerk_.getOrder();
+  int input_order = solver_accel_.getOrder();
   geometry_msgs::Vector3 tmp;
   tmp.x = X_(i, 0);
   tmp.y = X_(i, 1);
@@ -530,7 +530,7 @@ geometry_msgs::Vector3 CVX::getPos(int i)
 
 geometry_msgs::Vector3 CVX::getVel(int i)
 {
-  int input_order = solver_jerk_.getOrder();
+  int input_order = solver_accel_.getOrder();
   geometry_msgs::Vector3 tmp;
   switch (input_order)
   {
@@ -555,7 +555,7 @@ geometry_msgs::Vector3 CVX::getVel(int i)
 
 geometry_msgs::Vector3 CVX::getAccel(int i)
 {
-  int input_order = solver_jerk_.getOrder();
+  int input_order = solver_accel_.getOrder();
   geometry_msgs::Vector3 tmp;
 
   switch (input_order)
@@ -581,7 +581,7 @@ geometry_msgs::Vector3 CVX::getAccel(int i)
 
 geometry_msgs::Vector3 CVX::getJerk(int i)
 {
-  int input_order = solver_jerk_.getOrder();
+  int input_order = solver_accel_.getOrder();
   geometry_msgs::Vector3 tmp;
 
   switch (input_order)
@@ -612,7 +612,7 @@ void CVX::pubTraj(double** x)
   traj.header.frame_id = "world";
 
   geometry_msgs::PoseStamped temp_path;
-  int N = solver_jerk_.getN();
+  int N = solver_accel_.getN();
   for (int i = 1; i < N; i++)
   {
     temp_path.pose.position.x = x[i][0];
