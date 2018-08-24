@@ -76,7 +76,7 @@ Solver<INPUT_ORDER>::Solver()
       break;
     case ACCEL:
       printf("not implemented yet\n");
-      // accel::accel_initialize_optimizer();
+      accel::accel_initialize_optimizer();
       N_ = 15;
       break;
     case JERK:

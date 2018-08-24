@@ -17,7 +17,7 @@ CC = gcc
 .PHONY: all
 all: cvxgen_lib
 cvxgen_lib: solver.o matrix_support.o ldl.o cvxgen_lib.o util.o 
-	gcc -shared -o libcvx.so cvxgen_lib.o solver.o util.o matrix_support.o ldl.o
+	gcc -shared -o libcvx.so cvxgen_lib.o solver.o util.o matrix_support.o ldl.o -fPIC -Wl,--version-script=exportmap.map
 	 mv libcvx.so ../cvxgen/libcvx_$(INPUT).so && cp interface_$(INPUT).h ../cvxgen    
 
 
@@ -32,6 +32,8 @@ cvxgen_lib.o: solver.h
 .PHONY : clean
 clean :
 	rm -f *.o cvxgen_lib libcvx.so
+
+
 
 
 
