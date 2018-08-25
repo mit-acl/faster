@@ -4,9 +4,9 @@
 #include "../utils.hpp"
 #include "mlinterp.hpp"
 
-#include "cvxgen/interface_jerk.h"
-
+#include "cvxgen/interface_vel.h"
 #include "cvxgen/interface_accel.h"
+#include "cvxgen/interface_jerk.h"
 
 template <int INPUT_ORDER>
 class Solver
@@ -55,9 +55,8 @@ Solver<INPUT_ORDER>::Solver()
   switch (INPUT_ORDER)
   {
     case VEL:
-      printf("not implemented yet\n");
-      // vel_initialize_optimizer();
-      // N_=;
+      vel_initialize_optimizer();
+      N_ = 15;
       break;
     case ACCEL:
       accel_initialize_optimizer();
@@ -87,6 +86,7 @@ template <int INPUT_ORDER>
 void Solver<INPUT_ORDER>::obtainByDerivation(double** u, double** x)
 {
   int size = (int)(N_)*dt_ / DC;
+  size = (size < 2) ? 2 : size;  // force size to be at least 2 (happens when dt_<DC)
   for (int i = 0; i < size - 1; i++)
   {
     U_temp_(i, 3) = (U_temp_(i + 1, 0) - U_temp_(i, 0)) / DC;
@@ -137,6 +137,7 @@ template <int INPUT_ORDER>
 void Solver<INPUT_ORDER>::resetXandU()
 {
   int size = (int)(N_)*dt_ / DC;
+  size = (size < 2) ? 2 : size;  // force size to be at least 2
   U_temp_ = Eigen::MatrixXd::Zero(size, 6);
   X_temp_ = Eigen::MatrixXd::Zero(size, 3 * INPUT_ORDER);
 }
@@ -214,13 +215,35 @@ void Solver<INPUT_ORDER>::interpolate(int var, double** u, double** x)
 {
   int nxd = N_ + 1;
   int nd[] = { nxd };
+  printf("N_=%d\n", N_);
+  printf("dt_=%f\n", dt_);
+  printf("DC=%f\n", DC);
   int ni = (int)(N_)*dt_ / DC;  // total number of points
+  printf("ni=%d", ni);
   double xd[nxd];
   double yd[nxd];
   double xi[ni];
   double yi[ni];
   int type_of_var = (var < INPUT_ORDER) ? STATE : INPUT;
-
+  if (ni <= 2)
+  {
+    printf("NOT INTERPOLATING. THIS USUALLY HAPPENS WHEN INPUT=VEL, y VEL_MAX IS HIGH, REDUCE IT!\n");
+    for (int axis = 0; axis < 3; axis++)  // var_x,var_y,var_z
+    {
+      int column_x = axis + 3 * var;
+      if (type_of_var == INPUT)
+      {
+        U_temp_(0, axis) = 0;  // u[0][axis];
+        U_temp_(1, axis) = 0;  // Force the last input to be 0
+      }
+      if (type_of_var == STATE)
+      {
+        X_temp_(0, column_x) = x0_[column_x];
+        X_temp_(1, column_x) = x0_[column_x];
+      }
+    }
+    return;
+  }
   // printf("Tipo de variable=%d", type_of_var);
   for (int n = 0; n < ni; ++n)
   {
@@ -258,22 +281,21 @@ void Solver<INPUT_ORDER>::interpolate(int var, double** u, double** x)
     // Force the last input to be 0, and the last state to be the final state:
     yi[ni - 1] = (type_of_var == INPUT) ? 0 : xf_[column_x];
 
-    /*    printf("type_of_var=%d\n", type_of_var);
-        printf("type_of_var=%d\n", type_of_var);*/
     for (int n = 0; n < ni; ++n)
     {
+      // printf("inside the loop\n");
       if (type_of_var == INPUT)
       {
-        // printf("assigning\n");
         U_temp_(n, axis) = yi[n];
       }
       if (type_of_var == STATE)
       {
-        // printf("assigning\n");
         X_temp_(n, column_x) = yi[n];
       }
       // printf("%f    %f\n", U(n, 0), yi[n]);
     }
+    // printf("He asignado X_temp_=\n");
+    // std::cout << X_temp_ << std::endl;
   }
 }
 
@@ -288,12 +310,15 @@ void Solver<INPUT_ORDER>::genNewTraj()
   switch (INPUT_ORDER)
   {
     case VEL:
-      printf("Not implemented yet!");
-      // double** x = Vel::get_state();
-      // double** u = Vel::get_control();
-      // interpolate(POS, u, x);  // interpolate POS
-      // interpolate(VEL, u, x);  // ...
-      // obtainByDerivation(u, x);
+      printf("To grab states/control\n");
+      x = vel_get_state();
+      u = vel_get_control();
+      printf("To interpolate\n");
+      interpolate(POS, u, x);  // interpolate POS
+      interpolate(VEL, u, x);  // ...
+      printf("To obtain by derivation\n");
+      obtainByDerivation(u, x);
+      printf("Obtained by derivation\n");
       break;
     case ACCEL:
       x = accel_get_state();
@@ -334,7 +359,13 @@ void Solver<INPUT_ORDER>::callOptimizer()
     {
       case VEL:
       {
-        printf("Not implemented\n");
+        vel_load_default_data(dt, v_max_, x0_, xf_);
+        r = vel_optimize();
+        if (r == 1)
+        {
+          x = vel_get_state();
+          converged = checkConvergence(x[N_]);
+        }
         break;
       }
       case ACCEL:
@@ -367,7 +398,7 @@ void Solver<INPUT_ORDER>::callOptimizer()
     dt += 0.025;
   }
   ROS_INFO("Iterations = %d\n", i);
-  // ROS_INFO("converged, dt = %0.2f", dt);
+  ROS_INFO("converged, dt = %f", dt);
   dt_ = dt;
 }
 
@@ -386,6 +417,9 @@ double Solver<INPUT_ORDER>::getDTInitial()
   t_vx = (xf_[0] - x0_[0]) / v_max_;
   t_vy = (xf_[1] - x0_[1]) / v_max_;
   t_vz = (xf_[2] - x0_[2]) / v_max_;
+  printf("%f\n", t_vx);
+  printf("%f\n", t_vy);
+  printf("%f\n", t_vz);
   switch (INPUT_ORDER)
   {
     case VEL:
@@ -412,6 +446,7 @@ double Solver<INPUT_ORDER>::getDTInitial()
   dt_initial = std::max({ t_vx, t_vy, t_vz, t_ax, t_ay, t_az }) / N_;
   if (dt_initial > 10000)  // happens when there is no solution to the previous eq.
   {
+    printf("there is not a solution to the previous equations");
     dt_initial = 0;
   }
   printf("dt_initial=%f", dt_initial);

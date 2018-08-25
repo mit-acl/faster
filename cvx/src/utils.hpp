@@ -25,7 +25,7 @@
 #define STATE 0
 #define INPUT 1
 
-#define V_MAX 20
+#define V_MAX 2
 #define A_MAX 2
 #define J_MAX 10
 

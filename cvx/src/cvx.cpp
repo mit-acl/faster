@@ -323,21 +323,42 @@ void CVX::replanCB(const ros::TimerEvent& e)
         continue;
       }
 
-      // Solver ACCEL
-      double xf_sphere[6] = { p2[0], p2[1], p2[2], 0, 0, 0 };
+      // Solver VEL
+      double xf_sphere[3] = { p2[0], p2[1], p2[2] };
       mtx_goals.lock();
-      double x0[6] = { nextQuadGoal_.pos.x, nextQuadGoal_.pos.y, nextQuadGoal_.pos.z,
-                       nextQuadGoal_.vel.x, nextQuadGoal_.vel.y, nextQuadGoal_.vel.z };
-      double u0[3] = { nextQuadGoal_.accel.x, nextQuadGoal_.accel.y, nextQuadGoal_.accel.z };
+      double x0[3] = { nextQuadGoal_.pos.x, nextQuadGoal_.pos.y, nextQuadGoal_.pos.z };
+      double u0[3] = { nextQuadGoal_.vel.x, nextQuadGoal_.vel.y, nextQuadGoal_.vel.z };
       mtx_goals.unlock();
-      solver_accel_.set_xf(xf_sphere);
-      solver_accel_.set_x0(x0);
-      double max_values[2] = { V_MAX, A_MAX };
-      solver_accel_.set_max(max_values);
-      solver_accel_.set_u0(u0);
-      solver_accel_.genNewTraj();
-      U_temp_ = solver_accel_.getU();
-      X_temp_ = solver_accel_.getX();
+      solver_vel_.set_xf(xf_sphere);
+      solver_vel_.set_x0(x0);
+      printf("x0 is %f, %f, %f\n", x0[0], x0[1], x0[2]);
+      printf("xf is %f, %f, %f\n", xf_sphere[0], xf_sphere[1], xf_sphere[2]);
+      double max_values[1] = { V_MAX };
+      solver_vel_.set_max(max_values);
+      solver_vel_.set_u0(u0);
+      solver_vel_.genNewTraj();
+      printf("generated new traj\n");
+      U_temp_ = solver_vel_.getU();
+      printf("got U\n");
+      X_temp_ = solver_vel_.getX();
+      printf("X_temp=\n");
+      std::cout << X_temp_ << std::endl;
+
+      /*      // Solver ACCEL
+            double xf_sphere[6] = { p2[0], p2[1], p2[2], 0, 0, 0 };
+            mtx_goals.lock();
+            double x0[6] = { nextQuadGoal_.pos.x, nextQuadGoal_.pos.y, nextQuadGoal_.pos.z,
+                             nextQuadGoal_.vel.x, nextQuadGoal_.vel.y, nextQuadGoal_.vel.z };
+            double u0[3] = { nextQuadGoal_.accel.x, nextQuadGoal_.accel.y, nextQuadGoal_.accel.z };
+            mtx_goals.unlock();
+            solver_accel_.set_xf(xf_sphere);
+            solver_accel_.set_x0(x0);
+            double max_values[2] = { V_MAX, A_MAX };
+            solver_accel_.set_max(max_values);
+            solver_accel_.set_u0(u0);
+            solver_accel_.genNewTraj();
+            U_temp_ = solver_accel_.getU();
+            X_temp_ = solver_accel_.getX();*/
 
       // Solver JERK
       /*      double xf_sphere[9] = { p2[0], p2[1], p2[2], 0, 0, 0, 0, 0, 0 };
@@ -358,9 +379,11 @@ void CVX::replanCB(const ros::TimerEvent& e)
             printf("generated\n");
             U_temp_ = solver_jerk_.getU();
             X_temp_ = solver_jerk_.getX();*/
-
+      printf("Checking if Free\n");
       bool isFree = trajIsFree(X_temp_);
+      printf("Creating Markers\n");
       createMarkerSetOfArrows(X_temp_, isFree);
+      printf("Checked if Free\n");
       if (isFree)
       {
         // printf("******Replanned!\n");
@@ -386,6 +409,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
     ROS_ERROR("Unable to find a free traj");
   }
   pub_trajs_sphere_.publish(trajs_sphere_);
+  printf("published\n");
 
   // ROS_WARN("solve time: %0.2f ms", 1000 * (ros::Time::now().toSec() - then));
   // printf("Time in replanCB %0.2f ms\n", 1000 * (ros::Time::now().toSec() - t0replanCB));
@@ -396,12 +420,19 @@ void CVX::modeCB(const acl_msgs::QuadFlightMode& msg)
   // printf("In modeCB\n");
   if (msg.mode == msg.LAND && flight_mode_.mode != flight_mode_.LAND)
   {
+    // Solver Vel
+    double xf[6] = { quadGoal_.pos.x, quadGoal_.pos.y, z_land_ };
+    double max_values[1] = { V_MAX };
+    solver_vel_.set_max(max_values);  // TODO: To land, I use u_min_
+    solver_vel_.set_xf(xf);
+    solver_vel_.genNewTraj();
+
     // Solver Accel
-    double xf[6] = { quadGoal_.pos.x, quadGoal_.pos.y, z_land_, 0, 0, 0 };
-    double max_values[2] = { V_MAX, A_MAX };
-    solver_accel_.set_max(max_values);  // TODO: To land, I use u_min_
-    solver_accel_.set_xf(xf);
-    solver_accel_.genNewTraj();
+    /*    double xf[6] = { quadGoal_.pos.x, quadGoal_.pos.y, z_land_, 0, 0, 0 };
+        double max_values[2] = { V_MAX, A_MAX };
+        solver_accel_.set_max(max_values);  // TODO: To land, I use u_min_
+        solver_accel_.set_xf(xf);
+        solver_accel_.genNewTraj();*/
 
     // Solver Jerk
     /*    double xf[9] = { quadGoal_.pos.x, quadGoal_.pos.y, z_land_, 0, 0, 0, 0, 0, 0 };
@@ -520,7 +551,7 @@ void CVX::pubCB(const ros::TimerEvent& e)
 
 geometry_msgs::Vector3 CVX::getPos(int i)
 {
-  int input_order = solver_accel_.getOrder();
+  int input_order = solver_vel_.getOrder();
   geometry_msgs::Vector3 tmp;
   tmp.x = X_(i, 0);
   tmp.y = X_(i, 1);
@@ -530,7 +561,7 @@ geometry_msgs::Vector3 CVX::getPos(int i)
 
 geometry_msgs::Vector3 CVX::getVel(int i)
 {
-  int input_order = solver_accel_.getOrder();
+  int input_order = solver_vel_.getOrder();
   geometry_msgs::Vector3 tmp;
   switch (input_order)
   {
@@ -555,7 +586,7 @@ geometry_msgs::Vector3 CVX::getVel(int i)
 
 geometry_msgs::Vector3 CVX::getAccel(int i)
 {
-  int input_order = solver_accel_.getOrder();
+  int input_order = solver_vel_.getOrder();
   geometry_msgs::Vector3 tmp;
 
   switch (input_order)
@@ -587,7 +618,10 @@ geometry_msgs::Vector3 CVX::getJerk(int i)
   switch (input_order)
   {
     case VEL:
-      printf("JERK is not available\n");
+      printf("Input is Vel --> returning jerk=0\n");
+      tmp.x = 0;
+      tmp.y = 0;
+      tmp.z = 0;
       break;
     case ACCEL:
       tmp.x = U_(i, 3);
@@ -655,12 +689,20 @@ void CVX::pubTraj(Eigen::MatrixXd X)
 
 void CVX::createMarkerSetOfArrows(Eigen::MatrixXd X, bool isFree)
 {
-  // printf("In createMarkerSetOfArrows\n");
+  printf("In createMarkerSetOfArrows, X=\n");
+
+  /*  if (X.rows() == 0 || X.cols() == 0)
+    {
+      return;
+    }*/
+
+  std::cout << X << std::endl;
   geometry_msgs::Point p_last;
 
   p_last.x = X(0, 0);
   p_last.y = X(0, 1);
   p_last.z = X(0, 2);
+  printf("Antes del Loop\n");
   // TODO: change the 10 below
   for (int i = 1; i < X.rows(); i = i + 10)  // Push (a subset of) the points in the trajectory
   {

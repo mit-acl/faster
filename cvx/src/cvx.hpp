@@ -39,6 +39,7 @@ public:
   CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pub_CB);
 
 private:
+  Solver<VEL> solver_vel_;
   Solver<ACCEL> solver_accel_;
   Solver<JERK> solver_jerk_;
   // class methods
