@@ -528,13 +528,14 @@ void CVX::pubCB(const ros::TimerEvent& e)
 
     /*    if ((planner_status_ == REPLANNED && (k > OFFSET - 1)) && status_ == TRAVELING)
         {
+          printf("INCREASE OFFSET: the initial condition has already been published\n");
           planner_status_ = START_REPLANNING;  // Let's try to replan again...
           printf("pucCB1: planner_status_=START_REPLANNING\n");
         }*/
 
     // printf("k=%d\n", k);
     // printf("ROWS of X=%d\n", X_.rows());
-    if ((planner_status_ == REPLANNED && (k == OFFSET - 1)) || (force_reset_to_0_ && planner_status_ == REPLANNED))
+    if ((planner_status_ == REPLANNED && (k == OFFSET)) || (force_reset_to_0_ && planner_status_ == REPLANNED))
     {
       // printf("Starting again\n");
       force_reset_to_0_ = false;
@@ -546,10 +547,7 @@ void CVX::pubCB(const ros::TimerEvent& e)
 
       printf("pucCB2: planner_status_=START_REPLANNING\n");
       printf("%f, %f, %f, %f, %f, %f\n", X_(k, 0), X_(k, 1), X_(k, 2), X_(k, 3), X_(k, 4), X_(k, 5));
-
-      n_states_publised_ = 0;
     }
-    // printf("masabajo\n");
 
     k = std::min(k, (int)(X_.rows() - 1));
     int kp1 = std::min(k + OFFSET, (int)(X_.rows() - 1));  // k plus offset
