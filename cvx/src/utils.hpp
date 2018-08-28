@@ -147,4 +147,85 @@ inline geometry_msgs::Vector3 vectorNull()
   tmp.z = 0;
 }
 
+template <typename T>
+using vec_E = std::vector<T, Eigen::aligned_allocator<T>>;
+
+template <int N>
+using Vecf = Eigen::Matrix<decimal_t, N, 1>;
+
+template <int N>
+using vec_Vecf = vec_E<Vecf<N>>;
+
+// Given a path expressed by a vector of 3D-vectors (points), it returns its intersection with a sphere of
+// radius=r and center=center
+inline Eigen::Vector3f getIntersectionWithSphere(vec_Vecf<3> path, double r, Eigen::Vector3d center)
+{
+  int index = -1;
+  for (int i = 0; i < path.size(); i++)
+  {
+    float dist = (path[i] - center).norm();
+    if (dist > r)
+    {
+      index = i;  // This is the first point outside the sphere
+      break;
+    }
+  }
+
+  Eigen::Vector3d A;
+  Eigen::Vector3d B;
+
+  switch (index)
+  {
+    case -1:  // no points are outside the sphere --> find projection center-lastPoint into the sphere
+      A = center;
+      B = path[path.size() - 1];
+      break;
+    case 0:  // First element is outside the sphere
+      printf("First element is oustide the sphere, there is sth wrong");
+      break;
+    default:
+      A = path[index - 1];
+      B = path[index];
+  }
+
+  // http://www.ambrsoft.com/TrigoCalc/Sphere/SpherLineIntersection_.htm
+
+  std::cout << "Center=" << std::endl << center << std::endl;
+  std::cout << "Radius=" << std::endl << r << std::endl;
+  std::cout << "First Point=" << std::endl << A << std::endl;
+  std::cout << "Second Point=" << std::endl << B << std::endl;
+
+  float x1 = A[0];
+  float y1 = A[1];
+  float z1 = A[2];
+
+  float x2 = B[0];
+  float y2 = B[1];
+  float z2 = B[2];
+
+  float x3 = center[0];
+  float y3 = center[1];
+  float z3 = center[2];
+
+  float a = pow((x2 - x1), 2) + pow((y2 - y1), 2) + pow((z2 - z1), 2);
+  float b = 2 * ((x2 - x1) * (x1 - x3) + (y2 - y1) * (y1 - y3) + (z2 - z1) * (z1 - z3));
+  float c = x3 * x3 + y3 * y3 + z3 * z3 + x1 * x1 + y1 * y1 + z1 * z1 - 2 * (x3 * x1 + y3 * y1 + z3 * z1) - r * r;
+
+  float discrim = b * b - 4 * a * c;
+  if (discrim <= 0)
+  {
+    printf("The line is tangent or doesn't intersect");
+  }
+  else
+  {
+    float t = (-b + sqrt(b * b - 4 * a * c)) / (2 * a);
+    float x_int = x1 + (x2 - x1) * t;
+    float y_int = y1 + (y2 - y1) * t;
+    float z_int = z1 + (z2 - z1) * t;
+    Eigen::Vector3f Intersection(x_int, y_int, z_int);
+    std::cout << "Intersection=" << std::endl << Intersection << std::endl;
+    return Intersection;
+  }
+}
+
 #endif

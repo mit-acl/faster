@@ -39,6 +39,9 @@
 #define OFFSET                                                                                                         \
   10  // Replanning offset (the initial conditions are taken OFFSET states farther from the current position)
 
+#define Ra 4.0  // [m] Radius of the first sphere
+#define Rb 6.0  // [m] Radius of the second sphere
+
 using namespace JPS;
 
 CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pub_CB)
@@ -170,22 +173,17 @@ void CVX::solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr)
     // path
     // with more corners (not "cleaned")
     // printf("JPS Path: \n");
-    vec_Vecf<3> path_jps_vector =
-        planner_ptr->getPath();  // getRawPath() if you want the path with more corners (not "cleaned")
+    path_jps_vector_ = planner_ptr->getPath();  // getRawPath() if you want the path with more corners (not "cleaned")
 
-    directionJPS_ = path_jps_vector[1] - path_jps_vector[0];
+    directionJPS_ = path_jps_vector_[1] - path_jps_vector_[0];
     // printf("Estoy aqui: \n");
     /*    for (const auto& it : path_jps_vector)
         {
           std::cout << it.transpose() << std::endl;
         }*/
-    // printf("Estoy aqui2: \n");
     path_jps_ = clearArrows();
-    // printf("Estoy aqui3: \n");
-    vectorOfVectors2MarkerArray(path_jps_vector, &path_jps_);
-    // printf("Estoy aqui4: \n");
+    vectorOfVectors2MarkerArray(path_jps_vector_, &path_jps_);
     pub_path_jps_.publish(path_jps_);
-    // printf("Estoy aqui5: \n");
   }
   /*
  Timer time_astar(true);
@@ -286,9 +284,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   double dist_to_goal = sqrt(pow(term_goal_.pos.x - state_.pos.x, 2) + pow(term_goal_.pos.y - state_.pos.y, 2) +
                              pow(term_goal_.pos.z - state_.pos.z, 2));
 
-  // TODO: r_sphere_max should be a parameter
-  double r_sphere_max = 4.0;
-  double r = std::min(dist_to_goal, r_sphere_max);  // radius of the sphere
+  double ra = std::min(dist_to_goal, Ra);  // radius of the sphere
   Eigen::Vector3d curr_pos(state_.pos.x, state_.pos.y, state_.pos.z);
   Eigen::Vector3d term_goal(term_goal_.pos.x, term_goal_.pos.y, term_goal_.pos.z);
 
@@ -306,13 +302,19 @@ void CVX::replanCB(const ros::TimerEvent& e)
     return;
   }
 
-  solveJPS3D(pclptr_map_);
   // If you want the force to be the direction selector
   // Eigen::Vector3d force = computeForce(curr_pos, term_goal);
   // double x = force[0], y = force[1], z = force[2];
 
+  solveJPS3D(pclptr_map_);  // Solution is in path_jps_vector_
+
+  Eigen::Vector3d center(state_.pos.x, state_.pos.y, state_.pos.z);
+  Eigen::Vector3f B1 = getIntersectionWithSphere(path_jps_vector_, ra, center);
+
+  // Direction from the center to that point:
+  double x = B1[0] - center[0], y = B1[1] - center[1], z = B1[2] - center[2];
   // If you want the JPS3D solution to be the direction selector
-  double x = directionJPS_[0], y = directionJPS_[1], z = directionJPS_[2];
+  // double x = directionJPS_[0], y = directionJPS_[1], z = directionJPS_[2];
 
   double theta0 = acos(z / (sqrt(x * x + y * y + z * z)));
   double phi0 = atan2(y, x);
@@ -327,9 +329,9 @@ void CVX::replanCB(const ros::TimerEvent& e)
     for (double phi = 0; phi <= 2 * 3.14 && !found_it; phi = phi + 3.14 / 10)
     {
       Eigen::Vector3f p1, p2;
-      p1[0] = r * sin(theta) * cos(phi);
-      p1[1] = r * sin(theta) * sin(phi);
-      p1[2] = r * cos(theta);
+      p1[0] = ra * sin(theta) * cos(phi);
+      p1[1] = ra * sin(theta) * sin(phi);
+      p1[2] = ra * cos(theta);
       Eigen::Vector3f trans(state_.pos.x, state_.pos.y, state_.pos.z);
       p2 = rot_z * rot_y * p1 + trans;
 
@@ -382,11 +384,11 @@ void CVX::replanCB(const ros::TimerEvent& e)
                        nextQuadGoal_.vel.x,   nextQuadGoal_.vel.y,   nextQuadGoal_.vel.z,
                        nextQuadGoal_.accel.x, nextQuadGoal_.accel.y, nextQuadGoal_.accel.z };
 
-      printf("(Optimizando desde): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", nextQuadGoal_.pos.x, nextQuadGoal_.pos.y,
-             nextQuadGoal_.pos.z, nextQuadGoal_.vel.x, nextQuadGoal_.vel.y, nextQuadGoal_.vel.z);
+      /*      printf("(Optimizando desde): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", nextQuadGoal_.pos.x,
+         nextQuadGoal_.pos.y, nextQuadGoal_.pos.z, nextQuadGoal_.vel.x, nextQuadGoal_.vel.y, nextQuadGoal_.vel.z);
 
-      printf("(State): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", state_.pos.x, state_.pos.y, state_.pos.z,
-             state_.vel.x, state_.vel.y, state_.vel.z);
+            printf("(State): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", state_.pos.x, state_.pos.y, state_.pos.z,
+                   state_.vel.x, state_.vel.y, state_.vel.z);*/
 
       double u0[3] = { nextQuadGoal_.jerk.x, nextQuadGoal_.jerk.y, nextQuadGoal_.jerk.z };
       mtx_goals.unlock();
@@ -395,16 +397,11 @@ void CVX::replanCB(const ros::TimerEvent& e)
       double max_values[3] = { V_MAX, A_MAX, J_MAX };
       solver_jerk_.set_max(max_values);
       solver_jerk_.set_u0(u0);
-      // printf("generando new Traj\n");
       solver_jerk_.genNewTraj();
-      // printf("generated\n");
       U_temp_ = solver_jerk_.getU();
       X_temp_ = solver_jerk_.getX();
-      // printf("Checking if Free\n");
       bool isFree = trajIsFree(X_temp_);
-      // printf("Creating Markers\n");
       createMarkerSetOfArrows(X_temp_, isFree);
-      // printf("Checked if Free\n");
       if (isFree)
       {
         // printf("******Replanned!\n");
@@ -545,8 +542,8 @@ void CVX::pubCB(const ros::TimerEvent& e)
 
       planner_status_ = START_REPLANNING;
 
-      printf("pucCB2: planner_status_=START_REPLANNING\n");
-      printf("%f, %f, %f, %f, %f, %f\n", X_(k, 0), X_(k, 1), X_(k, 2), X_(k, 3), X_(k, 4), X_(k, 5));
+      // printf("pucCB2: planner_status_=START_REPLANNING\n");
+      // printf("%f, %f, %f, %f, %f, %f\n", X_(k, 0), X_(k, 1), X_(k, 2), X_(k, 3), X_(k, 4), X_(k, 5));
     }
 
     k = std::min(k, (int)(X_.rows() - 1));
@@ -554,8 +551,8 @@ void CVX::pubCB(const ros::TimerEvent& e)
                                                            // std::cout << "esto es X" << std::endl;
                                                            // std::cout << X_ << std::endl;
                                                            // printf("masabajo2\n");
-    printf("K-->%f, %f, %f, %f, %f, %f\n", X_(k, 0), X_(k, 1), X_(k, 2), X_(k, 3), X_(k, 4), X_(k, 5));
-    printf("KP1-->%f, %f, %f, %f, %f, %f\n", X_(kp1, 0), X_(kp1, 1), X_(kp1, 2), X_(kp1, 3), X_(kp1, 4), X_(kp1, 5));
+    // printf("K-->%f, %f, %f, %f, %f, %f\n", X_(k, 0), X_(k, 1), X_(k, 2), X_(k, 3), X_(k, 4), X_(k, 5));
+    // printf("KP1-->%f, %f, %f, %f, %f, %f\n", X_(kp1, 0), X_(kp1, 1), X_(kp1, 2), X_(kp1, 3), X_(kp1, 4), X_(kp1, 5));
     quadGoal_.pos = getPos(k);
     quadGoal_.vel = getVel(k);
     //// printf("masabajo3\n");

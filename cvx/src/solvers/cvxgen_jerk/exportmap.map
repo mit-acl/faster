@@ -3,6 +3,7 @@ global:
 	jerk_initialize_optimizer;
 	jerk_optimize;
 	jerk_load_default_data;
+	jerk_get_cost;
 	jerk_get_state;
 	jerk_get_control;
 local: *;

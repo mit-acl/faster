@@ -34,6 +34,11 @@ int CONCATENATE_INPUT(optimize)(void)
   return work.converged;
 }
 
+double CONCATENATE_INPUT(get_cost)(void)
+{
+  return eval_objv();
+}
+
 double** CONCATENATE_INPUT(get_state)(void)
 {
   return vars.x;

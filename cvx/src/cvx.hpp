@@ -151,6 +151,7 @@ private:
   bool force_reset_to_0_ = 1;
 
   Eigen::Vector3d directionJPS_;
+  vec_Vecf<3> path_jps_vector_;
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_map_;
 

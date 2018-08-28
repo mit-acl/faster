@@ -15,6 +15,7 @@ public:
   Solver();
   void interpolate(int var, double** u, double** x);
   void obtainByDerivation(double** u, double** x);
+  double getCost();
   Eigen::MatrixXd getX();
   Eigen::MatrixXd getU();
   void set_x0(double x0[]);
@@ -32,6 +33,7 @@ public:
 protected:
   Eigen::MatrixXd U_temp_;
   Eigen::MatrixXd X_temp_;
+  double cost_;
   double dt_;  // time step found by the solver
   int N_;
   double xf_[3 * INPUT_ORDER];
@@ -140,6 +142,25 @@ void Solver<INPUT_ORDER>::resetXandU()
   size = (size < 2) ? 2 : size;  // force size to be at least 2
   U_temp_ = Eigen::MatrixXd::Zero(size, 6);
   X_temp_ = Eigen::MatrixXd::Zero(size, 3 * INPUT_ORDER);
+}
+
+template <int INPUT_ORDER>
+double Solver<INPUT_ORDER>::getCost()
+{
+  switch (INPUT_ORDER)
+  {
+    case VEL:
+      printf("not implemented yet\n");
+      // cost_=vel_get_cost();
+      break;
+    case ACCEL:
+      // cost_=accel_get_cost();
+      break;
+    case JERK:
+      cost_ = jerk_get_cost();
+      break;
+  }
+  return cost_;
 }
 
 template <int INPUT_ORDER>
@@ -331,6 +352,21 @@ void Solver<INPUT_ORDER>::genNewTraj()
     case JERK:
       x = jerk_get_state();
       u = jerk_get_control();
+
+      /*      double my_cost = 0;
+            for (int i = 1; i <= N_ - 1; i++)
+            {
+              my_cost = my_cost + u[i][0] * u[i][0] + u[i][1] * u[i][1] + u[i][2] * u[i][2];
+            }
+            double term_cost = 0;
+            for (int i = 0; i <= 8; i++)
+            {
+              term_cost = term_cost + 100000 * pow(x[N_][i] - xf_[i], 2);
+            }
+            my_cost = my_cost + term_cost;
+            printf("*****My total cost: %f\n", my_cost);
+            printf("*****Real total cost: %f\n", getCost());*/
+
       interpolate(POS, u, x);    // interpolate POS
       interpolate(VEL, u, x);    // ...
       interpolate(ACCEL, u, x);  // ...
