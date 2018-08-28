@@ -26,6 +26,16 @@
 // Solvers includes
 #include "solvers/solvers.hpp"
 
+// status_ : TRAVELING-->GOAL_SEEN-->GOAL_REACHED-->TRAVELING-->...
+#define TRAVELING 0
+#define GOAL_SEEN 1
+#define GOAL_REACHED 2
+
+// planner_status_
+#define FIRST_PLAN 0
+#define START_REPLANNING 1
+#define REPLANNED 2
+
 struct kdTreeStamped
 {
   pcl::KdTreeFLANN<pcl::PointXYZ> kdTree;
@@ -119,7 +129,7 @@ private:
   Eigen::MatrixXd U_, X_;  // Contains the intepolated input/states that will be sent to the drone
   Eigen::MatrixXd U_temp_,
       X_temp_;  // Contains the intepolated input/states of a traj. If the traj. is free, it will be copied to U_, X_
-  bool replan_, optimized_, use_ff_;
+  bool optimized_, use_ff_;
   double u_min_, u_max_, z_start_, spinup_time_, z_land_;
   // int N_ = 20;
   pcl::KdTreeFLANN<pcl::PointXYZ> kdtree_map_;  // kdtree of the point cloud of the map
@@ -133,7 +143,16 @@ private:
   int cells_y_;  // Number of cells of the map in Y
   int cells_z_;  // Number of cells of the map in Z
 
+  int n_states_publised_ = 0;  // Number of goals=states published
+
+  int status_ = TRAVELING;  // status_ can be TRAVELING, GOAL_SEEN, GOAL_REACHED
+  int planner_status_ = FIRST_PLAN;
+
+  bool force_reset_to_0_ = 1;
+
   Eigen::Vector3d directionJPS_;
+
+  pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_map_;
 
   std::mutex mtx;
 

@@ -215,11 +215,11 @@ void Solver<INPUT_ORDER>::interpolate(int var, double** u, double** x)
 {
   int nxd = N_ + 1;
   int nd[] = { nxd };
-  printf("N_=%d\n", N_);
-  printf("dt_=%f\n", dt_);
-  printf("DC=%f\n", DC);
+  // printf("N_=%d\n", N_);
+  // printf("dt_=%f\n", dt_);
+  // printf("DC=%f\n", DC);
   int ni = (int)(N_)*dt_ / DC;  // total number of points
-  printf("ni=%d", ni);
+  // printf("ni=%d", ni);
   double xd[nxd];
   double yd[nxd];
   double xi[ni];
@@ -310,15 +310,15 @@ void Solver<INPUT_ORDER>::genNewTraj()
   switch (INPUT_ORDER)
   {
     case VEL:
-      printf("To grab states/control\n");
+      // printf("To grab states/control\n");
       x = vel_get_state();
       u = vel_get_control();
-      printf("To interpolate\n");
+      // printf("To interpolate\n");
       interpolate(POS, u, x);  // interpolate POS
       interpolate(VEL, u, x);  // ...
-      printf("To obtain by derivation\n");
+      // printf("To obtain by derivation\n");
       obtainByDerivation(u, x);
-      printf("Obtained by derivation\n");
+      // printf("Obtained by derivation\n");
       break;
     case ACCEL:
       x = accel_get_state();
@@ -397,8 +397,8 @@ void Solver<INPUT_ORDER>::callOptimizer()
     }
     dt += 0.025;
   }
-  ROS_INFO("Iterations = %d\n", i);
-  ROS_INFO("converged, dt = %f", dt);
+  // ROS_INFO("Iterations = %d\n", i);
+  // ROS_INFO("converged, dt = %f", dt);
   dt_ = dt;
 }
 
@@ -417,9 +417,9 @@ double Solver<INPUT_ORDER>::getDTInitial()
   t_vx = (xf_[0] - x0_[0]) / v_max_;
   t_vy = (xf_[1] - x0_[1]) / v_max_;
   t_vz = (xf_[2] - x0_[2]) / v_max_;
-  printf("%f\n", t_vx);
-  printf("%f\n", t_vy);
-  printf("%f\n", t_vz);
+  // printf("%f\n", t_vx);
+  // printf("%f\n", t_vy);
+  // printf("%f\n", t_vz);
   switch (INPUT_ORDER)
   {
     case VEL:
@@ -449,7 +449,7 @@ double Solver<INPUT_ORDER>::getDTInitial()
     printf("there is not a solution to the previous equations");
     dt_initial = 0;
   }
-  printf("dt_initial=%f", dt_initial);
+  // printf("dt_initial=%f", dt_initial);
   return dt_initial;
 }
 

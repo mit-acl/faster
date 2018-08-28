@@ -19,6 +19,8 @@
 
 // TODO: Quiz'a puedo anadir al potential field otra fuerza que me aleje de los sitios por los cuales ya he pasado?
 
+// TODO: I think in CVXGEN it should be sum from 0 to..., instead of from 1 to... (in the cost function)
+
 #include "cvx.hpp"
 #include "geometry_msgs/PointStamped.h"
 #include "nav_msgs/Path.h"
@@ -34,12 +36,14 @@
 #include <algorithm>
 #include <vector>
 
+#define OFFSET                                                                                                         \
+  10  // Replanning offset (the initial conditions are taken OFFSET states farther from the current position)
+
 using namespace JPS;
 
 CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pub_CB)
   : nh_(nh), nh_replan_CB_(nh_replan_CB), nh_pub_CB_(nh_pub_CB)
 {
-  replan_ = false;
   optimized_ = false;
   flight_mode_.mode = flight_mode_.NOT_FLYING;
 
@@ -103,6 +107,9 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   cells_x_ = (int)WDX / RES;
   cells_y_ = (int)WDY / RES;
   cells_z_ = (int)WDZ / RES;
+
+  // pcl::PointCloud<pcl::PointXYZ>::Ptr tmp(new pcl::PointCloud<pcl::PointXYZ>);
+  pclptr_map_ = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
 
   name_drone_ = ros::this_node::getNamespace();
   name_drone_.erase(0, 2);  // Erase slashes
@@ -250,9 +257,12 @@ void CVX::vectorOfVectors2MarkerArray(vec_Vecf<3> traj, visualization_msgs::Mark
 
 void CVX::goalCB(const acl_msgs::TermGoal& msg)
 {
-  // printf("In goalCB\n");
+  printf("NEW GOAL************************************************\n");
   term_goal_ = msg;
-  replanning_needed_ = true;
+  status_ = TRAVELING;
+  planner_status_ = START_REPLANNING;
+  force_reset_to_0_ = true;
+  printf("GCB: planner_status_ = START_REPLANNING\n");
   goal_click_initialized_ = true;
   clearMarkerActualTraj();
 }
@@ -285,13 +295,18 @@ void CVX::replanCB(const ros::TimerEvent& e)
   // TODO: I'm using only the direction of the force, but not the magnitude. Could I use the magnitude?
   // TODO: If I'm only using the direction of the force, not sure if quadratic+linear separation is needed in the
   // attractive force
+  if (dist_to_goal < GOAL_RADIUS)
+  {
+    status_ = GOAL_REACHED;
+  }
 
-  if (replanning_needed_ == false || dist_to_goal < GOAL_RADIUS)
+  if (status_ == GOAL_SEEN || status_ == GOAL_REACHED || planner_status_ == REPLANNED)
   {
     // printf("No replanning needed\n");
     return;
   }
 
+  solveJPS3D(pclptr_map_);
   // If you want the force to be the direction selector
   // Eigen::Vector3d force = computeForce(curr_pos, term_goal);
   // double x = force[0], y = force[1], z = force[2];
@@ -323,26 +338,26 @@ void CVX::replanCB(const ros::TimerEvent& e)
         continue;
       }
 
-      // Solver VEL
-      double xf_sphere[3] = { p2[0], p2[1], p2[2] };
-      mtx_goals.lock();
-      double x0[3] = { nextQuadGoal_.pos.x, nextQuadGoal_.pos.y, nextQuadGoal_.pos.z };
-      double u0[3] = { nextQuadGoal_.vel.x, nextQuadGoal_.vel.y, nextQuadGoal_.vel.z };
-      mtx_goals.unlock();
-      solver_vel_.set_xf(xf_sphere);
-      solver_vel_.set_x0(x0);
-      printf("x0 is %f, %f, %f\n", x0[0], x0[1], x0[2]);
-      printf("xf is %f, %f, %f\n", xf_sphere[0], xf_sphere[1], xf_sphere[2]);
-      double max_values[1] = { V_MAX };
-      solver_vel_.set_max(max_values);
-      solver_vel_.set_u0(u0);
-      solver_vel_.genNewTraj();
-      printf("generated new traj\n");
-      U_temp_ = solver_vel_.getU();
-      printf("got U\n");
-      X_temp_ = solver_vel_.getX();
-      printf("X_temp=\n");
-      std::cout << X_temp_ << std::endl;
+      /*      // Solver VEL
+            double xf_sphere[3] = { p2[0], p2[1], p2[2] };
+            mtx_goals.lock();
+            double x0[3] = { nextQuadGoal_.pos.x, nextQuadGoal_.pos.y, nextQuadGoal_.pos.z };
+            double u0[3] = { nextQuadGoal_.vel.x, nextQuadGoal_.vel.y, nextQuadGoal_.vel.z };
+            mtx_goals.unlock();
+            solver_vel_.set_xf(xf_sphere);
+            solver_vel_.set_x0(x0);
+            printf("x0 is %f, %f, %f\n", x0[0], x0[1], x0[2]);
+            printf("xf is %f, %f, %f\n", xf_sphere[0], xf_sphere[1], xf_sphere[2]);
+            double max_values[1] = { V_MAX };
+            solver_vel_.set_max(max_values);
+            solver_vel_.set_u0(u0);
+            solver_vel_.genNewTraj();
+            printf("generated new traj\n");
+            U_temp_ = solver_vel_.getU();
+            printf("got U\n");
+            X_temp_ = solver_vel_.getX();
+            printf("X_temp=\n");
+            std::cout << X_temp_ << std::endl;*/
 
       /*      // Solver ACCEL
             double xf_sphere[6] = { p2[0], p2[1], p2[2], 0, 0, 0 };
@@ -361,35 +376,41 @@ void CVX::replanCB(const ros::TimerEvent& e)
             X_temp_ = solver_accel_.getX();*/
 
       // Solver JERK
-      /*      double xf_sphere[9] = { p2[0], p2[1], p2[2], 0, 0, 0, 0, 0, 0 };
-            mtx_goals.lock();
-            double x0[9] = { nextQuadGoal_.pos.x,   nextQuadGoal_.pos.y,   nextQuadGoal_.pos.z,
-                             nextQuadGoal_.vel.x,   nextQuadGoal_.vel.y,   nextQuadGoal_.vel.z,
-                             nextQuadGoal_.accel.x, nextQuadGoal_.accel.y, nextQuadGoal_.accel.z };
+      double xf_sphere[9] = { p2[0], p2[1], p2[2], 0, 0, 0, 0, 0, 0 };
+      mtx_goals.lock();
+      double x0[9] = { nextQuadGoal_.pos.x,   nextQuadGoal_.pos.y,   nextQuadGoal_.pos.z,
+                       nextQuadGoal_.vel.x,   nextQuadGoal_.vel.y,   nextQuadGoal_.vel.z,
+                       nextQuadGoal_.accel.x, nextQuadGoal_.accel.y, nextQuadGoal_.accel.z };
 
-            double u0[3] = { nextQuadGoal_.jerk.x, nextQuadGoal_.jerk.y, nextQuadGoal_.jerk.z };
-            mtx_goals.unlock();
-            solver_jerk_.set_xf(xf_sphere);
-            solver_jerk_.set_x0(x0);
-            double max_values[3] = { V_MAX, A_MAX, J_MAX };
-            solver_jerk_.set_max(max_values);
-            solver_jerk_.set_u0(u0);
-            printf("generando new Traj\n");
-            solver_jerk_.genNewTraj();
-            printf("generated\n");
-            U_temp_ = solver_jerk_.getU();
-            X_temp_ = solver_jerk_.getX();*/
-      printf("Checking if Free\n");
+      printf("(Optimizando desde): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", nextQuadGoal_.pos.x, nextQuadGoal_.pos.y,
+             nextQuadGoal_.pos.z, nextQuadGoal_.vel.x, nextQuadGoal_.vel.y, nextQuadGoal_.vel.z);
+
+      printf("(State): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", state_.pos.x, state_.pos.y, state_.pos.z,
+             state_.vel.x, state_.vel.y, state_.vel.z);
+
+      double u0[3] = { nextQuadGoal_.jerk.x, nextQuadGoal_.jerk.y, nextQuadGoal_.jerk.z };
+      mtx_goals.unlock();
+      solver_jerk_.set_xf(xf_sphere);
+      solver_jerk_.set_x0(x0);
+      double max_values[3] = { V_MAX, A_MAX, J_MAX };
+      solver_jerk_.set_max(max_values);
+      solver_jerk_.set_u0(u0);
+      // printf("generando new Traj\n");
+      solver_jerk_.genNewTraj();
+      // printf("generated\n");
+      U_temp_ = solver_jerk_.getU();
+      X_temp_ = solver_jerk_.getX();
+      // printf("Checking if Free\n");
       bool isFree = trajIsFree(X_temp_);
-      printf("Creating Markers\n");
+      // printf("Creating Markers\n");
       createMarkerSetOfArrows(X_temp_, isFree);
-      printf("Checked if Free\n");
+      // printf("Checked if Free\n");
       if (isFree)
       {
         // printf("******Replanned!\n");
-        X_ = X_temp_;
-        U_ = U_temp_;
-        replan_ = true;
+
+        planner_status_ = REPLANNED;  // Don't replan again until start publishing current solution
+        printf("ReplanCB: planner_status_ = REPLANNED\n");
         optimized_ = true;
         pubTraj(X_);
         found_it = 1;
@@ -399,7 +420,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
         if (dist_end_traj_to_goal < GOAL_RADIUS)
         {  // I've found a free path that ends in the goal --> no more replanning (to avoid oscillations when reaching
           // the goal)
-          replanning_needed_ = false;
+          status_ = GOAL_SEEN;
+          printf("CHANGED TO GOAL_SEEN********\n");
         }
       }
     }
@@ -409,8 +431,6 @@ void CVX::replanCB(const ros::TimerEvent& e)
     ROS_ERROR("Unable to find a free traj");
   }
   pub_trajs_sphere_.publish(trajs_sphere_);
-  printf("published\n");
-
   // ROS_WARN("solve time: %0.2f ms", 1000 * (ros::Time::now().toSec() - then));
   // printf("Time in replanCB %0.2f ms\n", 1000 * (ros::Time::now().toSec() - t0replanCB));
 }
@@ -421,11 +441,11 @@ void CVX::modeCB(const acl_msgs::QuadFlightMode& msg)
   if (msg.mode == msg.LAND && flight_mode_.mode != flight_mode_.LAND)
   {
     // Solver Vel
-    double xf[6] = { quadGoal_.pos.x, quadGoal_.pos.y, z_land_ };
-    double max_values[1] = { V_MAX };
-    solver_vel_.set_max(max_values);  // TODO: To land, I use u_min_
-    solver_vel_.set_xf(xf);
-    solver_vel_.genNewTraj();
+    /*    double xf[6] = { quadGoal_.pos.x, quadGoal_.pos.y, z_land_ };
+        double max_values[1] = { V_MAX };
+        solver_vel_.set_max(max_values);  // TODO: To land, I use u_min_
+        solver_vel_.set_xf(xf);
+        solver_vel_.genNewTraj();*/
 
     // Solver Accel
     /*    double xf[6] = { quadGoal_.pos.x, quadGoal_.pos.y, z_land_, 0, 0, 0 };
@@ -435,18 +455,19 @@ void CVX::modeCB(const acl_msgs::QuadFlightMode& msg)
         solver_accel_.genNewTraj();*/
 
     // Solver Jerk
-    /*    double xf[9] = { quadGoal_.pos.x, quadGoal_.pos.y, z_land_, 0, 0, 0, 0, 0, 0 };
-        double max_values[3] = { V_MAX, A_MAX, J_MAX };
-        solver_jerk_.set_max(max_values);  // TODO: To land, I use u_min_
-        solver_jerk_.set_xf(xf);
-        solver_jerk_.genNewTraj();*/
+    double xf[9] = { quadGoal_.pos.x, quadGoal_.pos.y, z_land_, 0, 0, 0, 0, 0, 0 };
+    double max_values[3] = { V_MAX, A_MAX, J_MAX };
+    solver_jerk_.set_max(max_values);  // TODO: To land, I use u_min_
+    solver_jerk_.set_xf(xf);
+    solver_jerk_.genNewTraj();
   }
   flight_mode_.mode = msg.mode;
 }
 
 void CVX::stateCB(const acl_msgs::State& msg)
 {
-  // printf("In stateCB\n");
+  // printf("(State): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", msg.pos.x, msg.pos.y, msg.pos.z, msg.vel.x, msg.vel.y,
+  //       msg.vel.z);
   state_ = msg;
   // Stop updating when we get GO
   if (flight_mode_.mode == flight_mode_.NOT_FLYING || flight_mode_.mode == flight_mode_.KILL)
@@ -504,24 +525,59 @@ void CVX::pubCB(const ros::TimerEvent& e)
   if (optimized_ && flight_mode_.mode != flight_mode_.NOT_FLYING && flight_mode_.mode != flight_mode_.KILL)
   {
     quadGoal_.cut_power = false;
-    if (replan_)
+
+    /*    if ((planner_status_ == REPLANNED && (k > OFFSET - 1)) && status_ == TRAVELING)
+        {
+          planner_status_ = START_REPLANNING;  // Let's try to replan again...
+          printf("pucCB1: planner_status_=START_REPLANNING\n");
+        }*/
+
+    // printf("k=%d\n", k);
+    // printf("ROWS of X=%d\n", X_.rows());
+    if ((planner_status_ == REPLANNED && (k == OFFSET - 1)) || (force_reset_to_0_ && planner_status_ == REPLANNED))
     {
-      printf("***Setting k=0!\n");
+      // printf("Starting again\n");
+      force_reset_to_0_ = false;
+      X_ = X_temp_;
+      U_ = U_temp_;
       k = 0;  // Start again publishing the waypoints in X_ from the first row
-      replan_ = false;
+
+      planner_status_ = START_REPLANNING;
+
+      printf("pucCB2: planner_status_=START_REPLANNING\n");
+      printf("%f, %f, %f, %f, %f, %f\n", X_(k, 0), X_(k, 1), X_(k, 2), X_(k, 3), X_(k, 4), X_(k, 5));
+
+      n_states_publised_ = 0;
     }
+    // printf("masabajo\n");
 
     k = std::min(k, (int)(X_.rows() - 1));
-    int kp1 = std::min(k + 1, (int)(X_.rows() - 1));  // k plus one
-
+    int kp1 = std::min(k + OFFSET, (int)(X_.rows() - 1));  // k plus offset
+                                                           // std::cout << "esto es X" << std::endl;
+                                                           // std::cout << X_ << std::endl;
+                                                           // printf("masabajo2\n");
+    printf("K-->%f, %f, %f, %f, %f, %f\n", X_(k, 0), X_(k, 1), X_(k, 2), X_(k, 3), X_(k, 4), X_(k, 5));
+    printf("KP1-->%f, %f, %f, %f, %f, %f\n", X_(kp1, 0), X_(kp1, 1), X_(kp1, 2), X_(kp1, 3), X_(kp1, 4), X_(kp1, 5));
     quadGoal_.pos = getPos(k);
     quadGoal_.vel = getVel(k);
+    //// printf("masabajo3\n");
     quadGoal_.accel = (use_ff_) ? getAccel(k) : vectorNull();
     quadGoal_.jerk = (use_ff_) ? getJerk(k) : vectorNull();
-    nextQuadGoal_.pos = getPos(kp1);
-    nextQuadGoal_.vel = getVel(kp1);
-    nextQuadGoal_.accel = (use_ff_) ? getAccel(kp1) : vectorNull();
-    nextQuadGoal_.jerk = (use_ff_) ? getJerk(kp1) : vectorNull();
+
+    if (status_ != GOAL_REACHED)
+    {
+      nextQuadGoal_.pos = getPos(kp1);
+      nextQuadGoal_.vel = getVel(kp1);
+      nextQuadGoal_.accel = (use_ff_) ? getAccel(kp1) : vectorNull();
+      nextQuadGoal_.jerk = (use_ff_) ? getJerk(kp1) : vectorNull();
+    }
+    else
+    {
+      nextQuadGoal_.pos = state_.pos;
+      nextQuadGoal_.vel = vectorNull();
+      nextQuadGoal_.accel = vectorNull();
+      nextQuadGoal_.jerk = vectorNull();
+    }
     k++;
   }
   else
@@ -531,11 +587,12 @@ void CVX::pubCB(const ros::TimerEvent& e)
 
   // printf("In pubCB5\n");
   /*  ROS_INFO("publishing quadGoal: %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", quadGoal_.pos.x, quadGoal_.pos.y,
-             quadGoal_.pos.z, quadGoal_.vel.x, quadGoal_.vel.y, quadGoal_.vel.z);
-    ROS_INFO("(y nextQuadGoal_): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", nextQuadGoal_.pos.x, nextQuadGoal_.pos.y,
-             nextQuadGoal_.pos.z, nextQuadGoal_.vel.x, nextQuadGoal_.vel.y, nextQuadGoal_.vel.z);*/
+             quadGoal_.pos.z, quadGoal_.vel.x, quadGoal_.vel.y, quadGoal_.vel.z);*/
+  // printf("(NextQuadGoal_): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", nextQuadGoal_.pos.x, nextQuadGoal_.pos.y,
+  //       nextQuadGoal_.pos.z, nextQuadGoal_.vel.x, nextQuadGoal_.vel.y, nextQuadGoal_.vel.z);
 
   pub_goal_.publish(quadGoal_);
+  // n_states_publised_ = n_states_publised_ + 1;
 
   // Pub setpoint maker.  setpoint_ is the last quadGoal sent to the drone
   setpoint_.header.stamp = ros::Time::now();
@@ -547,11 +604,12 @@ void CVX::pubCB(const ros::TimerEvent& e)
   // printf("End pubCB\n");
   // printf("#########Time in pubCB %0.2f ms\n", 1000 * (ros::Time::now().toSec() - t0pubCB));
   mtx_goals.unlock();
+  // printf("Y mas masabajo\n");
 }
 
 geometry_msgs::Vector3 CVX::getPos(int i)
 {
-  int input_order = solver_vel_.getOrder();
+  int input_order = solver_jerk_.getOrder();
   geometry_msgs::Vector3 tmp;
   tmp.x = X_(i, 0);
   tmp.y = X_(i, 1);
@@ -561,7 +619,7 @@ geometry_msgs::Vector3 CVX::getPos(int i)
 
 geometry_msgs::Vector3 CVX::getVel(int i)
 {
-  int input_order = solver_vel_.getOrder();
+  int input_order = solver_jerk_.getOrder();
   geometry_msgs::Vector3 tmp;
   switch (input_order)
   {
@@ -586,7 +644,7 @@ geometry_msgs::Vector3 CVX::getVel(int i)
 
 geometry_msgs::Vector3 CVX::getAccel(int i)
 {
-  int input_order = solver_vel_.getOrder();
+  int input_order = solver_jerk_.getOrder();
   geometry_msgs::Vector3 tmp;
 
   switch (input_order)
@@ -612,7 +670,7 @@ geometry_msgs::Vector3 CVX::getAccel(int i)
 
 geometry_msgs::Vector3 CVX::getJerk(int i)
 {
-  int input_order = solver_accel_.getOrder();
+  int input_order = solver_jerk_.getOrder();
   geometry_msgs::Vector3 tmp;
 
   switch (input_order)
@@ -689,20 +747,18 @@ void CVX::pubTraj(Eigen::MatrixXd X)
 
 void CVX::createMarkerSetOfArrows(Eigen::MatrixXd X, bool isFree)
 {
-  printf("In createMarkerSetOfArrows, X=\n");
+  // printf("In createMarkerSetOfArrows, X=\n");
 
   /*  if (X.rows() == 0 || X.cols() == 0)
     {
       return;
     }*/
 
-  std::cout << X << std::endl;
   geometry_msgs::Point p_last;
 
   p_last.x = X(0, 0);
   p_last.y = X(0, 1);
   p_last.z = X(0, 2);
-  printf("Antes del Loop\n");
   // TODO: change the 10 below
   for (int i = 1; i < X.rows(); i = i + 10)  // Push (a subset of) the points in the trajectory
   {
@@ -825,15 +881,15 @@ void CVX::mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
   }
   mtx.lock();
   // printf("In mapCB2\n");
-  pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::fromROSMsg(*pcl2ptr_msg, *pclptr);
+  // pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr(new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::fromROSMsg(*pcl2ptr_msg, *pclptr_map_);
   std::vector<int> index;
   // TODO: there must be a better way to check this. It's here because (in the simulation) sometimes all the points
   // are NaN (when the drone is on the ground and stuck moving randomly). If this is not done, the program breaks. I
   // think it won't be needed in the real drone
   // printf("In mapCB3\n");
-  pcl::removeNaNFromPointCloud(*pclptr, *pclptr, index);
-  if (pclptr->size() == 0)
+  pcl::removeNaNFromPointCloud(*pclptr_map_, *pclptr_map_, index);
+  if (pclptr_map_->size() == 0)
   {
     return;
   }
@@ -849,9 +905,9 @@ void CVX::mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
     // printf("despues i=%d\n", i);
   }
   // printf("below\n");
-  solveJPS3D(pclptr);
 
-  kdtree_map_.setInputCloud(pclptr);
+  kdtree_map_.setInputCloud(pclptr_map_);
+
   kdtree_map_initialized_ = 1;
   // printf("pasado2\n");
   mtx.unlock();
