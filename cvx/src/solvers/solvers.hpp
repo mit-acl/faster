@@ -150,10 +150,10 @@ double Solver<INPUT_ORDER>::getCost()
   switch (INPUT_ORDER)
   {
     case VEL:
-      printf("not implemented yet\n");
-      // cost_=vel_get_cost();
+      cost_ = vel_get_cost();
       break;
     case ACCEL:
+      printf("not implemented yet\n");
       // cost_=accel_get_cost();
       break;
     case JERK:

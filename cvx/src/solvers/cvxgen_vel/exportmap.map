@@ -3,6 +3,7 @@ global:
 	vel_initialize_optimizer;
 	vel_optimize;
 	vel_load_default_data;
+	vel_get_cost;
 	vel_get_state;
 	vel_get_control;
 local: *;

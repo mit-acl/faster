@@ -82,7 +82,7 @@ private:
   // geometry_msgs::Point pointOrigin();
   // geometry_msgs::Point eigen2point(Eigen::Vector3d vector);
   void pubActualTraj();
-  void solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr);
+  void solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr, Vec3f start, Vec3f goal);
   void vectorOfVectors2MarkerArray(vec_Vecf<3> traj, visualization_msgs::MarkerArray* m_array);
   visualization_msgs::MarkerArray clearArrows();
   // geometry_msgs::Vector3 vectorNull();
@@ -90,6 +90,8 @@ private:
   geometry_msgs::Vector3 getVel(int i);
   geometry_msgs::Vector3 getAccel(int i);
   geometry_msgs::Vector3 getJerk(int i);
+
+  double solveVelAndGetCost(vec_Vecf<3> path);
 
   visualization_msgs::Marker setpoint_;
   acl_msgs::QuadGoal quadGoal_;

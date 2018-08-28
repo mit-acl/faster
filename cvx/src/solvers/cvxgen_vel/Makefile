@@ -1,5 +1,5 @@
 INPUT=vel
-OPT = -Wall -O3  
+OPT = -Wall -Os
 # The option -03 will compile with all the optimizations available for max performance
 # libmath is needed for sqrt, which is used only for reporting the gap. Can
 # remove if desired for production solvers..

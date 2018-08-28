@@ -136,35 +136,31 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   ROS_INFO("Planner initialized");
 }
 
-void CVX::solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr)
+void CVX::solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr, Vec3f start, Vec3f goal)
 {
-  // printf("In solveJPSD\n");
   // Create a map
-  const Vec3f start(state_.pos.x, state_.pos.y, state_.pos.z);
-  const Vec3f goal(term_goal_.pos.x, term_goal_.pos.y, term_goal_.pos.z);
+  // const Vec3f start(state_.pos.x, state_.pos.y, state_.pos.z);
+  // const Vec3f goal(term_goal_.pos.x, term_goal_.pos.y, term_goal_.pos.z);
+  /*  std::cout << "Solving JPS from start\n" << start << std::endl;
+    std::cout << "To goal\n" << goal << std::endl;*/
   const Vec3i dim(cells_x_, cells_y_, cells_z_);  //  number of cells in each dimension
-  // printf("In solveJPSD2\n");
-  const Vec3f center_map(state_.pos.x, state_.pos.y, state_.pos.z);  // position of the drone
+  const Vec3f center_map = start;                 // position of the drone
   // Read the pointcloud
-  // printf("In solveJPSD2.5\n");
-  MapReader<Vec3i, Vec3f> reader(pclptr, dim, RES, center_map);  // Map read
 
-  // printf("In solveJPSD3\n");
+  MapReader<Vec3i, Vec3f> reader(pclptr, dim, RES, center_map);  // Map read
 
   std::shared_ptr<VoxelMapUtil> map_util = std::make_shared<VoxelMapUtil>();
   map_util->setMap(reader.origin(), reader.dim(), reader.data(), reader.resolution());
-  // printf("In solveJPSD3.5\n");
 
   std::unique_ptr<JPSPlanner3D> planner_ptr(new JPSPlanner3D(false));  // Declare a planner
-  // printf("In solveJPSD5\n");
+
   planner_ptr->setMapUtil(map_util);  // Set collision checking function
   planner_ptr->updateMap();
 
-  // printf("In solveJPSD6\n");
   Timer time_jps(true);
   bool valid_jps = planner_ptr->plan(
       start, goal, 1, true);  // Plan from start to goal with heuristic weight=1, and using JPS (if false --> use A*)
-  // printf("In solveJPSD6.5\n");
+
   if (valid_jps == true)  // There is a solution
   {
     double dt_jps = time_jps.Elapsed().count();
@@ -175,6 +171,8 @@ void CVX::solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr)
     // printf("JPS Path: \n");
     path_jps_vector_ = planner_ptr->getPath();  // getRawPath() if you want the path with more corners (not "cleaned")
 
+    /*    printf("First point in path_jps_vector_:\n");
+        std::cout << path_jps_vector_[0].transpose() << std::endl;*/
     directionJPS_ = path_jps_vector_[1] - path_jps_vector_[0];
     // printf("Estoy aqui: \n");
     /*    for (const auto& it : path_jps_vector)
@@ -284,8 +282,11 @@ void CVX::replanCB(const ros::TimerEvent& e)
   double dist_to_goal = sqrt(pow(term_goal_.pos.x - state_.pos.x, 2) + pow(term_goal_.pos.y - state_.pos.y, 2) +
                              pow(term_goal_.pos.z - state_.pos.z, 2));
 
-  double ra = std::min(dist_to_goal, Ra);  // radius of the sphere
-  Eigen::Vector3d curr_pos(state_.pos.x, state_.pos.y, state_.pos.z);
+  // 0.96 and 0.98 are to ensure that ra<rb<dist_to_goal always
+  double ra = std::min(0.96 * dist_to_goal, Ra);                        // radius of the sphere Sa
+  double rb = std::min(0.98 * dist_to_goal, Rb);                        // radius of the sphere Sa
+  Eigen::Vector3d state_pos(state_.pos.x, state_.pos.y, state_.pos.z);  // Local copy of state
+  Eigen::Vector3d curr_pos = state_pos;
   Eigen::Vector3d term_goal(term_goal_.pos.x, term_goal_.pos.y, term_goal_.pos.z);
 
   // TODO: I'm using only the direction of the force, but not the magnitude. Could I use the magnitude?
@@ -295,10 +296,10 @@ void CVX::replanCB(const ros::TimerEvent& e)
   {
     status_ = GOAL_REACHED;
   }
-
+  // printf("Entering in replanCB, planner_status_=%d\n", planner_status_);
   if (status_ == GOAL_SEEN || status_ == GOAL_REACHED || planner_status_ == REPLANNED)
   {
-    // printf("No replanning needed\n");
+    // printf("No replanning needed because planner_status_=%d\n", planner_status_);
     return;
   }
 
@@ -306,10 +307,11 @@ void CVX::replanCB(const ros::TimerEvent& e)
   // Eigen::Vector3d force = computeForce(curr_pos, term_goal);
   // double x = force[0], y = force[1], z = force[2];
 
-  solveJPS3D(pclptr_map_);  // Solution is in path_jps_vector_
+  Vec3f goal(term_goal_.pos.x, term_goal_.pos.y, term_goal_.pos.z);
+  solveJPS3D(pclptr_map_, state_pos, goal);  // Solution is in path_jps_vector_
 
-  Eigen::Vector3d center(state_.pos.x, state_.pos.y, state_.pos.z);
-  Eigen::Vector3f B1 = getIntersectionWithSphere(path_jps_vector_, ra, center);
+  Eigen::Vector3d center = state_pos;
+  Eigen::Vector3d B1 = getFirstIntersectionWithSphere(path_jps_vector_, ra, center);
 
   // Direction from the center to that point:
   double x = B1[0] - center[0], y = B1[1] - center[1], z = B1[2] - center[2];
@@ -321,18 +323,18 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   bool found_it = 0;
 
-  Eigen::AngleAxis<float> rot_z(phi0, Eigen::Vector3f::UnitZ());
-  Eigen::AngleAxis<float> rot_y(theta0, Eigen::Vector3f::UnitY());
+  Eigen::AngleAxis<double> rot_z(phi0, Eigen::Vector3d::UnitZ());
+  Eigen::AngleAxis<double> rot_y(theta0, Eigen::Vector3d::UnitY());
 
   for (double theta = 0; theta <= 3.14 / 2 && !found_it; theta = theta + 3.14 / 10)
   {
     for (double phi = 0; phi <= 2 * 3.14 && !found_it; phi = phi + 3.14 / 10)
     {
-      Eigen::Vector3f p1, p2;
+      Eigen::Vector3d p1, p2;
       p1[0] = ra * sin(theta) * cos(phi);
       p1[1] = ra * sin(theta) * sin(phi);
       p1[2] = ra * cos(theta);
-      Eigen::Vector3f trans(state_.pos.x, state_.pos.y, state_.pos.z);
+      Eigen::Vector3d trans = state_pos;
       p2 = rot_z * rot_y * p1 + trans;
 
       if (p2[2] < 0)  // If below the ground, discard
@@ -405,6 +407,18 @@ void CVX::replanCB(const ros::TimerEvent& e)
       if (isFree)
       {
         // printf("******Replanned!\n");
+        double JPrimj1 = solver_jerk_.getCost();
+        // printf("Current state=%0.2f, %0.2f, %0.2f\n", state_pos[0], state_pos[1], state_pos[2]);
+        // printf("Before going to get C1, Points in JPS1\n");
+        /*        for (int i = 0; i < path_jps_vector_.size(); i++)
+                {
+                  std::cout << path_jps_vector_[i].transpose() << std::endl;
+                }*/
+        Eigen::Vector3d C1 = getLastIntersectionWithSphere(path_jps_vector_, rb, center);
+        vec_Vecf<3> WP = getPointsBw2Spheres(path_jps_vector_, ra, rb, center);
+        WP.insert(WP.begin(), B1);
+        WP.push_back(C1);
+        double JPrimv1 = solveVelAndGetCost(WP);
 
         planner_status_ = REPLANNED;  // Don't replan again until start publishing current solution
         printf("ReplanCB: planner_status_ = REPLANNED\n");
@@ -430,6 +444,32 @@ void CVX::replanCB(const ros::TimerEvent& e)
   pub_trajs_sphere_.publish(trajs_sphere_);
   // ROS_WARN("solve time: %0.2f ms", 1000 * (ros::Time::now().toSec() - then));
   // printf("Time in replanCB %0.2f ms\n", 1000 * (ros::Time::now().toSec() - t0replanCB));
+}
+
+double CVX::solveVelAndGetCost(vec_Vecf<3> path)
+{
+  double cost = 0;
+  /*  printf("Points in the path VEL\n");
+    for (int i = 0; i < path.size() - 1; i++)
+    {
+      std::cout << path[i].transpose() << std::endl;
+    }*/
+
+  for (int i = 0; i < path.size() - 1; i++)
+  {
+    double xf[3] = { path[i + 1][0], path[i + 1][1], path[i + 1][2] };
+
+    double x0[3] = { path[i][0], path[i][1], path[i][2] };
+    // double u0[3] = { nextQuadGoal_.vel.x, nextQuadGoal_.vel.y, nextQuadGoal_.vel.z };
+    solver_vel_.set_xf(xf);
+    solver_vel_.set_x0(x0);
+    double max_values[1] = { V_MAX };
+    solver_vel_.set_max(max_values);
+    // solver_vel_.set_u0(u0);
+    solver_vel_.genNewTraj();
+    cost = cost + solver_vel_.getCost();
+  }
+  return cost;
 }
 
 void CVX::modeCB(const acl_msgs::QuadFlightMode& msg)
@@ -541,8 +581,7 @@ void CVX::pubCB(const ros::TimerEvent& e)
       k = 0;  // Start again publishing the waypoints in X_ from the first row
 
       planner_status_ = START_REPLANNING;
-
-      // printf("pucCB2: planner_status_=START_REPLANNING\n");
+      printf("pucCB2: planner_status_=START_REPLANNING\n");
       // printf("%f, %f, %f, %f, %f, %f\n", X_(k, 0), X_(k, 1), X_(k, 2), X_(k, 3), X_(k, 4), X_(k, 5));
     }
 

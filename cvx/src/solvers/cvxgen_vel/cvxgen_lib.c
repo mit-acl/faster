@@ -16,13 +16,18 @@ int CONCATENATE_INPUT(initialize_optimizer)(void)
 
 int CONCATENATE_INPUT(optimize)(void)
 {
-  printf("in optimize vel\n");
+  // printf("in optimize vel\n");
   solve();
   // for(i=1;i<19;i++){
   // printf("%0.2f %0.2f %0.2f \n",vars.x[i][0],vars.x[i][3],vars.u[i][0]);
   // }
   // printf("%0.2f %0.2f %0.2f \n",vars.x[19][3],vars.x[19][4],vars.x[19][5]);
   return work.converged;
+}
+
+double CONCATENATE_INPUT(get_cost)(void)
+{
+  return eval_objv();
 }
 
 double** CONCATENATE_INPUT(get_state)(void)
@@ -37,7 +42,7 @@ double** CONCATENATE_INPUT(get_control)(void)
 
 void CONCATENATE_INPUT(load_default_data)(double dt, double v_max, double x0[], double xf[])
 {
-  printf("loading data vel\n");
+  // printf("loading data vel\n");
   // double dt = 0.5;
   double q = 100000;
   params.xf[0] = xf[0];
