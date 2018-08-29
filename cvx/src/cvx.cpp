@@ -100,10 +100,10 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   quadGoal_.accel = vectorNull();
   quadGoal_.jerk = vectorNull();
 
-  nextQuadGoal_.pos = vectorNull();
-  nextQuadGoal_.vel = vectorNull();
-  nextQuadGoal_.accel = vectorNull();
-  nextQuadGoal_.jerk = vectorNull();
+  initialCond_.pos = vectorNull();
+  initialCond_.vel = vectorNull();
+  initialCond_.accel = vectorNull();
+  initialCond_.jerk = vectorNull();
 
   markerID_ = 0;
 
@@ -261,6 +261,7 @@ void CVX::goalCB(const acl_msgs::TermGoal& msg)
   printf("GCB: planner_status_ = START_REPLANNING\n");
   goal_click_initialized_ = true;
   clearMarkerActualTraj();
+  printf("Exiting from goalCB\n");
 }
 
 void CVX::replanCB(const ros::TimerEvent& e)
@@ -345,8 +346,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
       /*      // Solver VEL
             double xf_sphere[3] = { p2[0], p2[1], p2[2] };
             mtx_goals.lock();
-            double x0[3] = { nextQuadGoal_.pos.x, nextQuadGoal_.pos.y, nextQuadGoal_.pos.z };
-            double u0[3] = { nextQuadGoal_.vel.x, nextQuadGoal_.vel.y, nextQuadGoal_.vel.z };
+            double x0[3] = { initialCond_.pos.x, initialCond_.pos.y, initialCond_.pos.z };
+            double u0[3] = { initialCond_.vel.x, initialCond_.vel.y, initialCond_.vel.z };
             mtx_goals.unlock();
             solver_vel_.set_xf(xf_sphere);
             solver_vel_.set_x0(x0);
@@ -366,9 +367,9 @@ void CVX::replanCB(const ros::TimerEvent& e)
       /*      // Solver ACCEL
             double xf_sphere[6] = { p2[0], p2[1], p2[2], 0, 0, 0 };
             mtx_goals.lock();
-            double x0[6] = { nextQuadGoal_.pos.x, nextQuadGoal_.pos.y, nextQuadGoal_.pos.z,
-                             nextQuadGoal_.vel.x, nextQuadGoal_.vel.y, nextQuadGoal_.vel.z };
-            double u0[3] = { nextQuadGoal_.accel.x, nextQuadGoal_.accel.y, nextQuadGoal_.accel.z };
+            double x0[6] = { initialCond_.pos.x, initialCond_.pos.y, initialCond_.pos.z,
+                             initialCond_.vel.x, initialCond_.vel.y, initialCond_.vel.z };
+            double u0[3] = { initialCond_.accel.x, initialCond_.accel.y, initialCond_.accel.z };
             mtx_goals.unlock();
             solver_accel_.set_xf(xf_sphere);
             solver_accel_.set_x0(x0);
@@ -380,19 +381,24 @@ void CVX::replanCB(const ros::TimerEvent& e)
             X_temp_ = solver_accel_.getX();*/
 
       // Solver JERK
+      if (optimized_)  // Needed to skip the first time (X_ still not initialized)
+      {
+        k_initial_cond_ = std::min(k_ + OFFSET, (int)(X_.rows() - 1));
+        updateInitialCond(k_initial_cond_);
+      }
       double xf_sphere[9] = { p2[0], p2[1], p2[2], 0, 0, 0, 0, 0, 0 };
       mtx_goals.lock();
-      double x0[9] = { nextQuadGoal_.pos.x,   nextQuadGoal_.pos.y,   nextQuadGoal_.pos.z,
-                       nextQuadGoal_.vel.x,   nextQuadGoal_.vel.y,   nextQuadGoal_.vel.z,
-                       nextQuadGoal_.accel.x, nextQuadGoal_.accel.y, nextQuadGoal_.accel.z };
+      double x0[9] = { initialCond_.pos.x,   initialCond_.pos.y,   initialCond_.pos.z,
+                       initialCond_.vel.x,   initialCond_.vel.y,   initialCond_.vel.z,
+                       initialCond_.accel.x, initialCond_.accel.y, initialCond_.accel.z };
 
-      /*      printf("(Optimizando desde): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", nextQuadGoal_.pos.x,
-         nextQuadGoal_.pos.y, nextQuadGoal_.pos.z, nextQuadGoal_.vel.x, nextQuadGoal_.vel.y, nextQuadGoal_.vel.z);
+      /*      printf("(Optimizando desde): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", initialCond_.pos.x,
+         initialCond_.pos.y, initialCond_.pos.z, initialCond_.vel.x, initialCond_.vel.y, initialCond_.vel.z);
 
             printf("(State): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", state_.pos.x, state_.pos.y, state_.pos.z,
                    state_.vel.x, state_.vel.y, state_.vel.z);*/
 
-      double u0[3] = { nextQuadGoal_.jerk.x, nextQuadGoal_.jerk.y, nextQuadGoal_.jerk.z };
+      double u0[3] = { initialCond_.jerk.x, initialCond_.jerk.y, initialCond_.jerk.z };
       mtx_goals.unlock();
       solver_jerk_.set_xf(xf_sphere);
       solver_jerk_.set_x0(x0);
@@ -460,7 +466,7 @@ double CVX::solveVelAndGetCost(vec_Vecf<3> path)
     double xf[3] = { path[i + 1][0], path[i + 1][1], path[i + 1][2] };
 
     double x0[3] = { path[i][0], path[i][1], path[i][2] };
-    // double u0[3] = { nextQuadGoal_.vel.x, nextQuadGoal_.vel.y, nextQuadGoal_.vel.z };
+    // double u0[3] = { initialCond_.vel.x, initialCond_.vel.y, initialCond_.vel.z };
     solver_vel_.set_xf(xf);
     solver_vel_.set_x0(x0);
     double max_values[1] = { V_MAX };
@@ -518,6 +524,25 @@ void CVX::stateCB(const acl_msgs::State& msg)
   pubActualTraj();
 }
 
+void CVX::updateInitialCond(int i)
+{
+  if (status_ != GOAL_REACHED)
+  {
+    initialCond_.pos = getPos(i);
+    initialCond_.vel = getVel(i);
+    initialCond_.accel = (use_ff_) ? getAccel(i) : vectorNull();
+    initialCond_.jerk = (use_ff_) ? getJerk(i) : vectorNull();
+  }
+
+  else
+  {
+    initialCond_.pos = state_.pos;
+    initialCond_.vel = vectorNull();
+    initialCond_.accel = vectorNull();
+    initialCond_.jerk = vectorNull();
+  }
+}
+
 void CVX::pubCB(const ros::TimerEvent& e)
 {
   mtx_goals.lock();
@@ -539,9 +564,9 @@ void CVX::pubCB(const ros::TimerEvent& e)
   quadGoal_.accel = vectorNull();
   quadGoal_.jerk = vectorNull();
 
-  nextQuadGoal_.vel = vectorNull();
-  nextQuadGoal_.accel = vectorNull();
-  nextQuadGoal_.jerk = vectorNull();
+  initialCond_.vel = vectorNull();
+  initialCond_.accel = vectorNull();
+  initialCond_.jerk = vectorNull();
 
   // printf("In pubCB3\n");
   if (quadGoal_.cut_power && (flight_mode_.mode == flight_mode_.TAKEOFF || flight_mode_.mode == flight_mode_.GO))
@@ -558,7 +583,7 @@ void CVX::pubCB(const ros::TimerEvent& e)
     }
   }
   // printf("In pubCB4\n");
-  static int k = 0;
+  // static int k = 0;
   if (optimized_ && flight_mode_.mode != flight_mode_.NOT_FLYING && flight_mode_.mode != flight_mode_.KILL)
   {
     quadGoal_.cut_power = false;
@@ -572,47 +597,45 @@ void CVX::pubCB(const ros::TimerEvent& e)
 
     // printf("k=%d\n", k);
     // printf("ROWS of X=%d\n", X_.rows());
-    if ((planner_status_ == REPLANNED && (k == OFFSET)) || (force_reset_to_0_ && planner_status_ == REPLANNED))
+    if ((planner_status_ == REPLANNED && (k_ == k_initial_cond_)) ||
+        (force_reset_to_0_ && planner_status_ == REPLANNED))
     {
       // printf("Starting again\n");
       force_reset_to_0_ = false;
       X_ = X_temp_;
       U_ = U_temp_;
-      k = 0;  // Start again publishing the waypoints in X_ from the first row
+      k_ = 0;  // Start again publishing the waypoints in X_ from the first row
 
       planner_status_ = START_REPLANNING;
       printf("pucCB2: planner_status_=START_REPLANNING\n");
       // printf("%f, %f, %f, %f, %f, %f\n", X_(k, 0), X_(k, 1), X_(k, 2), X_(k, 3), X_(k, 4), X_(k, 5));
     }
 
-    k = std::min(k, (int)(X_.rows() - 1));
-    int kp1 = std::min(k + OFFSET, (int)(X_.rows() - 1));  // k plus offset
-                                                           // std::cout << "esto es X" << std::endl;
-                                                           // std::cout << X_ << std::endl;
-                                                           // printf("masabajo2\n");
+    k_ = std::min(k_, (int)(X_.rows() - 1));
+    int kp1 = std::min(k_ + OFFSET, (int)(X_.rows() - 1));  // k plus offset
+                                                            // std::cout << "esto es X" << std::endl;
+                                                            // std::cout << X_ << std::endl;
+                                                            // printf("masabajo2\n");
     // printf("K-->%f, %f, %f, %f, %f, %f\n", X_(k, 0), X_(k, 1), X_(k, 2), X_(k, 3), X_(k, 4), X_(k, 5));
     // printf("KP1-->%f, %f, %f, %f, %f, %f\n", X_(kp1, 0), X_(kp1, 1), X_(kp1, 2), X_(kp1, 3), X_(kp1, 4), X_(kp1, 5));
-    quadGoal_.pos = getPos(k);
-    quadGoal_.vel = getVel(k);
+    quadGoal_.pos = getPos(k_);
+    quadGoal_.vel = getVel(k_);
     //// printf("masabajo3\n");
-    quadGoal_.accel = (use_ff_) ? getAccel(k) : vectorNull();
-    quadGoal_.jerk = (use_ff_) ? getJerk(k) : vectorNull();
+    quadGoal_.accel = (use_ff_) ? getAccel(k_) : vectorNull();
+    quadGoal_.jerk = (use_ff_) ? getJerk(k_) : vectorNull();
 
-    if (status_ != GOAL_REACHED)
-    {
-      nextQuadGoal_.pos = getPos(kp1);
-      nextQuadGoal_.vel = getVel(kp1);
-      nextQuadGoal_.accel = (use_ff_) ? getAccel(kp1) : vectorNull();
-      nextQuadGoal_.jerk = (use_ff_) ? getJerk(kp1) : vectorNull();
-    }
-    else
-    {
-      nextQuadGoal_.pos = state_.pos;
-      nextQuadGoal_.vel = vectorNull();
-      nextQuadGoal_.accel = vectorNull();
-      nextQuadGoal_.jerk = vectorNull();
-    }
-    k++;
+    /*    if (status_ != GOAL_REACHED)
+        {
+          updateInitialCond(kp1);
+        }
+        else
+        {
+          initialCond_.pos = state_.pos;
+          initialCond_.vel = vectorNull();
+          initialCond_.accel = vectorNull();
+          initialCond_.jerk = vectorNull();
+        }*/
+    k_++;
   }
   else
   {
@@ -622,8 +645,8 @@ void CVX::pubCB(const ros::TimerEvent& e)
   // printf("In pubCB5\n");
   /*  ROS_INFO("publishing quadGoal: %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", quadGoal_.pos.x, quadGoal_.pos.y,
              quadGoal_.pos.z, quadGoal_.vel.x, quadGoal_.vel.y, quadGoal_.vel.z);*/
-  // printf("(NextQuadGoal_): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", nextQuadGoal_.pos.x, nextQuadGoal_.pos.y,
-  //       nextQuadGoal_.pos.z, nextQuadGoal_.vel.x, nextQuadGoal_.vel.y, nextQuadGoal_.vel.z);
+  // printf("(initialCond_): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", initialCond_.pos.x, initialCond_.pos.y,
+  //       initialCond_.pos.z, initialCond_.vel.x, initialCond_.vel.y, initialCond_.vel.z);
 
   pub_goal_.publish(quadGoal_);
   // n_states_publised_ = n_states_publised_ + 1;

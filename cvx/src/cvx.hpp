@@ -92,10 +92,11 @@ private:
   geometry_msgs::Vector3 getJerk(int i);
 
   double solveVelAndGetCost(vec_Vecf<3> path);
+  void updateInitialCond(int i);
 
   visualization_msgs::Marker setpoint_;
   acl_msgs::QuadGoal quadGoal_;
-  acl_msgs::QuadGoal nextQuadGoal_;
+  acl_msgs::QuadGoal initialCond_;  // It's the initial condition for the solver
   acl_msgs::QuadFlightMode flight_mode_;
   acl_msgs::State state_;
   acl_msgs::TermGoal term_goal_;
@@ -151,6 +152,9 @@ private:
   int planner_status_ = FIRST_PLAN;
 
   bool force_reset_to_0_ = 1;
+
+  int k_ = 0;               // Row of X_ that will be published next;
+  int k_initial_cond_ = 0;  // Row of X_ chosen as the initial condition for the planner
 
   Eigen::Vector3d directionJPS_;
   vec_Vecf<3> path_jps_vector_;
