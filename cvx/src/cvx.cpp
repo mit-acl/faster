@@ -403,7 +403,10 @@ void CVX::replanCB(const ros::TimerEvent& e)
       solver_jerk_.genNewTraj();
       U_temp_ = solver_jerk_.getU();
       X_temp_ = solver_jerk_.getX();
+      // Timer time_coll_check(true);
       bool isFree = trajIsFree(X_temp_);
+      // double ms_ellapsed = time_coll_check.Elapsed().count();
+      // printf("Collision check takes: %f us/traj\n", 1000 * ms_ellapsed);
       createMarkerSetOfArrows(X_temp_, isFree);
 
       if (isFree)
@@ -974,41 +977,58 @@ bool CVX::trajIsFree(Eigen::MatrixXd X)
   // printf("In trajIsFree\n");
 
   mtx.lock();
-  // TODO: this cloud should be a subset of the entire cloud, not all the cloud (faster?)
-  bool isFree = true;
-  for (int i = 0; i < X.rows(); i = i + 1)  // Sample (a subset of) the points in the trajectory
+  int n = 1;  // Find nearest element
+
+  Eigen::Vector3d eig_search_point(X(0, 0), X(0, 1), X(0, 2));
+  pcl::PointXYZ pcl_search_point = eigenPoint2pclPoint(eig_search_point);
+  double r = 100000;
+  int last_i = 0;
+
+  while (last_i < X.rows() - 1)
   {
-    pcl::PointXYZ searchPoint(X(i, 0), X(i, 1), X(i, 2));
-    std::vector<int> pointIdxRadiusSearch;
-    std::vector<float> pointRadiusSquaredDistance;
-
-    // TODO: implement smart check
-    // TODO: maybe nearestKSearch is faster
-
-    // Check collision in all the new point clouds
-    // TODO: maybe I could check collision only against some of the new point clouds, not all of them.
-    // TODO: change the -1 in the line below
-
-    // TODO: check that it is inside the voxel, (not inside a sphere) would be more accurate
-    unsigned novale = v_kdtree_new_pcls_.size() - 1;
+    // printf("Inside the loop, last_i=%d\n", last_i);
+    // last point clouds
+    std::vector<int> id_inst(n);
+    std::vector<float> dist2_inst(n);  // squared distance
+    pcl_search_point = eigenPoint2pclPoint(eig_search_point);
     for (unsigned i = v_kdtree_new_pcls_.size() - 1; i < v_kdtree_new_pcls_.size() && i >= 0; ++i)
     {
-      if (v_kdtree_new_pcls_[i].kdTree.radiusSearch(searchPoint, DRONE_RADIUS, pointIdxRadiusSearch,
-                                                    pointRadiusSquaredDistance) > 0)
+      if (v_kdtree_new_pcls_[i].kdTree.nearestKSearch(pcl_search_point, n, id_inst, dist2_inst) > 0)
       {
-        isFree = false;  // if we model the drone as an sphere, I'm done (there is a collision)
+        r = std::min(r, sqrt(dist2_inst[0]));
       }
     }
 
-    // Check collision in the map
+    // map
+    std::vector<int> id_map(n);
+    std::vector<float> dist2_map(n);  // squared distance
 
-    if (kdtree_map_.radiusSearch(searchPoint, DRONE_RADIUS, pointIdxRadiusSearch, pointRadiusSquaredDistance) > 0)
+    if (kdtree_map_.nearestKSearch(pcl_search_point, n, id_map, dist2_map) > 0)
     {
-      isFree = false;  // if we model the drone as an sphere, I'm done (there is a collision)
+      r = std::min(r, sqrt(dist2_map[0]));
+    }
+    // Now r is the distance to the nearest obstacle
+    if (r < DRONE_RADIUS)
+    {
+      mtx.unlock();
+      return false;  // There is a collision
+    }
+
+    // Find the next eig_search_point
+    for (int i = last_i; i < X.rows(); i = i + 1)
+    {
+      last_i = i;
+      Eigen::Vector3d traj_point(X(i, 0), X(i, 1), X(i, 2));
+      if ((traj_point - eig_search_point).norm() > r)
+      {  // There may be a collision here
+        eig_search_point << X(i - 1, 0), X(i - 1, 1), X(i - 1, 2);
+        break;
+      }
     }
   }
+
   mtx.unlock();
-  return isFree;  // this traj is free
+  return true;  // It's free!
 }
 
 // TODO: the mapper receives a depth map and converts it to a point cloud. Why not receiving directly the point cloud?

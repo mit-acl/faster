@@ -40,6 +40,14 @@
 
 // inline is needed to avoid the "multiple definitions" error. Other option is to create the utils.cpp file, and put
 // there the function (and here only the prototype)
+
+inline pcl::PointXYZ eigenPoint2pclPoint(Eigen::Vector3d p)
+{
+  // std::cout << "solving\n" << coeff << std::endl;
+  pcl::PointXYZ tmp(p[0], p[1], p[2]);
+  return tmp;
+}
+
 inline float solvePolyOrder2(Eigen::Vector3f coeff)
 {
   // std::cout << "solving\n" << coeff << std::endl;
