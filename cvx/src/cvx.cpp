@@ -86,10 +86,6 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   setpoint_.header.frame_id = "world";
   setpoint_.id = 0;
   setpoint_.type = visualization_msgs::Marker::SPHERE;
-  /*  setpoint_.pose.orientation.x = 0.0;
-    setpoint_.pose.orientation.y = 0.0;
-    setpoint_.pose.orientation.z = 0.0;
-    setpoint_.pose.orientation.w = 1.0;*/
   setpoint_.scale.x = 0.35;
   setpoint_.scale.y = 0.35;
   setpoint_.scale.z = 0.35;
@@ -138,63 +134,9 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   ROS_INFO("Planner initialized");
 }
 
-void CVX::pubPlanningVisual(Eigen::Vector3d center, double ra, double rb, Eigen::Vector3d B1, Eigen::Vector3d C1)
-{
-  visualization_msgs::MarkerArray tmp;
-
-  /*  visualization_msgs::Marker m;
-    m.type = visualization_msgs::Marker::ARROW;
-    m.action = visualization_msgs::Marker::DELETEALL;
-    m.id = 0;
-    tmp.markers.push_back(m);
-    pub_path_jps_.publish(tmp);
-    visualization_msgs::MarkerArray new_array;*/
-
-  int start = 2200;  // Large enough to prevent conflict with other markers
-  visualization_msgs::Marker sphere_Sa;
-  sphere_Sa.header.frame_id = "world";
-  sphere_Sa.id = start;
-  sphere_Sa.type = visualization_msgs::Marker::SPHERE;
-  sphere_Sa.scale = vectorUniform(2 * ra);
-  sphere_Sa.color = color(BLUE_TRANS);
-  sphere_Sa.pose.position = eigen2point(center);
-  tmp.markers.push_back(sphere_Sa);
-
-  visualization_msgs::Marker sphere_Sb;
-  sphere_Sb.header.frame_id = "world";
-  sphere_Sb.id = start + 1;
-  sphere_Sb.type = visualization_msgs::Marker::SPHERE;
-  sphere_Sb.scale = vectorUniform(2 * rb);
-  sphere_Sb.color = color(RED_TRANS_TRANS);
-  sphere_Sb.pose.position = eigen2point(center);
-  tmp.markers.push_back(sphere_Sb);
-
-  visualization_msgs::Marker B1_marker;
-  B1_marker.header.frame_id = "world";
-  B1_marker.id = start + 2;
-  B1_marker.type = visualization_msgs::Marker::SPHERE;
-  B1_marker.scale = vectorUniform(0.1);
-  B1_marker.color = color(BLUE_LIGHT);
-  B1_marker.pose.position = eigen2point(B1);
-  tmp.markers.push_back(B1_marker);
-
-  visualization_msgs::Marker C1_marker;
-  C1_marker.header.frame_id = "world";
-  C1_marker.id = start + 3;
-  C1_marker.type = visualization_msgs::Marker::SPHERE;
-  C1_marker.scale = vectorUniform(0.1);
-  C1_marker.color = color(BLUE_LIGHT);
-  C1_marker.pose.position = eigen2point(C1);
-  tmp.markers.push_back(C1_marker);
-
-  pub_planning_vis_.publish(tmp);
-}
-
 void CVX::solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr, Vec3f start, Vec3f goal)
 {
   // Create a map
-  // const Vec3f start(state_.pos.x, state_.pos.y, state_.pos.z);
-  // const Vec3f goal(term_goal_.pos.x, term_goal_.pos.y, term_goal_.pos.z);
   /*  std::cout << "Solving JPS from start\n" << start << std::endl;
     std::cout << "To goal\n" << goal << std::endl;*/
   const Vec3i dim(cells_x_, cells_y_, cells_z_);  //  number of cells in each dimension
@@ -220,8 +162,7 @@ void CVX::solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr, Vec3f start, Ve
     double dt_jps = time_jps.Elapsed().count();
     // printf("JPS Planner takes: %f ms\n", dt_jps);
     // printf("JPS Path Distance: %f\n", total_distance3f(planner_ptr->getPath()));  // getRawPath() if you want the
-    // path
-    // with more corners (not "cleaned")
+    // path with more corners (not "cleaned")
     // printf("JPS Path: \n");
     path_jps_vector_ = planner_ptr->getPath();  // getRawPath() if you want the path with more corners (not "cleaned")
 
@@ -361,6 +302,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
   // If you want the force to be the direction selector
   // Eigen::Vector3d force = computeForce(curr_pos, term_goal);
   // double x = force[0], y = force[1], z = force[2];
+  // If you want the JPS3D solution to be the direction selector
+  // double x = directionJPS_[0], y = directionJPS_[1], z = directionJPS_[2];
 
   Vec3f goal(term_goal_.pos.x, term_goal_.pos.y, term_goal_.pos.z);
   solveJPS3D(pclptr_map_, state_pos, goal);  // Solution is in path_jps_vector_
@@ -370,8 +313,6 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   // Direction from the center to that point:
   double x = B1[0] - center[0], y = B1[1] - center[1], z = B1[2] - center[2];
-  // If you want the JPS3D solution to be the direction selector
-  // double x = directionJPS_[0], y = directionJPS_[1], z = directionJPS_[2];
 
   double theta0 = acos(z / (sqrt(x * x + y * y + z * z)));
   double phi0 = atan2(y, x);
@@ -467,7 +408,6 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
       if (isFree)
       {
-        // printf("******Replanned!\n");
         double JPrimj1 = solver_jerk_.getCost();
         // printf("Current state=%0.2f, %0.2f, %0.2f\n", state_pos[0], state_pos[1], state_pos[2]);
         // printf("Before going to get C1, Points in JPS1\n");
@@ -1218,4 +1158,48 @@ void CVX::pubActualTraj()
   m.points.push_back(p);
   pub_actual_traj_.publish(m);
   p_last = p;
+}
+
+void CVX::pubPlanningVisual(Eigen::Vector3d center, double ra, double rb, Eigen::Vector3d B1, Eigen::Vector3d C1)
+{
+  visualization_msgs::MarkerArray tmp;
+
+  int start = 2200;  // Large enough to prevent conflict with other markers
+  visualization_msgs::Marker sphere_Sa;
+  sphere_Sa.header.frame_id = "world";
+  sphere_Sa.id = start;
+  sphere_Sa.type = visualization_msgs::Marker::SPHERE;
+  sphere_Sa.scale = vectorUniform(2 * ra);
+  sphere_Sa.color = color(BLUE_TRANS);
+  sphere_Sa.pose.position = eigen2point(center);
+  tmp.markers.push_back(sphere_Sa);
+
+  visualization_msgs::Marker sphere_Sb;
+  sphere_Sb.header.frame_id = "world";
+  sphere_Sb.id = start + 1;
+  sphere_Sb.type = visualization_msgs::Marker::SPHERE;
+  sphere_Sb.scale = vectorUniform(2 * rb);
+  sphere_Sb.color = color(RED_TRANS_TRANS);
+  sphere_Sb.pose.position = eigen2point(center);
+  tmp.markers.push_back(sphere_Sb);
+
+  visualization_msgs::Marker B1_marker;
+  B1_marker.header.frame_id = "world";
+  B1_marker.id = start + 2;
+  B1_marker.type = visualization_msgs::Marker::SPHERE;
+  B1_marker.scale = vectorUniform(0.1);
+  B1_marker.color = color(BLUE_LIGHT);
+  B1_marker.pose.position = eigen2point(B1);
+  tmp.markers.push_back(B1_marker);
+
+  visualization_msgs::Marker C1_marker;
+  C1_marker.header.frame_id = "world";
+  C1_marker.id = start + 3;
+  C1_marker.type = visualization_msgs::Marker::SPHERE;
+  C1_marker.scale = vectorUniform(0.1);
+  C1_marker.color = color(BLUE_LIGHT);
+  C1_marker.pose.position = eigen2point(C1);
+  tmp.markers.push_back(C1_marker);
+
+  pub_planning_vis_.publish(tmp);
 }
