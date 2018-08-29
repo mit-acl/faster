@@ -58,12 +58,15 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   pub_actual_traj_ = nh_.advertise<visualization_msgs::Marker>("actual_traj", 1);
   pub_path_jps_ = nh_.advertise<visualization_msgs::MarkerArray>("path_jps", 1);
 
+  pub_intersec_points_ = nh_.advertise<visualization_msgs::MarkerArray>("intersection_points", 1);
+
   pub_planning_vis_ = nh_.advertise<visualization_msgs::MarkerArray>("planning_vis", 1);
 
   sub_goal_ = nh_.subscribe("term_goal", 1, &CVX::goalCB, this);
   sub_mode_ = nh_.subscribe("flightmode", 1, &CVX::modeCB, this);
   sub_state_ = nh_.subscribe("state", 1, &CVX::stateCB, this);
   sub_map_ = nh_.subscribe("occup_grid", 1, &CVX::mapCB, this);
+  sub_unk_ = nh_.subscribe("unknown_grid", 1, &CVX::unkCB, this);
   sub_pcl_ = nh_.subscribe("pcloud", 1, &CVX::pclCB, this);
 
   pubCBTimer_ = nh_pub_CB_.createTimer(ros::Duration(DC), &CVX::pubCB, this);
@@ -111,6 +114,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
 
   // pcl::PointCloud<pcl::PointXYZ>::Ptr tmp(new pcl::PointCloud<pcl::PointXYZ>);
   pclptr_map_ = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
+  pclptr_unk_ = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
 
   name_drone_ = ros::this_node::getNamespace();
   name_drone_.erase(0, 2);  // Erase slashes
@@ -264,7 +268,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
   // printf("In replanCB\n");
   // double t0replanCB = ros::Time::now().toSec();
   clearMarkerSetOfArrows();
-  if (!kdtree_map_initialized_)
+  pubintersecPoint(Eigen::Vector3d::Zero(), false);  // Clear the intersection points markers
+  if (!kdtree_map_initialized_ && !kdtree_unk_initialized_)
   {
     ROS_WARN("Run the mapper");
     return;
@@ -403,10 +408,10 @@ void CVX::replanCB(const ros::TimerEvent& e)
       solver_jerk_.genNewTraj();
       U_temp_ = solver_jerk_.getU();
       X_temp_ = solver_jerk_.getX();
-      // Timer time_coll_check(true);
+      Timer time_coll_check(true);
       bool isFree = trajIsFree(X_temp_);
-      // double ms_ellapsed = time_coll_check.Elapsed().count();
-      // printf("Collision check takes: %f us/traj\n", 1000 * ms_ellapsed);
+      double ms_ellapsed = time_coll_check.Elapsed().count();
+      printf("Collision check takes: %f ms/traj\n", ms_ellapsed);
       createMarkerSetOfArrows(X_temp_, isFree);
 
       if (isFree)
@@ -970,11 +975,32 @@ void CVX::mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
   // printf("pasado esto\n");
 }
 
+// Unkwown  CB
+void CVX::unkCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
+{
+  if (pcl2ptr_msg->width == 0 || pcl2ptr_msg->height == 0)  // Point Cloud is empty (this happens at the beginning)
+  {
+    return;
+  }
+  mtx_unk.lock();
+  pcl::fromROSMsg(*pcl2ptr_msg, *pclptr_unk_);
+  std::vector<int> index;
+  pcl::removeNaNFromPointCloud(*pclptr_unk_, *pclptr_unk_, index);
+  if (pclptr_unk_->size() == 0)
+  {
+    return;
+  }
+  kdtree_unk_.setInputCloud(pclptr_unk_);
+  kdtree_unk_initialized_ = 1;
+  mtx_unk.unlock();
+}
+
 // TODO: check also against unkown space? Be careful because with the new points cloud I may have information of
 // previously-unknown voxels
 bool CVX::trajIsFree(Eigen::MatrixXd X)
 {
-  // printf("In trajIsFree\n");
+  printf("********In trajIsFree\n");
+  // std::cout << X << std::endl;
 
   mtx.lock();
   int n = 1;  // Find nearest element
@@ -986,30 +1012,61 @@ bool CVX::trajIsFree(Eigen::MatrixXd X)
 
   while (last_i < X.rows() - 1)
   {
-    // printf("Inside the loop, last_i=%d\n", last_i);
+    printf("Inside the loop, last_i=%d\n", last_i);
     // last point clouds
     std::vector<int> id_inst(n);
     std::vector<float> dist2_inst(n);  // squared distance
     pcl_search_point = eigenPoint2pclPoint(eig_search_point);
+    Eigen::Vector3d intersectionPoint;
     for (unsigned i = v_kdtree_new_pcls_.size() - 1; i < v_kdtree_new_pcls_.size() && i >= 0; ++i)
     {
       if (v_kdtree_new_pcls_[i].kdTree.nearestKSearch(pcl_search_point, n, id_inst, dist2_inst) > 0)
       {
-        r = std::min(r, sqrt(dist2_inst[0]));
+        if (sqrt(dist2_inst[0]) < r)
+        {
+          r = sqrt(dist2_inst[0]);
+          pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr = v_kdtree_new_pcls_[i].kdTree.getInputCloud();
+          intersectionPoint << ptr->points[id_inst[0]].x, ptr->points[id_inst[0]].y, ptr->points[id_inst[0]].z;
+        }
+        // r = std::min(r, sqrt(dist2_inst[0]));
       }
     }
 
-    // map
+    // occupied (map)
     std::vector<int> id_map(n);
     std::vector<float> dist2_map(n);  // squared distance
 
     if (kdtree_map_.nearestKSearch(pcl_search_point, n, id_map, dist2_map) > 0)
     {
-      r = std::min(r, sqrt(dist2_map[0]));
+      if (sqrt(dist2_map[0]) < r)
+      {
+        r = sqrt(dist2_map[0]);
+        pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr = kdtree_map_.getInputCloud();
+        intersectionPoint << ptr->points[id_map[0]].x, ptr->points[id_map[0]].y, ptr->points[id_map[0]].z;
+      }
     }
-    // Now r is the distance to the nearest obstacle
+
+    // unknwown
+    std::vector<int> id_unk(n);
+    std::vector<float> dist2_unk(n);  // squared distance
+
+    mtx_unk.lock();
+    if (kdtree_unk_.nearestKSearch(pcl_search_point, n, id_unk, dist2_unk) > 0)
+    {
+      if (sqrt(dist2_unk[0]) < r)
+      {
+        r = sqrt(dist2_unk[0]);
+        pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr = kdtree_unk_.getInputCloud();
+        intersectionPoint << ptr->points[id_unk[0]].x, ptr->points[id_unk[0]].y, ptr->points[id_unk[0]].z;
+      }
+    }
+    mtx_unk.unlock();
+
+    // Now r is the distance to the nearest obstacle (considering unknown space as obstacles)
     if (r < DRONE_RADIUS)
     {
+      printf("There is a collision with i=%d out of X.rows=%d\n", last_i, X.rows() - 1);
+      pubintersecPoint(intersectionPoint, true);
       mtx.unlock();
       return false;  // There is a collision
     }
@@ -1222,4 +1279,39 @@ void CVX::pubPlanningVisual(Eigen::Vector3d center, double ra, double rb, Eigen:
   tmp.markers.push_back(C1_marker);
 
   pub_planning_vis_.publish(tmp);
+}
+
+void CVX::pubintersecPoint(Eigen::Vector3d p, bool add)
+{
+  static int i = 0;
+  static int last_id = 0;
+  int start = 300000;  // large enough to prevent conflict with others
+  if (add)
+  {
+    visualization_msgs::Marker tmp;
+    tmp.header.frame_id = "world";
+    tmp.id = start + i;
+    tmp.type = visualization_msgs::Marker::SPHERE;
+    tmp.scale = vectorUniform(0.1);
+    tmp.color = color(BLUE_LIGHT);
+    tmp.pose.position = eigen2point(p);
+    intersec_points_.markers.push_back(tmp);
+    last_id = i;
+    i = i + 1;
+  }
+  else
+  {  // clear everything
+    for (int j = start; j <= start + last_id; j++)
+    {
+      visualization_msgs::Marker tmp;
+      tmp.header.frame_id = "world";
+      tmp.id = start + j;
+      tmp.type = visualization_msgs::Marker::SPHERE;
+      tmp.action = visualization_msgs::Marker::DELETE;
+      intersec_points_.markers.push_back(tmp);
+    }
+    last_id = 0;
+    i = 0;
+  }
+  pub_intersec_points_.publish(intersec_points_);
 }

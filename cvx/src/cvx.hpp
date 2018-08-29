@@ -71,7 +71,8 @@ private:
   void createMarkerSetOfArrows(Eigen::MatrixXd X, bool isFree);
   void clearMarkerSetOfArrows();
   void clearMarkerActualTraj();
-  void mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg);
+  void mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg);  // Callback for the occupancy pcloud
+  void unkCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg);  // Callback for the unkown pcloud
   void pclCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg);
   bool trajIsFree(Eigen::MatrixXd X);
   Eigen::Vector3d computeForce(Eigen::Vector3d x, Eigen::Vector3d g);
@@ -94,6 +95,7 @@ private:
   double solveVelAndGetCost(vec_Vecf<3> path);
   void updateInitialCond(int i);
   void pubPlanningVisual(Eigen::Vector3d center, double ra, double rb, Eigen::Vector3d B1, Eigen::Vector3d C1);
+  void pubintersecPoint(Eigen::Vector3d p, bool add);
 
   visualization_msgs::Marker setpoint_;
   acl_msgs::QuadGoal quadGoal_;
@@ -114,10 +116,12 @@ private:
   ros::Publisher pub_actual_traj_;
   ros::Publisher pub_path_jps_;
   ros::Publisher pub_planning_vis_;
+  ros::Publisher pub_intersec_points_;
   ros::Subscriber sub_goal_;
   ros::Subscriber sub_state_;
   ros::Subscriber sub_mode_;
   ros::Subscriber sub_map_;
+  ros::Subscriber sub_unk_;
   ros::Subscriber sub_pcl_;
   ros::Timer pubCBTimer_;
   ros::Timer replanCBTimer_;
@@ -128,6 +132,8 @@ private:
 
   visualization_msgs::MarkerArray trajs_sphere_;  // all the trajectories generated in the sphere
   visualization_msgs::MarkerArray path_jps_;
+  visualization_msgs::MarkerArray intersec_points_;
+
   int markerID_ = 0;
   int markerID_last_ = 0;
   int actual_trajID_ = 0;
@@ -137,8 +143,11 @@ private:
   bool optimized_, use_ff_;
   double u_min_, u_max_, z_start_, spinup_time_, z_land_;
   // int N_ = 20;
-  pcl::KdTreeFLANN<pcl::PointXYZ> kdtree_map_;  // kdtree of the point cloud of the map
+  pcl::KdTreeFLANN<pcl::PointXYZ> kdtree_map_;  // kdtree of the point cloud of the occuppancy grid
+  pcl::KdTreeFLANN<pcl::PointXYZ> kdtree_unk_;  // kdtree of the point cloud of the unknown grid
+
   bool kdtree_map_initialized_ = 0;
+  bool kdtree_unk_initialized_ = 0;
   // vector that has all the kdtrees of the pclouds not included in the map:
   std::vector<kdTreeStamped> v_kdtree_new_pcls_;
   bool replanning_needed_ = true;
@@ -162,8 +171,9 @@ private:
   vec_Vecf<3> path_jps_vector_;
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_map_;
+  pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_unk_;
 
   std::mutex mtx;
-
+  std::mutex mtx_unk;
   std::mutex mtx_goals;
 };
