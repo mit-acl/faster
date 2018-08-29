@@ -12,11 +12,15 @@
 #define RES 0.15  //[m] cell dimension
 
 #define RED 1
-#define GREEN 2
-#define BLUE 3
-#define BLUE_LIGHT 4
-#define YELLOW 5
-#define ORANGE_TRANS 6
+#define RED_TRANS 2
+#define RED_TRANS_TRANS 3
+#define GREEN 4
+#define BLUE 5
+#define BLUE_TRANS 6
+#define BLUE_TRANS_TRANS 7
+#define BLUE_LIGHT 8
+#define YELLOW 9
+#define ORANGE_TRANS 10
 
 #define DC 0.01           //(seconds) Duration for the interpolation=Value of the timer pubGoal
 #define GOAL_RADIUS 0.2   //(m) Drone has arrived to the goal when distance_to_goal<GOAL_RADIUS
@@ -68,11 +72,31 @@ inline std_msgs::ColorRGBA color(int id)
   red.g = 0;
   red.b = 0;
   red.a = 1;
+  std_msgs::ColorRGBA red_trans;
+  red_trans.r = 1;
+  red_trans.g = 0;
+  red_trans.b = 0;
+  red_trans.a = 0.7;
+  std_msgs::ColorRGBA red_trans_trans;
+  red_trans_trans.r = 1;
+  red_trans_trans.g = 0;
+  red_trans_trans.b = 0;
+  red_trans_trans.a = 0.4;
   std_msgs::ColorRGBA blue;
   blue.r = 0;
   blue.g = 0;
   blue.b = 1;
   blue.a = 1;
+  std_msgs::ColorRGBA blue_trans;
+  blue_trans.r = 0;
+  blue_trans.g = 0;
+  blue_trans.b = 1;
+  blue_trans.a = 0.7;
+  std_msgs::ColorRGBA blue_trans_trans;
+  blue_trans_trans.r = 0;
+  blue_trans_trans.g = 0;
+  blue_trans_trans.b = 1;
+  blue_trans_trans.a = 0.4;
   std_msgs::ColorRGBA blue_light;
   blue_light.r = 0.5;
   blue_light.g = 0.7;
@@ -98,8 +122,20 @@ inline std_msgs::ColorRGBA color(int id)
     case RED:
       return red;
       break;
+    case RED_TRANS:
+      return red_trans;
+      break;
+    case RED_TRANS_TRANS:
+      return red_trans_trans;
+      break;
     case BLUE:
       return blue;
+      break;
+    case BLUE_TRANS:
+      return blue_trans;
+      break;
+    case BLUE_TRANS_TRANS:
+      return blue_trans_trans;
       break;
     case BLUE_LIGHT:
       return blue_light;
@@ -145,6 +181,16 @@ inline geometry_msgs::Vector3 vectorNull()
   tmp.x = 0;
   tmp.y = 0;
   tmp.z = 0;
+  return tmp;
+}
+
+inline geometry_msgs::Vector3 vectorUniform(double a)
+{
+  geometry_msgs::Vector3 tmp;
+  tmp.x = a;
+  tmp.y = a;
+  tmp.z = a;
+  return tmp;
 }
 
 template <typename T>

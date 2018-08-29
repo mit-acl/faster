@@ -93,6 +93,7 @@ private:
 
   double solveVelAndGetCost(vec_Vecf<3> path);
   void updateInitialCond(int i);
+  void pubPlanningVisual(Eigen::Vector3d center, double ra, double rb, Eigen::Vector3d B1, Eigen::Vector3d C1);
 
   visualization_msgs::Marker setpoint_;
   acl_msgs::QuadGoal quadGoal_;
@@ -112,6 +113,7 @@ private:
   ros::Publisher pub_forces_;
   ros::Publisher pub_actual_traj_;
   ros::Publisher pub_path_jps_;
+  ros::Publisher pub_planning_vis_;
   ros::Subscriber sub_goal_;
   ros::Subscriber sub_state_;
   ros::Subscriber sub_mode_;

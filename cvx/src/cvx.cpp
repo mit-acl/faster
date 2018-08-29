@@ -37,7 +37,7 @@
 #include <vector>
 
 #define OFFSET                                                                                                         \
-  10  // Replanning offset (the initial conditions are taken OFFSET states farther from the current position)
+  10  // Replanning offset (the initial conditions are taken OFFSET states farther from the last published goal)
 
 #define Ra 4.0  // [m] Radius of the first sphere
 #define Rb 6.0  // [m] Radius of the second sphere
@@ -57,6 +57,8 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   pub_forces_ = nh_.advertise<visualization_msgs::MarkerArray>("forces", 1);
   pub_actual_traj_ = nh_.advertise<visualization_msgs::Marker>("actual_traj", 1);
   pub_path_jps_ = nh_.advertise<visualization_msgs::MarkerArray>("path_jps", 1);
+
+  pub_planning_vis_ = nh_.advertise<visualization_msgs::MarkerArray>("planning_vis", 1);
 
   sub_goal_ = nh_.subscribe("term_goal", 1, &CVX::goalCB, this);
   sub_mode_ = nh_.subscribe("flightmode", 1, &CVX::modeCB, this);
@@ -134,6 +136,58 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   }
   clearMarkerActualTraj();
   ROS_INFO("Planner initialized");
+}
+
+void CVX::pubPlanningVisual(Eigen::Vector3d center, double ra, double rb, Eigen::Vector3d B1, Eigen::Vector3d C1)
+{
+  visualization_msgs::MarkerArray tmp;
+
+  /*  visualization_msgs::Marker m;
+    m.type = visualization_msgs::Marker::ARROW;
+    m.action = visualization_msgs::Marker::DELETEALL;
+    m.id = 0;
+    tmp.markers.push_back(m);
+    pub_path_jps_.publish(tmp);
+    visualization_msgs::MarkerArray new_array;*/
+
+  int start = 2200;  // Large enough to prevent conflict with other markers
+  visualization_msgs::Marker sphere_Sa;
+  sphere_Sa.header.frame_id = "world";
+  sphere_Sa.id = start;
+  sphere_Sa.type = visualization_msgs::Marker::SPHERE;
+  sphere_Sa.scale = vectorUniform(2 * ra);
+  sphere_Sa.color = color(BLUE_TRANS);
+  sphere_Sa.pose.position = eigen2point(center);
+  tmp.markers.push_back(sphere_Sa);
+
+  visualization_msgs::Marker sphere_Sb;
+  sphere_Sb.header.frame_id = "world";
+  sphere_Sb.id = start + 1;
+  sphere_Sb.type = visualization_msgs::Marker::SPHERE;
+  sphere_Sb.scale = vectorUniform(2 * rb);
+  sphere_Sb.color = color(RED_TRANS_TRANS);
+  sphere_Sb.pose.position = eigen2point(center);
+  tmp.markers.push_back(sphere_Sb);
+
+  visualization_msgs::Marker B1_marker;
+  B1_marker.header.frame_id = "world";
+  B1_marker.id = start + 2;
+  B1_marker.type = visualization_msgs::Marker::SPHERE;
+  B1_marker.scale = vectorUniform(0.1);
+  B1_marker.color = color(BLUE_LIGHT);
+  B1_marker.pose.position = eigen2point(B1);
+  tmp.markers.push_back(B1_marker);
+
+  visualization_msgs::Marker C1_marker;
+  C1_marker.header.frame_id = "world";
+  C1_marker.id = start + 3;
+  C1_marker.type = visualization_msgs::Marker::SPHERE;
+  C1_marker.scale = vectorUniform(0.1);
+  C1_marker.color = color(BLUE_LIGHT);
+  C1_marker.pose.position = eigen2point(C1);
+  tmp.markers.push_back(C1_marker);
+
+  pub_planning_vis_.publish(tmp);
 }
 
 void CVX::solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr, Vec3f start, Vec3f goal)
@@ -410,6 +464,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
       X_temp_ = solver_jerk_.getX();
       bool isFree = trajIsFree(X_temp_);
       createMarkerSetOfArrows(X_temp_, isFree);
+
       if (isFree)
       {
         // printf("******Replanned!\n");
@@ -421,6 +476,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
                   std::cout << path_jps_vector_[i].transpose() << std::endl;
                 }*/
         Eigen::Vector3d C1 = getLastIntersectionWithSphere(path_jps_vector_, rb, center);
+        pubPlanningVisual(center, ra, rb, B1, C1);
         vec_Vecf<3> WP = getPointsBw2Spheres(path_jps_vector_, ra, rb, center);
         WP.insert(WP.begin(), B1);
         WP.push_back(C1);
