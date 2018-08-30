@@ -26,10 +26,11 @@
 // Solvers includes
 #include "solvers/solvers.hpp"
 
-// status_ : TRAVELING-->GOAL_SEEN-->GOAL_REACHED-->TRAVELING-->...
-#define TRAVELING 0
-#define GOAL_SEEN 1
-#define GOAL_REACHED 2
+// status_ : YAWING-->TRAVELING-->GOAL_SEEN-->GOAL_REACHED-->YAWING-->TRAVELING-->...
+#define YAWING 0
+#define TRAVELING 1
+#define GOAL_SEEN 2
+#define GOAL_REACHED 3
 
 // planner_status_
 #define FIRST_PLAN 0
@@ -96,6 +97,7 @@ private:
   void updateInitialCond(int i);
   void pubPlanningVisual(Eigen::Vector3d center, double ra, double rb, Eigen::Vector3d B1, Eigen::Vector3d C1);
   void pubintersecPoint(Eigen::Vector3d p, bool add);
+  void yaw(double diff, acl_msgs::QuadGoal& quad_goal);
 
   visualization_msgs::Marker setpoint_;
   acl_msgs::QuadGoal quadGoal_;

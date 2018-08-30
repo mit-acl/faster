@@ -21,6 +21,8 @@
 
 // TODO: I think in CVXGEN it should be sum from 0 to..., instead of from 1 to... (in the cost function)
 
+// TODO: Remove all the points below the ground in the point cloud
+
 #include "cvx.hpp"
 #include "geometry_msgs/PointStamped.h"
 #include "nav_msgs/Path.h"
@@ -261,6 +263,18 @@ void CVX::goalCB(const acl_msgs::TermGoal& msg)
   goal_click_initialized_ = true;
   clearMarkerActualTraj();
   printf("Exiting from goalCB\n");
+}
+
+void CVX::yaw(double diff, acl_msgs::QuadGoal& quad_goal)
+{
+  float plan_eval_time_ = 0.01;
+  float r_max_ = 1;
+  saturate(diff, -plan_eval_time_ * r_max_, plan_eval_time_ * r_max_);
+  if (diff > 0)
+    quad_goal.dyaw = r_max_;
+  else
+    quad_goal.dyaw = -r_max_;
+  quad_goal.yaw += diff;
 }
 
 void CVX::replanCB(const ros::TimerEvent& e)
@@ -525,7 +539,10 @@ void CVX::stateCB(const acl_msgs::State& msg)
     z_start_ = std::max(0.0, z_start_);
   }
 
-  pubActualTraj();
+  if (status_ != GOAL_REACHED)
+  {
+    pubActualTraj();
+  }
 }
 
 void CVX::updateInitialCond(int i)
@@ -567,6 +584,7 @@ void CVX::pubCB(const ros::TimerEvent& e)
   quadGoal_.vel = vectorNull();
   quadGoal_.accel = vectorNull();
   quadGoal_.jerk = vectorNull();
+  quadGoal_.dyaw = 0;
 
   initialCond_.vel = vectorNull();
   initialCond_.accel = vectorNull();
@@ -628,17 +646,26 @@ void CVX::pubCB(const ros::TimerEvent& e)
     quadGoal_.accel = (use_ff_) ? getAccel(k_) : vectorNull();
     quadGoal_.jerk = (use_ff_) ? getJerk(k_) : vectorNull();
 
-    /*    if (status_ != GOAL_REACHED)
-        {
-          updateInitialCond(kp1);
-        }
-        else
-        {
-          initialCond_.pos = state_.pos;
-          initialCond_.vel = vectorNull();
-          initialCond_.accel = vectorNull();
-          initialCond_.jerk = vectorNull();
-        }*/
+    quadGoal_.dyaw = 0;
+
+    if (status_ == TRAVELING || status_ == GOAL_SEEN)
+    {
+      double desired_yaw = atan2(quadGoal_.vel.y, quadGoal_.vel.x);
+      double diff = desired_yaw - quadGoal_.yaw;
+      angle_wrap(diff);
+      yaw(diff, quadGoal_);
+    }
+    /*  double heading_ = atan2(term_goal_.pos.y - quadGoal_.pos.y, term_goal_.pos.x - quadGoal_.pos.x);
+      double diff = heading_ - quadGoal_.yaw;
+      angle_wrap(diff);
+      yaw(diff, quadGoal_);
+
+      sleep(3);
+
+      quadGoal_.dyaw = 0;*/
+
+    // quadGoal_.yaw = atan2(quadGoal_.vel.y / quadGoal_.vel.x);
+
     k_++;
   }
   else
@@ -653,7 +680,6 @@ void CVX::pubCB(const ros::TimerEvent& e)
   //       initialCond_.pos.z, initialCond_.vel.x, initialCond_.vel.y, initialCond_.vel.z);
 
   pub_goal_.publish(quadGoal_);
-  // n_states_publised_ = n_states_publised_ + 1;
 
   // Pub setpoint maker.  setpoint_ is the last quadGoal sent to the drone
   setpoint_.header.stamp = ros::Time::now();
@@ -1296,22 +1322,28 @@ void CVX::pubintersecPoint(Eigen::Vector3d p, bool add)
     tmp.color = color(BLUE_LIGHT);
     tmp.pose.position = eigen2point(p);
     intersec_points_.markers.push_back(tmp);
-    last_id = i;
+    last_id = start + i;
     i = i + 1;
   }
   else
   {  // clear everything
-    for (int j = start; j <= start + last_id; j++)
-    {
-      visualization_msgs::Marker tmp;
-      tmp.header.frame_id = "world";
-      tmp.id = start + j;
-      tmp.type = visualization_msgs::Marker::SPHERE;
-      tmp.action = visualization_msgs::Marker::DELETE;
-      intersec_points_.markers.push_back(tmp);
-    }
+    intersec_points_.markers.clear();
+    /*    for (int j = start; j <= start; j++)
+        {*/
+    visualization_msgs::Marker tmp;
+    tmp.header.frame_id = "world";
+    tmp.id = start;
+    tmp.type = visualization_msgs::Marker::SPHERE;
+    tmp.action = visualization_msgs::Marker::DELETEALL;
+    intersec_points_.markers.push_back(tmp);
+    /*    }
+     */
     last_id = 0;
     i = 0;
   }
   pub_intersec_points_.publish(intersec_points_);
+  if (!add)
+  {
+    intersec_points_.markers.clear();
+  }
 }

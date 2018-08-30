@@ -41,6 +41,26 @@
 // inline is needed to avoid the "multiple definitions" error. Other option is to create the utils.cpp file, and put
 // there the function (and here only the prototype)
 
+inline void saturate(double& var, double min, double max)
+{
+  if (var < min)
+  {
+    var = min;
+  }
+  else if (var > max)
+  {
+    var = max;
+  }
+}
+
+inline void angle_wrap(double& diff)
+{
+  diff = fmod(diff + M_PI, 2 * M_PI);
+  if (diff < 0)
+    diff += 2 * M_PI;
+  diff -= M_PI;
+}
+
 inline pcl::PointXYZ eigenPoint2pclPoint(Eigen::Vector3d p)
 {
   // std::cout << "solving\n" << coeff << std::endl;
