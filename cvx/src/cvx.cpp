@@ -37,9 +37,10 @@
 #define OFFSET                                                                                                         \
   10  // Replanning offset (the initial conditions are taken OFFSET states farther from the last published goal)
 
-#define Ra 4.0   // [m] Radius of the first sphere
-#define Rb 6.0   // [m] Radius of the second sphere
-#define W_MAX 1  // [rd/s] Maximum angular velocity
+#define Ra 4.0        // [m] Radius of the first sphere
+#define Rb 6.0        // [m] Radius of the second sphere
+#define W_MAX 1       // [rd/s] Maximum angular velocity
+#define Z_GROUND 0.2  //[m] points below Z_GROUND are considered in collision
 
 using namespace JPS;
 
@@ -1026,8 +1027,16 @@ bool CVX::trajIsFree(Eigen::MatrixXd X)
 {
   // printf("********In trajIsFree\n");
   // std::cout << X << std::endl;
-
   mtx.lock();
+
+  // TODO: maybe there is a more efficient way to do this (sampling only some points of X?)
+  if (((X.col(3)).array() < 0).any() == true)  // If there is some z < 0
+  {
+    printf("Collision with the ground \n");
+    mtx.unlock();
+    return false;  // There is a collision with the ground
+  }
+
   int n = 1;  // Find nearest element
 
   Eigen::Vector3d eig_search_point(X(0, 0), X(0, 1), X(0, 2));
