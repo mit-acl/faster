@@ -41,8 +41,9 @@
 #define OFFSET                                                                                                         \
   10  // Replanning offset (the initial conditions are taken OFFSET states farther from the last published goal)
 
-#define Ra 4.0  // [m] Radius of the first sphere
-#define Rb 6.0  // [m] Radius of the second sphere
+#define Ra 4.0   // [m] Radius of the first sphere
+#define Rb 6.0   // [m] Radius of the second sphere
+#define W_MAX 1  // [rd/s] Maximum angular velocity
 
 using namespace JPS;
 
@@ -256,24 +257,32 @@ void CVX::goalCB(const acl_msgs::TermGoal& msg)
 {
   printf("NEW GOAL************************************************\n");
   term_goal_ = msg;
-  status_ = TRAVELING;
+
+  status_ = (status_ == GOAL_REACHED) ? YAWING : TRAVELING;
+  if (status_ == YAWING)
+  {
+    printf("GCB: status_ = YAWING\n");
+  }
+  if (status_ == TRAVELING)
+  {
+    printf("GCB: status_ = TRAVELING\n");
+  }
+
   planner_status_ = START_REPLANNING;
   force_reset_to_0_ = true;
-  printf("GCB: planner_status_ = START_REPLANNING\n");
+  // printf("GCB: planner_status_ = START_REPLANNING\n");
   goal_click_initialized_ = true;
   clearMarkerActualTraj();
-  printf("Exiting from goalCB\n");
+  // printf("Exiting from goalCB\n");
 }
 
 void CVX::yaw(double diff, acl_msgs::QuadGoal& quad_goal)
 {
-  float plan_eval_time_ = 0.01;
-  float r_max_ = 1;
-  saturate(diff, -plan_eval_time_ * r_max_, plan_eval_time_ * r_max_);
+  saturate(diff, -DC * W_MAX, DC * W_MAX);
   if (diff > 0)
-    quad_goal.dyaw = r_max_;
+    quad_goal.dyaw = W_MAX;
   else
-    quad_goal.dyaw = -r_max_;
+    quad_goal.dyaw = -W_MAX;
   quad_goal.yaw += diff;
 }
 
@@ -310,9 +319,10 @@ void CVX::replanCB(const ros::TimerEvent& e)
   if (dist_to_goal < GOAL_RADIUS)
   {
     status_ = GOAL_REACHED;
+    printf("STATUS=GOAL_REACHED\n");
   }
   // printf("Entering in replanCB, planner_status_=%d\n", planner_status_);
-  if (status_ == GOAL_SEEN || status_ == GOAL_REACHED || planner_status_ == REPLANNED)
+  if (status_ == GOAL_SEEN || status_ == GOAL_REACHED || planner_status_ == REPLANNED || status_ == YAWING)
   {
     // printf("No replanning needed because planner_status_=%d\n", planner_status_);
     return;
@@ -425,7 +435,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
       Timer time_coll_check(true);
       bool isFree = trajIsFree(X_temp_);
       double ms_ellapsed = time_coll_check.Elapsed().count();
-      printf("Collision check takes: %f ms/traj\n", ms_ellapsed);
+      // printf("Collision check takes: %f ms/traj\n", ms_ellapsed);
       createMarkerSetOfArrows(X_temp_, isFree);
 
       if (isFree)
@@ -445,7 +455,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
         double JPrimv1 = solveVelAndGetCost(WP);
 
         planner_status_ = REPLANNED;  // Don't replan again until start publishing current solution
-        printf("ReplanCB: planner_status_ = REPLANNED\n");
+        // printf("ReplanCB: planner_status_ = REPLANNED\n");
         optimized_ = true;
         pubTraj(X_);
         found_it = 1;
@@ -610,43 +620,48 @@ void CVX::pubCB(const ros::TimerEvent& e)
   {
     quadGoal_.cut_power = false;
 
-    /*    if ((planner_status_ == REPLANNED && (k > OFFSET - 1)) && status_ == TRAVELING)
-        {
-          printf("INCREASE OFFSET: the initial condition has already been published\n");
-          planner_status_ = START_REPLANNING;  // Let's try to replan again...
-          printf("pucCB1: planner_status_=START_REPLANNING\n");
-        }*/
-
-    // printf("k=%d\n", k);
-    // printf("ROWS of X=%d\n", X_.rows());
     if ((planner_status_ == REPLANNED && (k_ == k_initial_cond_)) ||
         (force_reset_to_0_ && planner_status_ == REPLANNED))
     {
-      // printf("Starting again\n");
       force_reset_to_0_ = false;
       X_ = X_temp_;
       U_ = U_temp_;
       k_ = 0;  // Start again publishing the waypoints in X_ from the first row
 
       planner_status_ = START_REPLANNING;
-      printf("pucCB2: planner_status_=START_REPLANNING\n");
-      // printf("%f, %f, %f, %f, %f, %f\n", X_(k, 0), X_(k, 1), X_(k, 2), X_(k, 3), X_(k, 4), X_(k, 5));
+      // printf("pucCB2: planner_status_=START_REPLANNING\n");
     }
 
     k_ = std::min(k_, (int)(X_.rows() - 1));
     int kp1 = std::min(k_ + OFFSET, (int)(X_.rows() - 1));  // k plus offset
-                                                            // std::cout << "esto es X" << std::endl;
-                                                            // std::cout << X_ << std::endl;
-                                                            // printf("masabajo2\n");
-    // printf("K-->%f, %f, %f, %f, %f, %f\n", X_(k, 0), X_(k, 1), X_(k, 2), X_(k, 3), X_(k, 4), X_(k, 5));
-    // printf("KP1-->%f, %f, %f, %f, %f, %f\n", X_(kp1, 0), X_(kp1, 1), X_(kp1, 2), X_(kp1, 3), X_(kp1, 4), X_(kp1, 5));
+
     quadGoal_.pos = getPos(k_);
     quadGoal_.vel = getVel(k_);
-    //// printf("masabajo3\n");
     quadGoal_.accel = (use_ff_) ? getAccel(k_) : vectorNull();
     quadGoal_.jerk = (use_ff_) ? getJerk(k_) : vectorNull();
-
     quadGoal_.dyaw = 0;
+
+    // heading_ = atan2(goal_(1) - X_(0, 1), goal_(0) - X_(0, 0));
+
+    if (status_ == YAWING)
+    {
+      double desired_yaw = atan2(term_goal_.pos.y - quadGoal_.pos.y, term_goal_.pos.x - quadGoal_.pos.x);
+      double diff = desired_yaw - quadGoal_.yaw;
+      angle_wrap(diff);
+      yaw(diff, quadGoal_);
+      printf("Inside, desired_yaw=%0.2f,quadGoal_.yaw=%0.2f, diff=%f , abs(diff)=%f\n", desired_yaw, quadGoal_.yaw,
+             diff, fabs(diff));
+      if (fabs(diff) < 0.2)
+      {
+        printf("It's less than 0.2!!\n");
+        status_ = TRAVELING;
+        printf("status_=TRAVELING\n");
+      }
+      else
+      {
+        printf("Yawing\n");
+      }
+    }
 
     if (status_ == TRAVELING || status_ == GOAL_SEEN)
     {
@@ -655,16 +670,6 @@ void CVX::pubCB(const ros::TimerEvent& e)
       angle_wrap(diff);
       yaw(diff, quadGoal_);
     }
-    /*  double heading_ = atan2(term_goal_.pos.y - quadGoal_.pos.y, term_goal_.pos.x - quadGoal_.pos.x);
-      double diff = heading_ - quadGoal_.yaw;
-      angle_wrap(diff);
-      yaw(diff, quadGoal_);
-
-      sleep(3);
-
-      quadGoal_.dyaw = 0;*/
-
-    // quadGoal_.yaw = atan2(quadGoal_.vel.y / quadGoal_.vel.x);
 
     k_++;
   }
@@ -673,7 +678,6 @@ void CVX::pubCB(const ros::TimerEvent& e)
     quadGoal_.cut_power = true;
   }
 
-  // printf("In pubCB5\n");
   /*  ROS_INFO("publishing quadGoal: %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", quadGoal_.pos.x, quadGoal_.pos.y,
              quadGoal_.pos.z, quadGoal_.vel.x, quadGoal_.vel.y, quadGoal_.vel.z);*/
   // printf("(initialCond_): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", initialCond_.pos.x, initialCond_.pos.y,
@@ -691,7 +695,6 @@ void CVX::pubCB(const ros::TimerEvent& e)
   // printf("End pubCB\n");
   // printf("#########Time in pubCB %0.2f ms\n", 1000 * (ros::Time::now().toSec() - t0pubCB));
   mtx_goals.unlock();
-  // printf("Y mas masabajo\n");
 }
 
 geometry_msgs::Vector3 CVX::getPos(int i)
@@ -1025,7 +1028,7 @@ void CVX::unkCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 // previously-unknown voxels
 bool CVX::trajIsFree(Eigen::MatrixXd X)
 {
-  printf("********In trajIsFree\n");
+  // printf("********In trajIsFree\n");
   // std::cout << X << std::endl;
 
   mtx.lock();
@@ -1038,7 +1041,7 @@ bool CVX::trajIsFree(Eigen::MatrixXd X)
 
   while (last_i < X.rows() - 1)
   {
-    printf("Inside the loop, last_i=%d\n", last_i);
+    // printf("Inside the loop, last_i=%d\n", last_i);
     // last point clouds
     std::vector<int> id_inst(n);
     std::vector<float> dist2_inst(n);  // squared distance
