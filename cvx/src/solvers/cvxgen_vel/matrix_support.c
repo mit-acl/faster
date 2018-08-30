@@ -1,4 +1,4 @@
-/* Produced by CVXGEN, 2018-08-24 19:17:59 -0400.  */
+/* Produced by CVXGEN, 2018-08-30 09:02:13 -0400.  */
 /* CVXGEN is Copyright (C) 2006-2017 Jacob Mattingley, jem@cvxgen.com. */
 /* The code in this file is Copyright (C) 2006-2017 Jacob Mattingley. */
 /* CVXGEN, or solvers produced by CVXGEN, cannot be used for commercial */
@@ -409,9 +409,9 @@ void multbyP(double *lhs, double *rhs) {
   lhs[13] = 0;
   lhs[14] = 0;
   lhs[15] = 0;
-  lhs[16] = 0;
-  lhs[17] = 0;
-  lhs[18] = 0;
+  lhs[16] = rhs[16]*(2);
+  lhs[17] = rhs[17]*(2);
+  lhs[18] = rhs[18]*(2);
   lhs[19] = rhs[19]*(2);
   lhs[20] = rhs[20]*(2);
   lhs[21] = rhs[21]*(2);

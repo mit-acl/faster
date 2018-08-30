@@ -19,7 +19,7 @@ public:
   Eigen::MatrixXd getX();
   Eigen::MatrixXd getU();
   void set_x0(double x0[]);
-  void set_u0(double u0[]);
+  // void set_u0(double u0[]);
   void set_xf(double xf[]);
   void resetXandU();
   void set_max(double max_values[INPUT_ORDER]);
@@ -38,7 +38,7 @@ protected:
   int N_;
   double xf_[3 * INPUT_ORDER];
   double x0_[3 * INPUT_ORDER];
-  double u0_[3];
+  // double u0_[3];
   double v_max_;
   double a_max_;
   double j_max_;
@@ -126,14 +126,14 @@ void Solver<INPUT_ORDER>::set_xf(double xf[])
   }
 }
 
-template <int INPUT_ORDER>
+/*template <int INPUT_ORDER>
 void Solver<INPUT_ORDER>::set_u0(double u0[])
 {
   for (int i = 0; i < 3; i++)
   {
     u0_[i] = u0[i];
   }
-}
+}*/
 
 template <int INPUT_ORDER>
 void Solver<INPUT_ORDER>::resetXandU()
@@ -281,7 +281,7 @@ void Solver<INPUT_ORDER>::interpolate(int var, double** u, double** x)
     }
 
     xd[0] = 0;
-    yd[0] = (type_of_var == INPUT) ? u0_[axis] : x0_[column_x];
+    yd[0] = (type_of_var == INPUT) ? u[0][axis] : x0_[column_x];
 
     /*    printf("ROJOS\n");
         for (int i = 0; i < nxd; i++)
@@ -342,6 +342,7 @@ void Solver<INPUT_ORDER>::genNewTraj()
       // printf("Obtained by derivation\n");
       break;
     case ACCEL:
+      printf("REMEMBER TO MODIFY SUM_0_N-1 IN THE ACCELERATION\n");
       x = accel_get_state();
       u = accel_get_control();
       interpolate(POS, u, x);    // interpolate POS

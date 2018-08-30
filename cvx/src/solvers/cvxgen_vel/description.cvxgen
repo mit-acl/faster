@@ -1,4 +1,4 @@
-# Produced by CVXGEN, 2018-08-24 19:17:55 -0400.
+# Produced by CVXGEN, 2018-08-30 09:02:07 -0400.
 # CVXGEN is Copyright (C) 2006-2017 Jacob Mattingley, jem@cvxgen.com.
 # The code in this file is Copyright (C) 2006-2017 Jacob Mattingley.
 # CVXGEN, or solvers produced by CVXGEN, cannot be used for commercial
@@ -28,7 +28,7 @@ variables
 end
 
 minimize
-  sum[i=1..N-1](quad(u[i])) +  quad(x[N]-xf, Q_final)
+  sum[i=0..N-1](quad(u[i])) +  quad(x[N]-xf, Q_final)
 
 subject to
   x[t+1] == A*x[t]+B*u[t], t=0..N-1

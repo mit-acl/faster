@@ -1,4 +1,4 @@
-/* Produced by CVXGEN, 2018-08-24 19:18:00 -0400.  */
+/* Produced by CVXGEN, 2018-08-30 09:02:13 -0400.  */
 /* CVXGEN is Copyright (C) 2006-2017 Jacob Mattingley, jem@cvxgen.com. */
 /* The code in this file is Copyright (C) 2006-2017 Jacob Mattingley. */
 /* CVXGEN, or solvers produced by CVXGEN, cannot be used for commercial */
@@ -41,6 +41,7 @@ typedef struct Params_t
 } Params;
 typedef struct Vars_t
 {
+  double *u_0;  /* 3 rows. */
   double *u_1;  /* 3 rows. */
   double *u_2;  /* 3 rows. */
   double *u_3;  /* 3 rows. */
@@ -57,7 +58,6 @@ typedef struct Vars_t
   double *u_14; /* 3 rows. */
   double *x_15; /* 3 rows. */
   double *t_01; /* 1 rows. */
-  double *u_0;  /* 3 rows. */
   double *t_02; /* 1 rows. */
   double *t_03; /* 1 rows. */
   double *t_04; /* 1 rows. */
@@ -107,7 +107,7 @@ typedef struct Workspace_t
   double lhs_cc[378];
   double buffer[378];
   double buffer2[378];
-  double KKT[898];
+  double KKT[901];
   double L[896];
   double d[378];
   double v[378];

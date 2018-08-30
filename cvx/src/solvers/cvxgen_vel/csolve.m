@@ -4,7 +4,7 @@
 %
 % solves the convex optimization problem
 %
-%   minimize(quad_form(u_1, eye(3)) + quad_form(u_2, eye(3)) + quad_form(u_3, eye(3)) + quad_form(u_4, eye(3)) + quad_form(u_5, eye(3)) + quad_form(u_6, eye(3)) + quad_form(u_7, eye(3)) + quad_form(u_8, eye(3)) + quad_form(u_9, eye(3)) + quad_form(u_10, eye(3)) + quad_form(u_11, eye(3)) + quad_form(u_12, eye(3)) + quad_form(u_13, eye(3)) + quad_form(u_14, eye(3)) + quad_form(x_15 - xf, Q_final))
+%   minimize(quad_form(u_0, eye(3)) + quad_form(u_1, eye(3)) + quad_form(u_2, eye(3)) + quad_form(u_3, eye(3)) + quad_form(u_4, eye(3)) + quad_form(u_5, eye(3)) + quad_form(u_6, eye(3)) + quad_form(u_7, eye(3)) + quad_form(u_8, eye(3)) + quad_form(u_9, eye(3)) + quad_form(u_10, eye(3)) + quad_form(u_11, eye(3)) + quad_form(u_12, eye(3)) + quad_form(u_13, eye(3)) + quad_form(u_14, eye(3)) + quad_form(x_15 - xf, Q_final))
 %   subject to
 %     x_1 == A*x_0 + B*u_0
 %     x_2 == A*x_1 + B*u_1
@@ -88,7 +88,7 @@
 %
 % Specify params.A, ..., params.xf, then run
 %   [vars, status] = csolve(params, settings)
-% Produced by CVXGEN, 2018-08-24 19:17:55 -0400.
+% Produced by CVXGEN, 2018-08-30 09:02:07 -0400.
 % CVXGEN is Copyright (C) 2006-2017 Jacob Mattingley, jem@cvxgen.com.
 % The code in this file is Copyright (C) 2006-2017 Jacob Mattingley.
 % CVXGEN, or solvers produced by CVXGEN, cannot be used for commercial

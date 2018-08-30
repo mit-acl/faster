@@ -13,10 +13,6 @@
 
 // TODO: how to tackle unknown space
 
-// TODO: yaw should be pointing to the velocity vector? Or maybe to the place with more unknown space?
-
-// TODO: First of all, try with an straight line to the goal
-
 // TODO: Quiz'a puedo anadir al potential field otra fuerza que me aleje de los sitios por los cuales ya he pasado?
 
 // TODO: I think in CVXGEN it should be sum from 0 to..., instead of from 1 to... (in the cost function)
@@ -371,7 +367,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
             double xf_sphere[3] = { p2[0], p2[1], p2[2] };
             mtx_goals.lock();
             double x0[3] = { initialCond_.pos.x, initialCond_.pos.y, initialCond_.pos.z };
-            double u0[3] = { initialCond_.vel.x, initialCond_.vel.y, initialCond_.vel.z };
+            //double u0[3] = { initialCond_.vel.x, initialCond_.vel.y, initialCond_.vel.z };
             mtx_goals.unlock();
             solver_vel_.set_xf(xf_sphere);
             solver_vel_.set_x0(x0);
@@ -379,7 +375,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
             printf("xf is %f, %f, %f\n", xf_sphere[0], xf_sphere[1], xf_sphere[2]);
             double max_values[1] = { V_MAX };
             solver_vel_.set_max(max_values);
-            solver_vel_.set_u0(u0);
+            //solver_vel_.set_u0(u0);
             solver_vel_.genNewTraj();
             printf("generated new traj\n");
             U_temp_ = solver_vel_.getU();
@@ -393,13 +389,13 @@ void CVX::replanCB(const ros::TimerEvent& e)
             mtx_goals.lock();
             double x0[6] = { initialCond_.pos.x, initialCond_.pos.y, initialCond_.pos.z,
                              initialCond_.vel.x, initialCond_.vel.y, initialCond_.vel.z };
-            double u0[3] = { initialCond_.accel.x, initialCond_.accel.y, initialCond_.accel.z };
+            //double u0[3] = { initialCond_.accel.x, initialCond_.accel.y, initialCond_.accel.z };
             mtx_goals.unlock();
             solver_accel_.set_xf(xf_sphere);
             solver_accel_.set_x0(x0);
             double max_values[2] = { V_MAX, A_MAX };
             solver_accel_.set_max(max_values);
-            solver_accel_.set_u0(u0);
+            //solver_accel_.set_u0(u0);
             solver_accel_.genNewTraj();
             U_temp_ = solver_accel_.getU();
             X_temp_ = solver_accel_.getX();*/
@@ -428,7 +424,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
       solver_jerk_.set_x0(x0);
       double max_values[3] = { V_MAX, A_MAX, J_MAX };
       solver_jerk_.set_max(max_values);
-      solver_jerk_.set_u0(u0);
+      // solver_jerk_.set_u0(u0);
       solver_jerk_.genNewTraj();
       U_temp_ = solver_jerk_.getU();
       X_temp_ = solver_jerk_.getX();

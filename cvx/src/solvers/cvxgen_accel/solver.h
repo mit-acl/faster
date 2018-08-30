@@ -1,10 +1,9 @@
-/* Produced by CVXGEN, 2018-08-15 18:27:50 -0400.  */
+/* Produced by CVXGEN, 2018-08-30 09:34:39 -0400.  */
 /* CVXGEN is Copyright (C) 2006-2017 Jacob Mattingley, jem@cvxgen.com. */
 /* The code in this file is Copyright (C) 2006-2017 Jacob Mattingley. */
 /* CVXGEN, or solvers produced by CVXGEN, cannot be used for commercial */
 /* applications without prior written permission from Jacob Mattingley. */
 #ifdef __cplusplus
-
 extern "C" {
 #endif
 /* Filename: solver.h. */
@@ -43,6 +42,7 @@ typedef struct Params_t
 } Params;
 typedef struct Vars_t
 {
+  double *u_0;  /* 3 rows. */
   double *u_1;  /* 3 rows. */
   double *u_2;  /* 3 rows. */
   double *u_3;  /* 3 rows. */
@@ -59,7 +59,6 @@ typedef struct Vars_t
   double *u_14; /* 3 rows. */
   double *x_15; /* 6 rows. */
   double *t_01; /* 1 rows. */
-  double *u_0;  /* 3 rows. */
   double *t_02; /* 1 rows. */
   double *t_03; /* 1 rows. */
   double *t_04; /* 1 rows. */
@@ -169,7 +168,7 @@ typedef struct Workspace_t
   double lhs_cc[828];
   double buffer[828];
   double buffer2[828];
-  double KKT[2206];
+  double KKT[2209];
   double L[2667];
   double d[828];
   double v[828];
@@ -241,6 +240,8 @@ void better_start(void);
 void fillrhs_start(void);
 long solve(void);
 
+/* Function definitions in testsolver.c: */
+
 /* Function definitions in util.c: */
 void tic(void);
 float toc(void);
@@ -253,8 +254,6 @@ double randn(void);
 void reset_rand(void);
 
 #endif
-
 #ifdef __cplusplus
 }
-
 #endif
