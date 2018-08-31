@@ -15,9 +15,11 @@
 
 // TODO: Quiz'a puedo anadir al potential field otra fuerza que me aleje de los sitios por los cuales ya he pasado?
 
-// TODO: I think in CVXGEN it should be sum from 0 to..., instead of from 1 to... (in the cost function)
+// TODO: Check the offset or offset-1
 
-// TODO: Remove all the points below the ground in the point cloud
+// TODO: I'm using only the direction of the force, but not the magnitude. Could I use the magnitude?
+// TODO: If I'm only using the direction of the force, not sure if quadratic+linear separation is needed in the
+// attractive force
 
 #include "cvx.hpp"
 #include "geometry_msgs/PointStamped.h"
@@ -37,10 +39,10 @@
 #define OFFSET                                                                                                         \
   10  // Replanning offset (the initial conditions are taken OFFSET states farther from the last published goal)
 
-#define Ra 4.0        // [m] Radius of the first sphere
-#define Rb 6.0        // [m] Radius of the second sphere
-#define W_MAX 1       // [rd/s] Maximum angular velocity
-#define Z_GROUND 0.2  //[m] points below Z_GROUND are considered in collision
+#define Ra 4.0     // [m] Radius of the first sphere
+#define Rb 6.0     // [m] Radius of the second sphere
+#define W_MAX 1    // [rd/s] Maximum angular velocity
+#define alpha_0 1  //[rd] threshold to ignore current JPS solution, and consider the old one
 
 using namespace JPS;
 
@@ -138,7 +140,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   ROS_INFO("Planner initialized");
 }
 
-void CVX::solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr, Vec3f start, Vec3f goal)
+bool CVX::solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr, Vec3f start, Vec3f goal, vec_Vecf<3>& path)
 {
   // Create a map
   /*  std::cout << "Solving JPS from start\n" << start << std::endl;
@@ -168,18 +170,19 @@ void CVX::solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr, Vec3f start, Ve
     // printf("JPS Path Distance: %f\n", total_distance3f(planner_ptr->getPath()));  // getRawPath() if you want the
     // path with more corners (not "cleaned")
     // printf("JPS Path: \n");
-    path_jps_vector_ = planner_ptr->getPath();  // getRawPath() if you want the path with more corners (not "cleaned")
+    path.clear();
+    path = planner_ptr->getPath();  // getRawPath() if you want the path with more corners (not "cleaned")
 
     /*    printf("First point in path_jps_vector_:\n");
         std::cout << path_jps_vector_[0].transpose() << std::endl;*/
-    directionJPS_ = path_jps_vector_[1] - path_jps_vector_[0];
+    // directionJPS_ = path_jps_vector_[1] - path_jps_vector_[0];
     // printf("Estoy aqui: \n");
     /*    for (const auto& it : path_jps_vector)
         {
           std::cout << it.transpose() << std::endl;
         }*/
     path_jps_ = clearArrows();
-    vectorOfVectors2MarkerArray(path_jps_vector_, &path_jps_);
+    vectorOfVectors2MarkerArray(path, &path_jps_);
     pub_path_jps_.publish(path_jps_);
   }
   /*
@@ -194,7 +197,7 @@ void CVX::solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr, Vec3f start, Ve
    std::cout << it.transpose() << std::endl;
 */
   // printf("Out of solveJPSD\n");
-  return;
+  return valid_jps;
 }
 
 visualization_msgs::MarkerArray CVX::clearArrows()
@@ -300,19 +303,14 @@ void CVX::replanCB(const ros::TimerEvent& e)
     return;
   }
 
-  double dist_to_goal = sqrt(pow(term_goal_.pos.x - state_.pos.x, 2) + pow(term_goal_.pos.y - state_.pos.y, 2) +
-                             pow(term_goal_.pos.z - state_.pos.z, 2));
+  Eigen::Vector3d state_pos(state_.pos.x, state_.pos.y, state_.pos.z);              // Local copy of state
+  Eigen::Vector3d term_goal(term_goal_.pos.x, term_goal_.pos.y, term_goal_.pos.z);  // Local copy of the terminal goal
+  double dist_to_goal = (term_goal - state_pos).norm();
 
   // 0.96 and 0.98 are to ensure that ra<rb<dist_to_goal always
-  double ra = std::min(0.96 * dist_to_goal, Ra);                        // radius of the sphere Sa
-  double rb = std::min(0.98 * dist_to_goal, Rb);                        // radius of the sphere Sa
-  Eigen::Vector3d state_pos(state_.pos.x, state_.pos.y, state_.pos.z);  // Local copy of state
-  Eigen::Vector3d curr_pos = state_pos;
-  Eigen::Vector3d term_goal(term_goal_.pos.x, term_goal_.pos.y, term_goal_.pos.z);
+  double ra = std::min(0.96 * dist_to_goal, Ra);  // radius of the sphere Sa
+  double rb = std::min(0.98 * dist_to_goal, Rb);  // radius of the sphere Sa
 
-  // TODO: I'm using only the direction of the force, but not the magnitude. Could I use the magnitude?
-  // TODO: If I'm only using the direction of the force, not sure if quadratic+linear separation is needed in the
-  // attractive force
   if (dist_to_goal < GOAL_RADIUS)
   {
     status_ = GOAL_REACHED;
@@ -325,20 +323,23 @@ void CVX::replanCB(const ros::TimerEvent& e)
     return;
   }
 
-  // If you want the force to be the direction selector
-  // Eigen::Vector3d force = computeForce(curr_pos, term_goal);
-  // double x = force[0], y = force[1], z = force[2];
-  // If you want the JPS3D solution to be the direction selector
-  // double x = directionJPS_[0], y = directionJPS_[1], z = directionJPS_[2];
+  // Vec3f goal(term_goal_.pos.x, term_goal_.pos.y, term_goal_.pos.z);
+  vec_Vecf<3> null(1, Eigen::Vector3d::Zero());
+  vec_Vecf<3>& JPS1(null);  // references HAVE to be initialized
+  vec_Vecf<3>& JPS2(null);
+  bool solved1 = solveJPS3D(pclptr_map_, state_pos, term_goal, JPS1);  // Solution is in JPS1
+  bool solved2 = solveJPS3D(pclptr_map_, state_pos, term_goal, JPS2);  // Solution is in JPS2
+  if (solved1 == false || solved2 == false)
+  {
+    printf("JPS didn't find a solution\n");
+    return;
+  }
 
-  Vec3f goal(term_goal_.pos.x, term_goal_.pos.y, term_goal_.pos.z);
-  solveJPS3D(pclptr_map_, state_pos, goal);  // Solution is in path_jps_vector_
+  Eigen::Vector3d B1 = getFirstIntersectionWithSphere(JPS1, ra, state_pos);
 
-  Eigen::Vector3d center = state_pos;
-  Eigen::Vector3d B1 = getFirstIntersectionWithSphere(path_jps_vector_, ra, center);
-
-  // Direction from the center to that point:
-  double x = B1[0] - center[0], y = B1[1] - center[1], z = B1[2] - center[2];
+  // Direction from the center=state_pos to that point:
+  Eigen::Vector3d dir = B1 - state_pos;
+  double x = dir[0], y = dir[1], z = dir[2];
 
   double theta0 = acos(z / (sqrt(x * x + y * y + z * z)));
   double phi0 = atan2(y, x);
@@ -364,43 +365,6 @@ void CVX::replanCB(const ros::TimerEvent& e)
         continue;
       }
 
-      /*      // Solver VEL
-            double xf_sphere[3] = { p2[0], p2[1], p2[2] };
-            mtx_goals.lock();
-            double x0[3] = { initialCond_.pos.x, initialCond_.pos.y, initialCond_.pos.z };
-            //double u0[3] = { initialCond_.vel.x, initialCond_.vel.y, initialCond_.vel.z };
-            mtx_goals.unlock();
-            solver_vel_.set_xf(xf_sphere);
-            solver_vel_.set_x0(x0);
-            printf("x0 is %f, %f, %f\n", x0[0], x0[1], x0[2]);
-            printf("xf is %f, %f, %f\n", xf_sphere[0], xf_sphere[1], xf_sphere[2]);
-            double max_values[1] = { V_MAX };
-            solver_vel_.set_max(max_values);
-            //solver_vel_.set_u0(u0);
-            solver_vel_.genNewTraj();
-            printf("generated new traj\n");
-            U_temp_ = solver_vel_.getU();
-            printf("got U\n");
-            X_temp_ = solver_vel_.getX();
-            printf("X_temp=\n");
-            std::cout << X_temp_ << std::endl;*/
-
-      /*      // Solver ACCEL
-            double xf_sphere[6] = { p2[0], p2[1], p2[2], 0, 0, 0 };
-            mtx_goals.lock();
-            double x0[6] = { initialCond_.pos.x, initialCond_.pos.y, initialCond_.pos.z,
-                             initialCond_.vel.x, initialCond_.vel.y, initialCond_.vel.z };
-            //double u0[3] = { initialCond_.accel.x, initialCond_.accel.y, initialCond_.accel.z };
-            mtx_goals.unlock();
-            solver_accel_.set_xf(xf_sphere);
-            solver_accel_.set_x0(x0);
-            double max_values[2] = { V_MAX, A_MAX };
-            solver_accel_.set_max(max_values);
-            //solver_accel_.set_u0(u0);
-            solver_accel_.genNewTraj();
-            U_temp_ = solver_accel_.getU();
-            X_temp_ = solver_accel_.getX();*/
-
       // Solver JERK
       if (optimized_)  // Needed to skip the first time (X_ still not initialized)
       {
@@ -412,12 +376,6 @@ void CVX::replanCB(const ros::TimerEvent& e)
       double x0[9] = { initialCond_.pos.x,   initialCond_.pos.y,   initialCond_.pos.z,
                        initialCond_.vel.x,   initialCond_.vel.y,   initialCond_.vel.z,
                        initialCond_.accel.x, initialCond_.accel.y, initialCond_.accel.z };
-
-      /*      printf("(Optimizando desde): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", initialCond_.pos.x,
-         initialCond_.pos.y, initialCond_.pos.z, initialCond_.vel.x, initialCond_.vel.y, initialCond_.vel.z);
-
-            printf("(State): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", state_.pos.x, state_.pos.y, state_.pos.z,
-                   state_.vel.x, state_.vel.y, state_.vel.z);*/
 
       double u0[3] = { initialCond_.jerk.x, initialCond_.jerk.y, initialCond_.jerk.z };
       mtx_goals.unlock();
@@ -437,20 +395,6 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
       if (isFree)
       {
-        double JPrimj1 = solver_jerk_.getCost();
-        // printf("Current state=%0.2f, %0.2f, %0.2f\n", state_pos[0], state_pos[1], state_pos[2]);
-        // printf("Before going to get C1, Points in JPS1\n");
-        /*        for (int i = 0; i < path_jps_vector_.size(); i++)
-                {
-                  std::cout << path_jps_vector_[i].transpose() << std::endl;
-                }*/
-        Eigen::Vector3d C1 = getLastIntersectionWithSphere(path_jps_vector_, rb, center);
-        pubPlanningVisual(center, ra, rb, B1, C1);
-        vec_Vecf<3> WP = getPointsBw2Spheres(path_jps_vector_, ra, rb, center);
-        WP.insert(WP.begin(), B1);
-        WP.push_back(C1);
-        double JPrimv1 = solveVelAndGetCost(WP);
-
         planner_status_ = REPLANNED;  // Don't replan again until start publishing current solution
         // printf("ReplanCB: planner_status_ = REPLANNED\n");
         optimized_ = true;
@@ -464,6 +408,25 @@ void CVX::replanCB(const ros::TimerEvent& e)
           // the goal)
           status_ = GOAL_SEEN;
           printf("CHANGED TO GOAL_SEEN********\n");
+        }
+        Eigen::Vector3d C1 = getLastIntersectionWithSphere(JPS1, rb, state_pos);
+        pubPlanningVisual(state_pos, ra, rb, B1, C1);
+        // printf("Angle=%f\n", angleBetVectors(B1 - A, B2 - A));
+        // if (angleBetVectors(B1 - A, B2 - A) > alpha_0)
+        if (1)
+        {
+          printf("Computing costs to decide between 2 jerk trajectories\n");
+          double JPrimj1 = solver_jerk_.getCost();
+          // printf("Current state=%0.2f, %0.2f, %0.2f\n", state_pos[0], state_pos[1], state_pos[2]);
+          // printf("Before going to get C1, Points in JPS1\n");
+          /*        for (int i = 0; i < path_jps_vector_.size(); i++)
+                  {
+                    std::cout << path_jps_vector_[i].transpose() << std::endl;
+                  }*/
+          vec_Vecf<3> WP = getPointsBw2Spheres(JPS1, ra, rb, state_pos);
+          WP.insert(WP.begin(), B1);
+          WP.push_back(C1);
+          double JPrimv1 = solveVelAndGetCost(WP);
         }
       }
     }
@@ -1030,9 +993,10 @@ bool CVX::trajIsFree(Eigen::MatrixXd X)
   mtx.lock();
 
   // TODO: maybe there is a more efficient way to do this (sampling only some points of X?)
-  if (((X.col(3)).array() < 0).any() == true)  // If there is some z < 0
+  if (((X.col(2)).array() < 0).any() == true)  // If there is some z < 0. Note that in eigen, first_index=0
   {
     printf("Collision with the ground \n");
+    std::cout << X.col(3) << std::endl << std::endl;
     mtx.unlock();
     return false;  // There is a collision with the ground
   }
@@ -1355,3 +1319,52 @@ void CVX::pubintersecPoint(Eigen::Vector3d p, bool add)
     intersec_points_.markers.clear();
   }
 }
+
+// If you want the force to be the direction selector
+// Eigen::Vector3d force = computeForce(curr_pos, term_goal);
+// double x = force[0], y = force[1], z = force[2];
+// If you want the JPS3D solution to be the direction selector
+// double x = directionJPS_[0], y = directionJPS_[1], z = directionJPS_[2];
+
+/*      // Solver VEL
+      double xf_sphere[3] = { p2[0], p2[1], p2[2] };
+      mtx_goals.lock();
+      double x0[3] = { initialCond_.pos.x, initialCond_.pos.y, initialCond_.pos.z };
+      //double u0[3] = { initialCond_.vel.x, initialCond_.vel.y, initialCond_.vel.z };
+      mtx_goals.unlock();
+      solver_vel_.set_xf(xf_sphere);
+      solver_vel_.set_x0(x0);
+      printf("x0 is %f, %f, %f\n", x0[0], x0[1], x0[2]);
+      printf("xf is %f, %f, %f\n", xf_sphere[0], xf_sphere[1], xf_sphere[2]);
+      double max_values[1] = { V_MAX };
+      solver_vel_.set_max(max_values);
+      //solver_vel_.set_u0(u0);
+      solver_vel_.genNewTraj();
+      printf("generated new traj\n");
+      U_temp_ = solver_vel_.getU();
+      printf("got U\n");
+      X_temp_ = solver_vel_.getX();
+      printf("X_temp=\n");
+      std::cout << X_temp_ << std::endl;*/
+
+/*      // Solver ACCEL
+      double xf_sphere[6] = { p2[0], p2[1], p2[2], 0, 0, 0 };
+      mtx_goals.lock();
+      double x0[6] = { initialCond_.pos.x, initialCond_.pos.y, initialCond_.pos.z,
+                       initialCond_.vel.x, initialCond_.vel.y, initialCond_.vel.z };
+      //double u0[3] = { initialCond_.accel.x, initialCond_.accel.y, initialCond_.accel.z };
+      mtx_goals.unlock();
+      solver_accel_.set_xf(xf_sphere);
+      solver_accel_.set_x0(x0);
+      double max_values[2] = { V_MAX, A_MAX };
+      solver_accel_.set_max(max_values);
+      //solver_accel_.set_u0(u0);
+      solver_accel_.genNewTraj();
+      U_temp_ = solver_accel_.getU();
+      X_temp_ = solver_accel_.getX();*/
+
+/*      printf("(Optimizando desde): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", initialCond_.pos.x,
+   initialCond_.pos.y, initialCond_.pos.z, initialCond_.vel.x, initialCond_.vel.y, initialCond_.vel.z);
+
+      printf("(State): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", state_.pos.x, state_.pos.y, state_.pos.z,
+             state_.vel.x, state_.vel.y, state_.vel.z);*/

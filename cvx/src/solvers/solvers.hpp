@@ -342,7 +342,6 @@ void Solver<INPUT_ORDER>::genNewTraj()
       // printf("Obtained by derivation\n");
       break;
     case ACCEL:
-      printf("REMEMBER TO MODIFY SUM_0_N-1 IN THE ACCELERATION\n");
       x = accel_get_state();
       u = accel_get_control();
       interpolate(POS, u, x);    // interpolate POS

@@ -84,7 +84,7 @@ private:
   // geometry_msgs::Point pointOrigin();
   // geometry_msgs::Point eigen2point(Eigen::Vector3d vector);
   void pubActualTraj();
-  void solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr, Vec3f start, Vec3f goal);
+  bool solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr, Vec3f start, Vec3f goal, vec_Vecf<3>& path);
   void vectorOfVectors2MarkerArray(vec_Vecf<3> traj, visualization_msgs::MarkerArray* m_array);
   visualization_msgs::MarkerArray clearArrows();
   // geometry_msgs::Vector3 vectorNull();
@@ -169,7 +169,7 @@ private:
   int k_ = 0;               // Row of X_ that will be published next;
   int k_initial_cond_ = 0;  // Row of X_ chosen as the initial condition for the planner
 
-  Eigen::Vector3d directionJPS_;
+  // Eigen::Vector3d directionJPS_;
   vec_Vecf<3> path_jps_vector_;
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_map_;

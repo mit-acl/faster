@@ -41,6 +41,11 @@
 // inline is needed to avoid the "multiple definitions" error. Other option is to create the utils.cpp file, and put
 // there the function (and here only the prototype)
 
+inline double angleBetVectors(Eigen::Vector3d a, Eigen::Vector3d b)
+{
+  return acos(a.dot(b) / (a.norm() * b.norm()));
+}
+
 inline void saturate(double& var, double min, double max)
 {
   if (var < min)
