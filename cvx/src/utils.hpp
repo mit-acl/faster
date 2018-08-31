@@ -6,9 +6,9 @@
 #include <geometry_msgs/Vector3.h>
 #include <geometry_msgs/Point.h>
 // TODO: This values should be the same as the global_mapper.yaml
-#define WDX 20    //[m] world dimension in x
-#define WDY 20    //[m] world dimension in y
-#define WDZ 4     //[m] world dimension in z
+#define WDX 20.0  //[m] world dimension in x
+#define WDY 20.0  //[m] world dimension in y
+#define WDZ 4.0   //[m] world dimension in z
 #define RES 0.15  //[m] cell dimension
 
 #define RED 1
@@ -270,6 +270,28 @@ using Vecf = Eigen::Matrix<decimal_t, N, 1>;  // Be CAREFUL, because this is wit
 template <int N>
 using vec_Vecf = vec_E<Vecf<N>>;
 
+// returns 1 if there is an intersection between the segment P1-P2 and the plane given by coeff=[A B C D]
+// (Ax+By+Cz+D==0)  returns 0 if there is no intersection.
+// The intersection point is saved in "intersection"
+inline bool getIntersectionWithPlane(Eigen::Vector3d P1, Eigen::Vector3d P2, Eigen::Vector4d coeff,
+                                     Eigen::Vector3d* inters)
+{
+  // http://www.ambrsoft.com/TrigoCalc/Plan3D/PlaneLineIntersection_.htm
+  x1 = P1[0];
+  a = (P2[0] - P1[0]);
+  y1 = P1[1];
+  b = (P2[1] - P1[1]);
+  z1 = P1[2];
+  c = (P2[2] - P1[2]);
+  double t = -(A * x1 + B * y1 + C * z1 + D) / (A * a + B * b + C * c);
+  *inters[0] = x1 + a * t;
+  *inters[1] = x2 + b * t;
+  *inters[2] = z2 + c * t;
+  bool result =
+      (t > 1 || t < 0) ? false : true;  // False if the intersection is with the line P1-P2, not with the segment P1-P2
+  return result;
+}
+
 // given 2 points (A inside and B outside the sphere) it computes the intersection of the lines between
 // that 2 points and the sphere
 inline Eigen::Vector3d getIntersectionWithSphere(Eigen::Vector3d A, Eigen::Vector3d B, double r, Eigen::Vector3d center)
@@ -377,6 +399,46 @@ inline Eigen::Vector3d getLastIntersectionWithSphere(vec_Vecf<3> path, double r,
   Eigen::Vector3d B = path[index + 1];
 
   Eigen::Vector3d intersection = getIntersectionWithSphere(A, B, r, center);
+  return intersection;
+}
+
+// Same as the previous one, but also returns in Jdist the distance form the last intersection to the goal (following
+// the path)
+inline Eigen::Vector3d getLastIntersectionWithSphere(vec_Vecf<3> path, double r, Eigen::Vector3d center, double* Jdist)
+{
+  // printf("In getLastIntersectionWithSphere\n");
+  int index = -1;
+  for (int i = path.size() - 1; i >= 0; i--)
+  {
+    double dist = (path[i] - center).norm();
+    if (dist < r)
+    {
+      index = i;  // This is the first point inside the sphere
+      break;
+    }
+  }
+
+  // printf("Index=%d\n", index);
+
+  if (index == path.size() - 1)
+  {
+    printf("ERROR, the goal is inside the sphere Sb, returning the last point\n");
+    *Jdist = 0;
+    return path[path.size() - 1];
+  }
+
+  // Note that it's guaranteed that index>=1, since the path[0] is always inside the sphere.
+  Eigen::Vector3d A = path[index];      // point inside the sphere
+  Eigen::Vector3d B = path[index + 1];  // point outside the sphere
+
+  Eigen::Vector3d intersection = getIntersectionWithSphere(A, B, r, center);
+
+  *Jdist = (B - intersection).norm();
+  for (int i = index + 1; i < path.size() - 1; i++)
+  {
+    *Jdist = *Jdist + (path[i + 1] - path[i]).norm();
+  }
+
   return intersection;
 }
 

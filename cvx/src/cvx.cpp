@@ -256,7 +256,7 @@ void CVX::vectorOfVectors2MarkerArray(vec_Vecf<3> traj, visualization_msgs::Mark
 void CVX::goalCB(const acl_msgs::TermGoal& msg)
 {
   printf("NEW GOAL************************************************\n");
-  term_goal_ = msg;
+  term_term_goal_ = msg;
 
   status_ = (status_ == GOAL_REACHED) ? YAWING : TRAVELING;
   if (status_ == YAWING)
@@ -286,10 +286,49 @@ void CVX::yaw(double diff, acl_msgs::QuadGoal& quad_goal)
   quad_goal.yaw += diff;
 }
 
+Eigen::Vector3d CVX::projectClickedGoal(Eigen::Vector3d P1)
+{
+  //[px1, py1, pz1] is inside the map
+  //[px2, py2, pz2] is outside the map
+  P2 = term_term_goal_;
+  double x_max = P1[0] + WDX / 2;
+  double x_min = P1[0] - WDX / 2;
+  double y_max = P1[1] + WDY / 2;
+  double y_min = P1[1] - WDY / 2;
+  double z_max = P1[2] + WDZ / 2;
+  double z_min = P1[2] - WDZ / 2;
+
+  if ((P1[0] < x_max && P1[0] > xmin) && (P1[1] < y_max && P1[1] > ymin) && (P1[2] < z_max && P1[2] > zmin))
+  {
+    // Clicked goal is inside the map
+    return P1;
+  }
+  Eigen::Vector3d inters;
+  std::vector<Eigen::Vector4d> all_planes = {
+    Eigen::Vector4d(1, 0, 0, P1[0] + WDX / 2),   // Plane X right
+    Eigen::Vector4d(-1, 0, 0, P1[0] - WDX / 2),  // Plane X left
+    Eigen::Vector4d(0, 1, 0, P1[1] + WDY / 2),   // Plane Y right
+    Eigen::Vector4d(0, -1, 0, P1[1] - WDY / 2),  // Plane Y left
+    Eigen::Vector4d(0, 0, 1, P1[2] + WDZ / 2),   // Plane Z up
+    Eigen::Vector4d(0, 0, -1, P1[2] - WDZ / 2)   // Plane Z down
+  };
+  for (int i = 0; i < 6; i++)
+  {
+    if (getIntersectionWithPlane(P1, P2, coeff, &inters) == true)
+    {
+      return inters;
+    }
+  }
+  printf("Neither the goal is inside the map nor it has a projection into it, this is impossible");
+}
+
 void CVX::replanCB(const ros::TimerEvent& e)
 {
   // printf("In replanCB\n");
   // double t0replanCB = ros::Time::now().toSec();
+  Eigen::Vector3d state_pos(state_.pos.x, state_.pos.y, state_.pos.z);  // Local copy of state
+  term_goal_ = projectClickedGoal(state_pos);
+
   clearMarkerSetOfArrows();
   pubintersecPoint(Eigen::Vector3d::Zero(), false);  // Clear the intersection points markers
   if (!kdtree_map_initialized_ && !kdtree_unk_initialized_)
@@ -303,7 +342,6 @@ void CVX::replanCB(const ros::TimerEvent& e)
     return;
   }
 
-  Eigen::Vector3d state_pos(state_.pos.x, state_.pos.y, state_.pos.z);              // Local copy of state
   Eigen::Vector3d term_goal(term_goal_.pos.x, term_goal_.pos.y, term_goal_.pos.z);  // Local copy of the terminal goal
   double dist_to_goal = (term_goal - state_pos).norm();
 
@@ -323,91 +361,209 @@ void CVX::replanCB(const ros::TimerEvent& e)
     return;
   }
 
-  // Vec3f goal(term_goal_.pos.x, term_goal_.pos.y, term_goal_.pos.z);
+  ///////////////////////////////////////////////////////////////////////////////
+
+  bool have_seen_the_goal1 = false, have_seen_the_goal2 = false;
+  bool found_one_1 = false, found_one_2 = false;  // found at least one free trajectory
+  bool need_to_decide = true;
+  bool solvedjps1 = false, solvedjps2 = false;
+
+  double J1, J2, JPrimj1, JPrimj2, JPrimv1, JPrimv2, JDist1, JDist2;
+  J1 = std::numeric_limits<double>::max();
+  J2 = std::numeric_limits<double>::max();
+  Eigen::MatrixXd U_temp1, U_temp2, X_temp1, X_temp2;
+
+  printf("hola1\n");
+
+  static Eigen::Vector3d B1km1;  // B1km1 is B1 in t=t_k-1 (previous iteration)
+  Eigen::Vector3d B1, B2, C1, C2;
+  vec_Vecf<3> WP1, WP2;
+
+  printf("hola2\n");
+
   vec_Vecf<3> null(1, Eigen::Vector3d::Zero());
   vec_Vecf<3>& JPS1(null);  // references HAVE to be initialized
   vec_Vecf<3>& JPS2(null);
-  bool solved1 = solveJPS3D(pclptr_map_, state_pos, term_goal, JPS1);  // Solution is in JPS1
-  bool solved2 = solveJPS3D(pclptr_map_, state_pos, term_goal, JPS2);  // Solution is in JPS2
-  if (solved1 == false || solved2 == false)
+  static bool first_time = true;                                     // how many times I've solved JPS1
+  solvedjps1 = solveJPS3D(pclptr_map_, state_pos, term_goal, JPS1);  // Solution is in JPS1
+
+  printf("hola3\n");
+
+  if (first_time == true)
+  {  // B1km1 is still not initialized --> Run from
+    first_time = false;
+    solvedjps2 = solvedjps1;
+    JPS2 = JPS1;
+  }
+  else
   {
-    printf("JPS didn't find a solution\n");
+    // In general, solve from B1km1
+    solvedjps2 = solveJPS3D(pclptr_map_, B1km1, term_goal, JPS2);  // Solution is in JPS2
+  }
+
+  if (solvedjps1 == false)
+  {
+    printf("JPS1 didn't find a solution\n");
+    return;
+  }
+  if (solvedjps2 == false)
+  {
+    printf("JPS2 didn't find a solution");
     return;
   }
 
-  Eigen::Vector3d B1 = getFirstIntersectionWithSphere(JPS1, ra, state_pos);
+  B1 = getFirstIntersectionWithSphere(JPS1, ra, state_pos);
+  B2 = getFirstIntersectionWithSphere(JPS2, ra, state_pos);
+  B1km1 = B1;
 
-  bool found_it = 0;
+  printf("hola4\n");
 
   std::vector<Eigen::Vector3d> K = samplePointsSphere(B1, ra, state_pos);  // radius, center and point
 
-  for (int i = 0; i < K.size() && !found_it; i++)
+  for (int i = 0; i < K.size(); i++)
   {
-    // Solver JERK
+    printf("hola5\n");
     if (optimized_)  // Needed to skip the first time (X_ still not initialized)
     {
       k_initial_cond_ = std::min(k_ + OFFSET, (int)(X_.rows() - 1));
       updateInitialCond(k_initial_cond_);
     }
+    //////SOLVING FOR JERK
     Eigen::Vector3d p = K[i];
-    double xf_sphere[9] = { p[0], p[1], p[2], 0, 0, 0, 0, 0, 0 };
+    double xf[9] = { p[0], p[1], p[2], 0, 0, 0, 0, 0, 0 };
     mtx_goals.lock();
     double x0[9] = { initialCond_.pos.x,   initialCond_.pos.y,   initialCond_.pos.z,
                      initialCond_.vel.x,   initialCond_.vel.y,   initialCond_.vel.z,
                      initialCond_.accel.x, initialCond_.accel.y, initialCond_.accel.z };
-
     mtx_goals.unlock();
-    solver_jerk_.set_xf(xf_sphere);
+    solver_jerk_.set_xf(xf);
     solver_jerk_.set_x0(x0);
+    printf("hola6\n");
     double max_values[3] = { V_MAX, A_MAX, J_MAX };
     solver_jerk_.set_max(max_values);
     solver_jerk_.genNewTraj();
-    U_temp_ = solver_jerk_.getU();
-    X_temp_ = solver_jerk_.getX();
+    U_temp1 = solver_jerk_.getU();
+    X_temp1 = solver_jerk_.getX();
+    //////SOLVED FOR JERK
+    printf("hola7\n");
 
-    bool isFree = trajIsFree(X_temp_);
+    bool isFree = trajIsFree(X_temp1);
+    createMarkerSetOfArrows(X_temp1, isFree);
 
-    createMarkerSetOfArrows(X_temp_, isFree);
+    printf("hola8\n");
 
     if (isFree)
     {
-      planner_status_ = REPLANNED;  // Don't replan again until start publishing current solution
-      // printf("ReplanCB: planner_status_ = REPLANNED\n");
+      found_one_1 = true;
       optimized_ = true;
-      pubTraj(X_);
-      found_it = 1;
-      double dist_end_traj_to_goal = (term_goal - p).norm();
-      if (dist_end_traj_to_goal < GOAL_RADIUS)
-      {
-        status_ = GOAL_SEEN;  // I've found a free path that ends in the goal
-        printf("CHANGED TO GOAL_SEEN********\n");
-      }
-      Eigen::Vector3d C1 = getLastIntersectionWithSphere(JPS1, rb, state_pos);
+      double dist = (term_goal - p).norm();
+      have_seen_the_goal1 = (dist < GOAL_RADIUS) ? true : false;
+
+      C1 = getLastIntersectionWithSphere(JPS1, rb, state_pos, &JDist1);
       pubPlanningVisual(state_pos, ra, rb, B1, C1);
-      // printf("Angle=%f\n", angleBetVectors(B1 - A, B2 - A));
-      // if (angleBetVectors(B1 - A, B2 - A) > alpha_0)
-      if (1)
+      if (angleBetVectors(B1 - state_pos, B2 - state_pos) <= alpha_0)
       {
-        printf("Computing costs to decide between 2 jerk trajectories\n");
-        double JPrimj1 = solver_jerk_.getCost();
-        // printf("Current state=%0.2f, %0.2f, %0.2f\n", state_pos[0], state_pos[1], state_pos[2]);
-        // printf("Before going to get C1, Points in JPS1\n");
-        /*        for (int i = 0; i < path_jps_vector_.size(); i++)
-                {
-                  std::cout << path_jps_vector_[i].transpose() << std::endl;
-                }*/
-        vec_Vecf<3> WP = getPointsBw2Spheres(JPS1, ra, rb, state_pos);
-        WP.insert(WP.begin(), B1);
-        WP.push_back(C1);
-        double JPrimv1 = solveVelAndGetCost(WP);
+        need_to_decide = false;
+      }
+      break;
+    }
+  }
+
+  if (need_to_decide == true && have_seen_the_goal1 == false)
+  {
+    printf("Computing costs to decide between 2 jerk trajectories\n");
+    if (found_one_1)
+    {
+      JPrimj1 = solver_jerk_.getCost();
+      WP1 = getPointsBw2Spheres(JPS1, ra, rb, state_pos);
+      WP1.insert(WP1.begin(), B1);
+      WP1.push_back(C1);
+      JPrimv1 = solveVelAndGetCost(WP1);
+      J1 = JPrimj1 + JPrimv1 + JDist1;
+    }
+
+    K = samplePointsSphere(B2, ra, state_pos);  // radius, center and point
+    for (int i = 0; i < K.size(); i++)
+    {
+      if (optimized_)  // Needed to skip the first time (X_ still not initialized)
+      {
+        k_initial_cond_ = std::min(k_ + OFFSET, (int)(X_.rows() - 1));
+        updateInitialCond(k_initial_cond_);
+      }
+
+      //////SOLVING FOR JERK
+      Eigen::Vector3d p = K[i];
+      double xf[9] = { p[0], p[1], p[2], 0, 0, 0, 0, 0, 0 };
+      mtx_goals.lock();
+      double x0[9] = { initialCond_.pos.x,   initialCond_.pos.y,   initialCond_.pos.z,
+                       initialCond_.vel.x,   initialCond_.vel.y,   initialCond_.vel.z,
+                       initialCond_.accel.x, initialCond_.accel.y, initialCond_.accel.z };
+      mtx_goals.unlock();
+      solver_jerk_.set_xf(xf);
+      solver_jerk_.set_x0(x0);
+      double max_values[3] = { V_MAX, A_MAX, J_MAX };
+      solver_jerk_.set_max(max_values);
+      solver_jerk_.genNewTraj();
+      U_temp2 = solver_jerk_.getU();
+      X_temp2 = solver_jerk_.getX();
+      //////SOLVED FOR JERK
+
+      bool isFree = trajIsFree(X_temp1);
+      createMarkerSetOfArrows(X_temp1, isFree);
+      if (isFree)
+      {
+        found_one_2 = true;
+        double dist = (term_goal - p).norm();
+        have_seen_the_goal1 = (dist < GOAL_RADIUS) ? true : false;
+
+        C2 = getLastIntersectionWithSphere(JPS2, rb, state_pos, &JDist2);
+        pubPlanningVisual(state_pos, ra, rb, B2, C2);
+        // printf("Angle=%f\n", angleBetVectors(B1 - A, B2 - A));
+
+        pub_trajs_sphere_.publish(trajs_sphere_);
+
+        JPrimj2 = solver_jerk_.getCost();
+        WP2 = getPointsBw2Spheres(JPS2, ra, rb, state_pos);
+        WP2.insert(WP2.begin(), B2);
+        WP2.push_back(C2);
+        JPrimv2 = solveVelAndGetCost(WP2);
+        J2 = JPrimj2 + JPrimv2 + JDist2;
+        break;
       }
     }
   }
-  if (!found_it)
+  pub_trajs_sphere_.publish(trajs_sphere_);
+
+  if (found_one_1 == false && found_one_2 == false)  // J1=J2=infinity
   {
     ROS_ERROR("Unable to find a free traj");
+    return;
   }
-  pub_trajs_sphere_.publish(trajs_sphere_);
+
+  ////DECISION: Choose 1 or 2?
+  if (have_seen_the_goal1)
+  {
+    status_ = GOAL_SEEN;  // I've found a free path that ends in the goal
+    printf("CHANGED TO GOAL_SEEN********\n");
+    U_temp_ = U_temp1;
+    X_temp_ = X_temp1;
+  }
+  else if (have_seen_the_goal2)
+  {
+    status_ = GOAL_SEEN;  // I've found a free path that ends in the goal
+    printf("CHANGED TO GOAL_SEEN********\n");
+    U_temp_ = U_temp2;
+    X_temp_ = X_temp2;
+  }
+  else  // I reach this point also when need_to_decide==false, but it's ensured that J1<=J2
+  {
+    U_temp_ = (J1 <= J2) ? U_temp1 : U_temp2;
+    X_temp_ = (J1 <= J2) ? X_temp1 : X_temp2;
+  }
+
+  planner_status_ = REPLANNED;
+  printf("ReplanCB: planner_status_ = REPLANNED\n");
+  pubTraj(X_temp_);
   // ROS_WARN("solve time: %0.2f ms", 1000 * (ros::Time::now().toSec() - then));
   // printf("Time in replanCB %0.2f ms\n", 1000 * (ros::Time::now().toSec() - t0replanCB));
 }
@@ -1340,3 +1496,10 @@ void CVX::pubintersecPoint(Eigen::Vector3d p, bool add)
 
       printf("(State): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", state_.pos.x, state_.pos.y, state_.pos.z,
              state_.vel.x, state_.vel.y, state_.vel.z);*/
+
+// printf("Current state=%0.2f, %0.2f, %0.2f\n", state_pos[0], state_pos[1], state_pos[2]);
+// printf("Before going to get C1, Points in JPS1\n");
+/*        for (int i = 0; i < path_jps_vector_.size(); i++)
+        {
+          std::cout << path_jps_vector_[i].transpose() << std::endl;
+        }*/

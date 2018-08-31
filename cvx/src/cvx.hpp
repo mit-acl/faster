@@ -104,7 +104,8 @@ private:
   acl_msgs::QuadGoal initialCond_;  // It's the initial condition for the solver
   acl_msgs::QuadFlightMode flight_mode_;
   acl_msgs::State state_;
-  acl_msgs::TermGoal term_goal_;
+  acl_msgs::TermGoal term_goal_;       // This goal is always inside of the map
+  acl_msgs::TermGoal term_term_goal_;  // This is the clicked goal, it may be outside of the map
 
   ros::NodeHandle nh_;
   ros::NodeHandle nh_replan_CB_;
