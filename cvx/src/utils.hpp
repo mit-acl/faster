@@ -41,6 +41,41 @@
 // inline is needed to avoid the "multiple definitions" error. Other option is to create the utils.cpp file, and put
 // there the function (and here only the prototype)
 
+// returns the points around B sampled in the sphere with radius r and center center.
+inline std::vector<Eigen::Vector3d> samplePointsSphere(Eigen::Vector3d B, double r, Eigen::Vector3d center)
+{
+  std::vector<Eigen::Vector3d> tmp;
+
+  Eigen::Vector3d dir = B - center;
+  double x = dir[0], y = dir[1], z = dir[2];
+
+  double theta0 = acos(z / (sqrt(x * x + y * y + z * z)));
+  double phi0 = atan2(y, x);
+
+  Eigen::AngleAxis<double> rot_z(phi0, Eigen::Vector3d::UnitZ());
+  Eigen::AngleAxis<double> rot_y(theta0, Eigen::Vector3d::UnitY());
+
+  for (double theta = 0; theta <= 3.14 / 2; theta = theta + 3.14 / 10)
+  {
+    for (double phi = 0; phi <= 2 * 3.14; phi = phi + 3.14 / 10)
+    {
+      Eigen::Vector3d p1, p2;
+      p1[0] = r * sin(theta) * cos(phi);
+      p1[1] = r * sin(theta) * sin(phi);
+      p1[2] = r * cos(theta);
+      Eigen::Vector3d trans = center;
+      p2 = rot_z * rot_y * p1 + trans;
+
+      if (p2[2] > 0)  // If below the ground, discard
+      {
+        tmp.push_back(p2);
+      }
+    }
+  }
+
+  return tmp;
+}
+
 inline double angleBetVectors(Eigen::Vector3d a, Eigen::Vector3d b)
 {
   return acos(a.dot(b) / (a.norm() * b.norm()));

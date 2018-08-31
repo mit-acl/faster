@@ -311,7 +311,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   double ra = std::min(0.96 * dist_to_goal, Ra);  // radius of the sphere Sa
   double rb = std::min(0.98 * dist_to_goal, Rb);  // radius of the sphere Sa
 
-  if (dist_to_goal < GOAL_RADIUS)
+  if (dist_to_goal < GOAL_RADIUS && status_ != GOAL_REACHED)
   {
     status_ = GOAL_REACHED;
     printf("STATUS=GOAL_REACHED\n");
@@ -337,97 +337,72 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   Eigen::Vector3d B1 = getFirstIntersectionWithSphere(JPS1, ra, state_pos);
 
-  // Direction from the center=state_pos to that point:
-  Eigen::Vector3d dir = B1 - state_pos;
-  double x = dir[0], y = dir[1], z = dir[2];
-
-  double theta0 = acos(z / (sqrt(x * x + y * y + z * z)));
-  double phi0 = atan2(y, x);
-
   bool found_it = 0;
 
-  Eigen::AngleAxis<double> rot_z(phi0, Eigen::Vector3d::UnitZ());
-  Eigen::AngleAxis<double> rot_y(theta0, Eigen::Vector3d::UnitY());
+  std::vector<Eigen::Vector3d> K = samplePointsSphere(B1, ra, state_pos);  // radius, center and point
 
-  for (double theta = 0; theta <= 3.14 / 2 && !found_it; theta = theta + 3.14 / 10)
+  for (int i = 0; i < K.size() && !found_it; i++)
   {
-    for (double phi = 0; phi <= 2 * 3.14 && !found_it; phi = phi + 3.14 / 10)
+    // Solver JERK
+    if (optimized_)  // Needed to skip the first time (X_ still not initialized)
     {
-      Eigen::Vector3d p1, p2;
-      p1[0] = ra * sin(theta) * cos(phi);
-      p1[1] = ra * sin(theta) * sin(phi);
-      p1[2] = ra * cos(theta);
-      Eigen::Vector3d trans = state_pos;
-      p2 = rot_z * rot_y * p1 + trans;
+      k_initial_cond_ = std::min(k_ + OFFSET, (int)(X_.rows() - 1));
+      updateInitialCond(k_initial_cond_);
+    }
+    Eigen::Vector3d p = K[i];
+    double xf_sphere[9] = { p[0], p[1], p[2], 0, 0, 0, 0, 0, 0 };
+    mtx_goals.lock();
+    double x0[9] = { initialCond_.pos.x,   initialCond_.pos.y,   initialCond_.pos.z,
+                     initialCond_.vel.x,   initialCond_.vel.y,   initialCond_.vel.z,
+                     initialCond_.accel.x, initialCond_.accel.y, initialCond_.accel.z };
 
-      if (p2[2] < 0)  // If below the ground, discard
-      {
-        continue;
+    mtx_goals.unlock();
+    solver_jerk_.set_xf(xf_sphere);
+    solver_jerk_.set_x0(x0);
+    double max_values[3] = { V_MAX, A_MAX, J_MAX };
+    solver_jerk_.set_max(max_values);
+    solver_jerk_.genNewTraj();
+    U_temp_ = solver_jerk_.getU();
+    X_temp_ = solver_jerk_.getX();
+
+    bool isFree = trajIsFree(X_temp_);
+
+    createMarkerSetOfArrows(X_temp_, isFree);
+
+    if (isFree)
+    {
+      planner_status_ = REPLANNED;  // Don't replan again until start publishing current solution
+      // printf("ReplanCB: planner_status_ = REPLANNED\n");
+      optimized_ = true;
+      pubTraj(X_);
+      found_it = 1;
+      double dist_end_traj_to_goal =
+          sqrt(pow(term_goal_.pos.x - xf_sphere[0], 2) + pow(term_goal_.pos.y - xf_sphere[1], 2) +
+               pow(term_goal_.pos.z - xf_sphere[2], 2));
+      if (dist_end_traj_to_goal < GOAL_RADIUS)
+      {  // I've found a free path that ends in the goal --> no more replanning (to avoid oscillations when reaching
+        // the goal)
+        status_ = GOAL_SEEN;
+        printf("CHANGED TO GOAL_SEEN********\n");
       }
-
-      // Solver JERK
-      if (optimized_)  // Needed to skip the first time (X_ still not initialized)
+      Eigen::Vector3d C1 = getLastIntersectionWithSphere(JPS1, rb, state_pos);
+      pubPlanningVisual(state_pos, ra, rb, B1, C1);
+      // printf("Angle=%f\n", angleBetVectors(B1 - A, B2 - A));
+      // if (angleBetVectors(B1 - A, B2 - A) > alpha_0)
+      if (1)
       {
-        k_initial_cond_ = std::min(k_ + OFFSET, (int)(X_.rows() - 1));
-        updateInitialCond(k_initial_cond_);
-      }
-      double xf_sphere[9] = { p2[0], p2[1], p2[2], 0, 0, 0, 0, 0, 0 };
-      mtx_goals.lock();
-      double x0[9] = { initialCond_.pos.x,   initialCond_.pos.y,   initialCond_.pos.z,
-                       initialCond_.vel.x,   initialCond_.vel.y,   initialCond_.vel.z,
-                       initialCond_.accel.x, initialCond_.accel.y, initialCond_.accel.z };
-
-      double u0[3] = { initialCond_.jerk.x, initialCond_.jerk.y, initialCond_.jerk.z };
-      mtx_goals.unlock();
-      solver_jerk_.set_xf(xf_sphere);
-      solver_jerk_.set_x0(x0);
-      double max_values[3] = { V_MAX, A_MAX, J_MAX };
-      solver_jerk_.set_max(max_values);
-      // solver_jerk_.set_u0(u0);
-      solver_jerk_.genNewTraj();
-      U_temp_ = solver_jerk_.getU();
-      X_temp_ = solver_jerk_.getX();
-      Timer time_coll_check(true);
-      bool isFree = trajIsFree(X_temp_);
-      double ms_ellapsed = time_coll_check.Elapsed().count();
-      // printf("Collision check takes: %f ms/traj\n", ms_ellapsed);
-      createMarkerSetOfArrows(X_temp_, isFree);
-
-      if (isFree)
-      {
-        planner_status_ = REPLANNED;  // Don't replan again until start publishing current solution
-        // printf("ReplanCB: planner_status_ = REPLANNED\n");
-        optimized_ = true;
-        pubTraj(X_);
-        found_it = 1;
-        double dist_end_traj_to_goal =
-            sqrt(pow(term_goal_.pos.x - xf_sphere[0], 2) + pow(term_goal_.pos.y - xf_sphere[1], 2) +
-                 pow(term_goal_.pos.z - xf_sphere[2], 2));
-        if (dist_end_traj_to_goal < GOAL_RADIUS)
-        {  // I've found a free path that ends in the goal --> no more replanning (to avoid oscillations when reaching
-          // the goal)
-          status_ = GOAL_SEEN;
-          printf("CHANGED TO GOAL_SEEN********\n");
-        }
-        Eigen::Vector3d C1 = getLastIntersectionWithSphere(JPS1, rb, state_pos);
-        pubPlanningVisual(state_pos, ra, rb, B1, C1);
-        // printf("Angle=%f\n", angleBetVectors(B1 - A, B2 - A));
-        // if (angleBetVectors(B1 - A, B2 - A) > alpha_0)
-        if (1)
-        {
-          printf("Computing costs to decide between 2 jerk trajectories\n");
-          double JPrimj1 = solver_jerk_.getCost();
-          // printf("Current state=%0.2f, %0.2f, %0.2f\n", state_pos[0], state_pos[1], state_pos[2]);
-          // printf("Before going to get C1, Points in JPS1\n");
-          /*        for (int i = 0; i < path_jps_vector_.size(); i++)
-                  {
-                    std::cout << path_jps_vector_[i].transpose() << std::endl;
-                  }*/
-          vec_Vecf<3> WP = getPointsBw2Spheres(JPS1, ra, rb, state_pos);
-          WP.insert(WP.begin(), B1);
-          WP.push_back(C1);
-          double JPrimv1 = solveVelAndGetCost(WP);
-        }
+        printf("Computing costs to decide between 2 jerk trajectories\n");
+        double JPrimj1 = solver_jerk_.getCost();
+        // printf("Current state=%0.2f, %0.2f, %0.2f\n", state_pos[0], state_pos[1], state_pos[2]);
+        // printf("Before going to get C1, Points in JPS1\n");
+        /*        for (int i = 0; i < path_jps_vector_.size(); i++)
+                {
+                  std::cout << path_jps_vector_[i].transpose() << std::endl;
+                }*/
+        vec_Vecf<3> WP = getPointsBw2Spheres(JPS1, ra, rb, state_pos);
+        WP.insert(WP.begin(), B1);
+        WP.push_back(C1);
+        double JPrimv1 = solveVelAndGetCost(WP);
       }
     }
   }
