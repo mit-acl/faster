@@ -376,13 +376,10 @@ void CVX::replanCB(const ros::TimerEvent& e)
       optimized_ = true;
       pubTraj(X_);
       found_it = 1;
-      double dist_end_traj_to_goal =
-          sqrt(pow(term_goal_.pos.x - xf_sphere[0], 2) + pow(term_goal_.pos.y - xf_sphere[1], 2) +
-               pow(term_goal_.pos.z - xf_sphere[2], 2));
+      double dist_end_traj_to_goal = (term_goal - p).norm();
       if (dist_end_traj_to_goal < GOAL_RADIUS)
-      {  // I've found a free path that ends in the goal --> no more replanning (to avoid oscillations when reaching
-        // the goal)
-        status_ = GOAL_SEEN;
+      {
+        status_ = GOAL_SEEN;  // I've found a free path that ends in the goal
         printf("CHANGED TO GOAL_SEEN********\n");
       }
       Eigen::Vector3d C1 = getLastIntersectionWithSphere(JPS1, rb, state_pos);
