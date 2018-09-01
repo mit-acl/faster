@@ -184,8 +184,9 @@ private:
   pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_map_;
   pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_unk_;
 
-  std::mutex mtx_map;
-  std::mutex mtx_unk;
+  std::mutex mtx_map;   // mutex of occupied map (pclptr_map_)
+  std::mutex mtx_unk;   // mutex of unkonwn map (pclptr_unk_)
+  std::mutex mtx_inst;  // mutex of instanteneous data (v_kdtree_new_pcls_)
   std::mutex mtx_goals;
 
   std::shared_ptr<JPS::VoxelMapUtil> map_util_;

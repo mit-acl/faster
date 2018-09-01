@@ -1150,11 +1150,11 @@ void CVX::pclCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
     kdTreeStamped my_kdTreeStamped;
     my_kdTreeStamped.kdTree.setInputCloud(pclptr);
     my_kdTreeStamped.time = pcl2ptr_msg->header.stamp;
-    mtx.lock();
+    mtx_inst.lock();
     printf("pclCB: MTX is locked\n");
     v_kdtree_new_pcls_.push_back(my_kdTreeStamped);
     printf("pclCB: MTX is unlocked\n");
-    mtx.unlock();
+    mtx_inst.unlock();
   }
   catch (tf2::TransformException& ex)
   {
@@ -1165,28 +1165,41 @@ void CVX::pclCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 // Occupied CB
 void CVX::mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 {
-  // printf("In mapCB\n");
+  printf("In mapCB\n");
 
   if (pcl2ptr_msg->width == 0 || pcl2ptr_msg->height == 0)  // Point Cloud is empty (this happens at the beginning)
   {
     return;
   }
-  mtx.lock();
+
+  pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_map(new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::fromROSMsg(*pcl2ptr_msg, *pclptr_map);
+
+  mtx_map.lock();
+  printf("Before setting InputCloud\n");
+  kdtree_map_.setInputCloud(pclptr_map);
+  mtx_map.unlock();
+
+  kdtree_map_initialized_ = 1;
+  updateJPSMap(pclptr_map);
+
   // printf("mapCB: MTX is locked\n");
   // printf("In mapCB2\n");
   // pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::fromROSMsg(*pcl2ptr_msg, *pclptr_map_);
-  std::vector<int> index;
+
+  // std::vector<int> index;
   // TODO: there must be a better way to check this. It's here because (in the simulation) sometimes all the points
   // are NaN (when the drone is on the ground and stuck moving randomly). If this is not done, the program breaks. I
   // think it won't be needed in the real drone
   // printf("In mapCB3\n");
-  pcl::removeNaNFromPointCloud(*pclptr_map_, *pclptr_map_, index);
-  if (pclptr_map_->size() == 0)
-  {
-    return;
-  }
+  // pcl::removeNaNFromPointCloud(*pclptr_map_, *pclptr_map_, index);
+  /*  if (pclptr_map_->size() == 0)
+    {
+      return;
+    }*/
+
   // printf("In mapCB4, size=%d\n", v_kdtree_new_pcls_.size());
+  mtx_inst.lock();
   for (unsigned i = 0; i < v_kdtree_new_pcls_.size(); ++i)
   {
     // printf("antes i=%d\n", i);
@@ -1197,15 +1210,10 @@ void CVX::mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
     }
     // printf("despues i=%d\n", i);
   }
+  mtx_inst.unlock();
   // printf("below\n");
 
-  kdtree_map_.setInputCloud(pclptr_map_);
-
-  kdtree_map_initialized_ = 1;
-
-  updateJPSMap(pclptr_map_);
-
-  mtx.unlock();
+  // mtx.unlock();
 }
 
 // Unkwown  CB
@@ -1264,7 +1272,7 @@ bool CVX::trajIsFree(Eigen::MatrixXd X)
     Eigen::Vector3d intersectionPoint;
 
     printf("**********before the lock\n");
-    mtx.lock();
+    mtx_inst.lock();
     printf("after the lock\n");
     printf("TisFree: MTX is locked\n");
 
@@ -1281,11 +1289,13 @@ bool CVX::trajIsFree(Eigen::MatrixXd X)
         // r = std::min(r, sqrt(dist2_inst[0]));
       }
     }
+    mtx_inst.unlock();
 
     // occupied (map)
     std::vector<int> id_map(n);
     std::vector<float> dist2_map(n);  // squared distance
 
+    mtx_map.lock();
     if (kdtree_map_.nearestKSearch(pcl_search_point, n, id_map, dist2_map) > 0)
     {
       if (sqrt(dist2_map[0]) < r)
@@ -1295,9 +1305,10 @@ bool CVX::trajIsFree(Eigen::MatrixXd X)
         intersectionPoint << ptr->points[id_map[0]].x, ptr->points[id_map[0]].y, ptr->points[id_map[0]].z;
       }
     }
+    mtx_map.unlock();
 
-    printf("TisFree MTX is unlocked\n");
-    mtx.unlock();
+    /*    printf("TisFree MTX is unlocked\n");
+        mtx.unlock();*/
 
     // unknwown
     std::vector<int> id_unk(n);
@@ -1374,7 +1385,7 @@ Eigen::Vector3d CVX::computeForce(Eigen::Vector3d x, Eigen::Vector3d g)
   std::vector<int> id;                 // pointIdxRadiusSearch
   std::vector<float> sd;               // pointRadiusSquaredDistance
   pcl::PointXYZ sp(x[0], x[1], x[2]);  // searchPoint=x
-  mtx.lock();
+  mtx_map.lock();
   pcl::KdTree<pcl::PointXYZ>::PointCloudConstPtr cloud_ptr = kdtree_map_.getInputCloud();
 
   if (kdtree_map_.radiusSearch(sp, rho, id, sd) > 0)  // if further, f_rep=f_rep+0
@@ -1390,7 +1401,7 @@ Eigen::Vector3d CVX::computeForce(Eigen::Vector3d x, Eigen::Vector3d g)
       f_rep = f_rep + k_rep * (1 / d_obst - 1 / rho) * (pow(1 / d_obst, 2)) * (x - obs) / d_obst;
     }
   }
-  mtx.unlock();
+  mtx_map.unlock();
 
   visualization_msgs::MarkerArray forces;
   createForceArrow(x, f_att, f_rep, &forces);
