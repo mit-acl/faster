@@ -84,7 +84,6 @@ private:
   // geometry_msgs::Point pointOrigin();
   // geometry_msgs::Point eigen2point(Eigen::Vector3d vector);
   void pubActualTraj();
-  bool solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr, Vec3f start, Vec3f goal, vec_Vecf<3>& path);
   void vectorOfVectors2MarkerArray(vec_Vecf<3> traj, visualization_msgs::MarkerArray* m_array,
                                    std_msgs::ColorRGBA color);
   visualization_msgs::MarkerArray clearArrows();
@@ -103,6 +102,9 @@ private:
   void clearMarkerArray(visualization_msgs::MarkerArray* tmp, ros::Publisher* publisher);
   void publishJPSPath(vec_Vecf<3> path, int i);
   void clearJPSPathVisualization(int i);
+
+  void updateJPSMap(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr);
+  bool solveJPS3D(Vec3f start, Vec3f goal, vec_Vecf<3>& path);
 
   visualization_msgs::Marker setpoint_;
   acl_msgs::QuadGoal quadGoal_;
@@ -182,7 +184,10 @@ private:
   pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_map_;
   pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_unk_;
 
-  std::mutex mtx;
+  std::mutex mtx_map;
   std::mutex mtx_unk;
   std::mutex mtx_goals;
+
+  std::shared_ptr<JPS::VoxelMapUtil> map_util_;
+  std::unique_ptr<JPSPlanner3D> planner_ptr_;
 };

@@ -123,6 +123,9 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   name_drone_ = ros::this_node::getNamespace();
   name_drone_.erase(0, 2);  // Erase slashes
 
+  map_util_ = std::make_shared<VoxelMapUtil>();
+  planner_ptr_ = std::unique_ptr<JPSPlanner3D>(new JPSPlanner3D(false));
+
   tfListener = new tf2_ros::TransformListener(tf_buffer_);
   // wait for body transform to be published before initializing
   ROS_INFO("Waiting for world to camera transform...");
@@ -194,27 +197,42 @@ void CVX::publishJPSPath(vec_Vecf<3> path, int i)
   }
 }
 
-bool CVX::solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr, Vec3f start, Vec3f goal, vec_Vecf<3>& path)
+void CVX::updateJPSMap(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr)
+{
+  Vec3f center_map(state_.pos.x, state_.pos.y, state_.pos.z);  // center of the map
+  Vec3i dim(cells_x_, cells_y_, cells_z_);                     //  number of cells in each dimension
+  // printf("Before reader\n");
+  MapReader<Vec3i, Vec3f> reader(pclptr, dim, RES, center_map, Z_ground, DRONE_RADIUS);  // Map read
+  // std::shared_ptr<VoxelMapUtil> map_util = std::make_shared<VoxelMapUtil>();
+  // printf("Before setMap\n");
+  map_util_->setMap(reader.origin(), reader.dim(), reader.data(), reader.resolution());
+  // printf("After setMap\n");
+  planner_ptr_->setMapUtil(map_util_);  // Set collision checking function
+  // printf("After setMapUtil\n");
+}
+
+bool CVX::solveJPS3D(Vec3f start, Vec3f goal, vec_Vecf<3>& path)
 {
   // Create a map
   /*  std::cout << "Solving JPS from start\n" << start << std::endl;
     std::cout << "To goal\n" << goal << std::endl;*/
-  Vec3i dim(cells_x_, cells_y_, cells_z_);  //  number of cells in each dimension
-  Vec3f center_map = start;                 // position of the drone
+  // Vec3i dim(cells_x_, cells_y_, cells_z_);  //  number of cells in each dimension
+  // Vec3f center_map = start;                 // position of the drone
   // Read the pointcloud
 
-  MapReader<Vec3i, Vec3f> reader(pclptr, dim, RES, center_map, Z_ground);  // Map read
+  // MapReader<Vec3i, Vec3f> reader(pclptr, dim, RES, center_map, Z_ground, DRONE_RADIUS);  // Map read
 
-  std::shared_ptr<VoxelMapUtil> map_util = std::make_shared<VoxelMapUtil>();
-  map_util->setMap(reader.origin(), reader.dim(), reader.data(), reader.resolution());
+  // std::shared_ptr<VoxelMapUtil> map_util = std::make_shared<VoxelMapUtil>();
 
-  std::unique_ptr<JPSPlanner3D> planner_ptr(new JPSPlanner3D(false));  // Declare a planner
+  // map_util_->setMap(reader.origin(), reader.dim(), reader.data(), reader.resolution());
 
-  planner_ptr->setMapUtil(map_util);  // Set collision checking function
-  planner_ptr->updateMap();
+  // std::unique_ptr<JPSPlanner3D> planner_ptr(new JPSPlanner3D(false));  // Declare a planner
+
+  // planner_ptr_->setMapUtil(map_util_);  // Set collision checking function
+  planner_ptr_->updateMap();
 
   Timer time_jps(true);
-  bool valid_jps = planner_ptr->plan(
+  bool valid_jps = planner_ptr_->plan(
       start, goal, 1, true);  // Plan from start to goal with heuristic weight=1, and using JPS (if false --> use A*)
 
   if (valid_jps == true)  // There is a solution
@@ -225,7 +243,7 @@ bool CVX::solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr, Vec3f start, Ve
     // path with more corners (not "cleaned")
     // printf("JPS Path: \n");
     path.clear();
-    path = planner_ptr->getPath();  // getRawPath() if you want the path with more corners (not "cleaned")
+    path = planner_ptr_->getPath();  // getRawPath() if you want the path with more corners (not "cleaned")
 
     /*    printf("First point in path_jps_vector_:\n");
         std::cout << path_jps_vector_[0].transpose() << std::endl;*/
@@ -364,8 +382,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
   double ra = std::min(0.96 * dist_to_goal, Ra);  // radius of the sphere Sa
   double rb = std::min(0.98 * dist_to_goal, Rb);  // radius of the sphere Sb
 
-  /*  std::cout << "rb=" << rb << std::endl;
-    std::cout << "dist_to_goal=" << dist_to_goal << std::endl;*/
+  /*  std::cout << "rb=" << rb << std::endl;*/
+  std::cout << "dist_to_goal=" << dist_to_goal << std::endl;
 
   if (dist_to_goal < GOAL_RADIUS && status_ != GOAL_REACHED)
   {
@@ -403,8 +421,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
   vec_Vecf<3> null2(1, Eigen::Vector3d::Zero());
   vec_Vecf<3>& JPS1(null1);  // references HAVE to be initialized
   vec_Vecf<3>& JPS2(null2);
-  static bool first_time = true;                                     // how many times I've solved JPS1
-  solvedjps1 = solveJPS3D(pclptr_map_, state_pos, term_goal, JPS1);  // Solution is in JPS1
+  static bool first_time = true;                        // how many times I've solved JPS1
+  solvedjps1 = solveJPS3D(state_pos, term_goal, JPS1);  // Solution is in JPS1
   JPS1[JPS1.size() - 1] = term_goal;  // JPS ends in the voxel of the goal, but not exactly in the goal--> force it;
 
   /*  printf("Points in JPS1 before\n");
@@ -425,7 +443,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   {
     // In general, solve from B1km1
     // std::cout << "B1km1 before is" << B1km1 << std::endl;
-    solvedjps2 = solveJPS3D(pclptr_map_, B1km1, term_goal, JPS2);  // Solution is in JPS2
+    solvedjps2 = solveJPS3D(B1km1, term_goal, JPS2);  // Solution is in JPS2
     JPS2[JPS2.size() - 1] = term_goal;  // JPS ends in the voxel of the goal, but not exactly in the goal--> force it;
   }
 
@@ -504,6 +522,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
     printf("hola7\n");
 
     bool isFree = trajIsFree(X_temp1);
+
+    printf("hola7.5\n");
     createMarkerSetOfArrows(X_temp1, isFree);
 
     printf("hola8\n");
@@ -622,17 +642,27 @@ void CVX::replanCB(const ros::TimerEvent& e)
   {
     status_ = GOAL_SEEN;  // I've found a free path that ends in the goal
     printf("CHANGED TO GOAL_SEEN********\n");
+    if (have_seen_the_goal1)
+    {
+      printf("1 saw the goal\n");
+    }
+    if (have_seen_the_goal2)
+    {
+      printf("2 saw the goal\n");
+    }
   }
 
   if (have_seen_the_goal1 || !need_to_decide)
   {
     U_temp_ = U_temp1;
     X_temp_ = X_temp1;
+    printf("Copying Xtemp1\n");
   }
   else if (have_seen_the_goal2)
   {
     U_temp_ = U_temp2;
     X_temp_ = X_temp2;
+    printf("Copying Xtemp2\n");
   }
   else  // I reach this point also when need_to_decide==false, and noone has seen the goal
   {
@@ -746,6 +776,7 @@ void CVX::updateInitialCond(int i)
 void CVX::pubCB(const ros::TimerEvent& e)
 {
   mtx_goals.lock();
+  // printf("GOing to publish\n");
 
   if (flight_mode_.mode == flight_mode_.LAND)
   {
@@ -1120,7 +1151,9 @@ void CVX::pclCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
     my_kdTreeStamped.kdTree.setInputCloud(pclptr);
     my_kdTreeStamped.time = pcl2ptr_msg->header.stamp;
     mtx.lock();
+    printf("pclCB: MTX is locked\n");
     v_kdtree_new_pcls_.push_back(my_kdTreeStamped);
+    printf("pclCB: MTX is unlocked\n");
     mtx.unlock();
   }
   catch (tf2::TransformException& ex)
@@ -1139,6 +1172,7 @@ void CVX::mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
     return;
   }
   mtx.lock();
+  // printf("mapCB: MTX is locked\n");
   // printf("In mapCB2\n");
   // pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::fromROSMsg(*pcl2ptr_msg, *pclptr_map_);
@@ -1168,9 +1202,10 @@ void CVX::mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
   kdtree_map_.setInputCloud(pclptr_map_);
 
   kdtree_map_initialized_ = 1;
-  // printf("pasado2\n");
+
+  updateJPSMap(pclptr_map_);
+
   mtx.unlock();
-  // printf("pasado esto\n");
 }
 
 // Unkwown  CB
@@ -1197,18 +1232,18 @@ void CVX::unkCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 // previously-unknown voxels
 bool CVX::trajIsFree(Eigen::MatrixXd X)
 {
-  // printf("********In trajIsFree\n");
+  printf("********In trajIsFree\n");
   // std::cout << X << std::endl;
-  mtx.lock();
 
+  printf("before ground\n");
   // TODO: maybe there is a more efficient way to do this (sampling only some points of X?)
   if (((X.col(2)).array() < 0).any() == true)  // If there is some z < 0. Note that in eigen, first_index=0
   {
     printf("Collision with the ground \n");
-    std::cout << X.col(3) << std::endl << std::endl;
-    mtx.unlock();
+    // std::cout << X.col(3) << std::endl << std::endl;
     return false;  // There is a collision with the ground
   }
+  printf("later\n");
 
   int n = 1;  // Find nearest element
 
@@ -1216,7 +1251,9 @@ bool CVX::trajIsFree(Eigen::MatrixXd X)
   pcl::PointXYZ pcl_search_point = eigenPoint2pclPoint(eig_search_point);
   double r = 100000;
   int last_i = 0;
+  printf("later2\n");
 
+  printf("later3\n");
   while (last_i < X.rows() - 1)
   {
     // printf("Inside the loop, last_i=%d\n", last_i);
@@ -1225,6 +1262,12 @@ bool CVX::trajIsFree(Eigen::MatrixXd X)
     std::vector<float> dist2_inst(n);  // squared distance
     pcl_search_point = eigenPoint2pclPoint(eig_search_point);
     Eigen::Vector3d intersectionPoint;
+
+    printf("**********before the lock\n");
+    mtx.lock();
+    printf("after the lock\n");
+    printf("TisFree: MTX is locked\n");
+
     for (unsigned i = v_kdtree_new_pcls_.size() - 1; i < v_kdtree_new_pcls_.size() && i >= 0; ++i)
     {
       if (v_kdtree_new_pcls_[i].kdTree.nearestKSearch(pcl_search_point, n, id_inst, dist2_inst) > 0)
@@ -1253,6 +1296,9 @@ bool CVX::trajIsFree(Eigen::MatrixXd X)
       }
     }
 
+    printf("TisFree MTX is unlocked\n");
+    mtx.unlock();
+
     // unknwown
     std::vector<int> id_unk(n);
     std::vector<float> dist2_unk(n);  // squared distance
@@ -1272,9 +1318,9 @@ bool CVX::trajIsFree(Eigen::MatrixXd X)
     // Now r is the distance to the nearest obstacle (considering unknown space as obstacles)
     if (r < DRONE_RADIUS)
     {
-      printf("There is a collision with i=%d out of X.rows=%d\n", last_i, X.rows() - 1);
+      // printf("There is a collision with i=%d out of X.rows=%d\n", last_i, X.rows() - 1);
       pubintersecPoint(intersectionPoint, true);
-      mtx.unlock();
+      // mtx.unlock();
       return false;  // There is a collision
     }
 
@@ -1291,7 +1337,7 @@ bool CVX::trajIsFree(Eigen::MatrixXd X)
     }
   }
 
-  mtx.unlock();
+  // mtx.unlock();
   return true;  // It's free!
 }
 

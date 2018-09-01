@@ -7,8 +7,10 @@ template <class Ti, class Tf>
 class MapReader
 {
 public:
-  MapReader(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr, Vec3i dim, double res, const Vec3f center_map, double z_ground)
+  MapReader(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr, Vec3i dim, double res, const Vec3f center_map, double z_ground,
+            double inflation)
   {
+    // printf("reading_map\n");
     // **Box of the map --> it's the box with which the map moves.
     // **Center_map --> The center of the box of the map, expressed in global float coordinates
     // **Global float coordinates: (X,Y,Z) of the point relative to the global origin of the world
@@ -22,30 +24,61 @@ public:
     /// **Free cell: Cell that has value 0
     /// **Unknown cell: Cell that has value -1
 
-    /// z_ground is used to limit the map size and not include points that are below the ground (--> + efficiency and
-    /// safety of the trajectories)
+    /// z_ground [m] is used to limit the map size and not include points that are below the ground (--> + efficiency
+    /// and safety of the trajectories)
+
+    /// inflation [m] is used to inflate the obstacles that amount.
 
     // printf("In reader1\n");
 
     // printf("In reader2\n");
+    int dim2_down;
+    int dim2_up;
+
+    if (center_map[2] - res * dim[2] / 2.0 < 0)
+    {
+      dim2_down = (int)((center_map[2] - z_ground) / res) + 1;  //+1 to avoid problems when taking off
+      dim2_up = (int)(dim[2] / 2.0);
+      dim[2] = dim2_down + dim2_up;
+    }
+
+    /*    printf("*******Dim before is\n");
+        std::cout << dim << std::endl;*/
+    // printf("reading_map2\n");
     origin_(0) = center_map[0] - res * dim[0] / 2.0;
     origin_(1) = center_map[1] - res * dim[1] / 2.0;
-    origin_(2) = center_map[2] - res * dim[2] / 2.0;
+    origin_(2) = center_map[2] - res * dim2_down;
 
-    origin_(2) = (origin_(2) < z_ground) ? z_ground : origin_(2);
-    dim[2] = (origin_(2) < z_ground) ? (center_map[2] - z_ground) / res : dim[2];
+    /*    double or2 = origin_(2);
 
+        printf("*******origin_ before is\n");
+        std::cout << origin_ << std::endl;
+
+        printf("*******z_ground before is\n");
+        std::cout << z_ground << std::endl;
+
+        printf("*******FIRST ? before is\n");
+        std::cout << (int)((center_map[2] - z_ground) / res + dim[2] / 2.0) << std::endl;*/
+
+    // origin_(2) = (or2 < z_ground) ? z_ground : origin_(2);
+    // dim[2] = (or2 < z_ground) ? (int)((center_map[2] - z_ground) / res + dim[2] / 2.0) : dim[2];
+    // printf("reading_map3\n");
     for (unsigned int i = 0; i < 3; i++)
     {
       dim_(i) = dim[i];
     }
+    // printf("reading_map4\n");
+
+    /*    printf("*******Dim_ is\n");
+        std::cout << dim_ << std::endl;*/
 
     resolution_ = res;
     data_.resize(dim[0] * dim[1] * dim[2], 0);
     // printf("In reader3, size=%f, %f, %f\n", dim[0], dim[1], dim[2]);
+    // printf("reading_map5\n");
     for (size_t i = 0; i < pclptr->points.size(); ++i)
     {
-      // Let's find the coordinates of the point expresed in a system of coordinates that has as origin the (minX,
+      // Let's find the cell coordinates of the point expresed in a system of coordinates that has as origin the (minX,
       // minY, minZ) point of the map
       int x = std::round((pclptr->points[i].x - origin_(0)) / res - 0.5);
       int y = std::round((pclptr->points[i].y - origin_(1)) / res - 0.5);
@@ -70,7 +103,27 @@ public:
         printf("This shouldn't appear\n");
       }
       data_[id] = 100;
+
+      // now let's inflate the voxels around that point
+      int m = (int)(inflation / res);
+      // m is the amount of cells to inflate in each direction
+      int total_size = dim[0] * dim[1] * dim[2];
+      for (int ix = x - m; ix <= x + m; ix++)
+      {
+        for (int iy = y - m; iy <= y + m; iy++)
+        {
+          for (int iz = z - m; iz <= z + m; iz++)
+          {
+            int id_infl = ix + dim_(0) * iy + dim_(0) * dim_(1) * iz;
+            if (id_infl >= 0 && id_infl < total_size)  // Ensure we are inside the map
+            {
+              data_[id_infl] = 100;
+            }
+          }
+        }
+      }
     }
+    // printf("finished reading map\n");
   }
 
   Tf origin()
