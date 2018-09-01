@@ -85,7 +85,8 @@ private:
   // geometry_msgs::Point eigen2point(Eigen::Vector3d vector);
   void pubActualTraj();
   bool solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr, Vec3f start, Vec3f goal, vec_Vecf<3>& path);
-  void vectorOfVectors2MarkerArray(vec_Vecf<3> traj, visualization_msgs::MarkerArray* m_array);
+  void vectorOfVectors2MarkerArray(vec_Vecf<3> traj, visualization_msgs::MarkerArray* m_array,
+                                   std_msgs::ColorRGBA color);
   visualization_msgs::MarkerArray clearArrows();
   // geometry_msgs::Vector3 vectorNull();
   geometry_msgs::Vector3 getPos(int i);
@@ -99,13 +100,16 @@ private:
   void pubintersecPoint(Eigen::Vector3d p, bool add);
   void yaw(double diff, acl_msgs::QuadGoal& quad_goal);
 
+  void clearMarkerArray(visualization_msgs::MarkerArray* tmp, ros::Publisher* publisher);
+  void publishJPSPath(vec_Vecf<3> path, int i);
+  void clearJPSPathVisualization(int i);
+
   visualization_msgs::Marker setpoint_;
   acl_msgs::QuadGoal quadGoal_;
   acl_msgs::QuadGoal initialCond_;  // It's the initial condition for the solver
   acl_msgs::QuadFlightMode flight_mode_;
   acl_msgs::State state_;
-  acl_msgs::TermGoal term_goal_;       // This goal is always inside of the map
-  acl_msgs::TermGoal term_term_goal_;  // This is the clicked goal, it may be outside of the map
+  acl_msgs::TermGoal term_goal_;  // This goal is always inside of the map
 
   ros::NodeHandle nh_;
   ros::NodeHandle nh_replan_CB_;
@@ -117,7 +121,8 @@ private:
   ros::Publisher pub_trajs_sphere_;
   ros::Publisher pub_forces_;
   ros::Publisher pub_actual_traj_;
-  ros::Publisher pub_path_jps_;
+  ros::Publisher pub_path_jps1_;
+  ros::Publisher pub_path_jps2_;
   ros::Publisher pub_planning_vis_;
   ros::Publisher pub_intersec_points_;
   ros::Subscriber sub_goal_;
@@ -134,7 +139,8 @@ private:
   std::string name_drone_;
 
   visualization_msgs::MarkerArray trajs_sphere_;  // all the trajectories generated in the sphere
-  visualization_msgs::MarkerArray path_jps_;
+  visualization_msgs::MarkerArray path_jps1_;
+  visualization_msgs::MarkerArray path_jps2_;
   visualization_msgs::MarkerArray intersec_points_;
 
   int markerID_ = 0;

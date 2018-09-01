@@ -83,6 +83,8 @@ typedef Veci<3> Vec3i;
 typedef Vecf<4> Vec4f;
 /// Column vector in float of size 6
 typedef Vecf<6> Vec6f;
+/// Column vector of int of size 6
+typedef Veci<6> Vec6i;
 
 /// Vector of type Vec2f.
 typedef vec_E<Vec2f> vec_Vec2f;

@@ -76,11 +76,6 @@ inline std::vector<Eigen::Vector3d> samplePointsSphere(Eigen::Vector3d B, double
   return tmp;
 }
 
-inline double angleBetVectors(Eigen::Vector3d a, Eigen::Vector3d b)
-{
-  return acos(a.dot(b) / (a.norm() * b.norm()));
-}
-
 inline void saturate(double& var, double min, double max)
 {
   if (var < min)
@@ -91,6 +86,13 @@ inline void saturate(double& var, double min, double max)
   {
     var = max;
   }
+}
+
+inline double angleBetVectors(Eigen::Vector3d a, Eigen::Vector3d b)
+{
+  double tmp = a.dot(b) / (a.norm() * b.norm());
+  saturate(tmp, -1, 1);
+  return acos(tmp);
 }
 
 inline void angle_wrap(double& diff)
@@ -273,7 +275,7 @@ using vec_Vecf = vec_E<Vecf<N>>;
 // returns 1 if there is an intersection between the segment P1-P2 and the plane given by coeff=[A B C D]
 // (Ax+By+Cz+D==0)  returns 0 if there is no intersection.
 // The intersection point is saved in "intersection"
-inline bool getIntersectionWithPlane(Eigen::Vector3d P1, Eigen::Vector3d P2, Eigen::Vector4d coeff,
+/*inline bool getIntersectionWithPlane(Eigen::Vector3d P1, Eigen::Vector3d P2, Eigen::Vector4d coeff,
                                      Eigen::Vector3d* inters)
 {
   // http://www.ambrsoft.com/TrigoCalc/Plan3D/PlaneLineIntersection_.htm
@@ -290,7 +292,7 @@ inline bool getIntersectionWithPlane(Eigen::Vector3d P1, Eigen::Vector3d P2, Eig
   bool result =
       (t > 1 || t < 0) ? false : true;  // False if the intersection is with the line P1-P2, not with the segment P1-P2
   return result;
-}
+}*/
 
 // given 2 points (A inside and B outside the sphere) it computes the intersection of the lines between
 // that 2 points and the sphere
@@ -337,8 +339,11 @@ inline Eigen::Vector3d getIntersectionWithSphere(Eigen::Vector3d A, Eigen::Vecto
 
 // Given a path (starting inside the sphere and finishing outside of it) expressed by a vector of 3D-vectors (points),
 // it returns its first intersection with a sphere of radius=r and center=center
+// the center is added as the first point of the path to ensure that the first element of the path is inside the sphere
+// (to avoids issues with the first point of JPS2)
 inline Eigen::Vector3d getFirstIntersectionWithSphere(vec_Vecf<3> path, double r, Eigen::Vector3d center)
 {
+  path.insert(path.begin(), center);
   int index = -1;
   for (int i = 0; i < path.size(); i++)
   {
@@ -360,7 +365,9 @@ inline Eigen::Vector3d getFirstIntersectionWithSphere(vec_Vecf<3> path, double r
       B = path[path.size() - 1];
       break;
     case 0:  // First element is outside the sphere
-      printf("First element is oustide the sphere, there is sth wrong");
+      printf("First element is still oustide the sphere, there is sth wrong");
+      // std::cout << "radius=" << r << std::endl;
+      // std::cout << "dist=" << (path[0] - center).norm() << std::endl;
       break;
     default:
       A = path[index - 1];
@@ -391,6 +398,9 @@ inline Eigen::Vector3d getLastIntersectionWithSphere(vec_Vecf<3> path, double r,
 
   if (index == path.size() - 1)
   {
+    std::cout << "radius=" << r << std::endl;
+    std::cout << "dist=" << (path[index] - center).norm() << std::endl;
+
     printf("ERROR, the goal is inside the sphere Sb, returning the last point\n");
     return path[path.size() - 1];
   }
@@ -422,6 +432,8 @@ inline Eigen::Vector3d getLastIntersectionWithSphere(vec_Vecf<3> path, double r,
 
   if (index == path.size() - 1)
   {
+    std::cout << "radius=" << r << std::endl;
+    std::cout << "dist=" << (path[index] - center).norm() << std::endl;
     printf("ERROR, the goal is inside the sphere Sb, returning the last point\n");
     *Jdist = 0;
     return path[path.size() - 1];

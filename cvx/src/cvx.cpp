@@ -58,7 +58,8 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   pub_trajs_sphere_ = nh_.advertise<visualization_msgs::MarkerArray>("trajs_sphere", 1);
   pub_forces_ = nh_.advertise<visualization_msgs::MarkerArray>("forces", 1);
   pub_actual_traj_ = nh_.advertise<visualization_msgs::Marker>("actual_traj", 1);
-  pub_path_jps_ = nh_.advertise<visualization_msgs::MarkerArray>("path_jps", 1);
+  pub_path_jps1_ = nh_.advertise<visualization_msgs::MarkerArray>("path_jps1", 1);
+  pub_path_jps2_ = nh_.advertise<visualization_msgs::MarkerArray>("path_jps2", 1);
 
   pub_intersec_points_ = nh_.advertise<visualization_msgs::MarkerArray>("intersection_points", 1);
 
@@ -140,6 +141,58 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   ROS_INFO("Planner initialized");
 }
 
+void CVX::clearJPSPathVisualization(int i)
+{
+  if (i == 1)
+  {
+    // printf("going to clear MarkerArray");
+    clearMarkerArray(&path_jps1_, &pub_path_jps1_);
+  }
+  else
+  {
+    clearMarkerArray(&path_jps2_, &pub_path_jps2_);
+  }
+}
+
+void CVX::clearMarkerArray(visualization_msgs::MarkerArray* tmp, ros::Publisher* publisher)
+{
+  if ((*tmp).markers.size() == 0)
+  {
+    return;
+  }
+  int id_begin = (*tmp).markers[0].id;
+  // int id_end = (*path).markers[markers.size() - 1].id;
+
+  for (int i = 0; i < (*tmp).markers.size(); i++)
+  {
+    visualization_msgs::Marker m;
+    m.type = visualization_msgs::Marker::ARROW;
+    m.action = visualization_msgs::Marker::DELETE;
+    m.id = i + id_begin;
+    (*tmp).markers[i] = m;
+  }
+
+  (*publisher).publish(*tmp);
+  (*tmp).markers.clear();
+}
+
+void CVX::publishJPSPath(vec_Vecf<3> path, int i)
+{
+  /*vec_Vecf<3> traj, visualization_msgs::MarkerArray* m_array*/
+  clearJPSPathVisualization(i);
+  // path_jps_ = clearArrows();
+  if (i == 1)
+  {
+    vectorOfVectors2MarkerArray(path, &path_jps1_, color(BLUE));
+    pub_path_jps1_.publish(path_jps1_);
+  }
+  else
+  {
+    vectorOfVectors2MarkerArray(path, &path_jps2_, color(RED));
+    pub_path_jps2_.publish(path_jps2_);
+  }
+}
+
 bool CVX::solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr, Vec3f start, Vec3f goal, vec_Vecf<3>& path)
 {
   // Create a map
@@ -181,9 +234,6 @@ bool CVX::solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr, Vec3f start, Ve
         {
           std::cout << it.transpose() << std::endl;
         }*/
-    path_jps_ = clearArrows();
-    vectorOfVectors2MarkerArray(path, &path_jps_);
-    pub_path_jps_.publish(path_jps_);
   }
   /*
  Timer time_astar(true);
@@ -200,7 +250,7 @@ bool CVX::solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr, Vec3f start, Ve
   return valid_jps;
 }
 
-visualization_msgs::MarkerArray CVX::clearArrows()
+/*visualization_msgs::MarkerArray CVX::clearArrows()
 {
   visualization_msgs::MarkerArray tmp;
   visualization_msgs::Marker m;
@@ -211,9 +261,10 @@ visualization_msgs::MarkerArray CVX::clearArrows()
   pub_path_jps_.publish(tmp);
   visualization_msgs::MarkerArray new_array;
   return new_array;
-}
+}*/
 
-void CVX::vectorOfVectors2MarkerArray(vec_Vecf<3> traj, visualization_msgs::MarkerArray* m_array)
+void CVX::vectorOfVectors2MarkerArray(vec_Vecf<3> traj, visualization_msgs::MarkerArray* m_array,
+                                      std_msgs::ColorRGBA color)
 {
   // printf("In vectorOfVectors2MarkerArray\n");
   geometry_msgs::Point p_last = eigen2point(traj[0]);
@@ -234,7 +285,7 @@ void CVX::vectorOfVectors2MarkerArray(vec_Vecf<3> traj, visualization_msgs::Mark
     m.type = visualization_msgs::Marker::ARROW;
     m.action = visualization_msgs::Marker::ADD;
     m.id = i;
-    m.color = color(BLUE);
+    m.color = color;
     m.scale.x = 0.02;
     m.scale.y = 0.04;
     // m.scale.z = 1;
@@ -256,7 +307,7 @@ void CVX::vectorOfVectors2MarkerArray(vec_Vecf<3> traj, visualization_msgs::Mark
 void CVX::goalCB(const acl_msgs::TermGoal& msg)
 {
   printf("NEW GOAL************************************************\n");
-  term_term_goal_ = msg;
+  term_goal_ = msg;
 
   status_ = (status_ == GOAL_REACHED) ? YAWING : TRAVELING;
   if (status_ == YAWING)
@@ -286,48 +337,11 @@ void CVX::yaw(double diff, acl_msgs::QuadGoal& quad_goal)
   quad_goal.yaw += diff;
 }
 
-Eigen::Vector3d CVX::projectClickedGoal(Eigen::Vector3d P1)
-{
-  //[px1, py1, pz1] is inside the map
-  //[px2, py2, pz2] is outside the map
-  P2 = term_term_goal_;
-  double x_max = P1[0] + WDX / 2;
-  double x_min = P1[0] - WDX / 2;
-  double y_max = P1[1] + WDY / 2;
-  double y_min = P1[1] - WDY / 2;
-  double z_max = P1[2] + WDZ / 2;
-  double z_min = P1[2] - WDZ / 2;
-
-  if ((P1[0] < x_max && P1[0] > xmin) && (P1[1] < y_max && P1[1] > ymin) && (P1[2] < z_max && P1[2] > zmin))
-  {
-    // Clicked goal is inside the map
-    return P1;
-  }
-  Eigen::Vector3d inters;
-  std::vector<Eigen::Vector4d> all_planes = {
-    Eigen::Vector4d(1, 0, 0, P1[0] + WDX / 2),   // Plane X right
-    Eigen::Vector4d(-1, 0, 0, P1[0] - WDX / 2),  // Plane X left
-    Eigen::Vector4d(0, 1, 0, P1[1] + WDY / 2),   // Plane Y right
-    Eigen::Vector4d(0, -1, 0, P1[1] - WDY / 2),  // Plane Y left
-    Eigen::Vector4d(0, 0, 1, P1[2] + WDZ / 2),   // Plane Z up
-    Eigen::Vector4d(0, 0, -1, P1[2] - WDZ / 2)   // Plane Z down
-  };
-  for (int i = 0; i < 6; i++)
-  {
-    if (getIntersectionWithPlane(P1, P2, coeff, &inters) == true)
-    {
-      return inters;
-    }
-  }
-  printf("Neither the goal is inside the map nor it has a projection into it, this is impossible");
-}
-
 void CVX::replanCB(const ros::TimerEvent& e)
 {
   // printf("In replanCB\n");
   // double t0replanCB = ros::Time::now().toSec();
   Eigen::Vector3d state_pos(state_.pos.x, state_.pos.y, state_.pos.z);  // Local copy of state
-  term_goal_ = projectClickedGoal(state_pos);
 
   clearMarkerSetOfArrows();
   pubintersecPoint(Eigen::Vector3d::Zero(), false);  // Clear the intersection points markers
@@ -347,7 +361,10 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   // 0.96 and 0.98 are to ensure that ra<rb<dist_to_goal always
   double ra = std::min(0.96 * dist_to_goal, Ra);  // radius of the sphere Sa
-  double rb = std::min(0.98 * dist_to_goal, Rb);  // radius of the sphere Sa
+  double rb = std::min(0.98 * dist_to_goal, Rb);  // radius of the sphere Sb
+
+  /*  std::cout << "rb=" << rb << std::endl;
+    std::cout << "dist_to_goal=" << dist_to_goal << std::endl;*/
 
   if (dist_to_goal < GOAL_RADIUS && status_ != GOAL_REACHED)
   {
@@ -373,56 +390,94 @@ void CVX::replanCB(const ros::TimerEvent& e)
   J2 = std::numeric_limits<double>::max();
   Eigen::MatrixXd U_temp1, U_temp2, X_temp1, X_temp2;
 
-  printf("hola1\n");
+  // printf("hola1\n");
 
   static Eigen::Vector3d B1km1;  // B1km1 is B1 in t=t_k-1 (previous iteration)
   Eigen::Vector3d B1, B2, C1, C2;
   vec_Vecf<3> WP1, WP2;
 
-  printf("hola2\n");
+  // printf("hola2\n");
 
-  vec_Vecf<3> null(1, Eigen::Vector3d::Zero());
-  vec_Vecf<3>& JPS1(null);  // references HAVE to be initialized
-  vec_Vecf<3>& JPS2(null);
+  vec_Vecf<3> null1(1, Eigen::Vector3d::Zero());
+  vec_Vecf<3> null2(1, Eigen::Vector3d::Zero());
+  vec_Vecf<3>& JPS1(null1);  // references HAVE to be initialized
+  vec_Vecf<3>& JPS2(null2);
   static bool first_time = true;                                     // how many times I've solved JPS1
   solvedjps1 = solveJPS3D(pclptr_map_, state_pos, term_goal, JPS1);  // Solution is in JPS1
+  JPS1[JPS1.size() - 1] = term_goal;  // JPS ends in the voxel of the goal, but not exactly in the goal--> force it;
 
-  printf("hola3\n");
+  /*  printf("Points in JPS1 before\n");
+    for (int i = 0; i < JPS1.size(); i++)
+    {
+      std::cout << JPS1[i].transpose() << std::endl;
+    }*/
 
   if (first_time == true)
   {  // B1km1 is still not initialized --> Run from
     first_time = false;
     solvedjps2 = solvedjps1;
     JPS2 = JPS1;
+    solvedjps2 = true;  // only the first time
+    // printf("I'm in first time\n");
   }
   else
   {
     // In general, solve from B1km1
+    // std::cout << "B1km1 before is" << B1km1 << std::endl;
     solvedjps2 = solveJPS3D(pclptr_map_, B1km1, term_goal, JPS2);  // Solution is in JPS2
+    JPS2[JPS2.size() - 1] = term_goal;  // JPS ends in the voxel of the goal, but not exactly in the goal--> force it;
   }
 
-  if (solvedjps1 == false)
+  /*  if (solvedjps1 == false)
+    {
+      printf("JPS1 didn't find a solution\n");
+      return;
+    }
+    if (solvedjps2 == false)
+    {
+      printf("JPS2 didn't find a solution");
+      return;
+    }*/
+  // std::cout << "state" << state_pos << std::endl;
+  /*  printf("Points in JPS1 despues\n");
+    for (int i = 0; i < JPS1.size(); i++)
+    {
+      std::cout << JPS1[i].transpose() << std::endl;
+    }*/
+
+  if (solvedjps1 == true)
   {
-    printf("JPS1 didn't find a solution\n");
+    // printf("clearing\n");
+    clearJPSPathVisualization(1);
+    // printf("publishing");
+    publishJPSPath(JPS1, 1);
+    // printf("after\n");
+    B1 = getFirstIntersectionWithSphere(JPS1, ra, state_pos);
+    B1km1 = B1;
+  }
+
+  if (solvedjps2 == true)
+  {
+    clearJPSPathVisualization(2);
+    publishJPSPath(JPS2, 2);
+    B2 = getFirstIntersectionWithSphere(JPS2, ra, state_pos);
+  }
+
+  if (solvedjps1 == false || solvedjps2 == false)
+  {
+    printf("JPS didn't find a solution\n");
     return;
   }
-  if (solvedjps2 == false)
-  {
-    printf("JPS2 didn't find a solution");
-    return;
-  }
 
-  B1 = getFirstIntersectionWithSphere(JPS1, ra, state_pos);
-  B2 = getFirstIntersectionWithSphere(JPS2, ra, state_pos);
-  B1km1 = B1;
+  // std::cout << "B1km1 after is" << B1km1 << std::endl;
 
-  printf("hola4\n");
+  // printf("hola4\n");
 
   std::vector<Eigen::Vector3d> K = samplePointsSphere(B1, ra, state_pos);  // radius, center and point
 
   for (int i = 0; i < K.size(); i++)
   {
-    printf("hola5\n");
+    // printf("hola5\n");
     if (optimized_)  // Needed to skip the first time (X_ still not initialized)
     {
       k_initial_cond_ = std::min(k_ + OFFSET, (int)(X_.rows() - 1));
@@ -438,19 +493,19 @@ void CVX::replanCB(const ros::TimerEvent& e)
     mtx_goals.unlock();
     solver_jerk_.set_xf(xf);
     solver_jerk_.set_x0(x0);
-    printf("hola6\n");
+    // printf("hola6\n");
     double max_values[3] = { V_MAX, A_MAX, J_MAX };
     solver_jerk_.set_max(max_values);
     solver_jerk_.genNewTraj();
     U_temp1 = solver_jerk_.getU();
     X_temp1 = solver_jerk_.getX();
     //////SOLVED FOR JERK
-    printf("hola7\n");
+    // printf("hola7\n");
 
     bool isFree = trajIsFree(X_temp1);
     createMarkerSetOfArrows(X_temp1, isFree);
 
-    printf("hola8\n");
+    // printf("hola8\n");
 
     if (isFree)
     {
@@ -461,6 +516,11 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
       C1 = getLastIntersectionWithSphere(JPS1, rb, state_pos, &JDist1);
       pubPlanningVisual(state_pos, ra, rb, B1, C1);
+
+      /*      printf("Angle=%f\n", angleBetVectors(B1 - state_pos, B2 - state_pos));
+            std::cout << "uno\n" << B1 - state_pos << std::endl;
+            std::cout << "dos\n" << B2 - state_pos << std::endl;*/
+
       if (angleBetVectors(B1 - state_pos, B2 - state_pos) <= alpha_0)
       {
         need_to_decide = false;
@@ -471,7 +531,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   if (need_to_decide == true && have_seen_the_goal1 == false)
   {
-    printf("Computing costs to decide between 2 jerk trajectories\n");
+    printf("**************Computing costs to decide between 2 jerk trajectories\n");
     if (found_one_1)
     {
       JPrimj1 = solver_jerk_.getCost();
@@ -518,7 +578,6 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
         C2 = getLastIntersectionWithSphere(JPS2, rb, state_pos, &JDist2);
         pubPlanningVisual(state_pos, ra, rb, B2, C2);
-        // printf("Angle=%f\n", angleBetVectors(B1 - A, B2 - A));
 
         pub_trajs_sphere_.publish(trajs_sphere_);
 
@@ -541,21 +600,23 @@ void CVX::replanCB(const ros::TimerEvent& e)
   }
 
   ////DECISION: Choose 1 or 2?
-  if (have_seen_the_goal1)
+  if (have_seen_the_goal1 || have_seen_the_goal2)
   {
     status_ = GOAL_SEEN;  // I've found a free path that ends in the goal
     printf("CHANGED TO GOAL_SEEN********\n");
+  }
+
+  if (have_seen_the_goal1 || !need_to_decide)
+  {
     U_temp_ = U_temp1;
     X_temp_ = X_temp1;
   }
   else if (have_seen_the_goal2)
   {
-    status_ = GOAL_SEEN;  // I've found a free path that ends in the goal
-    printf("CHANGED TO GOAL_SEEN********\n");
     U_temp_ = U_temp2;
     X_temp_ = X_temp2;
   }
-  else  // I reach this point also when need_to_decide==false, but it's ensured that J1<=J2
+  else  // I reach this point also when need_to_decide==false, and noone has seen the goal
   {
     U_temp_ = (J1 <= J2) ? U_temp1 : U_temp2;
     X_temp_ = (J1 <= J2) ? X_temp1 : X_temp2;
@@ -737,11 +798,11 @@ void CVX::pubCB(const ros::TimerEvent& e)
       double diff = desired_yaw - quadGoal_.yaw;
       angle_wrap(diff);
       yaw(diff, quadGoal_);
-      printf("Inside, desired_yaw=%0.2f,quadGoal_.yaw=%0.2f, diff=%f , abs(diff)=%f\n", desired_yaw, quadGoal_.yaw,
-             diff, fabs(diff));
+      /*      printf("Inside, desired_yaw=%0.2f,quadGoal_.yaw=%0.2f, diff=%f , abs(diff)=%f\n", desired_yaw,
+         quadGoal_.yaw, diff, fabs(diff));*/
       if (fabs(diff) < 0.2)
       {
-        printf("It's less than 0.2!!\n");
+        // printf("It's less than 0.2!!\n");
         status_ = TRAVELING;
         printf("status_=TRAVELING\n");
       }
@@ -1503,3 +1564,39 @@ void CVX::pubintersecPoint(Eigen::Vector3d p, bool add)
         {
           std::cout << path_jps_vector_[i].transpose() << std::endl;
         }*/
+
+/*Eigen::Vector3d CVX::projectClickedGoal(Eigen::Vector3d P1)
+{
+  //[px1, py1, pz1] is inside the map
+  //[px2, py2, pz2] is outside the map
+  P2 = term_term_goal_;
+  double x_max = P1[0] + WDX / 2;
+  double x_min = P1[0] - WDX / 2;
+  double y_max = P1[1] + WDY / 2;
+  double y_min = P1[1] - WDY / 2;
+  double z_max = P1[2] + WDZ / 2;
+  double z_min = P1[2] - WDZ / 2;
+
+  if ((P1[0] < x_max && P1[0] > xmin) && (P1[1] < y_max && P1[1] > ymin) && (P1[2] < z_max && P1[2] > zmin))
+  {
+    // Clicked goal is inside the map
+    return P1;
+  }
+  Eigen::Vector3d inters;
+  std::vector<Eigen::Vector4d> all_planes = {
+    Eigen::Vector4d(1, 0, 0, P1[0] + WDX / 2),   // Plane X right
+    Eigen::Vector4d(-1, 0, 0, P1[0] - WDX / 2),  // Plane X left
+    Eigen::Vector4d(0, 1, 0, P1[1] + WDY / 2),   // Plane Y right
+    Eigen::Vector4d(0, -1, 0, P1[1] - WDY / 2),  // Plane Y left
+    Eigen::Vector4d(0, 0, 1, P1[2] + WDZ / 2),   // Plane Z up
+    Eigen::Vector4d(0, 0, -1, P1[2] - WDZ / 2)   // Plane Z down
+  };
+  for (int i = 0; i < 6; i++)
+  {
+    if (getIntersectionWithPlane(P1, P2, coeff, &inters) == true)
+    {
+      return inters;
+    }
+  }
+  printf("Neither the goal is inside the map nor it has a projection into it, this is impossible");
+}*/
