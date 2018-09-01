@@ -416,7 +416,16 @@ inline Eigen::Vector3d getLastIntersectionWithSphere(vec_Vecf<3> path, double r,
 // the path)
 inline Eigen::Vector3d getLastIntersectionWithSphere(vec_Vecf<3> path, double r, Eigen::Vector3d center, double* Jdist)
 {
-  // printf("In getLastIntersectionWithSphere\n");
+  printf("********************In getLastIntersectionWithSphere\n");
+
+  printf("Radius=%f\n", r);
+  std::cout << "Center\n" << center.transpose() << std::endl;
+  printf("Path\n");
+  for (int i = 0; i < path.size(); i++)
+  {
+    std::cout << path[i].transpose() << std::endl;
+  }
+
   int index = -1;
   for (int i = path.size() - 1; i >= 0; i--)
   {
@@ -432,8 +441,6 @@ inline Eigen::Vector3d getLastIntersectionWithSphere(vec_Vecf<3> path, double r,
 
   if (index == path.size() - 1)
   {
-    std::cout << "radius=" << r << std::endl;
-    std::cout << "dist=" << (path[index] - center).norm() << std::endl;
     printf("ERROR, the goal is inside the sphere Sb, returning the last point\n");
     *Jdist = 0;
     return path[path.size() - 1];
@@ -445,12 +452,20 @@ inline Eigen::Vector3d getLastIntersectionWithSphere(vec_Vecf<3> path, double r,
 
   Eigen::Vector3d intersection = getIntersectionWithSphere(A, B, r, center);
 
+  std::cout << "B\n " << B.transpose() << std::endl;
+  std::cout << "intersection\n " << intersection.transpose() << std::endl;
+
   *Jdist = (B - intersection).norm();
+  printf("primer valor es=%f\n", (B - intersection).norm());
   for (int i = index + 1; i < path.size() - 1; i++)
   {
+    printf("otro valor es %f \n", (path[i + 1] - path[i]).norm());
     *Jdist = *Jdist + (path[i + 1] - path[i]).norm();
   }
 
+  printf("Jist computed is %f\n", *Jdist);
+
+  printf("********************END OF getLastIntersectionWithSphere\n");
   return intersection;
 }
 

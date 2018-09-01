@@ -39,10 +39,11 @@
 #define OFFSET                                                                                                         \
   10  // Replanning offset (the initial conditions are taken OFFSET states farther from the last published goal)
 
-#define Ra 4.0     // [m] Radius of the first sphere
-#define Rb 6.0     // [m] Radius of the second sphere
-#define W_MAX 1    // [rd/s] Maximum angular velocity
-#define alpha_0 1  //[rd] threshold to ignore current JPS solution, and consider the old one
+#define Ra 4.0      // [m] Radius of the first sphere
+#define Rb 6.0      // [m] Radius of the second sphere
+#define W_MAX 1     // [rd/s] Maximum angular velocity
+#define alpha_0 1   //[rd] threshold to ignore current JPS solution, and consider the old one
+#define Z_ground 0  //[m] points below this are considered ground
 
 using namespace JPS;
 
@@ -198,11 +199,11 @@ bool CVX::solveJPS3D(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr, Vec3f start, Ve
   // Create a map
   /*  std::cout << "Solving JPS from start\n" << start << std::endl;
     std::cout << "To goal\n" << goal << std::endl;*/
-  const Vec3i dim(cells_x_, cells_y_, cells_z_);  //  number of cells in each dimension
-  const Vec3f center_map = start;                 // position of the drone
+  Vec3i dim(cells_x_, cells_y_, cells_z_);  //  number of cells in each dimension
+  Vec3f center_map = start;                 // position of the drone
   // Read the pointcloud
 
-  MapReader<Vec3i, Vec3f> reader(pclptr, dim, RES, center_map);  // Map read
+  MapReader<Vec3i, Vec3f> reader(pclptr, dim, RES, center_map, Z_ground);  // Map read
 
   std::shared_ptr<VoxelMapUtil> map_util = std::make_shared<VoxelMapUtil>();
   map_util->setMap(reader.origin(), reader.dim(), reader.data(), reader.resolution());
@@ -385,7 +386,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   bool need_to_decide = true;
   bool solvedjps1 = false, solvedjps2 = false;
 
-  double J1, J2, JPrimj1, JPrimj2, JPrimv1, JPrimv2, JDist1, JDist2;
+  double J1 = 0, J2 = 0, JPrimj1 = 0, JPrimj2 = 0, JPrimv1 = 0, JPrimv2 = 0, JDist1 = 0, JDist2 = 0;
   J1 = std::numeric_limits<double>::max();
   J2 = std::numeric_limits<double>::max();
   Eigen::MatrixXd U_temp1, U_temp2, X_temp1, X_temp2;
@@ -471,13 +472,13 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   // std::cout << "B1km1 after is" << B1km1 << std::endl;
 
-  // printf("hola4\n");
+  printf("hola4\n");
 
   std::vector<Eigen::Vector3d> K = samplePointsSphere(B1, ra, state_pos);  // radius, center and point
 
   for (int i = 0; i < K.size(); i++)
   {
-    // printf("hola5\n");
+    printf("hola5\n");
     if (optimized_)  // Needed to skip the first time (X_ still not initialized)
     {
       k_initial_cond_ = std::min(k_ + OFFSET, (int)(X_.rows() - 1));
@@ -500,17 +501,16 @@ void CVX::replanCB(const ros::TimerEvent& e)
     U_temp1 = solver_jerk_.getU();
     X_temp1 = solver_jerk_.getX();
     //////SOLVED FOR JERK
-    // printf("hola7\n");
+    printf("hola7\n");
 
     bool isFree = trajIsFree(X_temp1);
     createMarkerSetOfArrows(X_temp1, isFree);
 
-    // printf("hola8\n");
+    printf("hola8\n");
 
     if (isFree)
     {
       found_one_1 = true;
-      optimized_ = true;
       double dist = (term_goal - p).norm();
       have_seen_the_goal1 = (dist < GOAL_RADIUS) ? true : false;
 
@@ -529,28 +529,40 @@ void CVX::replanCB(const ros::TimerEvent& e)
     }
   }
 
-  if (need_to_decide == true && have_seen_the_goal1 == false)
+  printf("hola9\n");
+  //  if (need_to_decide == true && have_seen_the_goal1 == false)
+  if (1)
   {
     printf("**************Computing costs to decide between 2 jerk trajectories\n");
     if (found_one_1)
     {
+      printf("hola10\n");
       JPrimj1 = solver_jerk_.getCost();
+      printf("hola11\n");
       WP1 = getPointsBw2Spheres(JPS1, ra, rb, state_pos);
       WP1.insert(WP1.begin(), B1);
+      printf("hola12\n");
       WP1.push_back(C1);
       JPrimv1 = solveVelAndGetCost(WP1);
+      printf("hola13\n");
       J1 = JPrimj1 + JPrimv1 + JDist1;
     }
-
+    printf("hola14\n");
     K = samplePointsSphere(B2, ra, state_pos);  // radius, center and point
+    printf("hola15\n");
     for (int i = 0; i < K.size(); i++)
     {
+      printf("hola16\n");
       if (optimized_)  // Needed to skip the first time (X_ still not initialized)
       {
+        printf("hola16.5\n");
         k_initial_cond_ = std::min(k_ + OFFSET, (int)(X_.rows() - 1));
+        printf("hola16.7\n");
         updateInitialCond(k_initial_cond_);
+        printf("hola16.8\n");
       }
 
+      printf("hola17\n");
       //////SOLVING FOR JERK
       Eigen::Vector3d p = K[i];
       double xf[9] = { p[0], p[1], p[2], 0, 0, 0, 0, 0, 0 };
@@ -568,25 +580,31 @@ void CVX::replanCB(const ros::TimerEvent& e)
       X_temp2 = solver_jerk_.getX();
       //////SOLVED FOR JERK
 
+      printf("hola18\n");
       bool isFree = trajIsFree(X_temp1);
       createMarkerSetOfArrows(X_temp1, isFree);
       if (isFree)
       {
+        printf("hola19\n");
         found_one_2 = true;
         double dist = (term_goal - p).norm();
         have_seen_the_goal1 = (dist < GOAL_RADIUS) ? true : false;
 
         C2 = getLastIntersectionWithSphere(JPS2, rb, state_pos, &JDist2);
         pubPlanningVisual(state_pos, ra, rb, B2, C2);
-
+        printf("hola20\n");
         pub_trajs_sphere_.publish(trajs_sphere_);
-
+        printf("hola21\n");
         JPrimj2 = solver_jerk_.getCost();
         WP2 = getPointsBw2Spheres(JPS2, ra, rb, state_pos);
         WP2.insert(WP2.begin(), B2);
         WP2.push_back(C2);
         JPrimv2 = solveVelAndGetCost(WP2);
         J2 = JPrimj2 + JPrimv2 + JDist2;
+
+        printf("  JPrimj1    JPrimj2    JPrimv1    JPrimv2    JDista1    JDista2  \n");
+        printf("%10.1f,%10.1f,%10.1f,%10.1f,%10.1f,%10.1f\n", JPrimj1, JPrimj2, JPrimv1, JPrimv2, JDist1, JDist2);
+
         break;
       }
     }
@@ -622,9 +640,11 @@ void CVX::replanCB(const ros::TimerEvent& e)
     X_temp_ = (J1 <= J2) ? X_temp1 : X_temp2;
   }
 
+  optimized_ = true;
   planner_status_ = REPLANNED;
   printf("ReplanCB: planner_status_ = REPLANNED\n");
   pubTraj(X_temp_);
+  printf("replanCB finished\n");
   // ROS_WARN("solve time: %0.2f ms", 1000 * (ros::Time::now().toSec() - then));
   // printf("Time in replanCB %0.2f ms\n", 1000 * (ros::Time::now().toSec() - t0replanCB));
 }
@@ -635,7 +655,7 @@ double CVX::solveVelAndGetCost(vec_Vecf<3> path)
   /*  printf("Points in the path VEL\n");
     for (int i = 0; i < path.size() - 1; i++)
     {
-      std::cout << path[i].transpose() << std::endl;
+      std::cout << path[i].transpose(s) << std::endl;
     }*/
 
   for (int i = 0; i < path.size() - 1; i++)

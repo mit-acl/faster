@@ -7,7 +7,7 @@ template <class Ti, class Tf>
 class MapReader
 {
 public:
-  MapReader(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr, const Vec3i dim, double res, const Vec3f center_map)
+  MapReader(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr, Vec3i dim, double res, const Vec3f center_map, double z_ground)
   {
     // **Box of the map --> it's the box with which the map moves.
     // **Center_map --> The center of the box of the map, expressed in global float coordinates
@@ -22,15 +22,23 @@ public:
     /// **Free cell: Cell that has value 0
     /// **Unknown cell: Cell that has value -1
 
+    /// z_ground is used to limit the map size and not include points that are below the ground (--> + efficiency and
+    /// safety of the trajectories)
+
     // printf("In reader1\n");
-    for (unsigned int i = 0; i < 3; i++)
-    {
-      dim_(i) = dim[i];
-    }
+
     // printf("In reader2\n");
     origin_(0) = center_map[0] - res * dim[0] / 2.0;
     origin_(1) = center_map[1] - res * dim[1] / 2.0;
     origin_(2) = center_map[2] - res * dim[2] / 2.0;
+
+    origin_(2) = (origin_(2) < z_ground) ? z_ground : origin_(2);
+    dim[2] = (origin_(2) < z_ground) ? (center_map[2] - z_ground) / res : dim[2];
+
+    for (unsigned int i = 0; i < 3; i++)
+    {
+      dim_(i) = dim[i];
+    }
 
     resolution_ = res;
     data_.resize(dim[0] * dim[1] * dim[2], 0);
