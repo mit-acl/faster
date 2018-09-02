@@ -15,6 +15,7 @@
 		<remap from="~term_goal" to="term_goal" />
 		<remap from="~occup_grid" to="global_mapper_ros/occupancy_grid"/> <!--PointCloud of the map-->
 		<remap from="~unknown_grid" to="global_mapper_ros/unknown_grid"/> <!--PointCloud of the map-->
+		<remap from="~frontier_grid" to="global_mapper_ros/frontier_grid"/> <!--PointCloud of the map-->
 		<remap from="~pcloud" to="camera/cloud"/> <!--PointCloud from the camera-->
 
 		<!-- Publications -->

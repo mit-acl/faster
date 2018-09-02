@@ -32,11 +32,12 @@ public:
     // printf("In reader1\n");
 
     // printf("In reader2\n");
-    int dim2_down;
-    int dim2_up;
+    int dim2_down = dim[2] / 2.0;
+    int dim2_up = dim[2] / 2.0;
 
     if (center_map[2] - res * dim[2] / 2.0 < 0)
     {
+      // printf("modyfing");
       dim2_down = (int)((center_map[2] - z_ground) / res) + 1;  //+1 to avoid problems when taking off
       dim2_up = (int)(dim[2] / 2.0);
       dim[2] = dim2_down + dim2_up;
@@ -69,8 +70,11 @@ public:
     }
     // printf("reading_map4\n");
 
-    /*    printf("*******Dim_ is\n");
-        std::cout << dim_ << std::endl;*/
+    // printf("dim2down=%d\n", dim2_down);
+    // printf("dim2_up=%d\n", dim2_up);
+
+    // printf("*******Dim_ is\n");
+    // std::cout << dim_ << std::endl;
 
     resolution_ = res;
     data_.resize(dim[0] * dim[1] * dim[2], 0);
@@ -90,9 +94,10 @@ public:
       z = (z > 0) ? z : 0;
       // this next formula works only when x, y, z are in cell coordinates (relative to the origin of the map)
       int id = x + dim_(0) * y + dim_(0) * dim_(1) * z;
-      // printf("Trying to access to %d\n", id);
+
       if (id < 0)
       {
+        printf("JPS Reader: There is sth wrong, id= %d\n", id);
         /*        std::cout << "Center_map\n" << center_map << std::endl;
                 std::cout << "Origin\n" << origin_(0) << ", " << origin_(1) << ", " << origin_(2) << std::endl;
                 std::cout << "dim" << dim << std::endl;
@@ -100,7 +105,6 @@ public:
                 std::cout << "XYZCells=" << x << ", " << y << ", " << z << std::endl;
                 std::cout << "XYZ=" << pclptr->points[i].x << ", " << pclptr->points[i].y << ", " << pclptr->points[i].z
                           << std::endl;*/
-        printf("This shouldn't appear\n");
       }
       data_[id] = 100;
 

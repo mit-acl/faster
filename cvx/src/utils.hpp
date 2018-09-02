@@ -41,6 +41,25 @@
 // inline is needed to avoid the "multiple definitions" error. Other option is to create the utils.cpp file, and put
 // there the function (and here only the prototype)
 
+inline void saturate(double& var, double min, double max)
+{
+  if (var < min)
+  {
+    var = min;
+  }
+  else if (var > max)
+  {
+    var = max;
+  }
+}
+
+inline double angleBetVectors(Eigen::Vector3d a, Eigen::Vector3d b)
+{
+  double tmp = a.dot(b) / (a.norm() * b.norm());
+  saturate(tmp, -1, 1);
+  return acos(tmp);
+}
+
 // returns the points around B sampled in the sphere with radius r and center center.
 inline std::vector<Eigen::Vector3d> samplePointsSphere(Eigen::Vector3d B, double r, Eigen::Vector3d center)
 {
@@ -76,23 +95,90 @@ inline std::vector<Eigen::Vector3d> samplePointsSphere(Eigen::Vector3d B, double
   return tmp;
 }
 
-inline void saturate(double& var, double min, double max)
+// returns the points around B sampled in the sphere with radius r and center center, and sampled intelligently with
+// the given path
+// last_index_inside_sphere is the the index of the last point that is inside the sphere (should be provided as a
+// parameter to this function)
+// B is the first intersection of JPS with the sphere
+inline std::vector<Eigen::Vector3d> samplePointsSphereWithJPS(Eigen::Vector3d B, double r, Eigen::Vector3d center,
+                                                              vec_Vecf<3> path, int last_index_inside_sphere)
 {
-  if (var < min)
-  {
-    var = min;
-  }
-  else if (var > max)
-  {
-    var = max;
-  }
-}
+  /*  printf("To sample points1\n");
+    center = Eigen::Vector3d(1, 2, 3);
+    r = 6.57;
+    B = Eigen::Vector3d(7.5, 2, 4);
+    last_index_inside_sphere = 3;
+    std::vector<Eigen::Vector3d> path;
+    path.push_back(center);
+    path.push_back(Eigen::Vector3d(1.5, -2, 3));
+    path.push_back(Eigen::Vector3d(4, 2.5, 2));
+    path.push_back(Eigen::Vector3d(3, 6, 3));
+    printf("To sample points2\n");
 
-inline double angleBetVectors(Eigen::Vector3d a, Eigen::Vector3d b)
-{
-  double tmp = a.dot(b) / (a.norm() * b.norm());
-  saturate(tmp, -1, 1);
-  return acos(tmp);
+    path.push_back(B);*/
+
+  // printf("last_index_inside_sphere=%d", last_index_inside_sphere);
+
+  path[last_index_inside_sphere + 1] = B;  // path will always have last_index_inside_sphere + 2 elements at least
+  // std::vector<Eigen::Vector2d> proj;     // Projection of the waypoints in the sphere, in spherical coordinates
+  std::vector<Eigen::Vector3d> samples;  // Points sampled in the sphere
+  Eigen::Vector3d dir;
+  double x, y, z;
+
+  for (int i = last_index_inside_sphere + 1; i >= 1; i--)
+  {
+    Eigen::Vector3d point_i = path[i] - center;        // point i expressed with origin=origin sphere
+    Eigen::Vector3d point_im1 = path[i - 1] - center;  // point i minus 1
+    double angle_max = angleBetVectors(point_i, point_im1);
+    Eigen::Vector3d perp = (point_i.cross(point_im1)).normalized();  // perpendicular vector to point_i and point_ip1;
+
+    for (double angle = 0; angle < angle_max; angle = angle + 0.34)
+    {
+      Eigen::AngleAxis<double> rot(angle, perp);
+      dir = rot * point_i;
+      double x = dir[0], y = dir[1], z = dir[2];
+
+      double theta = acos(z / (sqrt(x * x + y * y + z * z)));
+      double phi = atan2(y, x);
+
+      Eigen::Vector3d sample;
+      sample[0] = r * sin(theta) * cos(phi);
+      sample[1] = r * sin(theta) * sin(phi);
+      sample[2] = r * cos(theta);
+      samples.push_back(sample + center);
+    }
+  }
+
+  if (last_index_inside_sphere >= 1)
+  {
+    // add the last sample (intersection of pa)
+    Eigen::Vector3d last = path[1] - center;
+    double x = last[0], y = last[1], z = last[2];
+    double theta = acos(z / (sqrt(x * x + y * y + z * z)));
+    double phi = atan2(y, x);
+
+    Eigen::Vector3d sample;
+    sample[0] = r * sin(theta) * cos(phi);
+    sample[1] = r * sin(theta) * sin(phi);
+    sample[2] = r * cos(theta);
+
+    samples.push_back(sample + center);
+  }
+
+  /*  printf("****SAMPLES OBTAINED*****\n");
+    for (int i = 0; i < samples.size() - 1; i++)
+    {
+      std::cout << "(" << samples[i][0] << "," << samples[i][1] << "," << samples[i][2] << ")" << std::endl;
+    }
+  */
+
+  // now let's concatenate some uniform samples in case last_index_inside_sphere=0;
+  std::vector<Eigen::Vector3d> uniform_samples = samplePointsSphere(B, r, center);
+
+  samples.insert(samples.end(), uniform_samples.begin(),
+                 uniform_samples.end());  // concatenate samples and uniform samples
+
+  return samples;
 }
 
 inline void angle_wrap(double& diff)
@@ -275,24 +361,42 @@ using vec_Vecf = vec_E<Vecf<N>>;
 // returns 1 if there is an intersection between the segment P1-P2 and the plane given by coeff=[A B C D]
 // (Ax+By+Cz+D==0)  returns 0 if there is no intersection.
 // The intersection point is saved in "intersection"
-/*inline bool getIntersectionWithPlane(Eigen::Vector3d P1, Eigen::Vector3d P2, Eigen::Vector4d coeff,
+inline bool getIntersectionWithPlane(Eigen::Vector3d P1, Eigen::Vector3d P2, Eigen::Vector4d coeff,
                                      Eigen::Vector3d* inters)
 {
+  std::cout << "Coefficients" << std::endl;
+  std::cout << coeff.transpose() << std::endl;
+
+  std::cout << "P1" << std::endl;
+  std::cout << P1.transpose() << std::endl;
+
+  std::cout << "P2" << std::endl;
+  std::cout << P2.transpose() << std::endl;
+
+  double A = coeff[0];
+  double B = coeff[1];
+  double C = coeff[2];
+  double D = coeff[3];
   // http://www.ambrsoft.com/TrigoCalc/Plan3D/PlaneLineIntersection_.htm
-  x1 = P1[0];
-  a = (P2[0] - P1[0]);
-  y1 = P1[1];
-  b = (P2[1] - P1[1]);
-  z1 = P1[2];
-  c = (P2[2] - P1[2]);
+  double x1 = P1[0];
+  double a = (P2[0] - P1[0]);
+  double y1 = P1[1];
+  double b = (P2[1] - P1[1]);
+  double z1 = P1[2];
+  double c = (P2[2] - P1[2]);
   double t = -(A * x1 + B * y1 + C * z1 + D) / (A * a + B * b + C * c);
-  *inters[0] = x1 + a * t;
-  *inters[1] = x2 + b * t;
-  *inters[2] = z2 + c * t;
+  (*inters)[0] = x1 + a * t;
+  (*inters)[1] = y1 + b * t;
+  (*inters)[2] = z1 + c * t;
+  printf("t=%f\n", t);
   bool result =
-      (t > 1 || t < 0) ? false : true;  // False if the intersection is with the line P1-P2, not with the segment P1-P2
+      (t < 0 || t > 1) ? false : true;  // False if the intersection is with the line P1-P2, not with the segment P1-P2
+  if (result)
+  {
+    std::cout << "Intersection\n" << *inters << std::endl;
+  }
   return result;
-}*/
+}
 
 // given 2 points (A inside and B outside the sphere) it computes the intersection of the lines between
 // that 2 points and the sphere
@@ -340,10 +444,11 @@ inline Eigen::Vector3d getIntersectionWithSphere(Eigen::Vector3d A, Eigen::Vecto
 // Given a path (starting inside the sphere and finishing outside of it) expressed by a vector of 3D-vectors (points),
 // it returns its first intersection with a sphere of radius=r and center=center
 // the center is added as the first point of the path to ensure that the first element of the path is inside the sphere
-// (to avoids issues with the first point of JPS2)
-inline Eigen::Vector3d getFirstIntersectionWithSphere(vec_Vecf<3> path, double r, Eigen::Vector3d center)
+// (to avoid issues with the first point of JPS2)
+inline Eigen::Vector3d getFirstIntersectionWithSphere(vec_Vecf<3> path, double r, Eigen::Vector3d center,
+                                                      int* last_index_inside_sphere)
 {
-  path.insert(path.begin(), center);
+  // path.insert(path.begin(), center);
   int index = -1;
   for (int i = 0; i < path.size(); i++)
   {
@@ -363,6 +468,7 @@ inline Eigen::Vector3d getFirstIntersectionWithSphere(vec_Vecf<3> path, double r
     case -1:  // no points are outside the sphere --> find projection center-lastPoint into the sphere
       A = center;
       B = path[path.size() - 1];
+      *last_index_inside_sphere = path.size() - 1;
       break;
     case 0:  // First element is outside the sphere
       printf("First element is still oustide the sphere, there is sth wrong");
@@ -372,6 +478,8 @@ inline Eigen::Vector3d getFirstIntersectionWithSphere(vec_Vecf<3> path, double r
     default:
       A = path[index - 1];
       B = path[index];
+      printf("index-1=%d\n", index - 1);
+      *last_index_inside_sphere = index - 1;
   }
 
   Eigen::Vector3d intersection = getIntersectionWithSphere(A, B, r, center);

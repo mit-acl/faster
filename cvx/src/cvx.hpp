@@ -75,6 +75,8 @@ private:
   void mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg);  // Callback for the occupancy pcloud
   void unkCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg);  // Callback for the unkown pcloud
   void pclCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg);
+  void frontierCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg);
+
   bool trajIsFree(Eigen::MatrixXd X);
   Eigen::Vector3d computeForce(Eigen::Vector3d x, Eigen::Vector3d g);
   // std_msgs::ColorRGBA color(int id);
@@ -106,17 +108,23 @@ private:
   void updateJPSMap(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr);
   bool solveJPS3D(Vec3f start, Vec3f goal, vec_Vecf<3>& path);
 
+  void pubTerminalGoal();
+
+  Eigen::Vector3d projectClickedGoal(Eigen::Vector3d P1);
+
   visualization_msgs::Marker setpoint_;
   acl_msgs::QuadGoal quadGoal_;
   acl_msgs::QuadGoal initialCond_;  // It's the initial condition for the solver
   acl_msgs::QuadFlightMode flight_mode_;
   acl_msgs::State state_;
-  acl_msgs::TermGoal term_goal_;  // This goal is always inside of the map
+  Eigen::Vector3d term_goal_;       // This goal is always inside of the map
+  Eigen::Vector3d term_term_goal_;  // This goal is the clicked goal
 
   ros::NodeHandle nh_;
   ros::NodeHandle nh_replan_CB_;
   ros::NodeHandle nh_pub_CB_;
 
+  ros::Publisher pub_term_goal_;
   ros::Publisher pub_goal_;
   ros::Publisher pub_traj_;
   ros::Publisher pub_setpoint_;
@@ -133,6 +141,7 @@ private:
   ros::Subscriber sub_map_;
   ros::Subscriber sub_unk_;
   ros::Subscriber sub_pcl_;
+  ros::Subscriber sub_frontier_;
   ros::Timer pubCBTimer_;
   ros::Timer replanCBTimer_;
 
@@ -154,11 +163,13 @@ private:
   bool optimized_, use_ff_;
   double u_min_, u_max_, z_start_, spinup_time_, z_land_;
   // int N_ = 20;
-  pcl::KdTreeFLANN<pcl::PointXYZ> kdtree_map_;  // kdtree of the point cloud of the occuppancy grid
-  pcl::KdTreeFLANN<pcl::PointXYZ> kdtree_unk_;  // kdtree of the point cloud of the unknown grid
+  pcl::KdTreeFLANN<pcl::PointXYZ> kdtree_map_;       // kdtree of the point cloud of the occuppancy grid
+  pcl::KdTreeFLANN<pcl::PointXYZ> kdtree_unk_;       // kdtree of the point cloud of the unknown grid
+  pcl::KdTreeFLANN<pcl::PointXYZ> kdtree_frontier_;  // kdtree of the frontier
 
   bool kdtree_map_initialized_ = 0;
   bool kdtree_unk_initialized_ = 0;
+  bool kdtree_frontier_initialized_ = 0;
   // vector that has all the kdtrees of the pclouds not included in the map:
   std::vector<kdTreeStamped> v_kdtree_new_pcls_;
   bool replanning_needed_ = true;
@@ -181,14 +192,18 @@ private:
   // Eigen::Vector3d directionJPS_;
   vec_Vecf<3> path_jps_vector_;
 
-  pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_map_;
+  // pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_map_;
   pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_unk_;
 
-  std::mutex mtx_map;   // mutex of occupied map (pclptr_map_)
-  std::mutex mtx_unk;   // mutex of unkonwn map (pclptr_unk_)
+  std::mutex mtx_map;  // mutex of occupied map (kdtree_map_)
+  std::mutex mtx_unk;  // mutex of unkonwn map (pclptr_unk_)
+  std::mutex mtx_frontier;
   std::mutex mtx_inst;  // mutex of instanteneous data (v_kdtree_new_pcls_)
   std::mutex mtx_goals;
+  std::mutex mtx_jps_map_util;  // mutex for map_util_ and planner_ptr_
 
   std::shared_ptr<JPS::VoxelMapUtil> map_util_;
   std::unique_ptr<JPSPlanner3D> planner_ptr_;
+
+  bool X_initialized_ = false;
 };
