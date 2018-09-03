@@ -106,7 +106,7 @@ private:
   void clearJPSPathVisualization(int i);
 
   void updateJPSMap(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr);
-  bool solveJPS3D(Vec3f start, Vec3f goal, vec_Vecf<3>& path);
+  vec_Vecf<3> solveJPS3D(Vec3f start, Vec3f goal, bool* solved);
 
   void pubTerminalGoal();
 
@@ -117,6 +117,8 @@ private:
 
   void publishJPS2handIntersection(vec_Vecf<3> JPS2, vec_Vecf<3> JPS2_fix, Eigen::Vector3d inter1,
                                    Eigen::Vector3d inter2);
+
+  vec_Vecf<3> fix(vec_Vecf<3> JPS_old);
 
   visualization_msgs::Marker setpoint_;
   acl_msgs::QuadGoal quadGoal_;

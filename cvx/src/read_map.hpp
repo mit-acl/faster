@@ -27,11 +27,16 @@ public:
     /// z_ground [m] is used to limit the map size and not include points that are below the ground (--> + efficiency
     /// and safety of the trajectories)
 
-    /// inflation [m] is used to inflate the obstacles that amount.
+    /// inflation [m] is used to inflate the obstacles that amount. Also the map is inflated in x and y with 2*(that
+    /// amount)
 
     // printf("In reader1\n");
 
     // printf("In reader2\n");
+
+    dim[0] = dim[0] + 10 * (inflation * 1.0) / res;
+    dim[1] = dim[1] + 10 * (inflation * 1.0) / res;
+
     int dim2_down = dim[2] / 2.0;
     int dim2_up = dim[2] / 2.0;
 

@@ -644,4 +644,14 @@ inline void printElementsOfJPS(vec_Vecf<3> path)
   }
 }
 
+inline vec_Vecf<3> copyJPS(vec_Vecf<3> path)
+{
+  vec_Vecf<3> tmp;
+  for (int i = 0; i < path.size(); i++)
+  {
+    tmp.push_back(path[i]);
+  }
+  return tmp;
+}
+
 #endif
