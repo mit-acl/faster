@@ -110,7 +110,13 @@ private:
 
   void pubTerminalGoal();
 
+  void pubJPSIntersection(Eigen::Vector3d inters);
+  Eigen::Vector3d getFirstCollisionJPS(vec_Vecf<3> path, bool* thereIsIntersection);
+
   Eigen::Vector3d projectClickedGoal(Eigen::Vector3d P1);
+
+  void publishJPS2handIntersection(vec_Vecf<3> JPS2, vec_Vecf<3> JPS2_fix, Eigen::Vector3d inter1,
+                                   Eigen::Vector3d inter2);
 
   visualization_msgs::Marker setpoint_;
   acl_msgs::QuadGoal quadGoal_;
@@ -135,6 +141,8 @@ private:
   ros::Publisher pub_path_jps2_;
   ros::Publisher pub_planning_vis_;
   ros::Publisher pub_intersec_points_;
+  ros::Publisher pub_jps_inters_;
+
   ros::Subscriber sub_goal_;
   ros::Subscriber sub_state_;
   ros::Subscriber sub_mode_;
@@ -152,6 +160,7 @@ private:
   visualization_msgs::MarkerArray trajs_sphere_;  // all the trajectories generated in the sphere
   visualization_msgs::MarkerArray path_jps1_;
   visualization_msgs::MarkerArray path_jps2_;
+  visualization_msgs::MarkerArray path_jps2_fix_;
   visualization_msgs::MarkerArray intersec_points_;
 
   int markerID_ = 0;
@@ -189,8 +198,7 @@ private:
   int k_ = 0;               // Row of X_ that will be published next;
   int k_initial_cond_ = 0;  // Row of X_ chosen as the initial condition for the planner
 
-  // Eigen::Vector3d directionJPS_;
-  vec_Vecf<3> path_jps_vector_;
+  vec_Vecf<3> JPS_old_;
 
   // pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_map_;
   pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_unk_;

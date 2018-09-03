@@ -364,14 +364,14 @@ using vec_Vecf = vec_E<Vecf<N>>;
 inline bool getIntersectionWithPlane(Eigen::Vector3d P1, Eigen::Vector3d P2, Eigen::Vector4d coeff,
                                      Eigen::Vector3d* inters)
 {
-  std::cout << "Coefficients" << std::endl;
-  std::cout << coeff.transpose() << std::endl;
+  /*  std::cout << "Coefficients" << std::endl;
+    std::cout << coeff.transpose() << std::endl;
 
-  std::cout << "P1" << std::endl;
-  std::cout << P1.transpose() << std::endl;
+    std::cout << "P1" << std::endl;
+    std::cout << P1.transpose() << std::endl;
 
-  std::cout << "P2" << std::endl;
-  std::cout << P2.transpose() << std::endl;
+    std::cout << "P2" << std::endl;
+    std::cout << P2.transpose() << std::endl;*/
 
   double A = coeff[0];
   double B = coeff[1];
@@ -388,13 +388,13 @@ inline bool getIntersectionWithPlane(Eigen::Vector3d P1, Eigen::Vector3d P2, Eig
   (*inters)[0] = x1 + a * t;
   (*inters)[1] = y1 + b * t;
   (*inters)[2] = z1 + c * t;
-  printf("t=%f\n", t);
+  // printf("t=%f\n", t);
   bool result =
       (t < 0 || t > 1) ? false : true;  // False if the intersection is with the line P1-P2, not with the segment P1-P2
-  if (result)
-  {
-    std::cout << "Intersection\n" << *inters << std::endl;
-  }
+                                        /*  if (result)
+                                          {
+                                            std::cout << "Intersection\n" << *inters << std::endl;
+                                          }*/
   return result;
 }
 
@@ -426,7 +426,7 @@ inline Eigen::Vector3d getIntersectionWithSphere(Eigen::Vector3d A, Eigen::Vecto
   float discrim = b * b - 4 * a * c;
   if (discrim <= 0)
   {
-    printf("The line is tangent or doesn't intersect, returning the first point");
+    printf("The line is tangent or doesn't intersect, returning the first point\n");
     return A;
   }
   else
@@ -446,8 +446,15 @@ inline Eigen::Vector3d getIntersectionWithSphere(Eigen::Vector3d A, Eigen::Vecto
 // the center is added as the first point of the path to ensure that the first element of the path is inside the sphere
 // (to avoid issues with the first point of JPS2)
 inline Eigen::Vector3d getFirstIntersectionWithSphere(vec_Vecf<3> path, double r, Eigen::Vector3d center,
-                                                      int* last_index_inside_sphere)
+                                                      int* last_index_inside_sphere = NULL,
+                                                      bool* noPointsOutsideSphere = NULL)
 {
+  // printf("here\n");
+  if (noPointsOutsideSphere != NULL)
+  {  // this argument has been provided
+    *noPointsOutsideSphere = false;
+  }
+  // printf("here2\n");
   // path.insert(path.begin(), center);
   int index = -1;
   for (int i = 0; i < path.size(); i++)
@@ -468,21 +475,33 @@ inline Eigen::Vector3d getFirstIntersectionWithSphere(vec_Vecf<3> path, double r
     case -1:  // no points are outside the sphere --> find projection center-lastPoint into the sphere
       A = center;
       B = path[path.size() - 1];
-      *last_index_inside_sphere = path.size() - 1;
+      if (last_index_inside_sphere != NULL)
+      {
+        *last_index_inside_sphere = path.size() - 1;
+      }
+      if (noPointsOutsideSphere != NULL)
+      {  // this argument has been provided
+        *noPointsOutsideSphere = true;
+      }
       break;
     case 0:  // First element is outside the sphere
-      printf("First element is still oustide the sphere, there is sth wrong");
+      printf("First element is still oustide the sphere, there is sth wrong\n");
       // std::cout << "radius=" << r << std::endl;
       // std::cout << "dist=" << (path[0] - center).norm() << std::endl;
       break;
     default:
       A = path[index - 1];
       B = path[index];
-      printf("index-1=%d\n", index - 1);
-      *last_index_inside_sphere = index - 1;
+      // printf("index-1=%d\n", index - 1);
+      if (last_index_inside_sphere != NULL)
+      {
+        *last_index_inside_sphere = index - 1;
+      }
   }
 
+  bool thereIsIntersec;
   Eigen::Vector3d intersection = getIntersectionWithSphere(A, B, r, center);
+
   return intersection;
 }
 
@@ -614,6 +633,15 @@ inline vec_Vecf<3> getPointsBw2Spheres(vec_Vecf<3> path, double ra, double rb, E
     tmp.push_back(path[i]);
   }
   return tmp;
+}
+
+inline void printElementsOfJPS(vec_Vecf<3> path)
+{
+  printf("Elements of the path given:\n");
+  for (int i = 0; i < path.size(); i++)
+  {
+    std::cout << path[i].transpose() << std::endl;
+  }
 }
 
 #endif

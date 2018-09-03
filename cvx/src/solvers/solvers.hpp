@@ -248,7 +248,7 @@ void Solver<INPUT_ORDER>::interpolate(int var, double** u, double** x)
   int type_of_var = (var < INPUT_ORDER) ? STATE : INPUT;
   if (ni <= 2)
   {
-    printf("NOT INTERPOLATING. THIS USUALLY HAPPENS WHEN INPUT=VEL, y VEL_MAX IS HIGH, REDUCE IT!\n");
+    // printf("NOT INTERPOLATING. THIS USUALLY HAPPENS WHEN INPUT=VEL, y VEL_MAX IS HIGH, REDUCE IT!\n");
     for (int axis = 0; axis < 3; axis++)  // var_x,var_y,var_z
     {
       int column_x = axis + 3 * var;

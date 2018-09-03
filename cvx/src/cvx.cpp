@@ -28,6 +28,8 @@
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/kdtree/kdtree.h>
 #include <pcl/filters/filter.h>
+#include <pcl/filters/crop_box.h>
+#include <pcl/filters/passthrough.h>
 
 #include <tf2_sensor_msgs/tf2_sensor_msgs.h>
 
@@ -39,11 +41,12 @@
 #define OFFSET                                                                                                         \
   10  // Replanning offset (the initial conditions are taken OFFSET states farther from the last published goal)
 
-#define Ra 2.0      // [m] Radius of the first sphere
-#define Rb 6.0      // [m] Radius of the second sphere
-#define W_MAX 1     // [rd/s] Maximum angular velocity
-#define alpha_0 1   //[rd] threshold to ignore current JPS solution, and consider the old one
-#define Z_ground 0  //[m] points below this are considered ground
+#define Ra 2.0             // [m] Radius of the first sphere
+#define Rb 6.0             // [m] Radius of the second sphere
+#define W_MAX 1            // [rd/s] Maximum angular velocity
+#define alpha_0 1          //[rd] threshold to ignore current JPS solution, and consider the old one
+#define Z_ground 0         //[m] points below this are considered ground
+#define INFLATION_JPS 0.3  //[m] The obstacles are inflated (to run JPS) by this amount
 
 using namespace JPS;
 
@@ -62,6 +65,8 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   pub_actual_traj_ = nh_.advertise<visualization_msgs::Marker>("actual_traj", 1);
   pub_path_jps1_ = nh_.advertise<visualization_msgs::MarkerArray>("path_jps1", 1);
   pub_path_jps2_ = nh_.advertise<visualization_msgs::MarkerArray>("path_jps2", 1);
+
+  pub_jps_inters_ = nh_.advertise<geometry_msgs::PointStamped>("jps_intersection", 1);
 
   pub_intersec_points_ = nh_.advertise<visualization_msgs::MarkerArray>("intersection_points", 1);
 
@@ -128,6 +133,8 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
 
   map_util_ = std::make_shared<VoxelMapUtil>();
   planner_ptr_ = std::unique_ptr<JPSPlanner3D>(new JPSPlanner3D(false));
+
+  JPS_old_.clear();
 
   tfListener = new tf2_ros::TransformListener(tf_buffer_);
   // wait for body transform to be published before initializing
@@ -200,13 +207,45 @@ void CVX::publishJPSPath(vec_Vecf<3> path, int i)
   }
 }
 
+void CVX::publishJPS2handIntersection(vec_Vecf<3> JPS2, vec_Vecf<3> JPS2_fix, Eigen::Vector3d inter1,
+                                      Eigen::Vector3d inter2)
+{
+  // printf("Going to publish\n");
+  /*vec_Vecf<3> traj, visualization_msgs::MarkerArray* m_array*/
+  clearJPSPathVisualization(2);
+  // path_jps_ = clearArrows();
+
+  // vectorOfVectors2MarkerArray(JPS2, &path_jps2_, color(RED));
+  vectorOfVectors2MarkerArray(JPS2_fix, &path_jps2_, color(GREEN));
+
+  visualization_msgs::Marker m1;
+  m1.header.frame_id = "world";
+  m1.id = 19865165;
+  m1.type = visualization_msgs::Marker::SPHERE;
+  m1.scale = vectorUniform(0.3);
+  m1.color = color(BLUE_TRANS);
+  m1.pose.position = eigen2point(inter1);
+  path_jps2_.markers.push_back(m1);
+
+  visualization_msgs::Marker m2;
+  m2.header.frame_id = "world";
+  m2.id = 19865166;
+  m2.type = visualization_msgs::Marker::SPHERE;
+  m2.scale = vectorUniform(0.3);
+  m2.color = color(RED_TRANS);
+  m2.pose.position = eigen2point(inter2);
+  path_jps2_.markers.push_back(m2);
+
+  pub_path_jps2_.publish(path_jps2_);
+}
+
 void CVX::updateJPSMap(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr)
 {
   Vec3f center_map(state_.pos.x, state_.pos.y, state_.pos.z);  // center of the map
   Vec3i dim(cells_x_, cells_y_, cells_z_);                     //  number of cells in each dimension
   // printf("Before reader\n");
 
-  MapReader<Vec3i, Vec3f> reader(pclptr, dim, RES, center_map, Z_ground, 2 * DRONE_RADIUS);  // Map read
+  MapReader<Vec3i, Vec3f> reader(pclptr, dim, RES, center_map, Z_ground, INFLATION_JPS);  // Map read
   // std::shared_ptr<VoxelMapUtil> map_util = std::make_shared<VoxelMapUtil>();
   // printf("Before setMap\n");
   mtx_jps_map_util.lock();
@@ -335,18 +374,18 @@ void CVX::goalCB(const acl_msgs::TermGoal& msg)
 {
   printf("NEW GOAL************************************************\n");
   term_term_goal_ = Eigen::Vector3d(msg.pos.x, msg.pos.y, msg.pos.z);
-  std::cout << "term_term_goal_=\n" << term_term_goal_ << std::endl;
+  // std::cout << "term_term_goal_=\n" << term_term_goal_ << std::endl;
   term_goal_ = projectClickedGoal(Eigen::Vector3d(state_.pos.x, state_.pos.y, state_.pos.z));
-  std::cout << "term_goal_=\n" << term_goal_ << std::endl;
+  // std::cout << "term_goal_=\n" << term_goal_ << std::endl;
 
   status_ = (status_ == GOAL_REACHED) ? YAWING : TRAVELING;
   if (status_ == YAWING)
   {
-    printf("GCB: status_ = YAWING\n");
+    // printf("GCB: status_ = YAWING\n");
   }
   if (status_ == TRAVELING)
   {
-    printf("GCB: status_ = TRAVELING\n");
+    // printf("GCB: status_ = TRAVELING\n");
   }
 
   planner_status_ = START_REPLANNING;
@@ -376,9 +415,11 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   clearMarkerSetOfArrows();
   pubintersecPoint(Eigen::Vector3d::Zero(), false);  // Clear the intersection points markers
-  if (!kdtree_map_initialized_ && !kdtree_unk_initialized_)
+  if (!kdtree_map_initialized_ || !kdtree_unk_initialized_)
   {
-    ROS_WARN("Run the mapper");
+    ROS_WARN("Run the mapper or decrease the filter limits of the unkown space when taking off (the kdtree_unk_ have "
+             "to have some point to run replanCB)");
+
     return;
   }
   if (!goal_click_initialized_)
@@ -400,7 +441,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   if (dist_to_goal < GOAL_RADIUS && status_ != GOAL_REACHED)
   {
     status_ = GOAL_REACHED;
-    printf("STATUS=GOAL_REACHED\n");
+    // printf("STATUS=GOAL_REACHED\n");
   }
   // printf("Entering in replanCB, planner_status_=%d\n", planner_status_);
   if (status_ == GOAL_SEEN || status_ == GOAL_REACHED || planner_status_ == REPLANNED || status_ == YAWING)
@@ -451,6 +492,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
     first_time = false;
     solvedjps2 = solvedjps1;
     JPS2 = JPS1;
+    JPS_old_ = JPS1;
     solvedjps2 = true;  // only the first time
     // printf("I'm in first time\n");
   }
@@ -485,17 +527,47 @@ void CVX::replanCB(const ros::TimerEvent& e)
     clearJPSPathVisualization(1);
     // printf("publishing");
     publishJPSPath(JPS1, 1);
-    // printf("after\n");
 
+    // printf("after\n");
+    bool thereIsIntersection = false;
+    // printf("before\n");
+    Eigen::Vector3d inters1 = getFirstCollisionJPS(JPS_old_, &thereIsIntersection);  // intersection starting from start
+    if (thereIsIntersection)
+    {
+      // printf("after\n");
+      clearJPSPathVisualization(2);
+      vec_Vecf<3> tmp = JPS_old_;
+      std::reverse(tmp.begin(), tmp.end());                                       // flip all the vector
+      Eigen::Vector3d inters2 = getFirstCollisionJPS(tmp, &thereIsIntersection);  // intersection starting from the goal
+      // publishJPS2handIntersection(JPS_old_, inters1, inters2);
+
+      bool solvedJPS2 = solveJPS3D(inters1, inters2, JPS2);  // Solution saved in JPS2
+      if (solvedJPS2 == false)
+      {
+        printf("**************Couldn't find solution to JPS2 Bueno***********");
+      }
+      publishJPS2handIntersection(JPS_old_, JPS2, inters1, inters2);
+    }
+    else
+    {
+      JPS2 = JPS_old_;
+    }
+
+    JPS_old_ = JPS1;
+
+    // printf("******************1\n");
     B1 = getFirstIntersectionWithSphere(JPS1, ra, state_pos, &li1);
+    // printf("******************1***********\n");
     B1km1 = B1;
   }
 
   if (solvedjps2 == true)
   {
-    clearJPSPathVisualization(2);
-    publishJPSPath(JPS2, 2);
+    // clearJPSPathVisualization(2);
+    // publishJPSPath(JPS2, 2);
+    // printf("******************2\n");
     B2 = getFirstIntersectionWithSphere(JPS2, ra, state_pos, &li2);
+    // printf("******************2***********\n");
   }
 
   if (solvedjps1 == false || solvedjps2 == false)
@@ -563,11 +635,11 @@ void CVX::replanCB(const ros::TimerEvent& e)
     }
   }
 
-  printf("hola9\n");
+  // printf("hola9\n");
   //  if (need_to_decide == true && have_seen_the_goal1 == false)
   if (1)
   {
-    printf("**************Computing costs to decide between 2 jerk trajectories\n");
+    // printf("**************Computing costs to decide between 2 jerk trajectories\n");
     if (found_one_1)
     {
       JPrimj1 = solver_jerk_.getCost();
@@ -621,8 +693,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
         JPrimv2 = solveVelAndGetCost(WP2);
         J2 = JPrimj2 + JPrimv2 + JDist2;
 
-        printf("  JPrimj1    JPrimj2    JPrimv1    JPrimv2    JDista1    JDista2  \n");
-        printf("%10.1f,%10.1f,%10.1f,%10.1f,%10.1f,%10.1f\n", JPrimj1, JPrimj2, JPrimv1, JPrimv2, JDist1, JDist2);
+        // printf("  JPrimj1    JPrimj2    JPrimv1    JPrimv2    JDista1    JDista2  \n");
+        // printf("%10.1f,%10.1f,%10.1f,%10.1f,%10.1f,%10.1f\n", JPrimj1, JPrimj2, JPrimv1, JPrimv2, JDist1, JDist2);
 
         break;
       }
@@ -640,14 +712,14 @@ void CVX::replanCB(const ros::TimerEvent& e)
   if (have_seen_the_goal1 || have_seen_the_goal2)
   {
     status_ = GOAL_SEEN;  // I've found a free path that ends in the goal
-    printf("CHANGED TO GOAL_SEEN********\n");
+    // printf("CHANGED TO GOAL_SEEN********\n");
     if (have_seen_the_goal1)
     {
-      printf("1 saw the goal\n");
+      // printf("1 saw the goal\n");
     }
     if (have_seen_the_goal2)
     {
-      printf("2 saw the goal\n");
+      // printf("2 saw the goal\n");
     }
   }
 
@@ -655,13 +727,13 @@ void CVX::replanCB(const ros::TimerEvent& e)
   {
     U_temp_ = U_temp1;
     X_temp_ = X_temp1;
-    printf("Copying Xtemp1\n");
+    // printf("Copying Xtemp1\n");
   }
   else if (have_seen_the_goal2)
   {
     U_temp_ = U_temp2;
     X_temp_ = X_temp2;
-    printf("Copying Xtemp2\n");
+    // printf("Copying Xtemp2\n");
   }
   else  // I reach this point also when need_to_decide==false, and noone has seen the goal
   {
@@ -671,9 +743,9 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   optimized_ = true;
   planner_status_ = REPLANNED;
-  printf("ReplanCB: planner_status_ = REPLANNED\n");
+  // printf("ReplanCB: planner_status_ = REPLANNED\n");
   pubTraj(X_temp_);
-  printf("replanCB finished\n");
+  // printf("replanCB finished\n");
   // ROS_WARN("solve time: %0.2f ms", 1000 * (ros::Time::now().toSec() - then));
   // printf("Time in replanCB %0.2f ms\n", 1000 * (ros::Time::now().toSec() - t0replanCB));
 }
@@ -1121,7 +1193,7 @@ void CVX::clearMarkerSetOfArrows()
 
 void CVX::frontierCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 {
-  printf("In FrontierCB\n");
+  // printf("In FrontierCB\n");
   if (pcl2ptr_msg->width == 0 || pcl2ptr_msg->height == 0)  // Point Cloud is empty (this happens at the beginning)
   {
     return;
@@ -1240,20 +1312,76 @@ void CVX::mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 // Unkwown  CB
 void CVX::unkCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 {
+  // printf("in unkCB\n");
   if (pcl2ptr_msg->width == 0 || pcl2ptr_msg->height == 0)  // Point Cloud is empty (this happens at the beginning)
   {
     return;
   }
-  mtx_unk.lock();
-  pcl::fromROSMsg(*pcl2ptr_msg, *pclptr_unk_);
+
+  pcl::PointCloud<pcl::PointXYZ>::Ptr cloudIn(new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::fromROSMsg(*pcl2ptr_msg, *cloudIn);
   std::vector<int> index;
-  pcl::removeNaNFromPointCloud(*pclptr_unk_, *pclptr_unk_, index);
-  if (pclptr_unk_->size() == 0)
+  pcl::removeNaNFromPointCloud(*cloudIn, *cloudIn, index);
+  if (cloudIn->size() == 0)
   {
     return;
   }
-  kdtree_unk_.setInputCloud(pclptr_unk_);
-  kdtree_unk_initialized_ = 1;
+
+  mtx_unk.lock();
+  // If the drone is nos flying/taking of/..., let's remove a box around it so that it can take off.
+  if (flight_mode_.mode == flight_mode_.LAND || flight_mode_.mode == flight_mode_.TAKEOFF ||
+      flight_mode_.mode == flight_mode_.NOT_FLYING || flight_mode_.mode == flight_mode_.INIT)
+  {
+    printf("inside\n");
+    // TODO A box filter would be better, I don't know why it doesn't work...
+    /*
+        // if the drone is not flying, remove a bounding box of side=3 m around the drone to ensure that it can take off
+        // Note that this is not visualized in the point cloud
+        float l = 4;
+        Eigen::Vector4f minPoint;
+        minPoint[0] = state_.pos.x - l;  // define minimum point x
+        minPoint[1] = state_.pos.y - l;  // define minimum point y
+        minPoint[2] = state_.pos.z - l;  // define minimum point z
+        minPoint[3] = 1;
+        Eigen::Vector4f maxPoint;
+        maxPoint[0] = state_.pos.x + l;  // define maximum point x
+        maxPoint[1] = state_.pos.y + l;  // define maximum point y
+        maxPoint[2] = state_.pos.z + l;  // define maximum point z
+        maxPoint[3] = 1;
+
+        std::cout << minPoint << std::endl;
+        std::cout << maxPoint << std::endl;
+
+        // pcl::PointCloud<pcl::PointXYZ>::Ptr cloudOut(new pcl::PointCloud<pcl::PointXYZ>);
+
+        pcl::CropBox<pcl::PointXYZ> cropFilter;
+
+        cropFilter.setMin(minPoint);
+        cropFilter.setMax(maxPoint);
+        cropFilter.setInputCloud(cloudIn);
+        cropFilter.filter(*pclptr_unk_);*/
+
+    // printf("Size before=%d", cloudIn->points.size());
+    pcl::PassThrough<pcl::PointXYZ> pass;
+    pass.setInputCloud(cloudIn);
+    pass.setFilterFieldName("z");
+    pass.setFilterLimits(-1, 1.5);       // TODO: Change this hand-coded values
+    pass.setFilterLimitsNegative(true);  // Forget the unknown space between z=-1 and z=3
+    pass.filter(*pclptr_unk_);
+
+    // printf("Size after=%d", pclptr_unk_->points.size());
+    if (pclptr_unk_->points.size() != 0)
+    {
+      kdtree_unk_.setInputCloud(pclptr_unk_);
+      kdtree_unk_initialized_ = 1;
+    }
+  }
+  else
+  {  // when the drone is flying
+
+    kdtree_unk_.setInputCloud(cloudIn);
+    kdtree_unk_initialized_ = 1;
+  }
   mtx_unk.unlock();
 }
 
@@ -1268,7 +1396,7 @@ bool CVX::trajIsFree(Eigen::MatrixXd X)
   // TODO: maybe there is a more efficient way to do this (sampling only some points of X?)
   if (((X.col(2)).array() < 0).any() == true)  // If there is some z < 0. Note that in eigen, first_index=0
   {
-    printf("Collision with the ground \n");
+    // printf("Collision with the ground \n");
     // std::cout << X.col(3) << std::endl << std::endl;
     return false;  // There is a collision with the ground
   }
@@ -1336,6 +1464,7 @@ bool CVX::trajIsFree(Eigen::MatrixXd X)
     std::vector<float> dist2_unk(n);  // squared distance
 
     mtx_unk.lock();
+    printf("here!\n");
     if (kdtree_unk_.nearestKSearch(pcl_search_point, n, id_unk, dist2_unk) > 0)
     {
       if (sqrt(dist2_unk[0]) < r)
@@ -1371,6 +1500,103 @@ bool CVX::trajIsFree(Eigen::MatrixXd X)
 
   // mtx.unlock();
   return true;  // It's free!
+}
+
+// Returns the first collision of JPS with the obstacles
+Eigen::Vector3d CVX::getFirstCollisionJPS(vec_Vecf<3> path, bool* thereIsIntersection)
+{
+  vec_Vecf<3> original = path;
+  // vec_Vecf<3> path_behind;
+  // printf("In getFirstCollisionJPS\n");
+  Eigen::Vector3d first_element = path[0];
+  Eigen::Vector3d inters = path[0];
+  Eigen::Vector3d n_obst;  // nearest obstacle
+  pcl::PointXYZ pcl_search_point = eigenPoint2pclPoint(path[0]);
+
+  Eigen::Vector3d result;
+
+  // occupied (map)
+  int n = 1;
+  std::vector<int> id_map(n);
+  std::vector<float> dist2_map(n);  // squared distance
+  double r = 1000000;
+  // printElementsOfJPS(path);
+  // printf("In 2\n");
+
+  mtx_map.lock();
+  int el_eliminated = 0;  // number of elements eliminated
+  while (path.size() > 0)
+  {
+    pcl_search_point = eigenPoint2pclPoint(path[0]);
+
+    if (kdtree_map_.nearestKSearch(pcl_search_point, n, id_map, dist2_map) > 0)
+    {
+      r = sqrt(dist2_map[0]);
+      // pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr = kdtree_map_.getInputCloud();
+      // n_obst << ptr->points[id_map[0]].x, ptr->points[id_map[0]].y, ptr->points[id_map[0]].z;
+
+      // r is now the distance to the nearest obstacle
+
+      if (r < 0.1)  // there is a collision of the JPS path and an obstacle
+      {
+        printf("Collision detected");  // We will return the search_point
+        // pubJPSIntersection(inters);
+        // inters = path[0];  // path[0] is the search_point I'm using.
+        *thereIsIntersection = true;
+
+        // now let's compute the point taking into account INFLATION_JPS
+        vec_Vecf<3> tmp = original;
+        tmp.erase(tmp.begin() + el_eliminated + 1, tmp.end());
+        std::reverse(tmp.begin(), tmp.end());
+        tmp.insert(tmp.begin(), path[0]);
+
+        result = getFirstIntersectionWithSphere(
+            tmp, 1.1 * INFLATION_JPS, tmp[0]);  // 1.1 to make sure that  JPS is going to work when I run it again
+
+        break;
+      }
+
+      // Find the next eig_search_point
+      int last_id;  // this is the last index inside the sphere
+
+      bool no_points_outside_sphere = false;
+
+      inters = getFirstIntersectionWithSphere(path, r, path[0], &last_id, &no_points_outside_sphere);
+      // printf("**********Found it*****************\n");
+      if (no_points_outside_sphere == true)
+      {  // JPS doesn't intersect with any obstacle
+        // printf("JPS provided doesn't intersect any obstacles\n");
+        // printf("Returning the first element of the path you gave me\n");
+        result = first_element;
+        break;
+      }
+      // printf("In 4\n");
+
+      // Remove all the points of the path whose id is <= to last_id:
+      path.erase(path.begin(), path.begin() + last_id + 1);
+      el_eliminated = el_eliminated + last_id;
+      // and add the intersection as the first point of the path
+      path.insert(path.begin(), inters);
+    }
+    else
+    {
+      // printf("JPS provided doesn't intersect any obstacles\n");
+      // printf("Returning the first element of the path you gave me\n");
+      result = first_element;
+      break;
+    }
+  }
+  mtx_map.unlock();
+
+  return result;
+}
+
+void CVX::pubJPSIntersection(Eigen::Vector3d inters)
+{
+  geometry_msgs::PointStamped p;
+  p.header.frame_id = "world";
+  p.point = eigen2point(inters);
+  pub_jps_inters_.publish(p);
 }
 
 // TODO: the mapper receives a depth map and converts it to a point cloud. Why not receiving directly the point cloud?
@@ -1505,7 +1731,7 @@ void CVX::pubActualTraj()
   visualization_msgs::Marker m;
   m.type = visualization_msgs::Marker::ARROW;
   m.action = visualization_msgs::Marker::ADD;
-  m.id = actual_trajID_;
+  m.id = actual_trajID_ % 1000;  // Start the id again after 300 points published (if not RVIZ goes very slow)
   actual_trajID_++;
   m.color = color(GREEN);
   m.scale.x = 0.02;
@@ -1688,7 +1914,6 @@ Eigen::Vector3d CVX::projectClickedGoal(Eigen::Vector3d P1)
   if ((P2[0] < x_max && P2[0] > x_min) && (P2[1] < y_max && P2[1] > y_min) && (P2[2] < z_max && P2[2] > z_min))
   {
     // Clicked goal is inside the map
-    printf("Clicked goal is inside the map\n");
     return P2;
   }
   Eigen::Vector3d inters;
@@ -1725,7 +1950,7 @@ Eigen::Vector3d CVX::projectClickedGoal(Eigen::Vector3d P1)
         if (kdtree_frontier_.nearestKSearch(searchPoint, N, id, pointNKNSquaredDistance) > 0)
         {
           inters = Eigen::Vector3d(ptr->points[id[0]].x, ptr->points[id[0]].y, ptr->points[id[0]].z);
-          printf("Found nearest neighbour\n");
+          // printf("Found nearest neighbour\n");
         }
         mtx_frontier.unlock();
         pubTerminalGoal();
