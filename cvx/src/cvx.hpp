@@ -116,7 +116,7 @@ private:
   Eigen::Vector3d projectClickedGoal(Eigen::Vector3d P1);
 
   void publishJPS2handIntersection(vec_Vecf<3> JPS2, vec_Vecf<3> JPS2_fix, Eigen::Vector3d inter1,
-                                   Eigen::Vector3d inter2);
+                                   Eigen::Vector3d inter2, bool solvedFix);
 
   vec_Vecf<3> fix(vec_Vecf<3> JPS_old);
 

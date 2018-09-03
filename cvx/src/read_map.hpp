@@ -34,12 +34,13 @@ public:
 
     // printf("In reader2\n");
 
-    dim[0] = dim[0] + 10 * (inflation * 1.0) / res;
-    dim[1] = dim[1] + 10 * (inflation * 1.0) / res;
+    dim[0] = dim[0] + (int)(50 * (inflation * 1.0) / res);
+    dim[1] = dim[1] + (int)(50 * (inflation * 1.0) / res);
 
     int dim2_down = dim[2] / 2.0;
     int dim2_up = dim[2] / 2.0;
 
+    printf("reading_map1\n");
     if (center_map[2] - res * dim[2] / 2.0 < 0)
     {
       // printf("modyfing");
@@ -69,6 +70,7 @@ public:
     // origin_(2) = (or2 < z_ground) ? z_ground : origin_(2);
     // dim[2] = (or2 < z_ground) ? (int)((center_map[2] - z_ground) / res + dim[2] / 2.0) : dim[2];
     // printf("reading_map3\n");
+    printf("reading_map2\n");
     for (unsigned int i = 0; i < 3; i++)
     {
       dim_(i) = dim[i];
@@ -80,11 +82,12 @@ public:
 
     // printf("*******Dim_ is\n");
     // std::cout << dim_ << std::endl;
-
+    printf("reading_map3\n");
     resolution_ = res;
     data_.resize(dim[0] * dim[1] * dim[2], 0);
+    int total_size = dim[0] * dim[1] * dim[2];
     // printf("In reader3, size=%f, %f, %f\n", dim[0], dim[1], dim[2]);
-    // printf("reading_map5\n");
+    printf("reading_map4\n");
     for (size_t i = 0; i < pclptr->points.size(); ++i)
     {
       // Let's find the cell coordinates of the point expresed in a system of coordinates that has as origin the (minX,
@@ -111,12 +114,15 @@ public:
                 std::cout << "XYZ=" << pclptr->points[i].x << ", " << pclptr->points[i].y << ", " << pclptr->points[i].z
                           << std::endl;*/
       }
-      data_[id] = 100;
+      if (id >= 0 && id < total_size)
+      {
+        data_[id] = 100;
+      }
 
       // now let's inflate the voxels around that point
-      int m = (int)(inflation / res);
+      int m = (int)floor((inflation / res));
       // m is the amount of cells to inflate in each direction
-      int total_size = dim[0] * dim[1] * dim[2];
+
       for (int ix = x - m; ix <= x + m; ix++)
       {
         for (int iy = y - m; iy <= y + m; iy++)
