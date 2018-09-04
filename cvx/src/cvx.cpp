@@ -302,7 +302,7 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f start, Vec3f goal, bool* solved)
     // std::cout << "distances" << distances << std::endl;
     if ((distances < INFLATION_JPS).all() == true)
     {
-      printf("The start is hitting an inflated obstacle, JPS won't work\n");
+      printf("The START is hitting an inflated obstacle or the ground, JPS won't work\n");
       printf("I'm going to try to fix it for you: Start= near point in the opposite direction\n");
 
       std::vector<int> idxR;
@@ -318,40 +318,48 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f start, Vec3f goal, bool* solved)
           force = force + (start - obs).normalized();
         }
       }
-      std::cout << "force=" << force.transpose() << std::endl;
+
+      // std::cout << "force=" << force.transpose() << std::endl;
       start = start + (INFLATION_JPS + 2 * RES) * (force.normalized());
-
-      /*      std::cout << "Old start\n" << start.transpose() << std::endl;
-            // Eigen::Vector3d obstacle;
-            // pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr = kdtree_map_.getInputCloud();
-            // obstacle << ptr->points[id_map1[0]].x, ptr->points[id_map1[0]].y, ptr->points[id_map1[0]].z;
-            // std::cout << "Obstacle\n" << obstacle.transpose() << std::endl;
-            // start = obstacle + (INFLATION_JPS + 2 * RES) * ((start - obstacle).normalized());  // 2*RES just to make
-         sure
-            // std::cout << "New start\n" << start.transpose() << std::endl;
-            // std::cout << "Distance from new start to the obstacle\n" << (start - obstacle).norm() << std::endl;
-
-            pcl::PointXYZ pcl_new_start = eigenPoint2pclPoint(start);
-            std::vector<int> id_map3(1);
-            std::vector<float> dist2_map3(1);  // squared distance
-            if (kdtree_map_.nearestKSearch(pcl_new_start, 1, id_map3, dist2_map3) > 0)
-            {
-              std::cout << "Nearest obstacle now is at d=" << sqrt(dist2_map3[0]) << std::endl;
-            }*/
+      if (start[2] < Z_ground)
+      {
+        start[2] = Z_ground + 2 * RES;
+      }
     }
-    printf("Out1\n");
   }
 
-  printf("Out2\n");
   std::vector<int> id_map2(1);
   std::vector<float> dist2_map2(1);  // squared distance
   if (kdtree_map_.nearestKSearch(pcl_goal, 1, id_map2, dist2_map2) > 0)
   {
     double r = sqrt(dist2_map2[0]);
     // printf("nearest obstacle for goal is at d=%f\n", r);
-    if (r < INFLATION_JPS)
+    Eigen::Vector3d n_obs;  // nearest obstacle
+    pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr = kdtree_map_.getInputCloud();
+    n_obs << ptr->points[id_map2[0]].x, ptr->points[id_map2[0]].y, ptr->points[id_map2[0]].z;
+
+    Eigen::Array3d distances = ((n_obs - goal).array()).abs();  // distances in each component to the nearest obstacle
+
+    if ((distances < INFLATION_JPS).all() == true)
     {
-      printf("The goal is hitting an inflated obstacle, JPS won't work\n");
+      printf("The GOAL is hitting an inflated obstacle, JPS won't work\n");
+      printf("I'm going to try to fix it for you: GOAL= near point in the opposite direction\n");
+      printf("If the new goal falls outside the map, it won't work neither\n");
+
+      std::vector<int> idxR;
+      std::vector<float> r2D;  // squared distance
+      Eigen::Vector3d force(0, 0, 0);
+      pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr = kdtree_map_.getInputCloud();
+
+      if (kdtree_map_.radiusSearch(pcl_goal, 2 * INFLATION_JPS, idxR, r2D) > 0)  // This is an approximation
+      {
+        for (size_t i = 0; i < idxR.size(); ++i)
+        {
+          Eigen::Vector3d obs(ptr->points[idxR[i]].x, ptr->points[idxR[i]].y, ptr->points[idxR[i]].z);
+          force = force + (start - obs).normalized();
+        }
+      }
+      goal = goal + (INFLATION_JPS + 2 * RES) * (force.normalized());
     }
   }
   printf("Out3\n");
@@ -597,7 +605,7 @@ vec_Vecf<3> CVX::fix(vec_Vecf<3> JPS_old, Eigen::Vector3d start, Eigen::Vector3d
 void CVX::replanCB(const ros::TimerEvent& e)
 {
   printf("In replanCB0\n");
-  // double t0replanCB = ros::Time::now().toSec();
+  double t0replanCB = ros::Time::now().toSec();
   Eigen::Vector3d state_pos(state_.pos.x, state_.pos.y, state_.pos.z);  // Local copy of state
   term_goal_ = projectClickedGoal(state_pos);
   // printf("In replanCB0.1\n");
@@ -816,8 +824,11 @@ void CVX::replanCB(const ros::TimerEvent& e)
         JPrimv2 = solveVelAndGetCost(WP2);
         J2 = JPrimj2 + JPrimv2 + JDist2;
 
-        printf("  JPrimj1    JPrimj2    JPrimv1    JPrimv2    JDista1    JDista2  \n");
-        printf("%10.1f,%10.1f,%10.1f,%10.1f,%10.1f,%10.1f\n", JPrimj1, JPrimj2, JPrimv1, JPrimv2, JDist1, JDist2);
+        printf("J1=        JPrimj1    +JPrimv1   +JDista1   \n");
+        printf("%10.1f=,%10.1f,%10.1f,%10.1f\n", J1, JPrimj1, JPrimv1, JDist1);
+
+        printf("J2=        JPrimj2    +JPrimv2   +JDista2   \n");
+        printf("%10.1f=,%10.1f,%10.1f,%10.1f\n", J2, JPrimj2, JPrimv2, JDist2);
 
         break;
       }
@@ -846,7 +857,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
     }
   }
 
-  if (have_seen_the_goal1 || need_to_decide == false || 1)
+  if (have_seen_the_goal1 || need_to_decide == false)
   {
     U_temp_ = U_temp1;
     X_temp_ = X_temp1;
@@ -859,6 +870,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
     U_temp_ = U_temp2;
     X_temp_ = X_temp2;
     JPS_old_ = JPS2;
+    printf("choosing 2");
     // printf("Copying Xtemp2\n");
   }
   else
@@ -868,12 +880,14 @@ void CVX::replanCB(const ros::TimerEvent& e)
       U_temp_ = U_temp1;
       X_temp_ = X_temp1;
       JPS_old_ = JPS1;
+      printf("choosing 1");
     }
     else
     {
       U_temp_ = U_temp2;
       X_temp_ = X_temp2;
       JPS_old_ = JPS2;
+      printf("choosing 2");
     }
   }
 
@@ -883,7 +897,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   pubTraj(X_temp_);
   // printf("replanCB finished\n");
   // ROS_WARN("solve time: %0.2f ms", 1000 * (ros::Time::now().toSec() - then));
-  // printf("Time in replanCB %0.2f ms\n", 1000 * (ros::Time::now().toSec() - t0replanCB));
+  printf("************Time in replanCB %0.2f ms\n", 1000 * (ros::Time::now().toSec() - t0replanCB));
 }
 
 double CVX::solveVelAndGetCost(vec_Vecf<3> path)
@@ -1030,8 +1044,8 @@ void CVX::pubCB(const ros::TimerEvent& e)
     if ((planner_status_ == REPLANNED && (k_ > k_initial_cond_)))
     {  // I've published what I planned --> plan again
        // printf("Rejecting current plan, planning again. Suggestion: Increase the offset\n");
-       // planner_status_ = START_REPLANNING;
-       // printf("pubCB: planner_status_ = START_REPLANNING\n");
+      // planner_status_ = START_REPLANNING;
+      // printf("pubCB: planner_status_ = START_REPLANNING\n");
       printf("k_ > k_initial_cond_\n");
     }
 
@@ -1567,7 +1581,7 @@ bool CVX::trajIsFree(Eigen::MatrixXd X)
   mtx_map.lock();
   mtx_unk.lock();
   mtx_inst.lock();
-  printf("*************************************\n");
+  // printf("*************************************\n");
   while (last_i < X.rows() - 1)
   {
     printf("Inside the loop, last_i=%d\n", last_i);
