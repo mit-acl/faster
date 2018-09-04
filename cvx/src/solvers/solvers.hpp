@@ -29,6 +29,7 @@ public:
   double getDTInitial();
   int getOrder();
   int getN();
+  void setDC(double dc);
 
 protected:
   Eigen::MatrixXd U_temp_;
@@ -42,6 +43,7 @@ protected:
   double v_max_;
   double a_max_;
   double j_max_;
+  double DC;
 };
 
 // Definitions of the functions of the template of the class Solver. They are in this file because Template definitions
@@ -81,6 +83,12 @@ template <int INPUT_ORDER>
 int Solver<INPUT_ORDER>::getN()
 {
   return N_;
+}
+
+template <int INPUT_ORDER>
+void Solver<INPUT_ORDER>::setDC(double dc)
+{
+  DC = dc;
 }
 
 // it obtains the variable with degree=degree_input+1

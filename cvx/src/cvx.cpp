@@ -38,21 +38,59 @@
 #include <algorithm>
 #include <vector>
 
-#define OFFSET                                                                                                         \
-  5  // Replanning offset (the initial conditions are taken OFFSET states farther from the last published goal)
-
-#define Ra 2.0             // [m] Radius of the first sphere
-#define Rb 6.0             // [m] Radius of the second sphere
-#define W_MAX 1            // [rd/s] Maximum angular velocity
-#define alpha_0 1          //[rd] threshold to ignore current JPS solution, and consider the old one
-#define Z_ground 0         //[m] points below this are considered ground
-#define INFLATION_JPS 0.8  //[m] The obstacles are inflated (to run JPS) by this amount
-
 using namespace JPS;
 
 CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pub_CB)
   : nh_(nh), nh_replan_CB_(nh_replan_CB), nh_pub_CB_(nh_pub_CB)
 {
+  ros::param::param<double>("~wdx", par_.wdx, 20.0);
+  ros::param::param<double>("~wdy", par_.wdy, 20.0);
+  ros::param::param<double>("~wdz", par_.wdz, 4.0);
+  ros::param::param<double>("~res", par_.res, 0.15);
+
+  ros::param::param<double>("~dc", par_.dc, 0.01);
+  ros::param::param<double>("~goal_radius", par_.goal_radius, 0.2);
+  ros::param::param<double>("~drone_radius", par_.drone_radius, 0.15);
+
+  ros::param::param<int>("~offset", par_.offset, 5);
+
+  ros::param::param<double>("~Ra", par_.Ra, 2.0);
+  ros::param::param<double>("~Rb", par_.Rb, 6.0);
+  ros::param::param<double>("~w_max", par_.w_max, 1.0);
+  ros::param::param<double>("~alpha_0", par_.alpha_0, 1.0);
+  ros::param::param<double>("~z_ground", par_.z_ground, 0.0);
+  ros::param::param<double>("~inflation_jps", par_.inflation_jps, 0.8);
+
+  ros::param::param<double>("~v_max", par_.v_max, 2.0);
+  ros::param::param<double>("~a_max", par_.a_max, 2.0);
+  ros::param::param<double>("~j_max", par_.j_max, 10.0);
+
+  /*wdx: 20.0  #[m] world dimension in x
+  wdy: 20.0  #[m] world dimension in y
+  wdz: 4.0   #[m] world dimension in z
+  res: 0.15  #[m] cell dimension
+
+
+  dc: 0.01            #(seconds) Duration for the interpolation=Value of the timer pubGoal
+  goal_radius: 0.2    #(m) Drone has arrived to the goal when distance_to_goal<par_.goal_radius
+  par_.par_.drone_radius: 0.15  #(m) Used for collision checking
+
+
+  offset: 5  # Replanning offset (the initial conditions are taken par_.offset states farther from the last published
+  goal)
+
+  par_.Ra: 2.0             # [m] par_.Radius of the first sphere
+  Rb: 6.0             # [m] par_.Radius of the second sphere
+  w_max: 1            # [rd/s] Maximum angular velocity
+  alpha_0: 1          #[rd] threshold to ignore current JPS solution, and consider the old one
+  z_ground: 0         #[m] points below this are considered ground
+  par_.inflation_jps: 0.8  #[m] The obstacles are inflated (to run JPS) by this amount
+
+
+  par_.v_max: 2.0   #[m/s]
+  par_.a_max: 2.0   #[m/s2]
+  par_.j_max: 10.0  #[m/s3]*/
+
   optimized_ = false;
   flight_mode_.mode = flight_mode_.NOT_FLYING;
 
@@ -80,9 +118,9 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   sub_frontier_ = nh_.subscribe("frontier_grid", 1, &CVX::frontierCB, this);
   sub_pcl_ = nh_.subscribe("pcloud", 1, &CVX::pclCB, this);
 
-  pubCBTimer_ = nh_pub_CB_.createTimer(ros::Duration(DC), &CVX::pubCB, this);
+  pubCBTimer_ = nh_pub_CB_.createTimer(ros::Duration(par_.dc), &CVX::pubCB, this);
 
-  replanCBTimer_ = nh_replan_CB.createTimer(ros::Duration(2 * DC), &CVX::replanCB, this);
+  replanCBTimer_ = nh_replan_CB.createTimer(ros::Duration(2 * par_.dc), &CVX::replanCB, this);
 
   bool ff;
   ros::param::param<bool>("~use_ff", ff, false);
@@ -120,9 +158,13 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
 
   markerID_ = 0;
 
-  cells_x_ = (int)WDX / RES;
-  cells_y_ = (int)WDY / RES;
-  cells_z_ = (int)WDZ / RES;
+  cells_x_ = (int)par_.wdx / par_.res;
+  cells_y_ = (int)par_.wdy / par_.res;
+  cells_z_ = (int)par_.wdz / par_.res;
+
+  solver_vel_.setDC(par_.dc);
+  solver_accel_.setDC(par_.dc);
+  solver_jerk_.setDC(par_.dc);
 
   // pcl::PointCloud<pcl::PointXYZ>::Ptr tmp(new pcl::PointCloud<pcl::PointXYZ>);
   // pclptr_map_ = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
@@ -248,7 +290,7 @@ void CVX::updateJPSMap(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr)
   Vec3i dim(cells_x_, cells_y_, cells_z_);                     //  number of cells in each dimension
   // printf("Before reader\n");
 
-  MapReader<Vec3i, Vec3f> reader(pclptr, dim, RES, center_map, Z_ground, INFLATION_JPS);  // Map read
+  MapReader<Vec3i, Vec3f> reader(pclptr, dim, par_.res, center_map, par_.z_ground, par_.inflation_jps);  // Map read
   // std::shared_ptr<VoxelMapUtil> map_util = std::make_shared<VoxelMapUtil>();
   // printf("Before setMap\n");
   mtx_jps_map_util.lock();
@@ -268,7 +310,7 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f start, Vec3f goal, bool* solved)
   // Vec3f center_map = start;                 // position of the drone
   // Read the pointcloud
 
-  // MapReader<Vec3i, Vec3f> reader(pclptr, dim, RES, center_map, Z_ground, DRONE_RADIUS);  // Map read
+  // MapReader<Vec3i, Vec3f> reader(pclptr, dim, par_.res, center_map, par_.z_ground, par_.drone_radius);  // Map read
 
   // std::shared_ptr<VoxelMapUtil> map_util = std::make_shared<VoxelMapUtil>();
 
@@ -300,7 +342,7 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f start, Vec3f goal, bool* solved)
         std::cout << "start" << start.transpose() << std::endl;*/
 
     // std::cout << "distances" << distances << std::endl;
-    if ((distances < INFLATION_JPS).all() == true)
+    if ((distances < par_.inflation_jps).all() == true)
     {
       printf("The START is hitting an inflated obstacle or the ground, JPS won't work\n");
       printf("I'm going to try to fix it for you: Start= near point in the opposite direction\n");
@@ -310,7 +352,7 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f start, Vec3f goal, bool* solved)
       Eigen::Vector3d force(0, 0, 0);
       pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr = kdtree_map_.getInputCloud();
 
-      if (kdtree_map_.radiusSearch(pcl_start, 2 * INFLATION_JPS, idxR, r2D) > 0)  // This is an approximation
+      if (kdtree_map_.radiusSearch(pcl_start, 2 * par_.inflation_jps, idxR, r2D) > 0)  // This is an approximation
       {
         for (size_t i = 0; i < idxR.size(); ++i)
         {
@@ -320,10 +362,10 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f start, Vec3f goal, bool* solved)
       }
 
       // std::cout << "force=" << force.transpose() << std::endl;
-      start = start + (INFLATION_JPS + 2 * RES) * (force.normalized());
-      if (start[2] < Z_ground)
+      start = start + (par_.inflation_jps + 2 * par_.res) * (force.normalized());
+      if (start[2] < par_.z_ground)
       {
-        start[2] = Z_ground + 2 * RES;
+        start[2] = par_.z_ground + 2 * par_.res;
       }
     }
   }
@@ -340,7 +382,7 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f start, Vec3f goal, bool* solved)
 
     Eigen::Array3d distances = ((n_obs - goal).array()).abs();  // distances in each component to the nearest obstacle
 
-    if ((distances < INFLATION_JPS).all() == true)
+    if ((distances < par_.inflation_jps).all() == true)
     {
       printf("The GOAL is hitting an inflated obstacle, JPS won't work\n");
       printf("I'm going to try to fix it for you: GOAL= near point in the opposite direction\n");
@@ -351,7 +393,7 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f start, Vec3f goal, bool* solved)
       Eigen::Vector3d force(0, 0, 0);
       pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr = kdtree_map_.getInputCloud();
 
-      if (kdtree_map_.radiusSearch(pcl_goal, 2 * INFLATION_JPS, idxR, r2D) > 0)  // This is an approximation
+      if (kdtree_map_.radiusSearch(pcl_goal, 2 * par_.inflation_jps, idxR, r2D) > 0)  // This is an approximation
       {
         for (size_t i = 0; i < idxR.size(); ++i)
         {
@@ -359,20 +401,20 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f start, Vec3f goal, bool* solved)
           force = force + (start - obs).normalized();
         }
       }
-      goal = goal + (INFLATION_JPS + 2 * RES) * (force.normalized());
+      goal = goal + (par_.inflation_jps + 2 * par_.res) * (force.normalized());
 
       // Check if it falls outside the map
       Eigen::Vector3d rel(goal[0] - state_.pos.x, goal[1] - state_.pos.y, goal[2] - state_.pos.z);
-      goal[0] = (rel[0] > WDX / 2 - 2 * RES) ? state_.pos.x + WDX / 2 - 2 * RES : goal[0];
-      goal[1] = (rel[1] > WDY / 2 - 2 * RES) ? state_.pos.y + WDY / 2 - 2 * RES : goal[1];
-      goal[2] = (rel[2] > WDZ / 2 - 2 * RES) ? state_.pos.z + WDZ / 2 - 2 * RES : goal[2];
-      goal[0] = (rel[0] < -WDX / 2 + 2 * RES) ? state_.pos.x - WDX / 2 + 2 * RES : goal[0];
-      goal[1] = (rel[1] > -WDY / 2 + 2 * RES) ? state_.pos.y - WDY / 2 + 2 * RES : goal[1];
-      goal[2] = (rel[2] > -WDZ / 2 + 2 * RES) ? state_.pos.z - WDZ / 2 + 2 * RES : goal[2];
+      goal[0] = (rel[0] > par_.wdx / 2 - 2 * par_.res) ? state_.pos.x + par_.wdx / 2 - 2 * par_.res : goal[0];
+      goal[1] = (rel[1] > par_.wdy / 2 - 2 * par_.res) ? state_.pos.y + par_.wdy / 2 - 2 * par_.res : goal[1];
+      goal[2] = (rel[2] > par_.wdz / 2 - 2 * par_.res) ? state_.pos.z + par_.wdz / 2 - 2 * par_.res : goal[2];
+      goal[0] = (rel[0] < -par_.wdx / 2 + 2 * par_.res) ? state_.pos.x - par_.wdx / 2 + 2 * par_.res : goal[0];
+      goal[1] = (rel[1] > -par_.wdy / 2 + 2 * par_.res) ? state_.pos.y - par_.wdy / 2 + 2 * par_.res : goal[1];
+      goal[2] = (rel[2] > -par_.wdz / 2 + 2 * par_.res) ? state_.pos.z - par_.wdz / 2 + 2 * par_.res : goal[2];
 
-      if (goal[2] < Z_ground)
+      if (goal[2] < par_.z_ground)
       {
-        goal[2] = goal[2] + 2 * RES;
+        goal[2] = goal[2] + 2 * par_.res;
       }
     }
   }
@@ -396,13 +438,12 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f start, Vec3f goal, bool* solved)
   {
     double dt_jps = time_jps.Elapsed().count();
     // printf("JPS Planner takes: %f ms\n", dt_jps);
-    // printf("JPS Path Distance: %f\n", total_distance3f(planner_ptr->getPath()));  // getRawPath() if you want the
-    // path with more corners (not "cleaned")
-    // printf("JPS Path: \n");
+    // printf("JPS Path Distance: %f\n", total_distance3f(planner_ptr->getPath()));  // getpar_.RawPath() if you want
+    // the path with more corners (not "cleaned") printf("JPS Path: \n");
 
     // printf("after cleaning:\n");
     // printElementsOfJPS(path);
-    path = planner_ptr_->getPath();  // getRawPath() if you want the path with more corners (not "cleaned")
+    path = planner_ptr_->getPath();  // getpar_.RawPath() if you want the path with more corners (not "cleaned")
     path[0] = start;
     path[path.size() - 1] = goal;  // force to start and end in the start and goal (and not somewhere in the voxel)
 
@@ -427,9 +468,9 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f start, Vec3f goal, bool* solved)
  bool valid_astar = planner_ptr->plan(start, goal, 1, false);  // Plan from start to goal using A*
  double dt_astar = time_astar.Elapsed().count();
  printf("AStar Planner takes: %f ms\n", dt_astar);
- printf("AStar Path Distance: %f\n", total_distance3f(planner_ptr->getRawPath()));
+ printf("AStar Path Distance: %f\n", total_distance3f(planner_ptr->getpar_.RawPath()));
  printf("AStar Path: \n");
- auto path_astar = planner_ptr->getRawPath();
+ auto path_astar = planner_ptr->getpar_.RawPath();
  for (const auto& it : path_astar)
    std::cout << it.transpose() << std::endl;
 */
@@ -520,11 +561,11 @@ void CVX::goalCB(const acl_msgs::TermGoal& msg)
 
 void CVX::yaw(double diff, acl_msgs::QuadGoal& quad_goal)
 {
-  saturate(diff, -DC * W_MAX, DC * W_MAX);
+  saturate(diff, -par_.dc * par_.w_max, par_.dc * par_.w_max);
   if (diff > 0)
-    quad_goal.dyaw = W_MAX;
+    quad_goal.dyaw = par_.w_max;
   else
-    quad_goal.dyaw = -W_MAX;
+    quad_goal.dyaw = -par_.w_max;
   quad_goal.yaw += diff;
 }
 
@@ -618,6 +659,8 @@ vec_Vecf<3> CVX::fix(vec_Vecf<3> JPS_old, Eigen::Vector3d start, Eigen::Vector3d
 
 void CVX::replanCB(const ros::TimerEvent& e)
 {
+  printf("Goal Radius=%f\n", par_.goal_radius);
+
   printf("In replanCB0\n");
   double t0replanCB = ros::Time::now().toSec();
   Eigen::Vector3d state_pos(state_.pos.x, state_.pos.y, state_.pos.z);  // Local copy of state
@@ -644,13 +687,13 @@ void CVX::replanCB(const ros::TimerEvent& e)
   double dist_to_goal = (term_goal - state_pos).norm();
 
   // 0.96 and 0.98 are to ensure that ra<rb<dist_to_goal always
-  double ra = std::min(0.96 * dist_to_goal, Ra);  // radius of the sphere Sa
-  double rb = std::min(0.98 * dist_to_goal, Rb);  // radius of the sphere Sb
+  double ra = std::min(0.96 * dist_to_goal, par_.Ra);  // radius of the sphere Sa
+  double rb = std::min(0.98 * dist_to_goal, par_.Rb);  // radius of the sphere Sb
 
   /*  std::cout << "rb=" << rb << std::endl;*/
   // std::cout << "dist_to_goal=" << dist_to_goal << std::endl;
 
-  if (dist_to_goal < GOAL_RADIUS && status_ != GOAL_REACHED)
+  if (dist_to_goal < par_.goal_radius && status_ != GOAL_REACHED)
   {
     status_ = GOAL_REACHED;
     // printf("STATUS=GOAL_REACHED\n");
@@ -734,7 +777,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
     printf("hola5\n");
     if (X_initialized_)  // Needed to skip the first time (X_ still not initialized)
     {
-      k_initial_cond_ = std::min(k_ + OFFSET, (int)(X_.rows() - 1));
+      k_initial_cond_ = std::min(k_ + par_.offset, (int)(X_.rows() - 1));
       updateInitialCond(k_initial_cond_);
     }
     //////SOLVING FOR JERK
@@ -748,7 +791,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
     solver_jerk_.set_xf(xf);
     solver_jerk_.set_x0(x0);
     // printf("hola6\n");
-    double max_values[3] = { V_MAX, A_MAX, J_MAX };
+    double max_values[3] = { par_.v_max, par_.a_max, par_.j_max };
     solver_jerk_.set_max(max_values);
     solver_jerk_.genNewTraj();
     U_temp1 = solver_jerk_.getU();
@@ -765,7 +808,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
       // printf("found free1\n");
       found_one_1 = true;
       double dist = (term_goal - p).norm();
-      have_seen_the_goal1 = (dist < GOAL_RADIUS) ? true : false;
+      have_seen_the_goal1 = (dist < par_.goal_radius) ? true : false;
 
       C1 = getLastIntersectionWithSphere(JPS1, rb, state_pos, &JDist1);
       pubPlanningVisual(state_pos, ra, rb, B1, C1);
@@ -774,7 +817,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
             std::cout << "uno\n" << B1 - state_pos << std::endl;
             std::cout << "dos\n" << B2 - state_pos << std::endl;*/
 
-      if (alpha <= alpha_0)
+      if (alpha <= par_.alpha_0)
       {
         need_to_decide = false;
       }
@@ -808,7 +851,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
     {
       if (X_initialized_)  // Needed to skip the first time (X_ still not initialized)
       {
-        k_initial_cond_ = std::min(k_ + OFFSET, (int)(X_.rows() - 1));
+        k_initial_cond_ = std::min(k_ + par_.offset, (int)(X_.rows() - 1));
         updateInitialCond(k_initial_cond_);
       }
 
@@ -822,7 +865,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
       mtx_goals.unlock();
       solver_jerk_.set_xf(xf);
       solver_jerk_.set_x0(x0);
-      double max_values[3] = { V_MAX, A_MAX, J_MAX };
+      double max_values[3] = { par_.v_max, par_.a_max, par_.j_max };
       solver_jerk_.set_max(max_values);
       solver_jerk_.genNewTraj();
       U_temp2 = solver_jerk_.getU();
@@ -837,7 +880,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
         printf("found free2\n");
         found_one_2 = true;
         double dist = (term_goal - p).norm();
-        have_seen_the_goal1 = (dist < GOAL_RADIUS) ? true : false;
+        have_seen_the_goal1 = (dist < par_.goal_radius) ? true : false;
 
         C2 = getLastIntersectionWithSphere(JPS2, rb, state_pos, &JDist2);
         pubPlanningVisual(state_pos, ra, rb, B2, C2);
@@ -943,7 +986,7 @@ double CVX::solveVelAndGetCost(vec_Vecf<3> path)
     // double u0[3] = { initialCond_.vel.x, initialCond_.vel.y, initialCond_.vel.z };
     solver_vel_.set_xf(xf);
     solver_vel_.set_x0(x0);
-    double max_values[1] = { V_MAX };
+    double max_values[1] = { par_.v_max };
     solver_vel_.set_max(max_values);
     // solver_vel_.set_u0(u0);
     solver_vel_.genNewTraj();
@@ -959,21 +1002,21 @@ void CVX::modeCB(const acl_msgs::QuadFlightMode& msg)
   {
     // Solver Vel
     /*    double xf[6] = { quadGoal_.pos.x, quadGoal_.pos.y, z_land_ };
-        double max_values[1] = { V_MAX };
+        double max_values[1] = { par_.v_max };
         solver_vel_.set_max(max_values);  // TODO: To land, I use u_min_
         solver_vel_.set_xf(xf);
         solver_vel_.genNewTraj();*/
 
     // Solver Accel
     /*    double xf[6] = { quadGoal_.pos.x, quadGoal_.pos.y, z_land_, 0, 0, 0 };
-        double max_values[2] = { V_MAX, A_MAX };
+        double max_values[2] = { par_.v_max, par_.a_max };
         solver_accel_.set_max(max_values);  // TODO: To land, I use u_min_
         solver_accel_.set_xf(xf);
         solver_accel_.genNewTraj();*/
 
     // Solver Jerk
     double xf[9] = { quadGoal_.pos.x, quadGoal_.pos.y, z_land_, 0, 0, 0, 0, 0, 0 };
-    double max_values[3] = { V_MAX, A_MAX, J_MAX };
+    double max_values[3] = { par_.v_max, par_.a_max, par_.j_max };
     solver_jerk_.set_max(max_values);  // TODO: To land, I use u_min_
     solver_jerk_.set_xf(xf);
     solver_jerk_.genNewTraj();
@@ -1089,7 +1132,7 @@ void CVX::pubCB(const ros::TimerEvent& e)
     }
 
     k_ = std::min(k_, (int)(X_.rows() - 1));
-    int kp1 = std::min(k_ + OFFSET, (int)(X_.rows() - 1));  // k plus offset
+    int kp1 = std::min(k_ + par_.offset, (int)(X_.rows() - 1));  // k plus offset
 
     quadGoal_.pos = getPos(k_);
     quadGoal_.vel = getVel(k_);
@@ -1680,7 +1723,7 @@ bool CVX::trajIsFree(Eigen::MatrixXd X)
     // printf("In 4\n");
 
     // Now r is the distance to the nearest obstacle (considering unknown space as obstacles)
-    if (r < DRONE_RADIUS)  // || r_map < INFLATION_JPS
+    if (r < par_.drone_radius)  // || r_map < par_.inflation_jps
     {
       // printf("There is a collision with i=%d out of X.rows=%d\n", last_i, X.rows() - 1);
       pubintersecPoint(intersectionPoint, true);
@@ -1756,19 +1799,20 @@ Eigen::Vector3d CVX::getFirstCollisionJPS(vec_Vecf<3> path, bool* thereIsInterse
               // inters = path[0];  // path[0] is the search_point I'm using.
               *thereIsIntersection = true;
 
-              // now let's compute the point taking into account INFLATION_JPS
+              // now let's compute the point taking into account par_.inflation_jps
               vec_Vecf<3> tmp = original;
               tmp.erase(tmp.begin() + el_eliminated + 1, tmp.end());
               std::reverse(tmp.begin(), tmp.end());
               tmp.insert(tmp.begin(), path[0]);
 
               result = getFirstIntersectionWithSphere(
-                  tmp, 2 * INFLATION_JPS, tmp[0]);  // 1.1 to make sure that  JPS is going to work when I run it again
+                  tmp, 2 * par_.inflation_jps, tmp[0]);  // 1.1 to make sure that  JPS is going to work when I run it
+         again
 
               break;
             }*/
 
-      if (r < INFLATION_JPS)  // collision of the JPS path and an inflated obstacle --> take last search point
+      if (r < par_.inflation_jps)  // collision of the JPS path and an inflated obstacle --> take last search point
       {
         // printf("Collision detected");  // We will return the search_point
         // pubJPSIntersection(inters);
@@ -1861,8 +1905,8 @@ Eigen::Vector3d CVX::computeForce(Eigen::Vector3d x, Eigen::Vector3d g)
   }
 
   // Compute repulsive force
-  std::vector<int> id;                 // pointIdxRadiusSearch
-  std::vector<float> sd;               // pointRadiusSquaredDistance
+  std::vector<int> id;                 // pointIdxpar_.RadiusSearch
+  std::vector<float> sd;               // pointpar_.RadiusSquaredDistance
   pcl::PointXYZ sp(x[0], x[1], x[2]);  // searchPoint=x
   mtx_map.lock();
   pcl::KdTree<pcl::PointXYZ>::PointCloudConstPtr cloud_ptr = kdtree_map_.getInputCloud();
@@ -1955,7 +1999,7 @@ void CVX::pubActualTraj()
   Eigen::Vector3d t_goal = term_goal_;
   float dist_to_goal = (t_goal - act_pos).norm();
 
-  if (dist_to_goal < 2 * GOAL_RADIUS)
+  if (dist_to_goal < 2 * par_.goal_radius)
   {
     return;
   }
@@ -2090,7 +2134,7 @@ void CVX::pubintersecPoint(Eigen::Vector3d p, bool add)
       solver_vel_.set_x0(x0);
       printf("x0 is %f, %f, %f\n", x0[0], x0[1], x0[2]);
       printf("xf is %f, %f, %f\n", xf_sphere[0], xf_sphere[1], xf_sphere[2]);
-      double max_values[1] = { V_MAX };
+      double max_values[1] = { par_.v_max };
       solver_vel_.set_max(max_values);
       //solver_vel_.set_u0(u0);
       solver_vel_.genNewTraj();
@@ -2110,7 +2154,7 @@ void CVX::pubintersecPoint(Eigen::Vector3d p, bool add)
       mtx_goals.unlock();
       solver_accel_.set_xf(xf_sphere);
       solver_accel_.set_x0(x0);
-      double max_values[2] = { V_MAX, A_MAX };
+      double max_values[2] = { par_.v_max, par_.a_max };
       solver_accel_.set_max(max_values);
       //solver_accel_.set_u0(u0);
       solver_accel_.genNewTraj();
@@ -2136,12 +2180,12 @@ Eigen::Vector3d CVX::projectClickedGoal(Eigen::Vector3d P1)
   //[px1, py1, pz1] is inside the map (it's the center of the map, where the drone is)
   //[px2, py2, pz2] is outside the map
   Eigen::Vector3d P2 = term_term_goal_;
-  double x_max = P1[0] + WDX / 2;
-  double x_min = P1[0] - WDX / 2;
-  double y_max = P1[1] + WDY / 2;
-  double y_min = P1[1] - WDY / 2;
-  double z_max = P1[2] + WDZ / 2;
-  double z_min = P1[2] - WDZ / 2;
+  double x_max = P1[0] + par_.wdx / 2;
+  double x_min = P1[0] - par_.wdx / 2;
+  double y_max = P1[1] + par_.wdy / 2;
+  double y_min = P1[1] - par_.wdy / 2;
+  double z_max = P1[2] + par_.wdz / 2;
+  double z_min = P1[2] - par_.wdz / 2;
 
   if ((P2[0] < x_max && P2[0] > x_min) && (P2[1] < y_max && P2[1] > y_min) && (P2[2] < z_max && P2[2] > z_min))
   {

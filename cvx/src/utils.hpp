@@ -5,11 +5,6 @@
 #include <std_msgs/ColorRGBA.h>
 #include <geometry_msgs/Vector3.h>
 #include <geometry_msgs/Point.h>
-// TODO: This values should be the same as the global_mapper.yaml
-#define WDX 20.0  //[m] world dimension in x
-#define WDY 20.0  //[m] world dimension in y
-#define WDZ 4.0   //[m] world dimension in z
-#define RES 0.15  //[m] cell dimension
 
 #define RED 1
 #define RED_TRANS 2
@@ -22,16 +17,8 @@
 #define YELLOW 9
 #define ORANGE_TRANS 10
 
-#define DC 0.01            //(seconds) Duration for the interpolation=Value of the timer pubGoal
-#define GOAL_RADIUS 0.2    //(m) Drone has arrived to the goal when distance_to_goal<GOAL_RADIUS
-#define DRONE_RADIUS 0.15  //(m) Used for collision checking
-
 #define STATE 0
 #define INPUT 1
-
-#define V_MAX 2
-#define A_MAX 2
-#define J_MAX 10
 
 #define POS 0
 #define VEL 1

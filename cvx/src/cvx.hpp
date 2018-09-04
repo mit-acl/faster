@@ -43,6 +43,30 @@ struct kdTreeStamped
   ros::Time time;
 };
 
+struct parameteres
+{
+  double wdx;
+  double wdy;
+  double wdz;
+  double res;
+
+  double dc;
+  double goal_radius;
+  double drone_radius;
+
+  int offset;
+  double Ra;
+  double Rb;
+  double w_max;
+  double alpha_0;
+  double z_ground;
+  double inflation_jps;
+
+  double v_max;
+  double a_max;
+  double j_max;
+};
+
 //####Class CVX
 class CVX
 {
@@ -153,6 +177,8 @@ private:
   ros::Subscriber sub_frontier_;
   ros::Timer pubCBTimer_;
   ros::Timer replanCBTimer_;
+
+  parameteres par_;  // where all the parameteres are
 
   tf2_ros::Buffer tf_buffer_;
   tf2_ros::TransformListener* tfListener;

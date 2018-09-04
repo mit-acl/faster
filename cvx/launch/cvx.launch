@@ -4,10 +4,13 @@
 
 	<node ns="$(arg quad)" name="cvx" pkg="cvx" type="cvx_node" output="screen" clear_params="true">
 
-        <param name="~u_max" value="2.0" type="double"/>
+    <rosparam file="$(find cvx)/param/cvx.yaml" command="load"/>
+
+
+<!--         <param name="~u_max" value="2.0" type="double"/>
         <param name="~u_min" value="0.3" type="double"/>
         <param name="~use_ff" value="false" type="bool"/>
-        <param name="~z_land" value="0.02" type="double"/>
+        <param name="~z_land" value="0.02" type="double"/> -->
 
         <!-- Subscriptions -->
 		<remap from="~state" to="state"/>
