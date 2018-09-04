@@ -34,8 +34,8 @@ public:
 
     // printf("In reader2\n");
 
-    dim[0] = dim[0] + (int)(50 * (inflation * 1.0) / res);
-    dim[1] = dim[1] + (int)(50 * (inflation * 1.0) / res);
+    dim[0] = dim[0] + (int)(2 * (inflation * 1.0) / res);
+    dim[1] = dim[1] + (int)(2 * (inflation * 1.0) / res);
 
     int dim2_down = dim[2] / 2.0;
     int dim2_up = dim[2] / 2.0;

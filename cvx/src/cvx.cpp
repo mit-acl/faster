@@ -39,7 +39,7 @@
 #include <vector>
 
 #define OFFSET                                                                                                         \
-  10  // Replanning offset (the initial conditions are taken OFFSET states farther from the last published goal)
+  5  // Replanning offset (the initial conditions are taken OFFSET states farther from the last published goal)
 
 #define Ra 2.0             // [m] Radius of the first sphere
 #define Rb 6.0             // [m] Radius of the second sphere
@@ -360,6 +360,20 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f start, Vec3f goal, bool* solved)
         }
       }
       goal = goal + (INFLATION_JPS + 2 * RES) * (force.normalized());
+
+      // Check if it falls outside the map
+      Eigen::Vector3d rel(goal[0] - state_.pos.x, goal[1] - state_.pos.y, goal[2] - state_.pos.z);
+      goal[0] = (rel[0] > WDX / 2 - 2 * RES) ? state_.pos.x + WDX / 2 - 2 * RES : goal[0];
+      goal[1] = (rel[1] > WDY / 2 - 2 * RES) ? state_.pos.y + WDY / 2 - 2 * RES : goal[1];
+      goal[2] = (rel[2] > WDZ / 2 - 2 * RES) ? state_.pos.z + WDZ / 2 - 2 * RES : goal[2];
+      goal[0] = (rel[0] < -WDX / 2 + 2 * RES) ? state_.pos.x - WDX / 2 + 2 * RES : goal[0];
+      goal[1] = (rel[1] > -WDY / 2 + 2 * RES) ? state_.pos.y - WDY / 2 + 2 * RES : goal[1];
+      goal[2] = (rel[2] > -WDZ / 2 + 2 * RES) ? state_.pos.z - WDZ / 2 + 2 * RES : goal[2];
+
+      if (goal[2] < Z_ground)
+      {
+        goal[2] = goal[2] + 2 * RES;
+      }
     }
   }
   printf("Out3\n");
@@ -542,14 +556,14 @@ vec_Vecf<3> CVX::fix(vec_Vecf<3> JPS_old, Eigen::Vector3d start, Eigen::Vector3d
     // printf("Calling to fix from\n");
     // std::cout << inters1.transpose() << std::endl << "to" << inters2.transpose() << std::endl;
     fix = solveJPS3D(inters1, inters2, &solvedFix);
-    // printf("AQUI2\n");
+    printf("AQUI2\n");
 
     path_start2fix = solveJPS3D(start, inters1, &solvedStart2Fix);
 
-    // printf("AQUI3\n");
+    printf("AQUI3\n");
     path_fix2goal = solveJPS3D(inters2, goal, &solvedFix2Goal);
 
-    // printf("AQUI4\n");
+    printf("AQUI4\n");
 
     // printf("After calling solveJPSD\n");
     bool solved_complete_fix = solvedFix && solvedStart2Fix && solvedFix2Goal;
@@ -657,45 +671,37 @@ void CVX::replanCB(const ros::TimerEvent& e)
   bool need_to_decide = true;
   bool solvedjps1 = false, solvedjps2 = false;
 
-  int li1;  // last index inside the sphere of JPS1
-  int li2;  // last index inside the sphere of JPS2
+  int li1;    // last index inside the sphere of JPS1
+  int li2;    // last index inside the sphere of JPS2
+  int liold;  // last index inside the sphere of JPS2
 
   double J1 = 0, J2 = 0, JPrimj1 = 0, JPrimj2 = 0, JPrimv1 = 0, JPrimv2 = 0, JDist1 = 0, JDist2 = 0;
   J1 = std::numeric_limits<double>::max();
   J2 = std::numeric_limits<double>::max();
   Eigen::MatrixXd U_temp1, U_temp2, X_temp1, X_temp2;
 
-  // printf("hola1\n");
-
-  // static Eigen::Vector3d B1km1;  // B1km1 is B1 in t=t_k-1 (previous iteration)
-  Eigen::Vector3d B1, B2, C1, C2;
+  Eigen::Vector3d B1, B2, C1, C2, B_old;
   vec_Vecf<3> WP1, WP2;
-
-  // printf("hola2\n");
 
   vec_Vecf<3> JPS1;
   vec_Vecf<3> JPS2;
 
   static bool first_time = true;                         // how many times I've solved JPS1
   JPS1 = solveJPS3D(state_pos, term_goal, &solvedjps1);  // Solution is in JPS1
-  printf("Aqui5\n");
+  printf("Aqui89\n");
 
-  // printf("In replanCB3\n");
   if (first_time == true)
-  {  // B1km1 is still not initialized --> Run from
+  {
     first_time = false;
     solvedjps2 = solvedjps1;
     JPS2 = JPS1;
     JPS_old_ = JPS1;
     solvedjps2 = true;  // only the first time
-    // printf("I'm in first time\n");
   }
   else
   {
-    JPS2 = fix(JPS_old_, state_pos, term_goal, &solvedjps2);
   }
-  // printf("In replanCB4\n");
-  printf("Aqui6\n");
+
   if (solvedjps1 == true)
   {
     clearJPSPathVisualization(1);
@@ -707,12 +713,25 @@ void CVX::replanCB(const ros::TimerEvent& e)
     return;
   }
 
+  printf("Aqui90\n");
   B1 = getFirstIntersectionWithSphere(JPS1, ra, state_pos, &li1);
+  printf("Aqui91\n");
+  B_old = getFirstIntersectionWithSphere(JPS_old_, ra, state_pos, &liold);
+  printf("Aqui92\n");
+  // printElementsOfJPS(JPS1);
+
+  double alpha = angleBetVectors(B1 - state_pos, B_old - state_pos);
+
+  printf("Aqui92.5\n");
+  printElementsOfJPS(JPS1);
+
   std::vector<Eigen::Vector3d> K = samplePointsSphereWithJPS(B1, ra, state_pos, JPS1, li1);
+
+  printf("Aqui93\n");
 
   for (int i = 0; i < K.size(); i++)
   {
-    // printf("hola5\n");
+    printf("hola5\n");
     if (X_initialized_)  // Needed to skip the first time (X_ still not initialized)
     {
       k_initial_cond_ = std::min(k_ + OFFSET, (int)(X_.rows() - 1));
@@ -736,14 +755,14 @@ void CVX::replanCB(const ros::TimerEvent& e)
     X_temp1 = solver_jerk_.getX();
     //////SOLVED FOR JERK
 
-    printf("Calling IsFree 1\n");
+    // printf("Calling IsFree 1\n");
     bool isFree = trajIsFree(X_temp1);
 
     createMarkerSetOfArrows(X_temp1, isFree);
 
     if (isFree)
     {
-      printf("found free1\n");
+      // printf("found free1\n");
       found_one_1 = true;
       double dist = (term_goal - p).norm();
       have_seen_the_goal1 = (dist < GOAL_RADIUS) ? true : false;
@@ -755,10 +774,10 @@ void CVX::replanCB(const ros::TimerEvent& e)
             std::cout << "uno\n" << B1 - state_pos << std::endl;
             std::cout << "dos\n" << B2 - state_pos << std::endl;*/
 
-      /*      if (angleBetVectors(B1 - state_pos, B2 - state_pos) <= alpha_0)
-            {
-              need_to_decide = false;
-            }*/
+      if (alpha <= alpha_0)
+      {
+        need_to_decide = false;
+      }
       break;
     }
   }
@@ -766,7 +785,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   if (need_to_decide == true && have_seen_the_goal1 == false && solvedjps2 == true)
 
   {
-    // printf("**************Computing costs to decide between 2 jerk trajectories\n");
+    printf("**************Computing costs to decide between 2 jerk trajectories\n");
     if (found_one_1)
     {
       JPrimj1 = solver_jerk_.getCost();
@@ -777,8 +796,14 @@ void CVX::replanCB(const ros::TimerEvent& e)
       J1 = JPrimj1 + JPrimv1 + JDist1;
     }
 
+    printf("hola1\n");
+
+    JPS2 = fix(JPS_old_, state_pos, term_goal, &solvedjps2);
+
+    printf("hola2\n");
     B2 = getFirstIntersectionWithSphere(JPS2, ra, state_pos, &li2);
     K = samplePointsSphere(B2, ra, state_pos);  // radius, center and point
+    printf("hola3\n");
     for (int i = 0; i < K.size(); i++)
     {
       if (X_initialized_)  // Needed to skip the first time (X_ still not initialized)
@@ -834,6 +859,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
       }
     }
   }
+
   pub_trajs_sphere_.publish(trajs_sphere_);
 
   if (found_one_1 == false && found_one_2 == false)  // J1=J2=infinity
@@ -862,7 +888,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
     U_temp_ = U_temp1;
     X_temp_ = X_temp1;
     JPS_old_ = JPS1;
-    printf("choosing 1");
+    printf("choosing 1\n");
     // printf("Copying Xtemp1\n");
   }
   else if (have_seen_the_goal2)
@@ -870,7 +896,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
     U_temp_ = U_temp2;
     X_temp_ = X_temp2;
     JPS_old_ = JPS2;
-    printf("choosing 2");
+    printf("choosing 2\n");
     // printf("Copying Xtemp2\n");
   }
   else
@@ -880,14 +906,14 @@ void CVX::replanCB(const ros::TimerEvent& e)
       U_temp_ = U_temp1;
       X_temp_ = X_temp1;
       JPS_old_ = JPS1;
-      printf("choosing 1");
+      printf("choosing 1\n");
     }
     else
     {
       U_temp_ = U_temp2;
       X_temp_ = X_temp2;
       JPS_old_ = JPS2;
-      printf("choosing 2");
+      printf("choosing 2\n");
     }
   }
 
@@ -1549,8 +1575,10 @@ void CVX::unkCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 // previously-unknown voxels
 bool CVX::trajIsFree(Eigen::MatrixXd X)
 {
-  if (flight_mode_.mode == flight_mode_.LAND || flight_mode_.mode == flight_mode_.TAKEOFF ||
-      flight_mode_.mode == flight_mode_.NOT_FLYING || flight_mode_.mode == flight_mode_.INIT)
+  /*    if (flight_mode_.mode == flight_mode_.LAND || flight_mode_.mode == flight_mode_.TAKEOFF ||
+        flight_mode_.mode == flight_mode_.NOT_FLYING || flight_mode_.mode == flight_mode_.INIT)*/
+
+  if (flight_mode_.mode != flight_mode_.GO)
   {
     return true;
   }
@@ -1578,9 +1606,12 @@ bool CVX::trajIsFree(Eigen::MatrixXd X)
 
   // printf("later3\n");
   bool isfree = true;
+
+  double t0mutex = ros::Time::now().toSec();
   mtx_map.lock();
   mtx_unk.lock();
   mtx_inst.lock();
+  printf("************Time waiting for mutex %0.2f ms\n", 1000 * (ros::Time::now().toSec() - t0mutex));
   // printf("*************************************\n");
   while (last_i < X.rows() - 1)
   {
