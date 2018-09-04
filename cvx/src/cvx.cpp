@@ -290,7 +290,17 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f start, Vec3f goal, bool* solved)
   {
     double r = sqrt(dist2_map1[0]);
     // printf("nearest obstacle for start is at d=%f\n", r);
-    if (r < INFLATION_JPS)
+
+    Eigen::Vector3d n_obs;  // nearest obstacle
+    pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr = kdtree_map_.getInputCloud();
+    n_obs << ptr->points[id_map1[0]].x, ptr->points[id_map1[0]].y, ptr->points[id_map1[0]].z;
+
+    Eigen::Array3d distances = ((n_obs - start).array()).abs();  // distances in each component to the nearest obstacle
+    /*    std::cout << "n_obs" << n_obs.transpose() << std::endl;
+        std::cout << "start" << start.transpose() << std::endl;*/
+
+    // std::cout << "distances" << distances << std::endl;
+    if ((distances < INFLATION_JPS).all() == true)
     {
       printf("The start is hitting an inflated obstacle, JPS won't work\n");
       printf("I'm going to try to fix it for you: Start= near point in the opposite direction\n");
@@ -300,7 +310,7 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f start, Vec3f goal, bool* solved)
       Eigen::Vector3d force(0, 0, 0);
       pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr = kdtree_map_.getInputCloud();
 
-      if (kdtree_map_.radiusSearch(pcl_start, INFLATION_JPS, idxR, r2D) > 0)
+      if (kdtree_map_.radiusSearch(pcl_start, 2 * INFLATION_JPS, idxR, r2D) > 0)  // This is an approximation
       {
         for (size_t i = 0; i < idxR.size(); ++i)
         {
@@ -308,27 +318,31 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f start, Vec3f goal, bool* solved)
           force = force + (start - obs).normalized();
         }
       }
+      std::cout << "force=" << force.transpose() << std::endl;
       start = start + (INFLATION_JPS + 2 * RES) * (force.normalized());
 
-      std::cout << "Old start\n" << start.transpose() << std::endl;
-      // Eigen::Vector3d obstacle;
-      // pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr = kdtree_map_.getInputCloud();
-      // obstacle << ptr->points[id_map1[0]].x, ptr->points[id_map1[0]].y, ptr->points[id_map1[0]].z;
-      // std::cout << "Obstacle\n" << obstacle.transpose() << std::endl;
-      // start = obstacle + (INFLATION_JPS + 2 * RES) * ((start - obstacle).normalized());  // 2*RES just to make sure
-      // std::cout << "New start\n" << start.transpose() << std::endl;
-      // std::cout << "Distance from new start to the obstacle\n" << (start - obstacle).norm() << std::endl;
+      /*      std::cout << "Old start\n" << start.transpose() << std::endl;
+            // Eigen::Vector3d obstacle;
+            // pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr = kdtree_map_.getInputCloud();
+            // obstacle << ptr->points[id_map1[0]].x, ptr->points[id_map1[0]].y, ptr->points[id_map1[0]].z;
+            // std::cout << "Obstacle\n" << obstacle.transpose() << std::endl;
+            // start = obstacle + (INFLATION_JPS + 2 * RES) * ((start - obstacle).normalized());  // 2*RES just to make
+         sure
+            // std::cout << "New start\n" << start.transpose() << std::endl;
+            // std::cout << "Distance from new start to the obstacle\n" << (start - obstacle).norm() << std::endl;
 
-      pcl::PointXYZ pcl_new_start = eigenPoint2pclPoint(start);
-      std::vector<int> id_map3(1);
-      std::vector<float> dist2_map3(1);  // squared distance
-      if (kdtree_map_.nearestKSearch(pcl_new_start, 1, id_map3, dist2_map3) > 0)
-      {
-        std::cout << "Nearest obstacle now is at d=" << sqrt(dist2_map3[0]) << std::endl;
-      }
+            pcl::PointXYZ pcl_new_start = eigenPoint2pclPoint(start);
+            std::vector<int> id_map3(1);
+            std::vector<float> dist2_map3(1);  // squared distance
+            if (kdtree_map_.nearestKSearch(pcl_new_start, 1, id_map3, dist2_map3) > 0)
+            {
+              std::cout << "Nearest obstacle now is at d=" << sqrt(dist2_map3[0]) << std::endl;
+            }*/
     }
+    printf("Out1\n");
   }
 
+  printf("Out2\n");
   std::vector<int> id_map2(1);
   std::vector<float> dist2_map2(1);  // squared distance
   if (kdtree_map_.nearestKSearch(pcl_goal, 1, id_map2, dist2_map2) > 0)
@@ -340,17 +354,19 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f start, Vec3f goal, bool* solved)
       printf("The goal is hitting an inflated obstacle, JPS won't work\n");
     }
   }
+  printf("Out3\n");
 
   mtx_map.unlock();
 
   mtx_jps_map_util.lock();
   planner_ptr_->updateMap();
+  printf("Out4\n");
 
   Timer time_jps(true);
   // std::cout << "Planning from start=" << start << std::endl;
   bool valid_jps = planner_ptr_->plan(
       start, goal, 1, true);  // Plan from start to goal with heuristic weight=1, and using JPS (if false --> use A*)
-
+  printf("Out5\n");
   vec_Vecf<3> path;
   path.clear();
 
@@ -396,6 +412,7 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f start, Vec3f goal, bool* solved)
    std::cout << it.transpose() << std::endl;
 */
   // printf("Out of solveJPSD\n");
+  printf("Out6\n");
   return path;
 }
 
@@ -489,7 +506,7 @@ void CVX::yaw(double diff, acl_msgs::QuadGoal& quad_goal)
   quad_goal.yaw += diff;
 }
 
-vec_Vecf<3> CVX::fix(vec_Vecf<3> JPS_old, Eigen::Vector3d start, Eigen::Vector3d goal)
+vec_Vecf<3> CVX::fix(vec_Vecf<3> JPS_old, Eigen::Vector3d start, Eigen::Vector3d goal, bool* solved)
 {
   vec_Vecf<3> fix;
   bool thereIsIntersection = false;
@@ -517,29 +534,27 @@ vec_Vecf<3> CVX::fix(vec_Vecf<3> JPS_old, Eigen::Vector3d start, Eigen::Vector3d
     // printf("Calling to fix from\n");
     // std::cout << inters1.transpose() << std::endl << "to" << inters2.transpose() << std::endl;
     fix = solveJPS3D(inters1, inters2, &solvedFix);
+    // printf("AQUI2\n");
 
     path_start2fix = solveJPS3D(start, inters1, &solvedStart2Fix);
 
+    // printf("AQUI3\n");
     path_fix2goal = solveJPS3D(inters2, goal, &solvedFix2Goal);
 
+    // printf("AQUI4\n");
+
     // printf("After calling solveJPSD\n");
-    if (solvedFix == false)
+    bool solved_complete_fix = solvedFix && solvedStart2Fix && solvedFix2Goal;
+    if (solved_complete_fix == false)
     {
-      printf("**************Couldn't find Fix**********");
-    }
-
-    if (solvedStart2Fix == false)
-    {
-      printf("**************Couldn't find Start-->Fix**********");
-    }
-
-    if (solvedFix2Goal == false)
-    {
-      printf("**************Couldn't find Fix-->Goal**********");
+      printf("**************Couldn't find some part of the fixed path**********");
+      *solved = false;
     }
 
     else
     {
+      *solved = true;
+      printf("AQUI1\n");
       /*printf("solution found!\n");
       printf("El path deberia ir\n");
       std::cout << JPS_old[0].transpose() << "--->" << JPS_old[JPS_old.size() - 1].transpose();
@@ -556,7 +571,7 @@ vec_Vecf<3> CVX::fix(vec_Vecf<3> JPS_old, Eigen::Vector3d start, Eigen::Vector3d
       printElementsOfJPS(path_fix2goal);
       printf("***************Everything***************************\n");
       printElementsOfJPS(path_fixed);*/
-      publishJPS2handIntersection(JPS_old, path_fixed, inters1, inters2, solvedFix);
+      publishJPS2handIntersection(JPS_old, path_fixed, inters1, inters2, solved_complete_fix);
     }
 
     // printf("Before publishing\n");
@@ -569,15 +584,19 @@ vec_Vecf<3> CVX::fix(vec_Vecf<3> JPS_old, Eigen::Vector3d start, Eigen::Vector3d
 
   else
   {
+    *solved = true;
+    JPS_old[0] = start;
+    JPS_old[JPS_old.size() - 1] = goal;
     fix = JPS_old;
   }
   // printf("finisshing fix\n");
+
   return fix;
 }
 
 void CVX::replanCB(const ros::TimerEvent& e)
 {
-  // printf("In replanCB0\n");
+  printf("In replanCB0\n");
   // double t0replanCB = ros::Time::now().toSec();
   Eigen::Vector3d state_pos(state_.pos.x, state_.pos.y, state_.pos.z);  // Local copy of state
   term_goal_ = projectClickedGoal(state_pos);
@@ -618,7 +637,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   // printf("In replanCB0.4s\n");
   if (status_ == GOAL_SEEN || status_ == GOAL_REACHED || planner_status_ == REPLANNED || status_ == YAWING)
   {
-    // printf("No replanning needed because planner_status_=%d\n", planner_status_);
+    printf("No replanning needed because planner_status_=%d\n", planner_status_);
     return;
   }
 
@@ -651,6 +670,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   static bool first_time = true;                         // how many times I've solved JPS1
   JPS1 = solveJPS3D(state_pos, term_goal, &solvedjps1);  // Solution is in JPS1
+  printf("Aqui5\n");
 
   // printf("In replanCB3\n");
   if (first_time == true)
@@ -664,13 +684,12 @@ void CVX::replanCB(const ros::TimerEvent& e)
   }
   else
   {
-    JPS2 = fix(JPS_old_, state_pos, term_goal);
+    JPS2 = fix(JPS_old_, state_pos, term_goal, &solvedjps2);
   }
   // printf("In replanCB4\n");
-
+  printf("Aqui6\n");
   if (solvedjps1 == true)
   {
-    // printf("JPS1 found a solution\n");
     clearJPSPathVisualization(1);
     publishJPSPath(JPS1, 1);
   }
@@ -709,12 +728,14 @@ void CVX::replanCB(const ros::TimerEvent& e)
     X_temp1 = solver_jerk_.getX();
     //////SOLVED FOR JERK
 
+    printf("Calling IsFree 1\n");
     bool isFree = trajIsFree(X_temp1);
 
     createMarkerSetOfArrows(X_temp1, isFree);
 
     if (isFree)
     {
+      printf("found free1\n");
       found_one_1 = true;
       double dist = (term_goal - p).norm();
       have_seen_the_goal1 = (dist < GOAL_RADIUS) ? true : false;
@@ -726,84 +747,87 @@ void CVX::replanCB(const ros::TimerEvent& e)
             std::cout << "uno\n" << B1 - state_pos << std::endl;
             std::cout << "dos\n" << B2 - state_pos << std::endl;*/
 
-      if (angleBetVectors(B1 - state_pos, B2 - state_pos) <= alpha_0)
-      {
-        need_to_decide = false;
-      }
+      /*      if (angleBetVectors(B1 - state_pos, B2 - state_pos) <= alpha_0)
+            {
+              need_to_decide = false;
+            }*/
       break;
     }
   }
 
-  // printf("hola9\n");
-  //  if (need_to_decide == true && have_seen_the_goal1 == false)
-  /*  if (1)
+  if (need_to_decide == true && have_seen_the_goal1 == false && solvedjps2 == true)
+
+  {
+    // printf("**************Computing costs to decide between 2 jerk trajectories\n");
+    if (found_one_1)
     {
-      // printf("**************Computing costs to decide between 2 jerk trajectories\n");
-      if (found_one_1)
+      JPrimj1 = solver_jerk_.getCost();
+      WP1 = getPointsBw2Spheres(JPS1, ra, rb, state_pos);
+      WP1.insert(WP1.begin(), B1);
+      WP1.push_back(C1);
+      JPrimv1 = solveVelAndGetCost(WP1);
+      J1 = JPrimj1 + JPrimv1 + JDist1;
+    }
+
+    B2 = getFirstIntersectionWithSphere(JPS2, ra, state_pos, &li2);
+    K = samplePointsSphere(B2, ra, state_pos);  // radius, center and point
+    for (int i = 0; i < K.size(); i++)
+    {
+      if (X_initialized_)  // Needed to skip the first time (X_ still not initialized)
       {
-        JPrimj1 = solver_jerk_.getCost();
-        WP1 = getPointsBw2Spheres(JPS1, ra, rb, state_pos);
-        WP1.insert(WP1.begin(), B1);
-        WP1.push_back(C1);
-        JPrimv1 = solveVelAndGetCost(WP1);
-        J1 = JPrimj1 + JPrimv1 + JDist1;
+        k_initial_cond_ = std::min(k_ + OFFSET, (int)(X_.rows() - 1));
+        updateInitialCond(k_initial_cond_);
       }
-      K = samplePointsSphere(B2, ra, state_pos);  // radius, center and point
-      for (int i = 0; i < K.size(); i++)
+
+      //////SOLVING FOR JERK
+      Eigen::Vector3d p = K[i];
+      double xf[9] = { p[0], p[1], p[2], 0, 0, 0, 0, 0, 0 };
+      mtx_goals.lock();
+      double x0[9] = { initialCond_.pos.x,   initialCond_.pos.y,   initialCond_.pos.z,
+                       initialCond_.vel.x,   initialCond_.vel.y,   initialCond_.vel.z,
+                       initialCond_.accel.x, initialCond_.accel.y, initialCond_.accel.z };
+      mtx_goals.unlock();
+      solver_jerk_.set_xf(xf);
+      solver_jerk_.set_x0(x0);
+      double max_values[3] = { V_MAX, A_MAX, J_MAX };
+      solver_jerk_.set_max(max_values);
+      solver_jerk_.genNewTraj();
+      U_temp2 = solver_jerk_.getU();
+      X_temp2 = solver_jerk_.getX();
+      //////SOLVED FOR JERK
+
+      printf("Calling IsFree 2\n");
+      bool isFree = trajIsFree(X_temp2);
+      createMarkerSetOfArrows(X_temp2, isFree);
+      if (isFree)
       {
-        if (X_initialized_)  // Needed to skip the first time (X_ still not initialized)
-        {
-          k_initial_cond_ = std::min(k_ + OFFSET, (int)(X_.rows() - 1));
-          updateInitialCond(k_initial_cond_);
-        }
+        printf("found free2\n");
+        found_one_2 = true;
+        double dist = (term_goal - p).norm();
+        have_seen_the_goal1 = (dist < GOAL_RADIUS) ? true : false;
 
-        //////SOLVING FOR JERK
-        Eigen::Vector3d p = K[i];
-        double xf[9] = { p[0], p[1], p[2], 0, 0, 0, 0, 0, 0 };
-        mtx_goals.lock();
-        double x0[9] = { initialCond_.pos.x,   initialCond_.pos.y,   initialCond_.pos.z,
-                         initialCond_.vel.x,   initialCond_.vel.y,   initialCond_.vel.z,
-                         initialCond_.accel.x, initialCond_.accel.y, initialCond_.accel.z };
-        mtx_goals.unlock();
-        solver_jerk_.set_xf(xf);
-        solver_jerk_.set_x0(x0);
-        double max_values[3] = { V_MAX, A_MAX, J_MAX };
-        solver_jerk_.set_max(max_values);
-        solver_jerk_.genNewTraj();
-        U_temp2 = solver_jerk_.getU();
-        X_temp2 = solver_jerk_.getX();
-        //////SOLVED FOR JERK
+        C2 = getLastIntersectionWithSphere(JPS2, rb, state_pos, &JDist2);
+        pubPlanningVisual(state_pos, ra, rb, B2, C2);
+        pub_trajs_sphere_.publish(trajs_sphere_);
+        JPrimj2 = solver_jerk_.getCost();
+        WP2 = getPointsBw2Spheres(JPS2, ra, rb, state_pos);
+        WP2.insert(WP2.begin(), B2);
+        WP2.push_back(C2);
+        JPrimv2 = solveVelAndGetCost(WP2);
+        J2 = JPrimj2 + JPrimv2 + JDist2;
 
-        bool isFree = trajIsFree(X_temp1);
-        createMarkerSetOfArrows(X_temp1, isFree);
-        if (isFree)
-        {
-          found_one_2 = true;
-          double dist = (term_goal - p).norm();
-          have_seen_the_goal1 = (dist < GOAL_RADIUS) ? true : false;
+        printf("  JPrimj1    JPrimj2    JPrimv1    JPrimv2    JDista1    JDista2  \n");
+        printf("%10.1f,%10.1f,%10.1f,%10.1f,%10.1f,%10.1f\n", JPrimj1, JPrimj2, JPrimv1, JPrimv2, JDist1, JDist2);
 
-          C2 = getLastIntersectionWithSphere(JPS2, rb, state_pos, &JDist2);
-          pubPlanningVisual(state_pos, ra, rb, B2, C2);
-          pub_trajs_sphere_.publish(trajs_sphere_);
-          JPrimj2 = solver_jerk_.getCost();
-          WP2 = getPointsBw2Spheres(JPS2, ra, rb, state_pos);
-          WP2.insert(WP2.begin(), B2);
-          WP2.push_back(C2);
-          JPrimv2 = solveVelAndGetCost(WP2);
-          J2 = JPrimj2 + JPrimv2 + JDist2;
-
-          // printf("  JPrimj1    JPrimj2    JPrimv1    JPrimv2    JDista1    JDista2  \n");
-          // printf("%10.1f,%10.1f,%10.1f,%10.1f,%10.1f,%10.1f\n", JPrimj1, JPrimj2, JPrimv1, JPrimv2, JDist1, JDist2);
-
-          break;
-        }
+        break;
       }
-    }*/
+    }
+  }
   pub_trajs_sphere_.publish(trajs_sphere_);
 
   if (found_one_1 == false && found_one_2 == false)  // J1=J2=infinity
   {
-    ROS_ERROR("Unable to find a free traj");
+    ROS_ERROR("************Unable to find a free traj**************************");
     return;
   }
 
@@ -822,11 +846,12 @@ void CVX::replanCB(const ros::TimerEvent& e)
     }
   }
 
-  if (have_seen_the_goal1 || !need_to_decide || 1)
+  if (have_seen_the_goal1 || need_to_decide == false || 1)
   {
     U_temp_ = U_temp1;
     X_temp_ = X_temp1;
     JPS_old_ = JPS1;
+    printf("choosing 1");
     // printf("Copying Xtemp1\n");
   }
   else if (have_seen_the_goal2)
@@ -836,7 +861,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
     JPS_old_ = JPS2;
     // printf("Copying Xtemp2\n");
   }
-  else  // I reach this point also when need_to_decide==false, and noone has seen the goal
+  else
   {
     if (J1 <= J2)
     {
@@ -1447,60 +1472,62 @@ void CVX::unkCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
   }
 
   mtx_unk.lock();
-  // If the drone is nos flying/taking of/..., let's remove a box around it so that it can take off.
-  if (flight_mode_.mode == flight_mode_.LAND || flight_mode_.mode == flight_mode_.TAKEOFF ||
-      flight_mode_.mode == flight_mode_.NOT_FLYING || flight_mode_.mode == flight_mode_.INIT)
-  {
-    // printf("inside\n");
-    // TODO A box filter would be better, I don't know why it doesn't work...
-    /*
-        // if the drone is not flying, remove a bounding box of side=3 m around the drone to ensure that it can take off
-        // Note that this is not visualized in the point cloud
-        float l = 4;
-        Eigen::Vector4f minPoint;
-        minPoint[0] = state_.pos.x - l;  // define minimum point x
-        minPoint[1] = state_.pos.y - l;  // define minimum point y
-        minPoint[2] = state_.pos.z - l;  // define minimum point z
-        minPoint[3] = 1;
-        Eigen::Vector4f maxPoint;
-        maxPoint[0] = state_.pos.x + l;  // define maximum point x
-        maxPoint[1] = state_.pos.y + l;  // define maximum point y
-        maxPoint[2] = state_.pos.z + l;  // define maximum point z
-        maxPoint[3] = 1;
-
-        std::cout << minPoint << std::endl;
-        std::cout << maxPoint << std::endl;
-
-        // pcl::PointCloud<pcl::PointXYZ>::Ptr cloudOut(new pcl::PointCloud<pcl::PointXYZ>);
-
-        pcl::CropBox<pcl::PointXYZ> cropFilter;
-
-        cropFilter.setMin(minPoint);
-        cropFilter.setMax(maxPoint);
-        cropFilter.setInputCloud(cloudIn);
-        cropFilter.filter(*pclptr_unk_);*/
-
-    // printf("Size before=%d", cloudIn->points.size());
-    pcl::PassThrough<pcl::PointXYZ> pass;
-    pass.setInputCloud(cloudIn);
-    pass.setFilterFieldName("z");
-    pass.setFilterLimits(-1, 1.5);       // TODO: Change this hand-coded values
-    pass.setFilterLimitsNegative(true);  // Forget the unknown space between z=-1 and z=3
-    pass.filter(*pclptr_unk_);
-
-    // printf("Size after=%d", pclptr_unk_->points.size());
-    if (pclptr_unk_->points.size() != 0)
+  /*  // If the drone is nos flying/taking of/..., let's remove a box around it so that it can take off.
+    if (flight_mode_.mode == flight_mode_.LAND || flight_mode_.mode == flight_mode_.TAKEOFF ||
+        flight_mode_.mode == flight_mode_.NOT_FLYING || flight_mode_.mode == flight_mode_.INIT)
     {
-      kdtree_unk_.setInputCloud(pclptr_unk_);
-      kdtree_unk_initialized_ = 1;
-    }
-  }
-  else
-  {  // when the drone is flying
+      printf("removing unkown space to allow takeoff\n");
+      // printf("inside\n");
+      // TODO A box filter would be better, I don't know why it doesn't work...
 
-    kdtree_unk_.setInputCloud(cloudIn);
-    kdtree_unk_initialized_ = 1;
-  }
+          // if the drone is not flying, remove a bounding box of side=3 m around the drone to ensure that it can take
+    off
+          // Note that this is not visualized in the point cloud
+          float l = 4;
+          Eigen::Vector4f minPoint;
+          minPoint[0] = state_.pos.x - l;  // define minimum point x
+          minPoint[1] = state_.pos.y - l;  // define minimum point y
+          minPoint[2] = state_.pos.z - l;  // define minimum point z
+          minPoint[3] = 1;
+          Eigen::Vector4f maxPoint;
+          maxPoint[0] = state_.pos.x + l;  // define maximum point x
+          maxPoint[1] = state_.pos.y + l;  // define maximum point y
+          maxPoint[2] = state_.pos.z + l;  // define maximum point z
+          maxPoint[3] = 1;
+
+          std::cout << minPoint << std::endl;
+          std::cout << maxPoint << std::endl;
+
+          // pcl::PointCloud<pcl::PointXYZ>::Ptr cloudOut(new pcl::PointCloud<pcl::PointXYZ>);
+
+          pcl::CropBox<pcl::PointXYZ> cropFilter;
+
+          cropFilter.setMin(minPoint);
+          cropFilter.setMax(maxPoint);
+          cropFilter.setInputCloud(cloudIn);
+          cropFilter.filter(*pclptr_unk_);
+
+      // printf("Size before=%d", cloudIn->points.size());
+      pcl::PassThrough<pcl::PointXYZ> pass;
+      pass.setInputCloud(cloudIn);
+      pass.setFilterFieldName("z");
+      pass.setFilterLimits(-1, 1.5);       // TODO: Change this hand-coded values
+      pass.setFilterLimitsNegative(true);  // Forget the unknown space between z=-1 and z=3
+      pass.filter(*pclptr_unk_);
+
+      // printf("Size after=%d", pclptr_unk_->points.size());
+      if (pclptr_unk_->points.size() != 0)
+      {
+        kdtree_unk_.setInputCloud(pclptr_unk_);
+        kdtree_unk_initialized_ = 1;
+      }
+    }
+    else
+    {  // when the drone is flying*/
+
+  kdtree_unk_.setInputCloud(cloudIn);
+  kdtree_unk_initialized_ = 1;
+  //}
   mtx_unk.unlock();
 }
 
@@ -1508,6 +1535,12 @@ void CVX::unkCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 // previously-unknown voxels
 bool CVX::trajIsFree(Eigen::MatrixXd X)
 {
+  if (flight_mode_.mode == flight_mode_.LAND || flight_mode_.mode == flight_mode_.TAKEOFF ||
+      flight_mode_.mode == flight_mode_.NOT_FLYING || flight_mode_.mode == flight_mode_.INIT)
+  {
+    return true;
+  }
+
   // printf("********In trajIsFree\n");
   // std::cout << X << std::endl;
 
@@ -1515,7 +1548,7 @@ bool CVX::trajIsFree(Eigen::MatrixXd X)
   // TODO: maybe there is a more efficient way to do this (sampling only some points of X?)
   if (((X.col(2)).array() < 0).any() == true)  // If there is some z < 0. Note that in eigen, first_index=0
   {
-    // printf("Collision with the ground \n");
+    printf("Collision with the ground \n");
     // std::cout << X.col(3) << std::endl << std::endl;
     return false;  // There is a collision with the ground
   }
@@ -1530,24 +1563,31 @@ bool CVX::trajIsFree(Eigen::MatrixXd X)
   // printf("later2\n");
 
   // printf("later3\n");
+  bool isfree = true;
+  mtx_map.lock();
+  mtx_unk.lock();
+  mtx_inst.lock();
+  printf("*************************************\n");
   while (last_i < X.rows() - 1)
   {
-    // printf("Inside the loop, last_i=%d\n", last_i);
+    printf("Inside the loop, last_i=%d\n", last_i);
     // last point clouds
     std::vector<int> id_inst(n);
     std::vector<float> dist2_inst(n);  // squared distance
     pcl_search_point = eigenPoint2pclPoint(eig_search_point);
     Eigen::Vector3d intersectionPoint;
 
-    // printf("**********before the lock\n");
-    mtx_inst.lock();
-    // printf("after the lock\n");
+    // printf("**********before the lock inst\n");
+
+    // printf("after the lock inst\n");
     // printf("TisFree: MTX is locked\n");
 
     for (unsigned i = v_kdtree_new_pcls_.size() - 1; i < v_kdtree_new_pcls_.size() && i >= 0; ++i)
     {
+      // printf("Inside the loop\n");
       if (v_kdtree_new_pcls_[i].kdTree.nearestKSearch(pcl_search_point, n, id_inst, dist2_inst) > 0)
       {
+        // printf("Below\n");
         if (sqrt(dist2_inst[0]) < r)
         {
           r = sqrt(dist2_inst[0]);
@@ -1557,14 +1597,12 @@ bool CVX::trajIsFree(Eigen::MatrixXd X)
         // r = std::min(r, sqrt(dist2_inst[0]));
       }
     }
-    mtx_inst.unlock();
-
+    // printf("In 1\n");
     // double r_map = 100000;
     // occupied (map)
     std::vector<int> id_map(n);
     std::vector<float> dist2_map(n);  // squared distance
 
-    mtx_map.lock();
     if (kdtree_map_.nearestKSearch(pcl_search_point, n, id_map, dist2_map) > 0)
     {
       if (sqrt(dist2_map[0]) < r)
@@ -1574,7 +1612,7 @@ bool CVX::trajIsFree(Eigen::MatrixXd X)
         intersectionPoint << ptr->points[id_map[0]].x, ptr->points[id_map[0]].y, ptr->points[id_map[0]].z;
       }
     }
-    mtx_map.unlock();
+    // printf("In 2\n");
 
     /*    printf("TisFree MTX is unlocked\n");
         mtx.unlock();*/
@@ -1583,8 +1621,7 @@ bool CVX::trajIsFree(Eigen::MatrixXd X)
     std::vector<int> id_unk(n);
     std::vector<float> dist2_unk(n);  // squared distance
 
-    mtx_unk.lock();
-    // printf("here!\n");
+    // printf("In 3\n");
     if (kdtree_unk_.nearestKSearch(pcl_search_point, n, id_unk, dist2_unk) > 0)
     {
       if (sqrt(dist2_unk[0]) < r)
@@ -1594,17 +1631,19 @@ bool CVX::trajIsFree(Eigen::MatrixXd X)
         intersectionPoint << ptr->points[id_unk[0]].x, ptr->points[id_unk[0]].y, ptr->points[id_unk[0]].z;
       }
     }
-    mtx_unk.unlock();
+
+    // printf("In 4\n");
 
     // Now r is the distance to the nearest obstacle (considering unknown space as obstacles)
     if (r < DRONE_RADIUS)  // || r_map < INFLATION_JPS
     {
       // printf("There is a collision with i=%d out of X.rows=%d\n", last_i, X.rows() - 1);
       pubintersecPoint(intersectionPoint, true);
-      // mtx.unlock();
-      return false;  // There is a collision
+      isfree = false;
+      break;
     }
 
+    printf("In 5\n");
     // Find the next eig_search_point
     for (int i = last_i; i < X.rows(); i = i + 1)
     {
@@ -1617,17 +1656,22 @@ bool CVX::trajIsFree(Eigen::MatrixXd X)
       }
     }
   }
-
+  printf("In 6\n");
+  mtx_inst.unlock();
+  mtx_map.unlock();
+  mtx_unk.unlock();
+  printf("In 7\n");
+  printf("returning isFree=%d\n", isfree);
   // mtx.unlock();
-  return true;  // It's free!
+  return isfree;  // It's free!
 }
 
 // Returns the first collision of JPS with the obstacles
 Eigen::Vector3d CVX::getFirstCollisionJPS(vec_Vecf<3> path, bool* thereIsIntersection)
 {
   vec_Vecf<3> original = path;
-  printf("*****ORIGINAL******");
-  printElementsOfJPS(original);
+  /*  printf("*****ORIGINAL******");
+    printElementsOfJPS(original);*/
   // vec_Vecf<3> path_behind;
   // printf("In getFirstCollisionJPS\n");
   Eigen::Vector3d first_element = path[0];

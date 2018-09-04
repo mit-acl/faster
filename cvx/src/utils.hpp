@@ -22,9 +22,9 @@
 #define YELLOW 9
 #define ORANGE_TRANS 10
 
-#define DC 0.01           //(seconds) Duration for the interpolation=Value of the timer pubGoal
-#define GOAL_RADIUS 0.2   //(m) Drone has arrived to the goal when distance_to_goal<GOAL_RADIUS
-#define DRONE_RADIUS 0.3  //(m) Used for collision checking
+#define DC 0.01            //(seconds) Duration for the interpolation=Value of the timer pubGoal
+#define GOAL_RADIUS 0.2    //(m) Drone has arrived to the goal when distance_to_goal<GOAL_RADIUS
+#define DRONE_RADIUS 0.15  //(m) Used for collision checking
 
 #define STATE 0
 #define INPUT 1
