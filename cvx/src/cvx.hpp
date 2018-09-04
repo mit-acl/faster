@@ -63,6 +63,7 @@ struct parameteres
   double alpha_0;
   double z_ground;
   double inflation_jps;
+  double factor_jps;
 
   double v_max;
   double a_max;

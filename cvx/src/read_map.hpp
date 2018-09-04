@@ -30,8 +30,6 @@ public:
     /// inflation [m] is used to inflate the obstacles that amount. Also the map is inflated in x and y with 2*(that
     /// amount)
 
-    // printf("In reader1\n");
-
     // printf("In reader2\n");
 
     dim[0] = dim[0] + (int)(2 * (inflation * 1.0) / res);

@@ -62,6 +62,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   ros::param::param<double>("~alpha_0", par_.alpha_0, 1.0);
   ros::param::param<double>("~z_ground", par_.z_ground, 0.0);
   ros::param::param<double>("~inflation_jps", par_.inflation_jps, 0.8);
+  ros::param::param<double>("~factor_jps", par_.factor_jps, 2);
 
   ros::param::param<double>("~v_max", par_.v_max, 2.0);
   ros::param::param<double>("~a_max", par_.a_max, 2.0);
@@ -258,7 +259,8 @@ void CVX::updateJPSMap(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr)
   Vec3i dim(cells_x_, cells_y_, cells_z_);                     //  number of cells in each dimension
   // printf("Before reader\n");
 
-  MapReader<Vec3i, Vec3f> reader(pclptr, dim, par_.res, center_map, par_.z_ground, par_.inflation_jps);  // Map read
+  MapReader<Vec3i, Vec3f> reader(pclptr, dim, par_.factor_jps * par_.res, center_map, par_.z_ground,
+                                 par_.inflation_jps);  // Map read
   // std::shared_ptr<VoxelMapUtil> map_util = std::make_shared<VoxelMapUtil>();
   // printf("Before setMap\n");
   mtx_jps_map_util.lock();
@@ -289,6 +291,8 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f start, Vec3f goal, bool* solved)
   // planner_ptr_->setMapUtil(map_util_);  // Set collision checking function
 
   // Eigen::Vector3d eig_search_point(X(0, 0), X(0, 1), X(0, 2));
+
+  Timer time_solve_jps_check(true);
 
   pcl::PointXYZ pcl_start = eigenPoint2pclPoint(start);
   pcl::PointXYZ pcl_goal = eigenPoint2pclPoint(goal);
@@ -387,6 +391,8 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f start, Vec3f goal, bool* solved)
       }
     }
   }
+
+  printf("       JPS check takes: %f ms\n", (double)time_solve_jps_check.Elapsed().count());
   // printf("Out3\n");
 
   mtx_map.unlock();

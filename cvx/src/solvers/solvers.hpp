@@ -427,6 +427,9 @@ void Solver<INPUT_ORDER>::callOptimizer()
       }
       case JERK:
       {
+        printf("Solving with v_max_=%f\n", v_max_);
+        printf("Solving with a_max_=%f\n", a_max_);
+        printf("Solving with j_max_=%f\n", j_max_);
         jerk_load_default_data(dt, v_max_, a_max_, j_max_, x0_, xf_);
         r = jerk_optimize();
         if (r == 1)
@@ -527,8 +530,8 @@ double Solver<INPUT_ORDER>::getDTInitial()
       t_jy = *std::min_element(realRootsy.begin(), realRootsy.end());
       t_jz = *std::min_element(realRootsz.begin(), realRootsz.end());
 
-      printf("t_jx, t_jy, t_jz:\n");
-      std::cout << t_jx << "  " << t_jy << "  " << t_jz << std::endl;
+      // printf("t_jx, t_jy, t_jz:\n");
+      // std::cout << t_jx << "  " << t_jy << "  " << t_jz << std::endl;
     }
   }
   dt_initial = std::max({ t_vx, t_vy, t_vz, t_ax, t_ay, t_az, t_jx, t_jy, t_jz }) / N_;
@@ -537,7 +540,7 @@ double Solver<INPUT_ORDER>::getDTInitial()
     printf("there is not a solution to the previous equations");
     dt_initial = 0;
   }
-  printf("dt_initial=%f", dt_initial);
+  // printf("dt_initial=%f", dt_initial);
   return dt_initial;
 }
 
