@@ -45,6 +45,8 @@ struct kdTreeStamped
 
 struct parameteres
 {
+  bool use_ff;
+
   double wdx;
   double wdy;
   double wdz;
@@ -65,6 +67,8 @@ struct parameteres
   double v_max;
   double a_max;
   double j_max;
+
+  double z_land;
 };
 
 //####Class CVX
@@ -196,8 +200,10 @@ private:
   Eigen::MatrixXd U_, X_;  // Contains the intepolated input/states that will be sent to the drone
   Eigen::MatrixXd U_temp_,
       X_temp_;  // Contains the intepolated input/states of a traj. If the traj. is free, it will be copied to U_, X_
-  bool optimized_, use_ff_;
-  double u_min_, u_max_, z_start_, spinup_time_, z_land_;
+  bool optimized_;
+  double spinup_time_;
+  double z_start_;
+  // double u_min_, u_max_, z_start_, spinup_time_, z_land_;
   // int N_ = 20;
   pcl::KdTreeFLANN<pcl::PointXYZ> kdtree_map_;       // kdtree of the point cloud of the occuppancy grid
   pcl::KdTreeFLANN<pcl::PointXYZ> kdtree_unk_;       // kdtree of the point cloud of the unknown grid

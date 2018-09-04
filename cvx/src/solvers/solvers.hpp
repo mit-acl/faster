@@ -8,6 +8,8 @@
 #include "cvxgen/interface_accel.h"
 #include "cvxgen/interface_jerk.h"
 
+#include <unsupported/Eigen/Polynomials>
+
 template <int INPUT_ORDER>
 class Solver
 {
@@ -39,7 +41,6 @@ protected:
   int N_;
   double xf_[3 * INPUT_ORDER];
   double x0_[3 * INPUT_ORDER];
-  // double u0_[3];
   double v_max_;
   double a_max_;
   double j_max_;
@@ -392,6 +393,7 @@ void Solver<INPUT_ORDER>::callOptimizer()
   // ROS_INFO("dt I found= %0.2f", dt_found);
   double dt = getDTInitial();  // 0.025
                                // ROS_INFO("empezando con, dt = %0.2f", dt);
+  dt = dt + 5 * 0.025;         // To make sure that it will converge in very few iterations (hopefully only 1)
   double** x;
   int i = 0;
   int r = 0;
@@ -441,6 +443,11 @@ void Solver<INPUT_ORDER>::callOptimizer()
     }
     dt += 0.025;
   }
+
+  if (i > 1)
+  {
+    printf("Iterations>1, if you increase dt at the beginning, it would be faster\n");
+  }
   // ROS_INFO("Iterations = %d\n", i);
   // ROS_INFO("converged, dt = %f", dt);
   dt_ = dt;
@@ -457,6 +464,9 @@ double Solver<INPUT_ORDER>::getDTInitial()
   float t_ax = 0;
   float t_ay = 0;
   float t_az = 0;
+  float t_jx = 0;
+  float t_jy = 0;
+  float t_jz = 0;
 
   t_vx = (xf_[0] - x0_[0]) / v_max_;
   t_vy = (xf_[1] - x0_[1]) / v_max_;
@@ -471,8 +481,7 @@ double Solver<INPUT_ORDER>::getDTInitial()
       // I'm done
       break;
     }
-    case ACCEL:
-    case JERK:  // case Accel or case Jerk
+    case ACCEL:  // case Accel
     {
       float accelx = copysign(1, xf_[0] - x0_[0]) * a_max_;
       float accely = copysign(1, xf_[1] - x0_[1]) * a_max_;
@@ -486,14 +495,49 @@ double Solver<INPUT_ORDER>::getDTInitial()
       t_az = solvePolyOrder2(Eigen::Vector3f(0.5 * accelz, v0z, x0_[2] - xf_[2]));
       break;
     }
+    case JERK:  // case Jerk
+    {
+      float jerkx = copysign(1, xf_[0] - x0_[0]) * j_max_;
+      float jerky = copysign(1, xf_[1] - x0_[1]) * j_max_;
+      float jerkz = copysign(1, xf_[2] - x0_[2]) * j_max_;
+      float a0x = x0_[6];
+      float a0y = x0_[7];
+      float a0z = x0_[8];
+      float v0x = x0_[3];
+      float v0y = x0_[4];
+      float v0z = x0_[5];
+
+      // polynomial ax3+bx2+cx+d=0 --> coeff=[d c b a]
+      Eigen::Vector4d coeffx(x0_[0] - xf_[0], v0x, a0x / 2, jerkx / 6);
+      Eigen::Vector4d coeffy(x0_[1] - xf_[1], v0y, a0y / 2, jerky / 6);
+      Eigen::Vector4d coeffz(x0_[2] - xf_[2], v0z, a0z / 2, jerkz / 6);
+
+      Eigen::PolynomialSolver<double, Eigen::Dynamic> psolvex(coeffx);
+      Eigen::PolynomialSolver<double, Eigen::Dynamic> psolvey(coeffy);
+      Eigen::PolynomialSolver<double, Eigen::Dynamic> psolvez(coeffz);
+
+      std::vector<double> realRootsx;
+      std::vector<double> realRootsy;
+      std::vector<double> realRootsz;
+      psolvex.realRoots(realRootsx);
+      psolvey.realRoots(realRootsy);
+      psolvez.realRoots(realRootsz);
+
+      t_jx = *std::min_element(realRootsx.begin(), realRootsx.end());
+      t_jy = *std::min_element(realRootsy.begin(), realRootsy.end());
+      t_jz = *std::min_element(realRootsz.begin(), realRootsz.end());
+
+      printf("t_jx, t_jy, t_jz:\n");
+      std::cout << t_jx << "  " << t_jy << "  " << t_jz << std::endl;
+    }
   }
-  dt_initial = std::max({ t_vx, t_vy, t_vz, t_ax, t_ay, t_az }) / N_;
+  dt_initial = std::max({ t_vx, t_vy, t_vz, t_ax, t_ay, t_az, t_jx, t_jy, t_jz }) / N_;
   if (dt_initial > 10000)  // happens when there is no solution to the previous eq.
   {
     printf("there is not a solution to the previous equations");
     dt_initial = 0;
   }
-  // printf("dt_initial=%f", dt_initial);
+  printf("dt_initial=%f", dt_initial);
   return dt_initial;
 }
 
