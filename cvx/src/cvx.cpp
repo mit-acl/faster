@@ -246,10 +246,9 @@ void CVX::updateJPSMap(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr)
 {
   Vec3f center_map(state_.pos.x, state_.pos.y, state_.pos.z);  // center of the map
   Vec3i dim(cells_x_, cells_y_, cells_z_);                     //  number of cells in each dimension
-  printf("Before reader\n");
+  // printf("Before reader\n");
 
   MapReader<Vec3i, Vec3f> reader(pclptr, dim, RES, center_map, Z_ground, INFLATION_JPS);  // Map read
-  printf("After reader\n");
   // std::shared_ptr<VoxelMapUtil> map_util = std::make_shared<VoxelMapUtil>();
   // printf("Before setMap\n");
   mtx_jps_map_util.lock();
@@ -290,20 +289,35 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f start, Vec3f goal, bool* solved)
   if (kdtree_map_.nearestKSearch(pcl_start, 1, id_map1, dist2_map1) > 0)
   {
     double r = sqrt(dist2_map1[0]);
-    printf("nearest obstacle for start is at d=%f\n", r);
+    // printf("nearest obstacle for start is at d=%f\n", r);
     if (r < INFLATION_JPS)
     {
       printf("The start is hitting an inflated obstacle, JPS won't work\n");
       printf("I'm going to try to fix it for you: Start= near point in the opposite direction\n");
 
-      std::cout << "Old start\n" << start.transpose() << std::endl;
-      Eigen::Vector3d obstacle;
+      std::vector<int> idxR;
+      std::vector<float> r2D;  // squared distance
+      Eigen::Vector3d force(0, 0, 0);
       pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr = kdtree_map_.getInputCloud();
-      obstacle << ptr->points[id_map1[0]].x, ptr->points[id_map1[0]].y, ptr->points[id_map1[0]].z;
-      std::cout << "Obstacle\n" << obstacle.transpose() << std::endl;
-      start = obstacle + (INFLATION_JPS + 2 * RES) * ((start - obstacle).normalized());  // 2*RES just to make sure
-      std::cout << "New start\n" << start.transpose() << std::endl;
-      std::cout << "Distance from new start to the obstacle\n" << (start - obstacle).norm() << std::endl;
+
+      if (kdtree_map_.radiusSearch(pcl_start, INFLATION_JPS, idxR, r2D) > 0)
+      {
+        for (size_t i = 0; i < idxR.size(); ++i)
+        {
+          Eigen::Vector3d obs(ptr->points[idxR[i]].x, ptr->points[idxR[i]].y, ptr->points[idxR[i]].z);
+          force = force + (start - obs).normalized();
+        }
+      }
+      start = start + (INFLATION_JPS + 2 * RES) * (force.normalized());
+
+      std::cout << "Old start\n" << start.transpose() << std::endl;
+      // Eigen::Vector3d obstacle;
+      // pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr = kdtree_map_.getInputCloud();
+      // obstacle << ptr->points[id_map1[0]].x, ptr->points[id_map1[0]].y, ptr->points[id_map1[0]].z;
+      // std::cout << "Obstacle\n" << obstacle.transpose() << std::endl;
+      // start = obstacle + (INFLATION_JPS + 2 * RES) * ((start - obstacle).normalized());  // 2*RES just to make sure
+      // std::cout << "New start\n" << start.transpose() << std::endl;
+      // std::cout << "Distance from new start to the obstacle\n" << (start - obstacle).norm() << std::endl;
 
       pcl::PointXYZ pcl_new_start = eigenPoint2pclPoint(start);
       std::vector<int> id_map3(1);
@@ -320,7 +334,7 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f start, Vec3f goal, bool* solved)
   if (kdtree_map_.nearestKSearch(pcl_goal, 1, id_map2, dist2_map2) > 0)
   {
     double r = sqrt(dist2_map2[0]);
-    printf("nearest obstacle for goal is at d=%f\n", r);
+    // printf("nearest obstacle for goal is at d=%f\n", r);
     if (r < INFLATION_JPS)
     {
       printf("The goal is hitting an inflated obstacle, JPS won't work\n");
@@ -333,7 +347,7 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f start, Vec3f goal, bool* solved)
   planner_ptr_->updateMap();
 
   Timer time_jps(true);
-  std::cout << "Planning from start=" << start << std::endl;
+  // std::cout << "Planning from start=" << start << std::endl;
   bool valid_jps = planner_ptr_->plan(
       start, goal, 1, true);  // Plan from start to goal with heuristic weight=1, and using JPS (if false --> use A*)
 
@@ -475,10 +489,19 @@ void CVX::yaw(double diff, acl_msgs::QuadGoal& quad_goal)
   quad_goal.yaw += diff;
 }
 
-vec_Vecf<3> CVX::fix(vec_Vecf<3> JPS_old)
+vec_Vecf<3> CVX::fix(vec_Vecf<3> JPS_old, Eigen::Vector3d start, Eigen::Vector3d goal)
 {
   vec_Vecf<3> fix;
   bool thereIsIntersection = false;
+  /*  vec_Vecf<3> null1(1, Eigen::Vector3d::Zero());
+    vec_Vecf<3> null2(1, Eigen::Vector3d::Zero());
+    vec_Vecf<3>& path_start2fix(null1);  // references has to be initialized
+    vec_Vecf<3>& path_fix2goal(null2);*/
+  vec_Vecf<3> path_start2fix;  // references has to be initialized
+  vec_Vecf<3> path_fix2goal;
+  path_start2fix.clear();
+  path_fix2goal.clear();
+  vec_Vecf<3> path_fixed;
   Eigen::Vector3d inters1 = getFirstCollisionJPS(JPS_old, &thereIsIntersection);  // intersection starting from start
 
   if (thereIsIntersection)
@@ -488,18 +511,56 @@ vec_Vecf<3> CVX::fix(vec_Vecf<3> JPS_old)
     std::reverse(tmp.begin(), tmp.end());                                       // flip all the vector
     Eigen::Vector3d inters2 = getFirstCollisionJPS(tmp, &thereIsIntersection);  // intersection starting from the goal
 
-    bool solvedFix;
+    // std::reverse(path_fix2goal.begin(), path_fix2goal.end());
+    bool solvedFix, solvedStart2Fix, solvedFix2Goal;
 
     // printf("Calling to fix from\n");
     // std::cout << inters1.transpose() << std::endl << "to" << inters2.transpose() << std::endl;
     fix = solveJPS3D(inters1, inters2, &solvedFix);
+
+    path_start2fix = solveJPS3D(start, inters1, &solvedStart2Fix);
+
+    path_fix2goal = solveJPS3D(inters2, goal, &solvedFix2Goal);
+
     // printf("After calling solveJPSD\n");
     if (solvedFix == false)
     {
-      printf("**************Couldn't find a fix**********");
+      printf("**************Couldn't find Fix**********");
     }
+
+    if (solvedStart2Fix == false)
+    {
+      printf("**************Couldn't find Start-->Fix**********");
+    }
+
+    if (solvedFix2Goal == false)
+    {
+      printf("**************Couldn't find Fix-->Goal**********");
+    }
+
+    else
+    {
+      /*printf("solution found!\n");
+      printf("El path deberia ir\n");
+      std::cout << JPS_old[0].transpose() << "--->" << JPS_old[JPS_old.size() - 1].transpose();
+      std::cout << "Pasando por" << inters1.transpose() << "y  " << inters2.transpose() << std::endl;*/
+      path_fixed.clear();
+      path_fixed.insert(path_fixed.end(), path_start2fix.begin(), path_start2fix.end());
+      path_fixed.insert(path_fixed.end(), fix.begin(), fix.end());
+      path_fixed.insert(path_fixed.end(), path_fix2goal.begin(), path_fix2goal.end());
+      /*printf("***************Start to fix******************\n");
+      printElementsOfJPS(path_start2fix);
+      printf("***************Fix***************************\n");
+      printElementsOfJPS(fix);
+      printf("***************Fix to Goal***************************\n");
+      printElementsOfJPS(path_fix2goal);
+      printf("***************Everything***************************\n");
+      printElementsOfJPS(path_fixed);*/
+      publishJPS2handIntersection(JPS_old, path_fixed, inters1, inters2, solvedFix);
+    }
+
     // printf("Before publishing\n");
-    publishJPS2handIntersection(JPS_old, fix, inters1, inters2, solvedFix);
+
     // printf("published\n");
 
     // printf("Solved, fix=:\n");
@@ -557,7 +618,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   // printf("In replanCB0.4s\n");
   if (status_ == GOAL_SEEN || status_ == GOAL_REACHED || planner_status_ == REPLANNED || status_ == YAWING)
   {
-    printf("No replanning needed because planner_status_=%d\n", planner_status_);
+    // printf("No replanning needed because planner_status_=%d\n", planner_status_);
     return;
   }
 
@@ -591,7 +652,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   static bool first_time = true;                         // how many times I've solved JPS1
   JPS1 = solveJPS3D(state_pos, term_goal, &solvedjps1);  // Solution is in JPS1
 
-  printf("In replanCB3\n");
+  // printf("In replanCB3\n");
   if (first_time == true)
   {  // B1km1 is still not initialized --> Run from
     first_time = false;
@@ -603,9 +664,9 @@ void CVX::replanCB(const ros::TimerEvent& e)
   }
   else
   {
-    JPS2 = fix(JPS_old_);
+    JPS2 = fix(JPS_old_, state_pos, term_goal);
   }
-  printf("In replanCB4\n");
+  // printf("In replanCB4\n");
 
   if (solvedjps1 == true)
   {
@@ -1322,19 +1383,8 @@ void CVX::mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
     return;
   }
 
-  pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_map_untransformed(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_map(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::fromROSMsg(*pcl2ptr_msg, *pclptr_map_untransformed);
-
-  printf("before, size=%d\n", pclptr_map_untransformed->points.size());
-  int N = 2;
-  Eigen::Matrix4f transform = Eigen::Matrix4f::Identity();
-  transform(0, 0) = transform(0, 0) * N;
-  transform(1, 1) = transform(1, 1) * N;
-  transform(2, 2) = transform(2, 2) * N;
-  printf("after\n");
-  pcl::transformPointCloud(*pclptr_map_untransformed, *pclptr_map, transform);
-  printf("after2, size=%d\n", pclptr_map->points.size());
+  pcl::fromROSMsg(*pcl2ptr_msg, *pclptr_map);
 
   // printf("In mapCB2\n");
   mtx_map.lock();
@@ -1343,9 +1393,7 @@ void CVX::mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
   mtx_map.unlock();
   // printf("In mapCB3\n");
   kdtree_map_initialized_ = 1;
-  printf("after3\n");
   updateJPSMap(pclptr_map);
-  printf("after4\n");
 
   // printf("mapCB: MTX is locked\n");
   // printf("In mapCB4\n");
@@ -1378,7 +1426,6 @@ void CVX::mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
   // printf("below\n");
 
   // mtx.unlock();
-  printf("saliendo\n");
 }
 
 // Unkwown  CB
@@ -1579,6 +1626,8 @@ bool CVX::trajIsFree(Eigen::MatrixXd X)
 Eigen::Vector3d CVX::getFirstCollisionJPS(vec_Vecf<3> path, bool* thereIsIntersection)
 {
   vec_Vecf<3> original = path;
+  printf("*****ORIGINAL******");
+  printElementsOfJPS(original);
   // vec_Vecf<3> path_behind;
   // printf("In getFirstCollisionJPS\n");
   Eigen::Vector3d first_element = path[0];
@@ -1637,6 +1686,14 @@ Eigen::Vector3d CVX::getFirstCollisionJPS(vec_Vecf<3> path, bool* thereIsInterse
         // inters = path[0];  // path[0] is the search_point I'm using.
         result = last_search_point;
         *thereIsIntersection = true;
+
+        /*        // Now let's compute the path from the beginning to the intersection
+                vec_Vecf<3> tmp = original;
+                tmp.erase(tmp.begin() + el_eliminated + 1, tmp.end());
+                for (int j = 0; j < tmp.size(); j++)
+                {
+                  (path_to_intersection).push_back(tmp[j]);
+                }*/
 
         break;
       }

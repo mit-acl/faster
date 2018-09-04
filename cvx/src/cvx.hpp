@@ -112,13 +112,12 @@ private:
 
   void pubJPSIntersection(Eigen::Vector3d inters);
   Eigen::Vector3d getFirstCollisionJPS(vec_Vecf<3> path, bool* thereIsIntersection);
-
   Eigen::Vector3d projectClickedGoal(Eigen::Vector3d P1);
 
   void publishJPS2handIntersection(vec_Vecf<3> JPS2, vec_Vecf<3> JPS2_fix, Eigen::Vector3d inter1,
                                    Eigen::Vector3d inter2, bool solvedFix);
 
-  vec_Vecf<3> fix(vec_Vecf<3> JPS_old);
+  vec_Vecf<3> fix(vec_Vecf<3> JPS_old, Eigen::Vector3d start, Eigen::Vector3d goal);
 
   visualization_msgs::Marker setpoint_;
   acl_msgs::QuadGoal quadGoal_;
