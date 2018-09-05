@@ -526,7 +526,7 @@ inline Eigen::Vector3d getLastIntersectionWithSphere(vec_Vecf<3> path, double r,
   return intersection;
 }
 
-// Same as the previous one, but also returns in Jdist the distance form the last intersection to the goal (following
+// Same as the previous one, but also returns dist = the distance form the last intersection to the goal (following
 // the path)
 inline Eigen::Vector3d getLastIntersectionWithSphere(vec_Vecf<3> path, double r, Eigen::Vector3d center, double* Jdist)
 {

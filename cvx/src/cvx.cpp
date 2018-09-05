@@ -67,6 +67,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   ros::param::param<double>("~v_max", par_.v_max, 2.0);
   ros::param::param<double>("~a_max", par_.a_max, 2.0);
   ros::param::param<double>("~j_max", par_.j_max, 10.0);
+  ros::param::param<double>("~q", par_.q, 100000.0);
 
   ros::param::param<double>("~z_land", par_.z_land, 0.02);
 
@@ -134,6 +135,10 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   solver_vel_.setDC(par_.dc);
   solver_accel_.setDC(par_.dc);
   solver_jerk_.setDC(par_.dc);
+
+  solver_vel_.setq(par_.q);
+  solver_accel_.setq(par_.q);
+  solver_jerk_.setq(par_.q);
 
   // pcl::PointCloud<pcl::PointXYZ>::Ptr tmp(new pcl::PointCloud<pcl::PointXYZ>);
   // pclptr_map_ = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
@@ -586,7 +591,7 @@ vec_Vecf<3> CVX::fix(vec_Vecf<3> JPS_old, Eigen::Vector3d start, Eigen::Vector3d
     bool solved_complete_fix = solvedFix && solvedStart2Fix && solvedFix2Goal;
     if (solved_complete_fix == false)
     {
-      printf("**************Couldn't find some part of the fixed path**********");
+      printf("**************Couldn't find some part of the fixed path**********\n");
       *solved = false;
     }
 
@@ -695,7 +700,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
   int li2;    // last index inside the sphere of JPS2
   int liold;  // last index inside the sphere of JPS2
 
-  double J1 = 0, J2 = 0, JPrimj1 = 0, JPrimj2 = 0, JPrimv1 = 0, JPrimv2 = 0, JDist1 = 0, JDist2 = 0;
+  double dist1 = 0, dist2 = 0, J1 = 0, J2 = 0, JPrimj1 = 0, JPrimj2 = 0, JPrimv1 = 0, JPrimv2 = 0, JDist1 = 0,
+         JDist2 = 0;
   J1 = std::numeric_limits<double>::max();
   J2 = std::numeric_limits<double>::max();
   Eigen::MatrixXd U_temp1, U_temp2, X_temp1, X_temp2;
@@ -792,13 +798,15 @@ void CVX::replanCB(const ros::TimerEvent& e)
       double dist = (term_goal - p).norm();
       have_seen_the_goal1 = (dist < par_.goal_radius) ? true : false;
 
-      C1 = getLastIntersectionWithSphere(JPS1, rb, state_pos, &JDist1);
+      C1 = getLastIntersectionWithSphere(JPS1, rb, state_pos, &dist1);
+      JDist1 = dist1 / par_.v_max;
       pubPlanningVisual(state_pos, ra, rb, B1, C1);
 
       /*      printf("Angle=%f\n", angleBetVectors(B1 - state_pos, B2 - state_pos));
             std::cout << "uno\n" << B1 - state_pos << std::endl;
             std::cout << "dos\n" << B2 - state_pos << std::endl;*/
 
+      printf("alpha=%f\n", alpha);
       if (alpha <= par_.alpha_0)
       {
         need_to_decide = false;
@@ -807,7 +815,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
     }
   }
 
-  if (need_to_decide == true && have_seen_the_goal1 == false && solvedjps2 == true)
+  if (need_to_decide == true && have_seen_the_goal1 == false)
 
   {
     printf("**************Computing costs to decide between 2 jerk trajectories\n");
@@ -825,71 +833,77 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
     printf("hola1\n");
 
+    printf("Going to fix\n");
     Timer time_fix(true);
     JPS2 = fix(JPS_old_, state_pos, term_goal, &solvedjps2);
+
     printf("ReplanCB: Fix JPS_old_ takes %f ms\n", (double)time_fix.Elapsed().count());
 
-    printf("hola2\n");
-    B2 = getFirstIntersectionWithSphere(JPS2, ra, state_pos, &li2);
-    K = samplePointsSphere(B2, ra, state_pos);  // radius, center and point
-    printf("hola3\n");
-
-    Timer time_traj2(true);
-    for (int i = 0; i < K.size(); i++)
+    if (solvedjps2 == true)
     {
-      if (X_initialized_)  // Needed to skip the first time (X_ still not initialized)
+      printf("hola2\n");
+      B2 = getFirstIntersectionWithSphere(JPS2, ra, state_pos, &li2);
+      K = samplePointsSphere(B2, ra, state_pos);  // radius, center and point
+      printf("hola3\n");
+
+      Timer time_traj2(true);
+      for (int i = 0; i < K.size(); i++)
       {
-        k_initial_cond_ = std::min(k_ + par_.offset, (int)(X_.rows() - 1));
-        updateInitialCond(k_initial_cond_);
-      }
+        if (X_initialized_)  // Needed to skip the first time (X_ still not initialized)
+        {
+          k_initial_cond_ = std::min(k_ + par_.offset, (int)(X_.rows() - 1));
+          updateInitialCond(k_initial_cond_);
+        }
 
-      //////SOLVING FOR JERK
-      Eigen::Vector3d p = K[i];
-      double xf[9] = { p[0], p[1], p[2], 0, 0, 0, 0, 0, 0 };
-      mtx_goals.lock();
-      double x0[9] = { initialCond_.pos.x,   initialCond_.pos.y,   initialCond_.pos.z,
-                       initialCond_.vel.x,   initialCond_.vel.y,   initialCond_.vel.z,
-                       initialCond_.accel.x, initialCond_.accel.y, initialCond_.accel.z };
-      mtx_goals.unlock();
-      solver_jerk_.set_xf(xf);
-      solver_jerk_.set_x0(x0);
-      double max_values[3] = { par_.v_max, par_.a_max, par_.j_max };
-      solver_jerk_.set_max(max_values);
-      solver_jerk_.genNewTraj();
-      U_temp2 = solver_jerk_.getU();
-      X_temp2 = solver_jerk_.getX();
-      //////SOLVED FOR JERK
+        //////SOLVING FOR JERK
+        Eigen::Vector3d p = K[i];
+        double xf[9] = { p[0], p[1], p[2], 0, 0, 0, 0, 0, 0 };
+        mtx_goals.lock();
+        double x0[9] = { initialCond_.pos.x,   initialCond_.pos.y,   initialCond_.pos.z,
+                         initialCond_.vel.x,   initialCond_.vel.y,   initialCond_.vel.z,
+                         initialCond_.accel.x, initialCond_.accel.y, initialCond_.accel.z };
+        mtx_goals.unlock();
+        solver_jerk_.set_xf(xf);
+        solver_jerk_.set_x0(x0);
+        double max_values[3] = { par_.v_max, par_.a_max, par_.j_max };
+        solver_jerk_.set_max(max_values);
+        solver_jerk_.genNewTraj();
+        U_temp2 = solver_jerk_.getU();
+        X_temp2 = solver_jerk_.getX();
+        //////SOLVED FOR JERK
 
-      printf("Calling IsFree 2\n");
-      bool isFree = trajIsFree(X_temp2);
-      createMarkerSetOfArrows(X_temp2, isFree);
-      if (isFree)
-      {
-        printf("ReplanCB: Find traj2 takes %f ms\n", (double)time_traj2.Elapsed().count());
-        printf("found free2\n");
-        found_one_2 = true;
-        double dist = (term_goal - p).norm();
-        have_seen_the_goal1 = (dist < par_.goal_radius) ? true : false;
+        printf("Calling IsFree 2\n");
+        bool isFree = trajIsFree(X_temp2);
+        createMarkerSetOfArrows(X_temp2, isFree);
+        if (isFree)
+        {
+          printf("ReplanCB: Find traj2 takes %f ms\n", (double)time_traj2.Elapsed().count());
+          printf("found free2\n");
+          found_one_2 = true;
+          double dist = (term_goal - p).norm();
+          have_seen_the_goal1 = (dist < par_.goal_radius) ? true : false;
 
-        Timer getCosts2(true);
-        C2 = getLastIntersectionWithSphere(JPS2, rb, state_pos, &JDist2);
-        pubPlanningVisual(state_pos, ra, rb, B2, C2);
-        pub_trajs_sphere_.publish(trajs_sphere_);
-        JPrimj2 = solver_jerk_.getCost();
-        WP2 = getPointsBw2Spheres(JPS2, ra, rb, state_pos);
-        WP2.insert(WP2.begin(), B2);
-        WP2.push_back(C2);
-        JPrimv2 = solveVelAndGetCost(WP2);
-        J2 = JPrimj2 + JPrimv2 + JDist2;
-        printf("ReplanCB: Get Costs for 1 takes %f ms\n", (double)getCosts2.Elapsed().count());
+          Timer getCosts2(true);
+          C2 = getLastIntersectionWithSphere(JPS2, rb, state_pos, &dist2);
+          JDist2 = dist2 / par_.v_max;
+          pubPlanningVisual(state_pos, ra, rb, B2, C2);
+          pub_trajs_sphere_.publish(trajs_sphere_);
+          JPrimj2 = solver_jerk_.getCost();
+          WP2 = getPointsBw2Spheres(JPS2, ra, rb, state_pos);
+          WP2.insert(WP2.begin(), B2);
+          WP2.push_back(C2);
+          JPrimv2 = solveVelAndGetCost(WP2);
+          J2 = JPrimj2 + JPrimv2 + JDist2;
+          printf("ReplanCB: Get Costs for 1 takes %f ms\n", (double)getCosts2.Elapsed().count());
 
-        printf("J1=        JPrimj1    +JPrimv1   +JDista1   \n");
-        printf("%10.1f=,%10.1f,%10.1f,%10.1f\n", J1, JPrimj1, JPrimv1, JDist1);
+          printf("J1=        JPrimj1    +JPrimv1   +JDista1   \n");
+          printf("%10.1f=,%10.1f,%10.1f,%10.1f\n", J1, JPrimj1, JPrimv1, JDist1);
 
-        printf("J2=        JPrimj2    +JPrimv2   +JDista2   \n");
-        printf("%10.1f=,%10.1f,%10.1f,%10.1f\n", J2, JPrimj2, JPrimv2, JDist2);
+          printf("J2=        JPrimj2    +JPrimv2   +JDista2   \n");
+          printf("%10.1f=,%10.1f,%10.1f,%10.1f\n", J2, JPrimj2, JPrimv2, JDist2);
 
-        break;
+          break;
+        }
       }
     }
   }

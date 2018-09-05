@@ -68,6 +68,7 @@ struct parameteres
   double v_max;
   double a_max;
   double j_max;
+  double q;
 
   double z_land;
 };

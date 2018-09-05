@@ -49,11 +49,12 @@ double** CONCATENATE_INPUT(get_control)(void)
   return vars.u;
 }
 
-void CONCATENATE_INPUT(load_default_data)(double dt, double v_max, double a_max, double j_max, double x0[], double xf[])
+void CONCATENATE_INPUT(load_default_data)(double dt, double v_max, double a_max, double j_max, double x0[], double xf[],
+                                          double q)
 {
   // printf("loading data jerk\n");
   // double dt = 0.5;
-  double q = 100000;
+  // double q = 100000;
   params.xf[0] = xf[0];
   params.xf[1] = xf[1];
   params.xf[2] = xf[2];

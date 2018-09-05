@@ -19,7 +19,7 @@ offset: 5  # Replanning offset (the initial conditions are taken OFFSET states f
 Ra: 4.0             # [m] Radius of the first sphere
 Rb: 6.0             # [m] Radius of the second sphere
 w_max: 1            # [rd/s] Maximum angular velocity
-alpha_0: 1          #[rd] threshold to ignore current JPS solution, and consider the old one
+alpha_0: 0          #[rd] threshold to ignore current JPS solution, and consider the old one
 z_ground: 0         #[m] points below this are considered ground
 inflation_jps: 0.8  #[m] The obstacles are inflated (to run JPS) by this amount
 factor_jps: 2  #[m] JPS is run with resolution=factor_jps*(resolution of the map)
@@ -29,6 +29,7 @@ v_max: 10.0   #[m/s]
 a_max: 10.0   #[m/s2]
 j_max: 50.0  #[m/s3]
 
+q: 100000  #[-] weight to the 2nd term of the cost function for cvxgen
 
 z_land: 0.02 #[m] z goal for landing
 
@@ -38,13 +39,14 @@ z_land: 0.02 #[m] z goal for landing
 
 #Ways to make the planner faster:
 # Increase deltaT in each cvxgen iteration
-# Omit visualization stuff
 # Timer of the mapper
 # More downsampling in the frontier point cloud
 # downsample instanteneous point clouds from the camera?
 # compile cvxgen with the option -03 (see makefile of cvxgen) instead of -0s
 # set a different resolution for the JPS solver (change factor_jps)
-# reduce dimensions of the map
+# reduce dimensions/increase resolution of the map
+# Run the mapper as a nodelet
+# Reduce alpha_0
 
 #Things to try
 #Change radius spheres Sa and Sb
@@ -52,3 +54,5 @@ z_land: 0.02 #[m] z goal for landing
 
 #Things to do
 #Change -1 in the instantaneous point cloud
+#Run 
+# Omit visualization stuff

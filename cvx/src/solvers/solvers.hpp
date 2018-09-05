@@ -32,6 +32,7 @@ public:
   int getOrder();
   int getN();
   void setDC(double dc);
+  void setq(double q);
 
 protected:
   Eigen::MatrixXd U_temp_;
@@ -45,6 +46,9 @@ protected:
   double a_max_;
   double j_max_;
   double DC;
+  double q_;  // weight to the 2nd term in the cost function
+  double** x_;
+  double** u_;
 };
 
 // Definitions of the functions of the template of the class Solver. They are in this file because Template definitions
@@ -90,6 +94,12 @@ template <int INPUT_ORDER>
 void Solver<INPUT_ORDER>::setDC(double dc)
 {
   DC = dc;
+}
+
+template <int INPUT_ORDER>
+void Solver<INPUT_ORDER>::setq(double q)
+{
+  q_ = q;
 }
 
 // it obtains the variable with degree=degree_input+1
@@ -156,17 +166,30 @@ void Solver<INPUT_ORDER>::resetXandU()
 template <int INPUT_ORDER>
 double Solver<INPUT_ORDER>::getCost()
 {
+  double term_cost = 0;
   switch (INPUT_ORDER)
   {
     case VEL:
-      cost_ = vel_get_cost();
+
+      for (int i = 0; i < 3 * INPUT_ORDER; i++)
+      {
+        term_cost = term_cost + q_ * pow(x_[N_][i] - xf_[i], 2);
+      }
+
+      cost_ = (vel_get_cost() - term_cost) * N_ * dt_ / (v_max_ * v_max_);
       break;
     case ACCEL:
       printf("not implemented yet\n");
       // cost_=accel_get_cost();
       break;
     case JERK:
-      cost_ = jerk_get_cost();
+      for (int i = 0; i < 3 * INPUT_ORDER; i++)
+      {
+        term_cost = term_cost + q_ * pow(x_[N_][i] - xf_[i], 2);
+      }
+      /*      printf("real total cost=%f\n", jerk_get_cost());
+            printf("real jerk cost=%f\n", jerk_get_cost() - term_cost);*/
+      cost_ = (jerk_get_cost() - term_cost) * N_ * dt_ / (j_max_ * j_max_);
       break;
   }
   return cost_;
@@ -335,51 +358,50 @@ void Solver<INPUT_ORDER>::genNewTraj()
   // printf("In genNewTraj\n");
   callOptimizer();
   resetXandU();
-  double** x;
-  double** u;
   switch (INPUT_ORDER)
   {
     case VEL:
       // printf("To grab states/control\n");
-      x = vel_get_state();
-      u = vel_get_control();
+      x_ = vel_get_state();
+      u_ = vel_get_control();
       // printf("To interpolate\n");
-      interpolate(POS, u, x);  // interpolate POS
-      interpolate(VEL, u, x);  // ...
+      interpolate(POS, u_, x_);  // interpolate POS
+      interpolate(VEL, u_, x_);  // ...
       // printf("To obtain by derivation\n");
-      obtainByDerivation(u, x);
+      obtainByDerivation(u_, x_);
       // printf("Obtained by derivation\n");
       break;
     case ACCEL:
-      x = accel_get_state();
-      u = accel_get_control();
-      interpolate(POS, u, x);    // interpolate POS
-      interpolate(VEL, u, x);    // ...
-      interpolate(ACCEL, u, x);  // ...
-      obtainByDerivation(u, x);
+      x_ = accel_get_state();
+      u_ = accel_get_control();
+      interpolate(POS, u_, x_);    // interpolate POS
+      interpolate(VEL, u_, x_);    // ...
+      interpolate(ACCEL, u_, x_);  // ...
+      obtainByDerivation(u_, x_);
       break;
     case JERK:
-      x = jerk_get_state();
-      u = jerk_get_control();
+      x_ = jerk_get_state();
+      u_ = jerk_get_control();
 
       /*      double my_cost = 0;
-            for (int i = 1; i <= N_ - 1; i++)
+            for (int i = 0; i <= N_ - 1; i++)
             {
-              my_cost = my_cost + u[i][0] * u[i][0] + u[i][1] * u[i][1] + u[i][2] * u[i][2];
+              my_cost = my_cost + u_[i][0] * u_[i][0] + u_[i][1] * u_[i][1] + u_[i][2] * u_[i][2];
             }
+            getCost();
+            printf("*****My effort cost: %f\n", my_cost);
             double term_cost = 0;
             for (int i = 0; i <= 8; i++)
             {
-              term_cost = term_cost + 100000 * pow(x[N_][i] - xf_[i], 2);
+              term_cost = term_cost + 100000 * pow(x_[N_][i] - xf_[i], 2);
             }
-            my_cost = my_cost + term_cost;
-            printf("*****My total cost: %f\n", my_cost);
-            printf("*****Real total cost: %f\n", getCost());*/
+            printf("*****My terminal cost: %f\n", term_cost);*/
+      // my_cost = my_cost + term_cost;
 
-      interpolate(POS, u, x);    // interpolate POS
-      interpolate(VEL, u, x);    // ...
-      interpolate(ACCEL, u, x);  // ...
-      interpolate(JERK, u, x);
+      interpolate(POS, u_, x_);    // interpolate POS
+      interpolate(VEL, u_, x_);    // ...
+      interpolate(ACCEL, u_, x_);  // ...
+      interpolate(JERK, u_, x_);
       break;
   }
 }
@@ -405,7 +427,7 @@ void Solver<INPUT_ORDER>::callOptimizer()
     {
       case VEL:
       {
-        vel_load_default_data(dt, v_max_, x0_, xf_);
+        vel_load_default_data(dt, v_max_, x0_, xf_, q_);
         r = vel_optimize();
         if (r == 1)
         {
@@ -416,7 +438,7 @@ void Solver<INPUT_ORDER>::callOptimizer()
       }
       case ACCEL:
       {
-        accel_load_default_data(dt, v_max_, a_max_, x0_, xf_);
+        accel_load_default_data(dt, v_max_, a_max_, x0_, xf_, q_);
         r = accel_optimize();
         if (r == 1)
         {
@@ -427,10 +449,7 @@ void Solver<INPUT_ORDER>::callOptimizer()
       }
       case JERK:
       {
-        printf("Solving with v_max_=%f\n", v_max_);
-        printf("Solving with a_max_=%f\n", a_max_);
-        printf("Solving with j_max_=%f\n", j_max_);
-        jerk_load_default_data(dt, v_max_, a_max_, j_max_, x0_, xf_);
+        jerk_load_default_data(dt, v_max_, a_max_, j_max_, x0_, xf_, q_);
         r = jerk_optimize();
         if (r == 1)
         {
