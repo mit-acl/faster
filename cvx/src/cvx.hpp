@@ -62,6 +62,7 @@ struct parameteres
   double w_max;
   double alpha_0;
   double z_ground;
+  double z_max;
   double inflation_jps;
   double factor_jps;
 
@@ -136,7 +137,7 @@ private:
   void clearJPSPathVisualization(int i);
 
   void updateJPSMap(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr);
-  vec_Vecf<3> solveJPS3D(Vec3f start, Vec3f goal, bool* solved);
+  vec_Vecf<3> solveJPS3D(Vec3f& start, Vec3f& goal, bool* solved);
 
   void pubTerminalGoal();
 
@@ -148,6 +149,8 @@ private:
                                    Eigen::Vector3d inter2, bool solvedFix);
 
   vec_Vecf<3> fix(vec_Vecf<3> JPS_old, Eigen::Vector3d start, Eigen::Vector3d goal, bool* solved);
+
+  double getDistanceToFirstCollisionJPSwithUnkonwnspace(vec_Vecf<3> path, bool* thereIsIntersection);
 
   visualization_msgs::Marker setpoint_;
   acl_msgs::QuadGoal quadGoal_;
@@ -244,6 +247,8 @@ private:
   std::mutex mtx_inst;  // mutex of instanteneous data (v_kdtree_new_pcls_)
   std::mutex mtx_goals;
   std::mutex mtx_jps_map_util;  // mutex for map_util_ and planner_ptr_
+
+  std::mutex mtx_term_goal;
 
   std::shared_ptr<JPS::VoxelMapUtil> map_util_;
   std::unique_ptr<JPSPlanner3D> planner_ptr_;

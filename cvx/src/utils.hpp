@@ -40,9 +40,14 @@ inline void saturate(double& var, double min, double max)
   }
 }
 
-inline double angleBetVectors(Eigen::Vector3d a, Eigen::Vector3d b)
+inline double angleBetVectors(const Eigen::Vector3d& a, const Eigen::Vector3d& b)
 {
+  printf("In angleBetVEctors\n");
+  std::cout << a.transpose() << std::endl;
+  std::cout << b.transpose() << std::endl;
+
   double tmp = a.dot(b) / (a.norm() * b.norm());
+  printf("tmp=%f\n", tmp);
   saturate(tmp, -1, 1);
   return acos(tmp);
 }
@@ -82,14 +87,30 @@ inline std::vector<Eigen::Vector3d> samplePointsSphere(Eigen::Vector3d B, double
   return tmp;
 }
 
+inline void printElementsOfJPS(vec_Vecf<3> path)
+{
+  printf("Elements of the path given:\n");
+  for (int i = 0; i < path.size(); i++)
+  {
+    std::cout << path[i].transpose() << std::endl;
+  }
+}
+
 // returns the points around B sampled in the sphere with radius r and center center, and sampled intelligently with
 // the given path
 // last_index_inside_sphere is the the index of the last point that is inside the sphere (should be provided as a
 // parameter to this function)
 // B is the first intersection of JPS with the sphere
-inline std::vector<Eigen::Vector3d> samplePointsSphereWithJPS(Eigen::Vector3d B, double r, Eigen::Vector3d center,
-                                                              vec_Vecf<3> path, int last_index_inside_sphere)
+inline std::vector<Eigen::Vector3d> samplePointsSphereWithJPS(Eigen::Vector3d& B, double r, Eigen::Vector3d& center,
+                                                              vec_Vecf<3>& path_sent, int last_index_inside_sphere)
 {
+  vec_Vecf<3> path;
+
+  for (int i = 0; i < path_sent.size(); i++)
+  {
+    path.push_back(path_sent[i]);  // Local copy of path_sent
+  }
+
   /*  printf("To sample points1\n");
     center = Eigen::Vector3d(1, 2, 3);
     r = 6.57;
@@ -112,12 +133,37 @@ inline std::vector<Eigen::Vector3d> samplePointsSphereWithJPS(Eigen::Vector3d B,
   Eigen::Vector3d dir;
   double x, y, z;
 
+  printf("In samplePointsSphereWithJPS\n");
+  printElementsOfJPS(path);
+
   for (int i = last_index_inside_sphere + 1; i >= 1; i--)
   {
-    Eigen::Vector3d point_i = path[i] - center;        // point i expressed with origin=origin sphere
-    Eigen::Vector3d point_im1 = path[i - 1] - center;  // point i minus 1
-    double angle_max = angleBetVectors(point_i, point_im1);
+    Eigen::Vector3d point_i = (path[i] - center);        // point i expressed with origin=origin sphere
+    Eigen::Vector3d point_im1 = (path[i - 1] - center);  // point i minus 1
+
+    /*    Eigen::Vector3d& point_i_ref(point_i);      // point i expressed with origin=origin sphere
+        Eigen::Vector3d& point_im1_ref(point_im1);  // point i minus 1*/
+
+    std::cout << "i=" << i << "point_i=" << path[i].transpose() << std::endl;
+    std::cout << "i=" << i << "point_im1=" << path[i - 1].transpose() << std::endl;
+
+    Eigen::Vector3d a = point_i;
+    Eigen::Vector3d b = point_im1;
+
+    double tmp = a.dot(b) / (a.norm() * b.norm());
+
+    saturate(tmp, -1, 1);
+
+    double angle_max = acos(tmp);
+
+    if (std::isnan(angle_max))
+    {
+      continue;  // sometimes the path has two same elements. Skip it (if not there will be an error later in cvxgen)
+    }
+
     Eigen::Vector3d perp = (point_i.cross(point_im1)).normalized();  // perpendicular vector to point_i and point_ip1;
+    printf("Perpendicular vector=\n");
+    std::cout << perp << std::endl;
 
     for (double angle = 0; angle < angle_max; angle = angle + 0.34)
     {
@@ -158,6 +204,9 @@ inline std::vector<Eigen::Vector3d> samplePointsSphereWithJPS(Eigen::Vector3d B,
       std::cout << "(" << samples[i][0] << "," << samples[i][1] << "," << samples[i][2] << ")" << std::endl;
     }
   */
+
+  // now let's flip the vector
+  // std::reverse(samples.begin(), samples.end());
 
   // now let's concatenate some uniform samples in case last_index_inside_sphere=0;
   std::vector<Eigen::Vector3d> uniform_samples = samplePointsSphere(B, r, center);
@@ -620,15 +669,6 @@ inline vec_Vecf<3> getPointsBw2Spheres(vec_Vecf<3> path, double ra, double rb, E
     tmp.push_back(path[i]);
   }
   return tmp;
-}
-
-inline void printElementsOfJPS(vec_Vecf<3> path)
-{
-  printf("Elements of the path given:\n");
-  for (int i = 0; i < path.size(); i++)
-  {
-    std::cout << path[i].transpose() << std::endl;
-  }
 }
 
 inline vec_Vecf<3> copyJPS(vec_Vecf<3> path)
