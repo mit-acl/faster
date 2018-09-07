@@ -264,8 +264,10 @@ void CVX::updateJPSMap(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr)
   Vec3f center_map(state_.pos.x, state_.pos.y, state_.pos.z);  // center of the map
   Vec3i dim(cells_x_, cells_y_, cells_z_);                     //  number of cells in each dimension
   // printf("Before reader\n");
-
-  MapReader<Vec3i, Vec3f> reader(pclptr, dim, par_.factor_jps * par_.res, center_map, par_.z_ground, par_.z_max,
+  // printf("Sending dim=\n");
+  std::cout << dim.transpose() << std::endl;
+  MapReader<Vec3i, Vec3f> reader(pclptr, cells_x_, cells_y_, cells_z_, par_.factor_jps * par_.res, center_map,
+                                 par_.z_ground, par_.z_max,
                                  par_.inflation_jps);  // Map read
   // std::shared_ptr<VoxelMapUtil> map_util = std::make_shared<VoxelMapUtil>();
   // printf("Before setMap\n");
@@ -345,9 +347,9 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f& start, Vec3f& goal, bool* solved)
       printf("I'm going to try to fix it for you: Start= near point in the opposite direction\n");
 
       Eigen::Array3d signed_dists = start - n_obs;
-      double signx = signed_dists[0] / fabs(signed_dists[0]);  // sign of signed_dists[0]
-      double signy = signed_dists[1] / fabs(signed_dists[1]);  // sign of signed_dists[1]
-      double signz = signed_dists[2] / fabs(signed_dists[2]);  // sign of signed_dists[2]
+      double signx = copysign(1, signed_dists[0]);
+      double signy = copysign(1, signed_dists[1]);  // sign of signed_dists[1]
+      double signz = copysign(1, signed_dists[2]);  // sign of signed_dists[2]
 
       std::cout << "Obstaculo" << n_obs.transpose() << std::endl;
       std::cout << "Start antes" << start.transpose() << std::endl;
@@ -368,8 +370,8 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f& start, Vec3f& goal, bool* solved)
       std::cout << "signz=" << signz << std::endl;
 
       std::cout << "1=" << start[0] + signx * (par_.inflation_jps + 2 * par_.res - dist[0]) << std::endl;
-      std::cout << "2=" << signy * (par_.inflation_jps + 2 * par_.res - dist[1]) << std::endl;
-      std::cout << "3=" << signz * (par_.inflation_jps + 2 * par_.res - dist[2]) << std::endl;
+      std::cout << "2=" << signy * (par_.inflation_jps + 1 * par_.res - dist[1]) << std::endl;
+      std::cout << "3=" << signz * (par_.inflation_jps + 1 * par_.res - dist[2]) << std::endl;
 
       /*      std::vector<int> idxR;
             std::vector<float> r2D;  // squared distance
@@ -745,7 +747,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   // printf("In replanCB0.4s\n");
   if (status_ == GOAL_SEEN || status_ == GOAL_REACHED || planner_status_ == REPLANNED || status_ == YAWING)
   {
-    // printf("No replanning needed because planner_status_=%d\n", planner_status_);
+    printf("No replanning needed because planner_status_=%d\n", planner_status_);
     return;
   }
 
@@ -795,10 +797,15 @@ void CVX::replanCB(const ros::TimerEvent& e)
     printf("here, flight_mode=%d\n", flight_mode_.mode);
     // double l = getDistanceToFirstCollisionJPSwithUnkonwnspace(JPS1, &dummy);
     ra = (JPS1[1] - JPS1[0]).norm();
-    saturate(ra, 1.5, 3);
+    saturate(ra, par_.Ra, 4);
   }
 
   ra = std::min(0.96 * dist_to_goal, ra);  // radius of the sphere Sa
+
+  if (flight_mode_.mode != flight_mode_.GO)
+  {
+    ra = term_goal[2] - state_.pos.z;
+  }
 
   printElementsOfJPS(JPS1);
   printf("ra=%f\n", ra);
@@ -999,15 +1006,29 @@ void CVX::replanCB(const ros::TimerEvent& e)
           double dist = (term_goal - p).norm();
           have_seen_the_goal1 = (dist < par_.goal_radius) ? true : false;
 
+          printf("dist=%f\n", dist);
           Timer getCosts2(true);
+          printf("h2\n");
+          std::cout << "JPS2=" << std::endl;
+          printElementsOfJPS(JPS2);
           C2 = getLastIntersectionWithSphere(JPS2, rb, state_pos, &dist2);
+          std::cout << "C2=" << C2.transpose() << std::endl;
           JDist2 = dist2 / par_.v_max;
+          printf("h4\n");
           pubPlanningVisual(state_pos, ra, rb, B2, C2);
+          printf("h5\n");
           pub_trajs_sphere_.publish(trajs_sphere_);
+          printf("h6\n");
           JPrimj2 = solver_jerk_.getCost();
+          printf("h7\n");
           WP2 = getPointsBw2Spheres(JPS2, ra, rb, state_pos);
+          std::cout << "WP2=" << std::endl;
+          printElementsOfJPS(WP2);
+          printf("h8\n");
           WP2.insert(WP2.begin(), B2);
           WP2.push_back(C2);
+          std::cout << "WP2 despues=" << std::endl;
+          printElementsOfJPS(WP2);
           JPrimv2 = solveVelAndGetCost(WP2);
           J2 = JPrimj2 + JPrimv2 + JDist2;
           printf("ReplanCB: Get Costs for 1 takes %f ms\n", (double)getCosts2.Elapsed().count());
@@ -1233,15 +1254,15 @@ void CVX::pubCB(const ros::TimerEvent& e)
   {
     quadGoal_.cut_power = false;
 
-    if ((planner_status_ == REPLANNED && (k_ > k_initial_cond_)))
-    {  // I've published what I planned --> plan again
-       // printf("Rejecting current plan, planning again. Suggestion: Increase the offset\n");
-      // planner_status_ = START_REPLANNING;
-      // printf("pubCB: planner_status_ = START_REPLANNING\n");
-      printf("k_ > k_initial_cond_\n");
-    }
+    /*    if ((planner_status_ == REPLANNED && (k_ > k_initial_cond_)))
+        {  // I've published what I planned --> plan again
+           // printf("Rejecting current plan, planning again. Suggestion: Increase the offset\n");
+          planner_status_ = START_REPLANNING;
+          // printf("pubCB: planner_status_ = START_REPLANNING\n");
+          printf("k_ > k_initial_cond_\n");
+        }*/
 
-    if ((planner_status_ == REPLANNED && (k_ == k_initial_cond_)) ||
+    if ((planner_status_ == REPLANNED && (k_ >= k_initial_cond_)) ||  // Should be k_==
         (force_reset_to_0_ && planner_status_ == REPLANNED))
     {
       force_reset_to_0_ = false;
@@ -1285,7 +1306,7 @@ void CVX::pubCB(const ros::TimerEvent& e)
       }
     }
 
-    if (status_ == TRAVELING || status_ == GOAL_SEEN)
+    if ((status_ == TRAVELING || status_ == GOAL_SEEN))
     {
       double desired_yaw = atan2(quadGoal_.vel.y, quadGoal_.vel.x);
       double diff = desired_yaw - quadGoal_.yaw;
@@ -1669,11 +1690,13 @@ void CVX::unkCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
   }
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloudIn(new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::PointCloud<pcl::PointXYZ>::Ptr cloudFiltered(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::fromROSMsg(*pcl2ptr_msg, *cloudIn);
   std::vector<int> index;
   pcl::removeNaNFromPointCloud(*cloudIn, *cloudIn, index);
-  if (cloudIn->size() == 0)
+  if (cloudIn->points.size() == 0)
   {
+    printf("Cloud In has 0 points\n");
     return;
   }
 
@@ -1681,55 +1704,60 @@ void CVX::unkCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
   /*  // If the drone is nos flying/taking of/..., let's remove a box around it so that it can take off.
     if (flight_mode_.mode == flight_mode_.LAND || flight_mode_.mode == flight_mode_.TAKEOFF ||
         flight_mode_.mode == flight_mode_.NOT_FLYING || flight_mode_.mode == flight_mode_.INIT)
+    {*/
+  /*  printf("removing unkown space to allow takeoff\n");
+    // printf("inside\n");
+    // TODO A box filter would be better, I don't know why it doesn't work...
+
+    // Note that this is not visualized in the point cloud
+    float l = par_.drone_radius;
+    Eigen::Vector4f minPoint;
+    minPoint[0] = state_.pos.x - l;  // define minimum point x
+    minPoint[1] = state_.pos.y - l;  // define minimum point y
+    minPoint[2] = state_.pos.z - l;  // define minimum point z
+    minPoint[3] = 1;
+    Eigen::Vector4f maxPoint;
+    maxPoint[0] = state_.pos.x + l;  // define maximum point x
+    maxPoint[1] = state_.pos.y + l;  // define maximum point y
+    maxPoint[2] = state_.pos.z + l;  // define maximum point z
+    maxPoint[3] = 1;
+
+    std::cout << minPoint << std::endl;
+    std::cout << maxPoint << std::endl;
+
+    // pcl::PointCloud<pcl::PointXYZ>::Ptr cloudOut(new pcl::PointCloud<pcl::PointXYZ>);
+
+    pcl::CropBox<pcl::PointXYZ> cropFilter;
+
+    cropFilter.setMin(minPoint);
+    cropFilter.setMax(maxPoint);
+    cropFilter.setInputCloud(cloudIn);
+    cropFilter.filter(*cloudFiltered);
+    //I think I'm missing sth here
+
+    if (cloudFiltered->points.size() == 0)
     {
-      printf("removing unkown space to allow takeoff\n");
-      // printf("inside\n");
-      // TODO A box filter would be better, I don't know why it doesn't work...
-
-          // if the drone is not flying, remove a bounding box of side=3 m around the drone to ensure that it can take
-    off
-          // Note that this is not visualized in the point cloud
-          float l = 4;
-          Eigen::Vector4f minPoint;
-          minPoint[0] = state_.pos.x - l;  // define minimum point x
-          minPoint[1] = state_.pos.y - l;  // define minimum point y
-          minPoint[2] = state_.pos.z - l;  // define minimum point z
-          minPoint[3] = 1;
-          Eigen::Vector4f maxPoint;
-          maxPoint[0] = state_.pos.x + l;  // define maximum point x
-          maxPoint[1] = state_.pos.y + l;  // define maximum point y
-          maxPoint[2] = state_.pos.z + l;  // define maximum point z
-          maxPoint[3] = 1;
-
-          std::cout << minPoint << std::endl;
-          std::cout << maxPoint << std::endl;
-
-          // pcl::PointCloud<pcl::PointXYZ>::Ptr cloudOut(new pcl::PointCloud<pcl::PointXYZ>);
-
-          pcl::CropBox<pcl::PointXYZ> cropFilter;
-
-          cropFilter.setMin(minPoint);
-          cropFilter.setMax(maxPoint);
-          cropFilter.setInputCloud(cloudIn);
-          cropFilter.filter(*pclptr_unk_);
-
-      // printf("Size before=%d", cloudIn->points.size());
-      pcl::PassThrough<pcl::PointXYZ> pass;
-      pass.setInputCloud(cloudIn);
-      pass.setFilterFieldName("z");
-      pass.setFilterLimits(-1, 1.5);       // TODO: Change this hand-coded values
-      pass.setFilterLimitsNegative(true);  // Forget the unknown space between z=-1 and z=3
-      pass.filter(*pclptr_unk_);
-
-      // printf("Size after=%d", pclptr_unk_->points.size());
-      if (pclptr_unk_->points.size() != 0)
-      {
-        kdtree_unk_.setInputCloud(pclptr_unk_);
-        kdtree_unk_initialized_ = 1;
-      }
+      printf("Cloud filtered has 0 points\n");
+      return;
     }
-    else
-    {  // when the drone is flying*/
+  */
+  /*    // printf("Size before=%d", cloudIn->points.size());
+     pcl::PassThrough<pcl::PointXYZ> pass;
+     pass.setInputCloud(cloudIn);
+     pass.setFilterFieldName("z");
+     pass.setFilterLimits(-1, 1.5);       // TODO: Change this hand-coded values
+     pass.setFilterLimitsNegative(true);  // Forget the unknown space between z=-1 and z=3
+     pass.filter(*pclptr_unk_);
+
+     // printf("Size after=%d", pclptr_unk_->points.size());
+     if (pclptr_unk_->points.size() != 0)
+     {
+       kdtree_unk_.setInputCloud(pclptr_unk_);
+       kdtree_unk_initialized_ = 1;
+     }
+   }
+   else
+   {  // when the drone is flying*/
 
   kdtree_unk_.setInputCloud(cloudIn);
   kdtree_unk_initialized_ = 1;

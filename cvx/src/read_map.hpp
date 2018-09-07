@@ -7,8 +7,8 @@ template <class Ti, class Tf>
 class MapReader
 {
 public:
-  MapReader(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr, Vec3i& dim, double res, const Vec3f center_map, double z_ground,
-            double z_max, double inflation)
+  MapReader(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr, int cells_x, int cells_y, int cells_z, double res,
+            const Vec3f center_map, double z_ground, double z_max, double inflation)
   {
     // printf("reading_map\n");
     // **Box of the map --> it's the box with which the map moves.
@@ -31,11 +31,13 @@ public:
     /// amount)
 
     // printf("In reader2\n");
+    Vec3i dim(cells_x, cells_y, cells_z);
+    // printf("dim[0] before is %d\n", dim[0]);
 
     dim[0] = dim[0] + (int)(5 * (inflation * 1.0) / res);
     dim[1] = dim[1] + (int)(5 * (inflation * 1.0) / res);
 
-    printf("dim[0] is %f\n", dim[0]);
+    // printf("dim[0] is %d\n", dim[0]);
 
     int dim2_down = dim[2] / 2.0;
     int dim2_up = dim[2] / 2.0;
@@ -56,8 +58,8 @@ public:
       dim2_up = (dim2_up > 0) ? dim2_up : 1;           // Force it to be >= 1
       // dim[2] = dim2_down + dim2_up;
     }
-    printf("z_max is %f\n", z_max);
-    printf("Dim_up is %d\n", dim2_up);
+    // printf("z_max is %f\n", z_max);
+    // printf("Dim_up is %d\n", dim2_up);
     dim[2] = dim2_down + dim2_up;
     /*    printf("*******Dim before is\n");
         std::cout << dim << std::endl;*/

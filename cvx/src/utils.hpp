@@ -81,6 +81,10 @@ inline std::vector<Eigen::Vector3d> samplePointsSphere(Eigen::Vector3d B, double
       {
         tmp.push_back(p2);
       }
+      if (theta == 0)
+      {  // to avoid including multiple times the pointB
+        break;
+      }
     }
   }
 
@@ -101,8 +105,9 @@ inline void printElementsOfJPS(vec_Vecf<3> path)
 // last_index_inside_sphere is the the index of the last point that is inside the sphere (should be provided as a
 // parameter to this function)
 // B is the first intersection of JPS with the sphere
-inline std::vector<Eigen::Vector3d> samplePointsSphereWithJPS(Eigen::Vector3d& B, double r, Eigen::Vector3d& center,
-                                                              vec_Vecf<3>& path_sent, int last_index_inside_sphere)
+inline std::vector<Eigen::Vector3d> samplePointsSphereWithJPS(Eigen::Vector3d& B, double r,
+                                                              Eigen::Vector3d& center_sent, vec_Vecf<3>& path_sent,
+                                                              int last_index_inside_sphere)
 {
   vec_Vecf<3> path;
 
@@ -111,6 +116,13 @@ inline std::vector<Eigen::Vector3d> samplePointsSphereWithJPS(Eigen::Vector3d& B
     path.push_back(path_sent[i]);  // Local copy of path_sent
   }
 
+  Eigen::Vector3d center(center_sent[0], center_sent[1], center_sent[2]);
+
+  /*  for (int i = 0; i < path_sent.size(); i++)
+    {
+      path.push_back(path_sent[i]);  // Local copy of path_sent
+    }
+  */
   /*  printf("To sample points1\n");
     center = Eigen::Vector3d(1, 2, 3);
     r = 6.57;
@@ -150,16 +162,33 @@ inline std::vector<Eigen::Vector3d> samplePointsSphereWithJPS(Eigen::Vector3d& B
     Eigen::Vector3d a = point_i;
     Eigen::Vector3d b = point_im1;
 
-    double tmp = a.dot(b) / (a.norm() * b.norm());
-
-    saturate(tmp, -1, 1);
-
-    double angle_max = acos(tmp);
-
-    if (std::isnan(angle_max))
+    double angle_max;
+    if (a.norm() != 0 && b.norm() != 0)
     {
-      continue;  // sometimes the path has two same elements. Skip it (if not there will be an error later in cvxgen)
+      printf("estoy dentro\n");
+      double tmp = a.dot(b) / (a.norm() * b.norm());
+      saturate(tmp, -1, 1);
+      angle_max = acos(tmp);
     }
+    else
+    {
+      samples.push_back(B);
+      continue;  // it's weird, but solves the problem when the vectors a and b are the same ones...
+    }
+    std::cout << "a=" << a.transpose() << std::endl;
+    std::cout << "b=" << b.transpose() << std::endl;
+
+    std::cout << "a=" << a.norm() << std::endl;
+    std::cout << "b=" << b.norm() << std::endl;
+
+    std::cout << "numerator=" << a.dot(b) << std::endl;
+    std::cout << "denominator=" << a.norm() * b.norm() << std::endl;
+
+    /*    if (std::isnan(angle_max))
+        {
+          continue;  // sometimes the path has two same elements. Skip it (if not there will be an error later in
+       cvxgen)
+        }*/
 
     Eigen::Vector3d perp = (point_i.cross(point_im1)).normalized();  // perpendicular vector to point_i and point_ip1;
     printf("Perpendicular vector=\n");
@@ -209,10 +238,29 @@ inline std::vector<Eigen::Vector3d> samplePointsSphereWithJPS(Eigen::Vector3d& B
   // std::reverse(samples.begin(), samples.end());
 
   // now let's concatenate some uniform samples in case last_index_inside_sphere=0;
+  printf("ahora mismo samples vale:\n");
+  for (int i = 0; i < samples.size(); i++)
+  {
+    std::cout << samples[i].transpose() << std::endl;
+  }
+  printf("despues del bucle:\n");
   std::vector<Eigen::Vector3d> uniform_samples = samplePointsSphere(B, r, center);
+
+  printf("uniform_samples vale:\n");
+  for (int i = 0; i < uniform_samples.size(); i++)
+  {
+    std::cout << uniform_samples[i].transpose() << std::endl;
+  }
 
   samples.insert(samples.end(), uniform_samples.begin(),
                  uniform_samples.end());  // concatenate samples and uniform samples
+
+  printf("y despues samples vale:\n");
+  for (int i = 0; i < samples.size(); i++)
+  {
+    std::cout << samples[i].transpose() << std::endl;
+  }
+  printf("returning it:\n");
 
   return samples;
 }
@@ -436,7 +484,8 @@ inline bool getIntersectionWithPlane(Eigen::Vector3d P1, Eigen::Vector3d P2, Eig
 
 // given 2 points (A inside and B outside the sphere) it computes the intersection of the lines between
 // that 2 points and the sphere
-inline Eigen::Vector3d getIntersectionWithSphere(Eigen::Vector3d A, Eigen::Vector3d B, double r, Eigen::Vector3d center)
+inline Eigen::Vector3d getIntersectionWithSphere(Eigen::Vector3d& A, Eigen::Vector3d& B, double r,
+                                                 Eigen::Vector3d& center)
 {
   // http://www.ambrsoft.com/TrigoCalc/Sphere/SpherLineIntersection_.htm
   /*  std::cout << "Center=" << std::endl << center << std::endl;
@@ -462,7 +511,25 @@ inline Eigen::Vector3d getIntersectionWithSphere(Eigen::Vector3d A, Eigen::Vecto
   float discrim = b * b - 4 * a * c;
   if (discrim <= 0)
   {
-    printf("The line is tangent or doesn't intersect, returning the first point\n");
+    printf("The line is tangent or doesn't intersect, returning the intersection with the center and the first "
+           "point\n");
+
+    float x1 = center[0];
+    float y1 = center[1];
+    float z1 = center[2];
+
+    float x2 = A[0];
+    float y2 = A[1];
+    float z2 = A[2];
+
+    float x3 = center[0];
+    float y3 = center[1];
+    float z3 = center[2];
+
+    float a = pow((x2 - x1), 2) + pow((y2 - y1), 2) + pow((z2 - z1), 2);
+    float b = 2 * ((x2 - x1) * (x1 - x3) + (y2 - y1) * (y1 - y3) + (z2 - z1) * (z1 - z3));
+    float c = x3 * x3 + y3 * y3 + z3 * z3 + x1 * x1 + y1 * y1 + z1 * z1 - 2 * (x3 * x1 + y3 * y1 + z3 * z1) - r * r;
+
     return A;
   }
   else
@@ -481,10 +548,16 @@ inline Eigen::Vector3d getIntersectionWithSphere(Eigen::Vector3d A, Eigen::Vecto
 // it returns its first intersection with a sphere of radius=r and center=center
 // the center is added as the first point of the path to ensure that the first element of the path is inside the sphere
 // (to avoid issues with the first point of JPS2)
-inline Eigen::Vector3d getFirstIntersectionWithSphere(vec_Vecf<3> path, double r, Eigen::Vector3d center,
+inline Eigen::Vector3d getFirstIntersectionWithSphere(vec_Vecf<3>& path, double r, Eigen::Vector3d& center,
                                                       int* last_index_inside_sphere = NULL,
                                                       bool* noPointsOutsideSphere = NULL)
 {
+  /*  vec_Vecf<3> path;
+    for (int i = 0; i < path_sent.size(); i++)
+    {
+      path[i] = path_sent[i];
+    }*/
+
   // printf("here\n");
   if (noPointsOutsideSphere != NULL)
   {  // this argument has been provided
@@ -506,6 +579,8 @@ inline Eigen::Vector3d getFirstIntersectionWithSphere(vec_Vecf<3> path, double r
   Eigen::Vector3d A;
   Eigen::Vector3d B;
 
+  Eigen::Vector3d intersection;
+
   switch (index)
   {
     case -1:  // no points are outside the sphere --> find projection center-lastPoint into the sphere
@@ -519,15 +594,18 @@ inline Eigen::Vector3d getFirstIntersectionWithSphere(vec_Vecf<3> path, double r
       {  // this argument has been provided
         *noPointsOutsideSphere = true;
       }
+      intersection = getIntersectionWithSphere(A, B, r, center);
       break;
     case 0:  // First element is outside the sphere
-      printf("First element is still oustide the sphere, there is sth wrong\n");
+      printf("First element is still oustide the sphere, there is sth wrong, returning the first element\n");
+      intersection = path[0];
       // std::cout << "radius=" << r << std::endl;
       // std::cout << "dist=" << (path[0] - center).norm() << std::endl;
       break;
     default:
       A = path[index - 1];
       B = path[index];
+      intersection = getIntersectionWithSphere(A, B, r, center);
       // printf("index-1=%d\n", index - 1);
       if (last_index_inside_sphere != NULL)
       {
@@ -536,7 +614,6 @@ inline Eigen::Vector3d getFirstIntersectionWithSphere(vec_Vecf<3> path, double r
   }
 
   bool thereIsIntersec;
-  Eigen::Vector3d intersection = getIntersectionWithSphere(A, B, r, center);
 
   return intersection;
 }
@@ -572,6 +649,8 @@ inline Eigen::Vector3d getLastIntersectionWithSphere(vec_Vecf<3> path, double r,
   Eigen::Vector3d B = path[index + 1];
 
   Eigen::Vector3d intersection = getIntersectionWithSphere(A, B, r, center);
+  printf("returning intersection=\n");
+  std::cout << intersection.transpose() << std::endl;
   return intersection;
 }
 
@@ -579,15 +658,15 @@ inline Eigen::Vector3d getLastIntersectionWithSphere(vec_Vecf<3> path, double r,
 // the path)
 inline Eigen::Vector3d getLastIntersectionWithSphere(vec_Vecf<3> path, double r, Eigen::Vector3d center, double* Jdist)
 {
-  // printf("********************In getLastIntersectionWithSphere\n");
+  printf("********************In getLastIntersectionWithSphere\n");
 
-  /*  printf("Radius=%f\n", r);
-    std::cout << "Center\n" << center.transpose() << std::endl;
-    printf("Path\n");
-    for (int i = 0; i < path.size(); i++)
-    {
-      std::cout << path[i].transpose() << std::endl;
-    }*/
+  printf("Radius=%f\n", r);
+  std::cout << "Center\n" << center.transpose() << std::endl;
+  printf("Path\n");
+  for (int i = 0; i < path.size(); i++)
+  {
+    std::cout << path[i].transpose() << std::endl;
+  }
 
   int index = -1;
   for (int i = path.size() - 1; i >= 0; i--)
@@ -615,8 +694,8 @@ inline Eigen::Vector3d getLastIntersectionWithSphere(vec_Vecf<3> path, double r,
 
   Eigen::Vector3d intersection = getIntersectionWithSphere(A, B, r, center);
 
-  /*  std::cout << "B\n " << B.transpose() << std::endl;
-    std::cout << "intersection\n " << intersection.transpose() << std::endl;*/
+  std::cout << "B\n " << B.transpose() << std::endl;
+  std::cout << "intersection\n " << intersection.transpose() << std::endl;
 
   *Jdist = (B - intersection).norm();
   // printf("primer valor es=%f\n", (B - intersection).norm());
