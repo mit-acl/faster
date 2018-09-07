@@ -355,11 +355,11 @@ void Solver<INPUT_ORDER>::interpolate(int var, double** u, double** x)
 template <int INPUT_ORDER>
 void Solver<INPUT_ORDER>::genNewTraj()
 {
-  printf("In genNewTraj\n");
+  // printf("In genNewTraj\n");
   callOptimizer();
-  printf("In genNewTraj0.5\n");
+  // printf("In genNewTraj0.5\n");
   resetXandU();
-  printf("In genNewTraj1\n");
+  // printf("In genNewTraj1\n");
   switch (INPUT_ORDER)
   {
     case VEL:
@@ -374,10 +374,10 @@ void Solver<INPUT_ORDER>::genNewTraj()
       // printf("Obtained by derivation\n");
       break;
     case ACCEL:
-      printf("In genNewTraj2\n");
+      // printf("In genNewTraj2\n");
       x_ = accel_get_state();
       u_ = accel_get_control();
-      printf("In genNewTraj3\n");
+      // printf("In genNewTraj3\n");
       interpolate(POS, u_, x_);    // interpolate POS
       interpolate(VEL, u_, x_);    // ...
       interpolate(ACCEL, u_, x_);  // ...

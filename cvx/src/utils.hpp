@@ -42,12 +42,12 @@ inline void saturate(double& var, double min, double max)
 
 inline double angleBetVectors(const Eigen::Vector3d& a, const Eigen::Vector3d& b)
 {
-  printf("In angleBetVEctors\n");
-  std::cout << a.transpose() << std::endl;
-  std::cout << b.transpose() << std::endl;
+  // printf("In angleBetVEctors\n");
+  // std::cout << a.transpose() << std::endl;
+  // std::cout << b.transpose() << std::endl;
 
   double tmp = a.dot(b) / (a.norm() * b.norm());
-  printf("tmp=%f\n", tmp);
+  // printf("tmp=%f\n", tmp);
   saturate(tmp, -1, 1);
   return acos(tmp);
 }
@@ -91,14 +91,14 @@ inline std::vector<Eigen::Vector3d> samplePointsSphere(Eigen::Vector3d B, double
   return tmp;
 }
 
-inline void printElementsOfJPS(vec_Vecf<3> path)
+/*inline void printElementsOfJPS(vec_Vecf<3> path)
 {
   printf("Elements of the path given:\n");
   for (int i = 0; i < path.size(); i++)
   {
     std::cout << path[i].transpose() << std::endl;
   }
-}
+}*/
 
 // returns the points around B sampled in the sphere with radius r and center center, and sampled intelligently with
 // the given path
@@ -145,8 +145,8 @@ inline std::vector<Eigen::Vector3d> samplePointsSphereWithJPS(Eigen::Vector3d& B
   Eigen::Vector3d dir;
   double x, y, z;
 
-  printf("In samplePointsSphereWithJPS\n");
-  printElementsOfJPS(path);
+  // printf("In samplePointsSphereWithJPS\n");
+  // printElementsOfJPS(path);
 
   for (int i = last_index_inside_sphere + 1; i >= 1; i--)
   {
@@ -156,8 +156,8 @@ inline std::vector<Eigen::Vector3d> samplePointsSphereWithJPS(Eigen::Vector3d& B
     /*    Eigen::Vector3d& point_i_ref(point_i);      // point i expressed with origin=origin sphere
         Eigen::Vector3d& point_im1_ref(point_im1);  // point i minus 1*/
 
-    std::cout << "i=" << i << "point_i=" << path[i].transpose() << std::endl;
-    std::cout << "i=" << i << "point_im1=" << path[i - 1].transpose() << std::endl;
+    // std::cout << "i=" << i << "point_i=" << path[i].transpose() << std::endl;
+    // std::cout << "i=" << i << "point_im1=" << path[i - 1].transpose() << std::endl;
 
     Eigen::Vector3d a = point_i;
     Eigen::Vector3d b = point_im1;
@@ -165,7 +165,7 @@ inline std::vector<Eigen::Vector3d> samplePointsSphereWithJPS(Eigen::Vector3d& B
     double angle_max;
     if (a.norm() != 0 && b.norm() != 0)
     {
-      printf("estoy dentro\n");
+      // printf("estoy dentro\n");
       double tmp = a.dot(b) / (a.norm() * b.norm());
       saturate(tmp, -1, 1);
       angle_max = acos(tmp);
@@ -175,14 +175,14 @@ inline std::vector<Eigen::Vector3d> samplePointsSphereWithJPS(Eigen::Vector3d& B
       samples.push_back(B);
       continue;  // it's weird, but solves the problem when the vectors a and b are the same ones...
     }
-    std::cout << "a=" << a.transpose() << std::endl;
-    std::cout << "b=" << b.transpose() << std::endl;
+    /*    std::cout << "a=" << a.transpose() << std::endl;
+        std::cout << "b=" << b.transpose() << std::endl;
 
-    std::cout << "a=" << a.norm() << std::endl;
-    std::cout << "b=" << b.norm() << std::endl;
+        std::cout << "a=" << a.norm() << std::endl;
+        std::cout << "b=" << b.norm() << std::endl;
 
-    std::cout << "numerator=" << a.dot(b) << std::endl;
-    std::cout << "denominator=" << a.norm() * b.norm() << std::endl;
+        std::cout << "numerator=" << a.dot(b) << std::endl;
+        std::cout << "denominator=" << a.norm() * b.norm() << std::endl;*/
 
     /*    if (std::isnan(angle_max))
         {
@@ -191,8 +191,8 @@ inline std::vector<Eigen::Vector3d> samplePointsSphereWithJPS(Eigen::Vector3d& B
         }*/
 
     Eigen::Vector3d perp = (point_i.cross(point_im1)).normalized();  // perpendicular vector to point_i and point_ip1;
-    printf("Perpendicular vector=\n");
-    std::cout << perp << std::endl;
+    // printf("Perpendicular vector=\n");
+    // std::cout << perp << std::endl;
 
     for (double angle = 0; angle < angle_max; angle = angle + 0.34)
     {
@@ -238,29 +238,29 @@ inline std::vector<Eigen::Vector3d> samplePointsSphereWithJPS(Eigen::Vector3d& B
   // std::reverse(samples.begin(), samples.end());
 
   // now let's concatenate some uniform samples in case last_index_inside_sphere=0;
-  printf("ahora mismo samples vale:\n");
-  for (int i = 0; i < samples.size(); i++)
-  {
-    std::cout << samples[i].transpose() << std::endl;
-  }
-  printf("despues del bucle:\n");
+  // printf("ahora mismo samples vale:\n");
+  /*  for (int i = 0; i < samples.size(); i++)
+    {
+      std::cout << samples[i].transpose() << std::endl;
+    }*/
+  // printf("despues del bucle:\n");
   std::vector<Eigen::Vector3d> uniform_samples = samplePointsSphere(B, r, center);
 
-  printf("uniform_samples vale:\n");
-  for (int i = 0; i < uniform_samples.size(); i++)
-  {
-    std::cout << uniform_samples[i].transpose() << std::endl;
-  }
+  // printf("uniform_samples vale:\n");
+  /*  for (int i = 0; i < uniform_samples.size(); i++)
+    {
+      std::cout << uniform_samples[i].transpose() << std::endl;
+    }*/
 
   samples.insert(samples.end(), uniform_samples.begin(),
                  uniform_samples.end());  // concatenate samples and uniform samples
 
-  printf("y despues samples vale:\n");
-  for (int i = 0; i < samples.size(); i++)
-  {
-    std::cout << samples[i].transpose() << std::endl;
-  }
-  printf("returning it:\n");
+  /*  printf("y despues samples vale:\n");
+    for (int i = 0; i < samples.size(); i++)
+    {
+      std::cout << samples[i].transpose() << std::endl;
+    }
+    printf("returning it:\n");*/
 
   return samples;
 }
@@ -638,10 +638,10 @@ inline Eigen::Vector3d getLastIntersectionWithSphere(vec_Vecf<3> path, double r,
 
   if (index == path.size() - 1)
   {
-    std::cout << "radius=" << r << std::endl;
-    std::cout << "dist=" << (path[index] - center).norm() << std::endl;
+    // std::cout << "radius=" << r << std::endl;
+    // std::cout << "dist=" << (path[index] - center).norm() << std::endl;
 
-    printf("ERROR, the goal is inside the sphere Sb, returning the last point\n");
+    // printf("ERROR, the goal is inside the sphere Sb, returning the last point\n");
     return path[path.size() - 1];
   }
   // Note that it's guaranteed that index>=1, since the path[0] is always inside the sphere.
@@ -649,8 +649,8 @@ inline Eigen::Vector3d getLastIntersectionWithSphere(vec_Vecf<3> path, double r,
   Eigen::Vector3d B = path[index + 1];
 
   Eigen::Vector3d intersection = getIntersectionWithSphere(A, B, r, center);
-  printf("returning intersection=\n");
-  std::cout << intersection.transpose() << std::endl;
+  // printf("returning intersection=\n");
+  // std::cout << intersection.transpose() << std::endl;
   return intersection;
 }
 
@@ -658,15 +658,15 @@ inline Eigen::Vector3d getLastIntersectionWithSphere(vec_Vecf<3> path, double r,
 // the path)
 inline Eigen::Vector3d getLastIntersectionWithSphere(vec_Vecf<3> path, double r, Eigen::Vector3d center, double* Jdist)
 {
-  printf("********************In getLastIntersectionWithSphere\n");
+  /*  printf("********************In getLastIntersectionWithSphere\n");
 
-  printf("Radius=%f\n", r);
-  std::cout << "Center\n" << center.transpose() << std::endl;
-  printf("Path\n");
-  for (int i = 0; i < path.size(); i++)
-  {
-    std::cout << path[i].transpose() << std::endl;
-  }
+    printf("Radius=%f\n", r);
+    std::cout << "Center\n" << center.transpose() << std::endl;
+    printf("Path\n");
+    for (int i = 0; i < path.size(); i++)
+    {
+      std::cout << path[i].transpose() << std::endl;
+    }*/
 
   int index = -1;
   for (int i = path.size() - 1; i >= 0; i--)
@@ -694,8 +694,8 @@ inline Eigen::Vector3d getLastIntersectionWithSphere(vec_Vecf<3> path, double r,
 
   Eigen::Vector3d intersection = getIntersectionWithSphere(A, B, r, center);
 
-  std::cout << "B\n " << B.transpose() << std::endl;
-  std::cout << "intersection\n " << intersection.transpose() << std::endl;
+  // std::cout << "B\n " << B.transpose() << std::endl;
+  // std::cout << "intersection\n " << intersection.transpose() << std::endl;
 
   *Jdist = (B - intersection).norm();
   // printf("primer valor es=%f\n", (B - intersection).norm());

@@ -46,6 +46,7 @@ struct kdTreeStamped
 struct parameteres
 {
   bool use_ff;
+  bool visual;
 
   double wdx;
   double wdy;
@@ -235,6 +236,9 @@ private:
 
   int k_ = 0;               // Row of X_ that will be published next;
   int k_initial_cond_ = 0;  // Row of X_ chosen as the initial condition for the planner
+
+  int k_initial_cond_1_ = 0;
+  int k_initial_cond_2_ = 0;
 
   vec_Vecf<3> JPS_old_;
 
