@@ -803,6 +803,24 @@ void CVX::replanCB(const ros::TimerEvent& e)
   static bool first_time = true;                            // how many times I've solved JPS1
   JPS1 = solveJPS3D(state_pos, term_goal, &solvedjps1, 1);  // Solution is in JPS1
   // printf("Aqui89\n");
+  bool previous = solvedjps1;
+  if (solvedjps1 ==
+      false)  // Happens when the drone is near the obstacles. Let's sample some points to scape from this situation.
+  {
+    for (float i = -0.2; i <= 0.25 && solvedjps1 == false; i = i + 0.2)
+    {
+      for (float j = -0.2; j <= 0.25 && solvedjps1 == false; j = j + 0.2)
+      {
+        printf("Trying to escape from critial situation!!***\n");
+        Eigen::Vector3d new_pos(state_pos[0] + i, state_pos[1] + j, state_pos[2]);
+        JPS1 = solveJPS3D(new_pos, term_goal, &solvedjps1, 1);
+      }
+    }
+  }
+  if (previous == false && solvedjps1 == true)
+  {
+    printf("******************Escaped from critial situation!!***\n");
+  }
 
   // printf("init3\n");
   bool dummy;
@@ -898,7 +916,9 @@ void CVX::replanCB(const ros::TimerEvent& e)
     // printf("hola5\n");
     if (X_initialized_)  // Needed to skip the first time (X_ still not initialized)
     {
+      mtx_k.lock();
       k_initial_cond_1_ = std::min(k_ + par_.offset, (int)(X_.rows() - 1));
+      mtx_k.unlock();
       updateInitialCond(k_initial_cond_1_);
     }
     //////SOLVING FOR JERK
@@ -1005,7 +1025,9 @@ void CVX::replanCB(const ros::TimerEvent& e)
       {
         if (X_initialized_)  // Needed to skip the first time (X_ still not initialized)
         {
+          mtx_k.lock();
           k_initial_cond_2_ = std::min(k_ + par_.offset, (int)(X_.rows() - 1));
+          mtx_k.unlock();
           updateInitialCond(k_initial_cond_2_);
         }
 
@@ -1124,8 +1146,12 @@ void CVX::replanCB(const ros::TimerEvent& e)
     U_temp_ = U_temp1;
     X_temp_ = X_temp1;
     JPS_old_ = JPS1;
+    mtx_k.lock();
     k_initial_cond_ = k_initial_cond_1_;
+    mtx_k.unlock();
     printf("****************************************choosing 1\n");
+    std::cout << "Estas son las 10 1as filas de lo planificado" << std::endl;
+    std::cout << X_temp_.block(0, 0, 10, 1) << std::endl;
     // printf("Copying Xtemp1\n");
   }
   else if (have_seen_the_goal2)
@@ -1134,8 +1160,12 @@ void CVX::replanCB(const ros::TimerEvent& e)
     U_temp_ = U_temp2;
     X_temp_ = X_temp2;
     JPS_old_ = JPS2;
+    mtx_k.lock();
     k_initial_cond_ = k_initial_cond_2_;
+    mtx_k.unlock();
     printf("****************************************choosing 2\n");
+    std::cout << "Estas son las 10 1as filas de lo planificado" << std::endl;
+    std::cout << X_temp_.block(0, 0, 10, 1) << std::endl;
     // printf("Copying Xtemp2\n");
   }
   else
@@ -1146,8 +1176,12 @@ void CVX::replanCB(const ros::TimerEvent& e)
       U_temp_ = U_temp1;
       X_temp_ = X_temp1;
       JPS_old_ = JPS1;
+      mtx_k.lock();
       k_initial_cond_ = k_initial_cond_1_;
+      mtx_k.unlock();
       printf("***************************************choosing 1\n");
+      std::cout << "Estas son las 10 1as filas de lo planificado" << std::endl;
+      std::cout << X_temp_.block(0, 0, 10, 1) << std::endl;
     }
     else
     {
@@ -1155,8 +1189,12 @@ void CVX::replanCB(const ros::TimerEvent& e)
       U_temp_ = U_temp2;
       X_temp_ = X_temp2;
       JPS_old_ = JPS2;
+      mtx_k.lock();
       k_initial_cond_ = k_initial_cond_2_;
+      mtx_k.unlock();
       printf("**************************************choosing 2\n");
+      std::cout << "Estas son las 10 1as filas de lo planificado" << std::endl;
+      std::cout << X_temp_.block(0, 0, 10, 1) << std::endl;
     }
   }
 
@@ -1171,7 +1209,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   // ROS_WARN("solve time: %0.2f ms", 1000 * (ros::Time::now().toSec() - then));
   // printf("ReplanCB: Deciding takes %f ms\n", (double)decision_time.Elapsed().count());
   log_.total_ms_replanCB = 1000 * (ros::Time::now().toSec() - t0replanCB);
-  printf("************ReplanCB: TotalTime= %0.2f ms\n", 1000 * (ros::Time::now().toSec() - t0replanCB));
+  // printf("************ReplanCB: TotalTime= %0.2f ms\n", 1000 * (ros::Time::now().toSec() - t0replanCB));
   log_.header.stamp = ros::Time::now();
   pub_log_.publish(log_);
 }
@@ -1334,10 +1372,11 @@ void CVX::pubCB(const ros::TimerEvent& e)
 
     // printf("k_ = %d\n", k_);
     // printf("k_initial_cond_ = %d\n", k_initial_cond_);
-
+    mtx_k.lock();
     if ((planner_status_ == REPLANNED && (k_ == k_initial_cond_)) ||  // Should be k_==
         (force_reset_to_0_ && planner_status_ == REPLANNED))
     {
+      printf("************Reseteando a 0!\n");
       force_reset_to_0_ = false;
       X_ = X_temp_;
       U_ = U_temp_;
@@ -1353,11 +1392,15 @@ void CVX::pubCB(const ros::TimerEvent& e)
        // printf("Rejecting current plan, planning again. Suggestion: Increase the offset\n");
       planner_status_ = START_REPLANNING;
       // printf("pubCB: planner_status_ = START_REPLANNING\n");
-      //  printf("k_ > k_initial_cond_\n");
+      printf("********************k_ > k_initial_cond_\n");
     }
 
     k_ = std::min(k_, (int)(X_.rows() - 1));
-    int kp1 = std::min(k_ + par_.offset, (int)(X_.rows() - 1));  // k plus offset
+    std::cout << "PubCB: Esto es lo que tengo por delante, voy a publicar la 1a fila" << std::endl;
+    std::cout << X_.block(k_, 0, 10, 1) << std::endl;
+
+    mtx_k.unlock();
+    // int kp1 = std::min(k_ + par_.offset, (int)(X_.rows() - 1));  // k plus offset
 
     quadGoal_.pos = getPos(k_);
     quadGoal_.vel = getVel(k_);
@@ -1395,7 +1438,9 @@ void CVX::pubCB(const ros::TimerEvent& e)
       yaw(diff, quadGoal_);
     }
 
+    mtx_k.lock();
     k_++;
+    mtx_k.unlock();
   }
   else
   {

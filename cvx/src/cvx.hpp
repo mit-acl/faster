@@ -285,7 +285,7 @@ private:
   std::mutex mtx_inst;  // mutex of instanteneous data (v_kdtree_new_pcls_)
   std::mutex mtx_goals;
   std::mutex mtx_jps_map_util;  // mutex for map_util_ and planner_ptr_
-                                // std::mutex mtx_init_cond;
+  std::mutex mtx_k;
 
   std::mutex mtx_term_goal;
 

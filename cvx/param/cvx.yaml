@@ -28,8 +28,8 @@ factor_jps: 1  #[m] JPS is run with resolution=factor_jps*(resolution of the map
 
 
 v_max: 6.0   #[m/s]
-a_max: 20.0   #[m/s2]
-j_max: 100.0  #[m/s3]
+a_max: 10.0   #[m/s2]
+j_max: 50.0  #[m/s3]
 
 q: 100000  #[-] weight to the 2nd term of the cost function for cvxgen
 
