@@ -11,6 +11,7 @@
 
 #include <Eigen/Dense>
 
+#include <acl_msgs/Cvx.h>
 #include <acl_msgs/State.h>
 #include <acl_msgs/QuadGoal.h>
 #include <acl_msgs/QuadFlightMode.h>
@@ -75,6 +76,38 @@ struct parameteres
   double z_land;
 };
 
+/*struct log_values
+{
+  double JPS1_time;
+  double JPS2_time;
+
+  double Cvxgen_jerk_time;
+  double Cvxgen_vel_time;
+
+  double JPS1_cost;
+  double JPrimj1_cost;
+  double JPrimv1_cost;
+  double JDist1_cost;
+
+  double JPS2_cost;
+  double JPrimj2_cost;
+  double JPrimv2_cost;
+  double JDist2_cost;
+
+  double coll_check1;
+  double coll_check2;
+
+  double vmax_reached;
+
+  double total_dist;
+
+  double angle;
+
+  double total_time_replanCB;
+
+  int decision;
+};*/
+
 //####Class CVX
 class CVX
 {
@@ -138,7 +171,7 @@ private:
   void clearJPSPathVisualization(int i);
 
   void updateJPSMap(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr);
-  vec_Vecf<3> solveJPS3D(Vec3f& start, Vec3f& goal, bool* solved);
+  vec_Vecf<3> solveJPS3D(Vec3f& start, Vec3f& goal, bool* solved, int i);
 
   void pubTerminalGoal();
 
@@ -177,6 +210,7 @@ private:
   ros::Publisher pub_planning_vis_;
   ros::Publisher pub_intersec_points_;
   ros::Publisher pub_jps_inters_;
+  ros::Publisher pub_log_;
 
   ros::Subscriber sub_goal_;
   ros::Subscriber sub_state_;
@@ -188,8 +222,8 @@ private:
   ros::Timer pubCBTimer_;
   ros::Timer replanCBTimer_;
 
-  parameteres par_;  // where all the parameteres are
-
+  parameteres par_;    // where all the parameteres are
+  acl_msgs::Cvx log_;  // to log all the data
   tf2_ros::Buffer tf_buffer_;
   tf2_ros::TransformListener* tfListener;
   std::string name_drone_;
@@ -251,6 +285,7 @@ private:
   std::mutex mtx_inst;  // mutex of instanteneous data (v_kdtree_new_pcls_)
   std::mutex mtx_goals;
   std::mutex mtx_jps_map_util;  // mutex for map_util_ and planner_ptr_
+                                // std::mutex mtx_init_cond;
 
   std::mutex mtx_term_goal;
 
@@ -258,4 +293,6 @@ private:
   std::unique_ptr<JPSPlanner3D> planner_ptr_;
 
   bool X_initialized_ = false;
+
+  Eigen::Vector3d pos_old_;
 };

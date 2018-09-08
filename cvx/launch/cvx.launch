@@ -26,6 +26,8 @@
 		<remap from="~trajs_sphere" to="trajs_sphere"/>
 		<remap from="~goal" to="goal" />
 		<remap from="~setpoint" to="setpoint" />
+        <remap from="~log_topic" to="log_topic" />
+		
 
 	</node>
 
