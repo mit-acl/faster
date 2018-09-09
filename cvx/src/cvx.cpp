@@ -820,6 +820,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   if (previous == false && solvedjps1 == true)
   {
     printf("******************Escaped from critial situation!!***\n");
+    JPS1.insert(JPS1.begin(), state_pos);
   }
 
   // printf("init3\n");
@@ -839,6 +840,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   }
 
   ra = std::min(0.96 * dist_to_goal, ra);  // radius of the sphere Sa
+  printf("ra vale %f\n", ra);
 
   if (flight_mode_.mode != flight_mode_.GO)
   {
@@ -968,6 +970,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
       have_seen_the_goal1 = (dist < par_.goal_radius) ? true : false;
 
       C1 = getLastIntersectionWithSphere(JPS1, rb, state_pos, &dist1);
+      printf("Distance=%f\n", dist1);
       JDist1 = dist1 / par_.v_max;
       if (par_.visual == true)
       {
@@ -1150,8 +1153,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
     k_initial_cond_ = k_initial_cond_1_;
     mtx_k.unlock();
     printf("****************************************choosing 1\n");
-    std::cout << "Estas son las 10 1as filas de lo planificado" << std::endl;
-    std::cout << X_temp_.block(0, 0, 10, 1) << std::endl;
+    /*   std::cout << "Estas son las 10 1as filas de lo planificado" << std::endl;
+       std::cout << X_temp_.block(0, 0, 10, 1) << std::endl;*/
     // printf("Copying Xtemp1\n");
   }
   else if (have_seen_the_goal2)
@@ -1164,8 +1167,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
     k_initial_cond_ = k_initial_cond_2_;
     mtx_k.unlock();
     printf("****************************************choosing 2\n");
-    std::cout << "Estas son las 10 1as filas de lo planificado" << std::endl;
-    std::cout << X_temp_.block(0, 0, 10, 1) << std::endl;
+    /*    std::cout << "Estas son las 10 1as filas de lo planificado" << std::endl;
+        std::cout << X_temp_.block(0, 0, 10, 1) << std::endl;*/
     // printf("Copying Xtemp2\n");
   }
   else
@@ -1180,8 +1183,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
       k_initial_cond_ = k_initial_cond_1_;
       mtx_k.unlock();
       printf("***************************************choosing 1\n");
-      std::cout << "Estas son las 10 1as filas de lo planificado" << std::endl;
-      std::cout << X_temp_.block(0, 0, 10, 1) << std::endl;
+      /*      std::cout << "Estas son las 10 1as filas de lo planificado" << std::endl;
+            std::cout << X_temp_.block(0, 0, 10, 1) << std::endl;*/
     }
     else
     {
@@ -1193,8 +1196,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
       k_initial_cond_ = k_initial_cond_2_;
       mtx_k.unlock();
       printf("**************************************choosing 2\n");
-      std::cout << "Estas son las 10 1as filas de lo planificado" << std::endl;
-      std::cout << X_temp_.block(0, 0, 10, 1) << std::endl;
+      /*      std::cout << "Estas son las 10 1as filas de lo planificado" << std::endl;
+            std::cout << X_temp_.block(0, 0, 10, 1) << std::endl;*/
     }
   }
 
@@ -1372,6 +1375,7 @@ void CVX::pubCB(const ros::TimerEvent& e)
 
     // printf("k_ = %d\n", k_);
     // printf("k_initial_cond_ = %d\n", k_initial_cond_);
+    // k_ = std::min(k_, (int)(X_.rows() - 1));
     mtx_k.lock();
     if ((planner_status_ == REPLANNED && (k_ == k_initial_cond_)) ||  // Should be k_==
         (force_reset_to_0_ && planner_status_ == REPLANNED))
@@ -1392,12 +1396,14 @@ void CVX::pubCB(const ros::TimerEvent& e)
        // printf("Rejecting current plan, planning again. Suggestion: Increase the offset\n");
       planner_status_ = START_REPLANNING;
       // printf("pubCB: planner_status_ = START_REPLANNING\n");
-      printf("********************k_ > k_initial_cond_\n");
+      // printf("********************k_ > k_initial_cond_\n");
     }
 
     k_ = std::min(k_, (int)(X_.rows() - 1));
-    std::cout << "PubCB: Esto es lo que tengo por delante, voy a publicar la 1a fila" << std::endl;
-    std::cout << X_.block(k_, 0, 10, 1) << std::endl;
+    /*    printf("k_=%d\n", k_);
+        printf("X_.rows() - 1=%d\n", (int)(X_.rows() - 1));
+        std::cout << "PubCB: Esto es lo que tengo por delante, voy a publicar la 1a fila" << std::endl;
+        std::cout << X_.block(k_, 0, 10, 1) << std::endl;*/
 
     mtx_k.unlock();
     // int kp1 = std::min(k_ + par_.offset, (int)(X_.rows() - 1));  // k plus offset

@@ -66,9 +66,9 @@ inline std::vector<Eigen::Vector3d> samplePointsSphere(Eigen::Vector3d B, double
   Eigen::AngleAxis<double> rot_z(phi0, Eigen::Vector3d::UnitZ());
   Eigen::AngleAxis<double> rot_y(theta0, Eigen::Vector3d::UnitY());
 
-  for (double theta = 0; theta <= 3.14 / 2; theta = theta + 3.14 / 10)
+  for (double theta = 0; theta <= 3.14 / 2; theta = theta + 3.14 / 5)
   {
-    for (double phi = 0; phi <= 2 * 3.14; phi = phi + 3.14 / 10)
+    for (double phi = 0; phi <= 2 * 3.14; phi = phi + 3.14 / 5)
     {
       Eigen::Vector3d p1, p2;
       p1[0] = r * sin(theta) * cos(phi);
@@ -91,14 +91,14 @@ inline std::vector<Eigen::Vector3d> samplePointsSphere(Eigen::Vector3d B, double
   return tmp;
 }
 
-/*inline void printElementsOfJPS(vec_Vecf<3> path)
+inline void printElementsOfJPS(vec_Vecf<3> path)
 {
   printf("Elements of the path given:\n");
   for (int i = 0; i < path.size(); i++)
   {
     std::cout << path[i].transpose() << std::endl;
   }
-}*/
+}
 
 // returns the points around B sampled in the sphere with radius r and center center, and sampled intelligently with
 // the given path
@@ -530,7 +530,13 @@ inline Eigen::Vector3d getIntersectionWithSphere(Eigen::Vector3d& A, Eigen::Vect
     float b = 2 * ((x2 - x1) * (x1 - x3) + (y2 - y1) * (y1 - y3) + (z2 - z1) * (z1 - z3));
     float c = x3 * x3 + y3 * y3 + z3 * z3 + x1 * x1 + y1 * y1 + z1 * z1 - 2 * (x3 * x1 + y3 * y1 + z3 * z1) - r * r;
 
-    return A;
+    float t = (-b + sqrt(b * b - 4 * a * c)) / (2 * a);
+    float x_int = x1 + (x2 - x1) * t;
+    float y_int = y1 + (y2 - y1) * t;
+    float z_int = z1 + (z2 - z1) * t;
+    Eigen::Vector3d intersection(x_int, y_int, z_int);
+
+    return intersection;
   }
   else
   {
@@ -557,7 +563,8 @@ inline Eigen::Vector3d getFirstIntersectionWithSphere(vec_Vecf<3>& path, double 
     {
       path[i] = path_sent[i];
     }*/
-
+  /*  printf("In getFirstIntersectionWithSphere");
+    printElementsOfJPS(path);*/
   // printf("here\n");
   if (noPointsOutsideSphere != NULL)
   {  // this argument has been provided
@@ -594,6 +601,7 @@ inline Eigen::Vector3d getFirstIntersectionWithSphere(vec_Vecf<3>& path, double 
       {  // this argument has been provided
         *noPointsOutsideSphere = true;
       }
+      // std::cout << "Calling intersecion1 with A=" << A.transpose() << "  and B=" << B.transpose() << std::endl;
       intersection = getIntersectionWithSphere(A, B, r, center);
       break;
     case 0:  // First element is outside the sphere
@@ -605,6 +613,7 @@ inline Eigen::Vector3d getFirstIntersectionWithSphere(vec_Vecf<3>& path, double 
     default:
       A = path[index - 1];
       B = path[index];
+      // std::cout << "Calling intersecion2 with A=" << A.transpose() << "  and B=" << B.transpose() << std::endl;
       intersection = getIntersectionWithSphere(A, B, r, center);
       // printf("index-1=%d\n", index - 1);
       if (last_index_inside_sphere != NULL)

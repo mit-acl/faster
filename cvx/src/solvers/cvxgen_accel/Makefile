@@ -7,7 +7,7 @@
 # Filename: Makefile.
 # Description: Basic Makefile.
 INPUT=accel
-OPT = -Wall -Os 
+OPT = -Wall -O3
 # The option -03 will compile with all the optimizations available for max performance
 # libmath is needed for sqrt, which is used only for reporting the gap. Can
 # remove if desired for production solvers..

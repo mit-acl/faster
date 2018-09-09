@@ -419,12 +419,13 @@ void Solver<INPUT_ORDER>::callOptimizer()
   // ROS_INFO("dt I found= %0.2f", dt_found);
   double dt = getDTInitial();  // 0.025
                                // ROS_INFO("empezando con, dt = %0.2f", dt);
-  dt = dt + 5 * 0.025;         // To make sure that it will converge in very few iterations (hopefully only 1)
+
   double** x;
   int i = 0;
   int r = 0;
   while (1)
   {
+    dt = dt + 4 * 0.025;  // To make sure that it will converge in very few iterations (hopefully only 1)
     i = i + 1;
     // printf("Loading default data!\n");
     switch (INPUT_ORDER)
@@ -467,11 +468,12 @@ void Solver<INPUT_ORDER>::callOptimizer()
     {
       break;
     }
-    dt += 0.025;
+    // dt += 0.025;
   }
 
   if (i > 1)
   {
+    printf("Iterations = %d\n", i);
     printf("Iterations>1, if you increase dt at the beginning, it would be faster\n");
   }
   // ROS_INFO("Iterations = %d\n", i);
@@ -502,26 +504,7 @@ double Solver<INPUT_ORDER>::getDTInitial()
   // printf("%f\n", t_vz);
   switch (INPUT_ORDER)
   {
-    case VEL:
-    {
-      // I'm done
-      break;
-    }
-    case ACCEL:  // case Accel
-    {
-      float accelx = copysign(1, xf_[0] - x0_[0]) * a_max_;
-      float accely = copysign(1, xf_[1] - x0_[1]) * a_max_;
-      float accelz = copysign(1, xf_[2] - x0_[2]) * a_max_;
-      float v0x = x0_[3];
-      float v0y = x0_[4];
-      float v0z = x0_[5];
-      // Solve equation xf=x0+v0t+0.5*a*t^2
-      t_ax = solvePolyOrder2(Eigen::Vector3f(0.5 * accelx, v0x, x0_[0] - xf_[0]));
-      t_ay = solvePolyOrder2(Eigen::Vector3f(0.5 * accely, v0y, x0_[1] - xf_[1]));
-      t_az = solvePolyOrder2(Eigen::Vector3f(0.5 * accelz, v0z, x0_[2] - xf_[2]));
-      break;
-    }
-    case JERK:  // case Jerk
+    case JERK:
     {
       float jerkx = copysign(1, xf_[0] - x0_[0]) * j_max_;
       float jerky = copysign(1, xf_[1] - x0_[1]) * j_max_;
@@ -555,6 +538,26 @@ double Solver<INPUT_ORDER>::getDTInitial()
 
       // printf("t_jx, t_jy, t_jz:\n");
       // std::cout << t_jx << "  " << t_jy << "  " << t_jz << std::endl;
+
+      // DON'T PUT HERE A BREAK!!
+    }
+    case ACCEL:  // case Accel
+    {
+      float accelx = copysign(1, xf_[0] - x0_[0]) * a_max_;
+      float accely = copysign(1, xf_[1] - x0_[1]) * a_max_;
+      float accelz = copysign(1, xf_[2] - x0_[2]) * a_max_;
+      float v0x = x0_[3];
+      float v0y = x0_[4];
+      float v0z = x0_[5];
+      // Solve equation xf=x0+v0t+0.5*a*t^2
+      t_ax = solvePolyOrder2(Eigen::Vector3f(0.5 * accelx, v0x, x0_[0] - xf_[0]));
+      t_ay = solvePolyOrder2(Eigen::Vector3f(0.5 * accely, v0y, x0_[1] - xf_[1]));
+      t_az = solvePolyOrder2(Eigen::Vector3f(0.5 * accelz, v0z, x0_[2] - xf_[2]));
+    }
+    case VEL:
+    {
+      // I'm done
+      break;
     }
   }
   dt_initial = std::max({ t_vx, t_vy, t_vz, t_ax, t_ay, t_az, t_jx, t_jy, t_jz }) / N_;

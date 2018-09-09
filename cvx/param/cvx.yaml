@@ -17,7 +17,7 @@ drone_radius: 0.42  #(m) Used for collision checking
 
 offset: 5  # Replanning offset (the initial conditions are taken OFFSET states farther from the last published goal)
 
-Ra: 0.3            # [m] Minimum radius of the first sphere
+Ra: 0.5            # [m] Minimum radius of the first sphere
 Rb: 6.0             # [m] Radius of the second sphere
 w_max: 1            # [rd/s] Maximum angular velocity
 alpha_0: 0.25         #[rd] threshold to ignore current JPS solution, and consider the old one. 0--> always decide
@@ -27,9 +27,9 @@ inflation_jps: 0.42  #[m] The obstacles are inflated (to run JPS) by this amount
 factor_jps: 1  #[m] JPS is run with resolution=factor_jps*(resolution of the map)
 
 
-v_max: 6.0   #[m/s]
-a_max: 10.0   #[m/s2]
-j_max: 50.0  #[m/s3]
+v_max: 5.0   #[m/s]
+a_max: 5.0   #[m/s2]
+j_max: 8.0  #[m/s3]
 
 q: 100000  #[-] weight to the 2nd term of the cost function for cvxgen
 
