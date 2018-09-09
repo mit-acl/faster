@@ -285,9 +285,9 @@ void CVX::updateJPSMap(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr)
 
 vec_Vecf<3> CVX::solveJPS3D(Vec3f& start, Vec3f& goal, bool* solved, int i)
 {
-  /*  std::cout << "calling JPS3d" << std::endl;
-    std::cout << "start=" << start.transpose() << std::endl;
-    std::cout << "goal=" << goal.transpose() << std::endl;*/
+  /*  std::cout << "calling JPS3d" << std::endl;*/
+  std::cout << "start=" << start.transpose() << std::endl;
+  std::cout << "goal=" << goal.transpose() << std::endl;
 
   Vec3f originalStart = start;
   if (flight_mode_.mode != flight_mode_.GO)
@@ -464,8 +464,8 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f& start, Vec3f& goal, bool* solved, int i)
   // printf("       JPS check takes: %f ms\n", (double)time_solve_jps_check.Elapsed().count());
   // printf("Out3\n");
 
-  /*  std::cout << "start=" << start.transpose() << std::endl;
-    std::cout << "goal=" << goal.transpose() << std::endl;*/
+  std::cout << "start despues=" << start.transpose() << std::endl;
+  std::cout << "goal despues=" << goal.transpose() << std::endl;
 
   mtx_map.unlock();
 
@@ -803,25 +803,25 @@ void CVX::replanCB(const ros::TimerEvent& e)
   static bool first_time = true;                            // how many times I've solved JPS1
   JPS1 = solveJPS3D(state_pos, term_goal, &solvedjps1, 1);  // Solution is in JPS1
   // printf("Aqui89\n");
-  bool previous = solvedjps1;
-  if (solvedjps1 ==
-      false)  // Happens when the drone is near the obstacles. Let's sample some points to scape from this situation.
-  {
-    for (float i = -0.2; i <= 0.25 && solvedjps1 == false; i = i + 0.2)
+  /*  bool previous = solvedjps1;
+    if (solvedjps1 ==
+        false)  // Happens when the drone is near the obstacles. Let's sample some points to scape from this situation.
     {
-      for (float j = -0.2; j <= 0.25 && solvedjps1 == false; j = j + 0.2)
+      for (float i = -0.2; i <= 0.25 && solvedjps1 == false; i = i + 0.2)
       {
-        printf("Trying to escape from critial situation!!***\n");
-        Eigen::Vector3d new_pos(state_pos[0] + i, state_pos[1] + j, state_pos[2]);
-        JPS1 = solveJPS3D(new_pos, term_goal, &solvedjps1, 1);
+        for (float j = -0.2; j <= 0.25 && solvedjps1 == false; j = j + 0.2)
+        {
+          printf("Trying to escape from critial situation!!***\n");
+          Eigen::Vector3d new_pos(state_pos[0] + i, state_pos[1] + j, state_pos[2]);
+          JPS1 = solveJPS3D(new_pos, term_goal, &solvedjps1, 1);
+        }
       }
     }
-  }
-  if (previous == false && solvedjps1 == true)
-  {
-    printf("******************Escaped from critial situation!!***\n");
-    JPS1.insert(JPS1.begin(), state_pos);
-  }
+    if (previous == false && solvedjps1 == true)
+    {
+      printf("******************Escaped from critial situation!!***\n");
+      JPS1.insert(JPS1.begin(), state_pos);
+    }*/
 
   // printf("init3\n");
   bool dummy;
@@ -1760,15 +1760,19 @@ void CVX::pclCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 // Occupied CB
 void CVX::mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 {
-  // printf("In mapCB\n");
+  printf("***********************************In mapCB\n");
+
+  pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_map(new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::fromROSMsg(*pcl2ptr_msg, *pclptr_map);
+
+  printf("updating JSPMAP\n");
+  updateJPSMap(pclptr_map);  // UPDATE EVEN WHEN THERE ARE NO POINTS!!
+  printf("updated!!\n");
 
   if (pcl2ptr_msg->width == 0 || pcl2ptr_msg->height == 0)  // Point Cloud is empty (this happens at the beginning)
   {
     return;
   }
-
-  pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_map(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::fromROSMsg(*pcl2ptr_msg, *pclptr_map);
 
   // printf("In mapCB2\n");
   mtx_map.lock();
@@ -1777,7 +1781,6 @@ void CVX::mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
   mtx_map.unlock();
   // printf("In mapCB3\n");
   kdtree_map_initialized_ = 1;
-  updateJPSMap(pclptr_map);
 
   // printf("mapCB: MTX is locked\n");
   // printf("In mapCB4\n");
@@ -1807,6 +1810,7 @@ void CVX::mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
     // printf("despues i=%d\n", i);
   }
   mtx_inst.unlock();
+  printf("***********************************OUT mapCB\n");
   // printf("below\n");
 
   // mtx.unlock();
@@ -1815,9 +1819,10 @@ void CVX::mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 // Unkwown  CB
 void CVX::unkCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 {
-  // printf("in unkCB\n");
+  // printf("*************************IN unkCB\n");
   if (pcl2ptr_msg->width == 0 || pcl2ptr_msg->height == 0)  // Point Cloud is empty (this happens at the beginning)
   {
+    printf("Cloud In has 0 points\n");
     return;
   }
 
@@ -1832,6 +1837,7 @@ void CVX::unkCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
     return;
   }
 
+  // printf("Waiting for lock!");
   mtx_unk.lock();
   /*  // If the drone is nos flying/taking of/..., let's remove a box around it so that it can take off.
     if (flight_mode_.mode == flight_mode_.LAND || flight_mode_.mode == flight_mode_.TAKEOFF ||
@@ -1895,6 +1901,7 @@ void CVX::unkCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
   kdtree_unk_initialized_ = 1;
   //}
   mtx_unk.unlock();
+  // printf("*************************OUT unkCB\n");
 }
 
 // TODO: check also against unkown space? Be careful because with the new points cloud I may have information of
