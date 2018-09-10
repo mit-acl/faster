@@ -12,7 +12,7 @@
 
   <node ns="$(arg quad)" 
     pkg="mpl_test_node"
-    type="test_primitive_cloud"
+    type="comparison_upenn"
     name="test_primitive"
     launch-prefix="$(arg prefix)"
     output="screen">
@@ -23,29 +23,29 @@
     <param name="file" value="$(find mpl_test_node)/maps/office/office.bag"/>
     <param name="topic" value="/cloud"/>
     <!-- Set start and goal -->
-    <param name="start_x" value="8.0"/>
-    <param name="start_y" value="13.0"/>
-    <param name="start_z" value="1.3"/>
+    <param name="start_x" value="-7"/>
+    <param name="start_y" value="2"/>
+    <param name="start_z" value="1"/>
     <param name="start_vx" value="0.0"/>
     <param name="start_vy" value="0.0"/>
     <param name="start_vz" value="0.0"/>
-    <param name="goal_x" value="28.5"/>
-    <param name="goal_y" value="14.0"/>
-    <param name="goal_z" value="1.3"/>
+    <param name="goal_x" value="42"/>
+    <param name="goal_y" value="0"/>
+    <param name="goal_z" value="1"/>
     <!-- Set range --> <!-- Range defines a box that has the origin has one vertex, and each side has the dimension of range__  -->
     <!-- I think that the box that range defines should be the same as the map limits-->
-    <param name="origin_x" value="6.0"/>
-    <param name="origin_y" value="12.0"/>
+    <param name="origin_x" value="-9"/>
+    <param name="origin_y" value="-15"/>
     <param name="origin_z" value="0.0"/>
-    <param name="range_x" value="25.0"/>  <!--TODO: set these values to the same ones as the mappper?? 25    40-->
-    <param name="range_y" value="25.0"/>   <!--5   40-->
+    <param name="range_x" value="205.0"/>  <!--TODO: set these values to the same ones as the mappper?? 25    40-->
+    <param name="range_y" value="205.0"/>   <!--5   40-->
     <param name="range_z" value="5"/>   <!--1.5   5.5-->
     <!-- Set dynamic constraints -->
     <param name="dt" value="$(arg dt)"/>
-    <param name="v_max" value="10"/>
+    <param name="v_max" value="10.0"/>
     <param name="a_max" value="10"/>
-    <param name="u_max" value="60"/>
-    <param name="u_max_z" value="100"/>
+    <param name="u_max" value="20"/>
+    <param name="u_max_z" value="100.0"/>
     <!--<param name="t_max" value="$(eval dt*10)"/>-->
     <param name="t_max" value="-1"/>
     <param name="use_3d" value="true"/> <!-- if it's false, it won't work when v_initial_z is high, and the goal is in z=z_actual -->
@@ -54,7 +54,7 @@
     <param name="use_jrk" value="false"/>  <!--true if jerk is a state  (i.e. true if input=snap or higher, false otherwise) -->
     <param name="num" value="2"/>  <!-- umax/num will be the increment in the discretization of u -->
     <param name="w" value="10000"/>
-    <param name="epsilon" value="10"/>  <!--The lower, the slower the planner works-->
+    <param name="epsilon" value="2"/>  <!--The lower, the slower the planner works-->
     <param name="max_num" value="$(arg max_num)"/>
     <param name="robot_r" value="0.5"/>
     <param name="robot_h" value="0.4"/>

@@ -295,4 +295,5 @@ private:
   bool X_initialized_ = false;
 
   Eigen::Vector3d pos_old_;
+  Eigen::Vector3d B_;
 };

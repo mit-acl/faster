@@ -802,26 +802,26 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   static bool first_time = true;                            // how many times I've solved JPS1
   JPS1 = solveJPS3D(state_pos, term_goal, &solvedjps1, 1);  // Solution is in JPS1
-  // printf("Aqui89\n");
-  /*  bool previous = solvedjps1;
-    if (solvedjps1 ==
-        false)  // Happens when the drone is near the obstacles. Let's sample some points to scape from this situation.
+                                                            // printf("Aqui89\n");
+  bool previous = solvedjps1;
+  if (solvedjps1 ==
+      false)  // Happens when the drone is near the obstacles. Let's sample some points to scape from this situation.
+  {
+    for (float i = -0.2; i <= 0.25 && solvedjps1 == false; i = i + 0.2)
     {
-      for (float i = -0.2; i <= 0.25 && solvedjps1 == false; i = i + 0.2)
+      for (float j = -0.2; j <= 0.25 && solvedjps1 == false; j = j + 0.2)
       {
-        for (float j = -0.2; j <= 0.25 && solvedjps1 == false; j = j + 0.2)
-        {
-          printf("Trying to escape from critial situation!!***\n");
-          Eigen::Vector3d new_pos(state_pos[0] + i, state_pos[1] + j, state_pos[2]);
-          JPS1 = solveJPS3D(new_pos, term_goal, &solvedjps1, 1);
-        }
+        printf("Trying to escape from critial situation!!***\n");
+        Eigen::Vector3d new_pos(state_pos[0] + i, state_pos[1] + j, state_pos[2]);
+        JPS1 = solveJPS3D(new_pos, term_goal, &solvedjps1, 1);
       }
     }
-    if (previous == false && solvedjps1 == true)
-    {
-      printf("******************Escaped from critial situation!!***\n");
-      JPS1.insert(JPS1.begin(), state_pos);
-    }*/
+  }
+  if (previous == false && solvedjps1 == true)
+  {
+    printf("******************Escaped from critial situation!!***\n");
+    JPS1.insert(JPS1.begin(), state_pos);
+  }
 
   // printf("init3\n");
   bool dummy;
@@ -836,7 +836,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
     // printf("here, flight_mode=%d\n", flight_mode_.mode);
     // double l = getDistanceToFirstCollisionJPSwithUnkonwnspace(JPS1, &dummy);
     ra = (JPS1[1] - JPS1[0]).norm();
-    saturate(ra, par_.Ra, 4);
+    saturate(ra, par_.Ra, 2.5);
   }
 
   ra = std::min(0.96 * dist_to_goal, ra);  // radius of the sphere Sa
@@ -1152,6 +1152,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
     mtx_k.lock();
     k_initial_cond_ = k_initial_cond_1_;
     mtx_k.unlock();
+    B_ = B1;
     printf("****************************************choosing 1\n");
     /*   std::cout << "Estas son las 10 1as filas de lo planificado" << std::endl;
        std::cout << X_temp_.block(0, 0, 10, 1) << std::endl;*/
@@ -1166,6 +1167,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
     mtx_k.lock();
     k_initial_cond_ = k_initial_cond_2_;
     mtx_k.unlock();
+    B_ = B2;
     printf("****************************************choosing 2\n");
     /*    std::cout << "Estas son las 10 1as filas de lo planificado" << std::endl;
         std::cout << X_temp_.block(0, 0, 10, 1) << std::endl;*/
@@ -1182,6 +1184,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
       mtx_k.lock();
       k_initial_cond_ = k_initial_cond_1_;
       mtx_k.unlock();
+      B_ = B1;
       printf("***************************************choosing 1\n");
       /*      std::cout << "Estas son las 10 1as filas de lo planificado" << std::endl;
             std::cout << X_temp_.block(0, 0, 10, 1) << std::endl;*/
@@ -1195,6 +1198,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
       mtx_k.lock();
       k_initial_cond_ = k_initial_cond_2_;
       mtx_k.unlock();
+      B_ = B2;
       printf("**************************************choosing 2\n");
       /*      std::cout << "Estas son las 10 1as filas de lo planificado" << std::endl;
             std::cout << X_temp_.block(0, 0, 10, 1) << std::endl;*/
@@ -1287,15 +1291,16 @@ void CVX::stateCB(const acl_msgs::State& msg)
     quadGoal_.vel = msg.vel;
     z_start_ = msg.pos.z;
     z_start_ = std::max(0.0, z_start_);
+    initialCond_.pos = msg.pos;
   }
+
+  static int i = 0;
+  i++;
 
   if (status_ != GOAL_REACHED && par_.visual == true)
   {
     pubActualTraj();
   }
-
-  static int i = 0;
-  i++;
 
   if (i % 10 == 0)
   {
@@ -1438,7 +1443,8 @@ void CVX::pubCB(const ros::TimerEvent& e)
 
     if ((status_ == TRAVELING || status_ == GOAL_SEEN))
     {
-      double desired_yaw = atan2(quadGoal_.vel.y, quadGoal_.vel.x);
+      // double desired_yaw = atan2(quadGoal_.vel.y, quadGoal_.vel.x);
+      double desired_yaw = atan2(B_[1] - quadGoal_.pos.y, B_[0] - quadGoal_.pos.x);
       double diff = desired_yaw - quadGoal_.yaw;
       angle_wrap(diff);
       yaw(diff, quadGoal_);
@@ -1962,8 +1968,12 @@ bool CVX::trajIsFree(Eigen::MatrixXd X)
     // printf("after the lock inst\n");
     // printf("TisFree: MTX is locked\n");
 
-    for (unsigned i = v_kdtree_new_pcls_.size() - 1; i < v_kdtree_new_pcls_.size() && i >= 0; ++i)
+    for (unsigned i = v_kdtree_new_pcls_.size() - 5; i < v_kdtree_new_pcls_.size() && i >= 0; i = i + 2)
     {
+      if (i < 0)
+      {
+        continue;
+      }
       // printf("Inside the loop\n");
       if (v_kdtree_new_pcls_[i].kdTree.nearestKSearch(pcl_search_point, n, id_inst, dist2_inst) > 0)
       {
@@ -2399,12 +2409,12 @@ void CVX::pubActualTraj()
   visualization_msgs::Marker m;
   m.type = visualization_msgs::Marker::ARROW;
   m.action = visualization_msgs::Marker::ADD;
-  m.id = actual_trajID_ % 1000;  // Start the id again after 300 points published (if not RVIZ goes very slow)
+  m.id = actual_trajID_ % 3000;  // Start the id again after 300 points published (if not RVIZ goes very slow)
   actual_trajID_++;
-  m.color = color(GREEN);
-  m.scale.x = 0.02;
-  m.scale.y = 0.04;
-  m.scale.z = 1;
+  m.color = color(RED);
+  m.scale.x = 0.15;
+  m.scale.y = 0;
+  m.scale.z = 0;
   m.header.stamp = ros::Time::now();
   m.header.frame_id = "world";
 

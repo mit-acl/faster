@@ -2,7 +2,7 @@
 #debug: true
 
 use_ff: true # use feedforward
-visual: false #publish visualization stuff
+visual: true #publish visualization stuff
 
 wdx: 20.0  #[m] world dimension in x
 wdy: 20.0  #[m] world dimension in y
@@ -15,7 +15,7 @@ goal_radius: 0.2    #(m) Drone has arrived to the goal when distance_to_goal<GOA
 drone_radius: 0.42  #(m) Used for collision checking
 
 
-offset: 5  # Replanning offset (the initial conditions are taken OFFSET states farther from the last published goal)
+offset: 10  # Replanning offset (the initial conditions are taken OFFSET states farther from the last published goal)
 
 Ra: 0.5            # [m] Minimum radius of the first sphere
 Rb: 6.0             # [m] Radius of the second sphere
@@ -27,9 +27,9 @@ inflation_jps: 0.42  #[m] The obstacles are inflated (to run JPS) by this amount
 factor_jps: 1  #[m] JPS is run with resolution=factor_jps*(resolution of the map)
 
 
-v_max: 5.0   #[m/s]
-a_max: 5.0   #[m/s2]
-j_max: 8.0  #[m/s3]
+v_max: 10   #[m/s]
+a_max: 10   #[m/s2]
+j_max: 40  #[m/s3]
 
 q: 100000  #[-] weight to the 2nd term of the cost function for cvxgen
 

@@ -20,8 +20,6 @@ protected:
   std::unique_ptr<DecompUtil> map_util_;
 
 public:
-  Vec3f origin;  // Root of the tree (where the drone is right now)
-
   /// Simple constructor
   env_cloud()
   {
@@ -32,7 +30,6 @@ public:
     map_util_.reset(new DecompUtil(r, h));
     map_util_->setObstacles(obs);
     map_util_->set_region(ori, dim);
-    origin = ori;
   }
 
   ~env_cloud()
@@ -58,7 +55,7 @@ public:
    * Here we use Heuristic function and multiply with 2
    */
   void get_succ(const Waypoint3& curr, vec_E<Waypoint3>& succ, std::vector<Key>& succ_idx,
-                std::vector<decimal_t>& succ_cost, std::vector<int>& action_idx, bool low) const
+                std::vector<decimal_t>& succ_cost, std::vector<int>& action_idx) const
   {
     succ.clear();
     succ_idx.clear();
@@ -69,38 +66,22 @@ public:
     // ws_.push_back(curr);
     for (int i = 0; i < (int)U_.size(); i++)
     {
-      Primitive3 pr(curr, U_[i], dt_);  // Primitive obtained applying the input U_[i] to the current node
-      Waypoint3 tn = pr.evaluate(dt_);  // State in that primitive when t=dt
+      Primitive3 pr(curr, U_[i], dt_);
+      Waypoint3 tn = pr.evaluate(dt_);
       if (pr.valid_vel(v_max_) && pr.valid_acc(a_max_))
-      {  // Aqui se podria anadir lo que yo quiero (planear hasta una distancia con jerk y hasta otra con vel??)
-        bool valid = map_util_->isFree(pr);  // if that state is collision free
+      {
+        bool valid = map_util_->isFree(pr);
         if (valid)
         {
-          /*          tn.use_pos = curr.use_pos;
-                    tn.use_vel = curr.use_vel;
-                    tn.use_acc = curr.use_acc;
-                    tn.use_jrk = curr.use_jrk;*/
-          if (low)
-          {  // primitives_.push_back(pr);
-            // distance_to_origin =
-            std::cout << "distance to=" << (origin - tn.pos).norm() << std::endl;
-            // std::cout << "waypoint=" << tn.pos << std::endl;
-            tn.use_pos = true;
-            tn.use_vel = false;
-            tn.use_acc = false;
-            tn.use_jrk = false;
-          }
-          else
-          {  // primitives_.push_back(pr);
-            tn.use_pos = curr.use_pos;
-            tn.use_vel = curr.use_vel;
-            tn.use_acc = curr.use_acc;
-            tn.use_jrk = curr.use_jrk;
-          }
+          // primitives_.push_back(pr);
+          tn.use_pos = curr.use_pos;
+          tn.use_vel = curr.use_vel;
+          tn.use_acc = curr.use_acc;
+          tn.use_jrk = curr.use_jrk;
 
-          succ.push_back(tn);                         // insert that state to the end of the vector succ
-          succ_idx.push_back(state_to_idx(tn));       // insert its index
-          succ_cost.push_back(pr.J(wi_) + w_ * dt_);  // and its cost
+          succ.push_back(tn);
+          succ_idx.push_back(state_to_idx(tn));
+          succ_cost.push_back(pr.J(wi_) + w_ * dt_);
           action_idx.push_back(i);
         }
       }
