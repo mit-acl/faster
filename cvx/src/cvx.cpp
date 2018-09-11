@@ -720,6 +720,8 @@ vec_Vecf<3> CVX::fix(vec_Vecf<3> JPS_old, Eigen::Vector3d start, Eigen::Vector3d
 
 void CVX::replanCB(const ros::TimerEvent& e)
 {
+  printf("IN replan CB!!!\n");
+
   log_.cvx_jerk_total_ms = 0;
   log_.cvx_vel_total_ms = 0;
 
@@ -1255,6 +1257,7 @@ void CVX::modeCB(const acl_msgs::QuadFlightMode& msg)
   // printf("In modeCB\n");
   if (msg.mode == msg.LAND && flight_mode_.mode != flight_mode_.LAND)
   {
+    printf("LANDING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
     // Solver Vel
     /*    double xf[6] = { quadGoal_.pos.x, quadGoal_.pos.y, z_land_ };
         double max_values[1] = { par_.v_max };
@@ -1269,12 +1272,27 @@ void CVX::modeCB(const acl_msgs::QuadFlightMode& msg)
         solver_accel_.set_xf(xf);
         solver_accel_.genNewTraj();*/
 
+    double x0[9] = { state_.pos.x, state_.pos.y, state_.pos.z, state_.vel.x, state_.vel.y, state_.vel.z, 0, 0, 0 };
+
+    double xf[9] = { state_.pos.x, state_.pos.y, par_.z_land, 0, 0, 0, 0, 0, 0 };
+    mtx_goals.unlock();
+    // printf("Hola6.7\n");
+    solver_jerk_.set_xf(xf);
+    solver_jerk_.set_x0(x0);
+
+    k_initial_cond_ = std::min(k_ + par_.offset, (int)(X_.rows() - 1));
     // Solver Jerk
-    double xf[9] = { quadGoal_.pos.x, quadGoal_.pos.y, par_.z_land, 0, 0, 0, 0, 0, 0 };
+    // double xf[9] = { quadGoal_.pos.x, quadGoal_.pos.y, par_.z_land, 0, 0, 0, 0, 0, 0 };
     double max_values[3] = { par_.v_max, par_.a_max, par_.j_max };
     solver_jerk_.set_max(max_values);  // TODO: To land, I use u_min_
+    solver_jerk_.set_x0(x0);
     solver_jerk_.set_xf(xf);
     solver_jerk_.genNewTraj();
+    to_land_ = true;
+
+    U_temp_ = solver_jerk_.getU();
+    X_temp_ = solver_jerk_.getX();
+    planner_status_ = REPLANNED;
   }
   flight_mode_.mode = msg.mode;
 }
@@ -1382,9 +1400,13 @@ void CVX::pubCB(const ros::TimerEvent& e)
     // printf("k_initial_cond_ = %d\n", k_initial_cond_);
     // k_ = std::min(k_, (int)(X_.rows() - 1));
     mtx_k.lock();
-    if ((planner_status_ == REPLANNED && (k_ == k_initial_cond_)) ||  // Should be k_==
+    printf("planner_status_= %d\n", planner_status_);
+    printf("to_land_= %d\n", to_land_);
+
+    if ((planner_status_ == REPLANNED && (k_ == k_initial_cond_ || to_land_ == true)) ||  // Should be k_==
         (force_reset_to_0_ && planner_status_ == REPLANNED))
     {
+      to_land_ == false;
       printf("************Reseteando a 0!\n");
       force_reset_to_0_ = false;
       X_ = X_temp_;
@@ -1766,14 +1788,14 @@ void CVX::pclCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 // Occupied CB
 void CVX::mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 {
-  printf("***********************************In mapCB\n");
+  // printf("***********************************In mapCB\n");
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_map(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::fromROSMsg(*pcl2ptr_msg, *pclptr_map);
 
-  printf("updating JSPMAP\n");
+  // printf("updating JSPMAP\n");
   updateJPSMap(pclptr_map);  // UPDATE EVEN WHEN THERE ARE NO POINTS!!
-  printf("updated!!\n");
+  // printf("updated!!\n");
 
   if (pcl2ptr_msg->width == 0 || pcl2ptr_msg->height == 0)  // Point Cloud is empty (this happens at the beginning)
   {
@@ -1816,7 +1838,7 @@ void CVX::mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
     // printf("despues i=%d\n", i);
   }
   mtx_inst.unlock();
-  printf("***********************************OUT mapCB\n");
+  // printf("***********************************OUT mapCB\n");
   // printf("below\n");
 
   // mtx.unlock();

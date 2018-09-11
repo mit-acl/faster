@@ -61,8 +61,8 @@ public:
     // printf("z_max is %f\n", z_max);
     // printf("Dim_up is %d\n", dim2_up);
     dim[2] = dim2_down + dim2_up;
-    printf("*******Dim is\n");
-    std::cout << dim << std::endl;
+    // printf("*******Dim is\n");
+    // std::cout << dim << std::endl;
     // printf("reading_map2\n");
     origin_(0) = center_map[0] - res * dim[0] / 2.0;
     origin_(1) = center_map[1] - res * dim[1] / 2.0;
@@ -70,11 +70,11 @@ public:
 
     /*        double or2 = origin_(2);*/
 
-    printf("*******origin_ before is\n");
-    std::cout << origin_ << std::endl;
+    // printf("*******origin_ before is\n");
+    // std::cout << origin_ << std::endl;
 
-    printf("*******z_ground before is\n");
-    std::cout << z_ground << std::endl;
+    //  printf("*******z_ground before is\n");
+    //  std::cout << z_ground << std::endl;
 
     /*        printf("*******FIRST ? before is\n");
             std::cout << (int)((center_map[2] - z_ground) / res + dim[2] / 2.0) << std::endl;*/

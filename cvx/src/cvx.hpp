@@ -296,4 +296,6 @@ private:
 
   Eigen::Vector3d pos_old_;
   Eigen::Vector3d B_;
+
+  bool to_land_ = false;
 };
