@@ -24,7 +24,7 @@
     <param name="topic" value="/cloud"/>
     <!-- Set start and goal -->
     <param name="start_x" value="-7"/>
-    <param name="start_y" value="2"/>
+    <param name="start_y" value="1.5"/>
     <param name="start_z" value="1"/>
     <param name="start_vx" value="0.0"/>
     <param name="start_vy" value="0.0"/>
@@ -44,7 +44,7 @@
     <param name="dt" value="$(arg dt)"/>
     <param name="v_max" value="10.0"/>
     <param name="a_max" value="10"/>
-    <param name="u_max" value="20"/>
+    <param name="u_max" value="40"/>
     <param name="u_max_z" value="100.0"/>
     <!--<param name="t_max" value="$(eval dt*10)"/>-->
     <param name="t_max" value="-1"/>
