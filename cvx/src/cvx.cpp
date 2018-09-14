@@ -1398,7 +1398,7 @@ void CVX::pubCB(const ros::TimerEvent& e)
 
     // printf("k_ = %d\n", k_);
     // printf("k_initial_cond_ = %d\n", k_initial_cond_);
-    // k_ = std::min(k_, (int)(X_.rows() - 1));
+    k_ = std::min(k_, (int)(X_.rows() - 1));
     mtx_k.lock();
     printf("planner_status_= %d\n", planner_status_);
     printf("to_land_= %d\n", to_land_);
