@@ -298,4 +298,5 @@ private:
   Eigen::Vector3d B_;
 
   bool to_land_ = false;
+  bool JPS1_solved_=false;
 };

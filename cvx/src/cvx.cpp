@@ -868,6 +868,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   if (solvedjps1 == true)
   {
+    JPS1_solved_=true;
     if (par_.visual == true)
     {
       clearJPSPathVisualization(1);
@@ -881,6 +882,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   else
   {
     printf("JPS1 didn't find a solution\n");
+    JPS1_solved_=false;
     return;
   }
 
@@ -1469,7 +1471,13 @@ void CVX::pubCB(const ros::TimerEvent& e)
       double desired_yaw = atan2(B_[1] - quadGoal_.pos.y, B_[0] - quadGoal_.pos.x);
       double diff = desired_yaw - quadGoal_.yaw;
       angle_wrap(diff);
+      if(JPS1_solved_==true){
       yaw(diff, quadGoal_);
+      }
+
+     if(JPS1_solved_==false){
+       quadGoal_.dyaw=0;
+     }
     }
 
     mtx_k.lock();
