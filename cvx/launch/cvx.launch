@@ -19,7 +19,7 @@
 		<remap from="~occup_grid" to="global_mapper_ros/occupancy_grid"/> <!--PointCloud of the map-->
 		<remap from="~unknown_grid" to="global_mapper_ros/unknown_grid"/> <!--PointCloud of the map-->
 		<remap from="~frontier_grid" to="global_mapper_ros/frontier_grid"/> <!--PointCloud of the map-->
-		<remap from="~pcloud" to="camera/cloud"/> <!--PointCloud from the camera-->
+		<remap from="~pcloud" to="camera/depth/color/points"/> <!--PointCloud from the camera-->
 
 		<!-- Publications -->
 		<remap from="~traj" to="traj"/>
