@@ -167,7 +167,7 @@ private:
   void yaw(double diff, acl_msgs::QuadGoal& quad_goal);
 
   void clearMarkerArray(visualization_msgs::MarkerArray* tmp, ros::Publisher* publisher);
-  void publishJPSPath(vec_Vecf<3> path, int i);
+  void publishJPSPath(vec_Vecf<3>& path, int i);
   void clearJPSPathVisualization(int i);
 
   void updateJPSMap(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr);
@@ -286,6 +286,10 @@ private:
   std::mutex mtx_goals;
   std::mutex mtx_jps_map_util;  // mutex for map_util_ and planner_ptr_
   std::mutex mtx_k;
+  std::mutex mtx_X_U_temp;
+  std::mutex mtx_X_U;
+  std::mutex mtx_planner_status_;
+  std::mutex mtx_initial_cond;
 
   std::mutex mtx_term_goal;
 

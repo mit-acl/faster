@@ -115,19 +115,22 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   setpoint_.scale.y = 0.35;
   setpoint_.scale.z = 0.35;
   setpoint_.color = color(ORANGE_TRANS);
-
+ // mtx_term_goal.lock();
   term_goal_ << 0, 0, 0;
+ // mtx_term_goal.unlock();
   term_term_goal_ << 0, 0, 0;
 
   quadGoal_.pos = vectorNull();
   quadGoal_.vel = vectorNull();
   quadGoal_.accel = vectorNull();
   quadGoal_.jerk = vectorNull();
-
+  
+  mtx_initial_cond.lock();
   initialCond_.pos = vectorNull();
   initialCond_.vel = vectorNull();
   initialCond_.accel = vectorNull();
   initialCond_.jerk = vectorNull();
+  mtx_initial_cond.unlock();
 
   log_.total_dist = 0;
 
@@ -144,6 +147,11 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   solver_vel_.setq(par_.q);
   solver_accel_.setq(par_.q);
   solver_jerk_.setq(par_.q);
+  double max_values[3] = { par_.v_max, par_.a_max, par_.j_max };
+  solver_jerk_.set_max(max_values);
+
+  double max_values_vel[1] = { par_.v_max };
+  solver_vel_.set_max(max_values_vel);
 
   // pcl::PointCloud<pcl::PointXYZ>::Ptr tmp(new pcl::PointCloud<pcl::PointXYZ>);
   // pclptr_map_ = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
@@ -211,7 +219,7 @@ void CVX::clearMarkerArray(visualization_msgs::MarkerArray* tmp, ros::Publisher*
   (*tmp).markers.clear();
 }
 
-void CVX::publishJPSPath(vec_Vecf<3> path, int i)
+void CVX::publishJPSPath(vec_Vecf<3>& path, int i)
 {
   /*vec_Vecf<3> traj, visualization_msgs::MarkerArray* m_array*/
   clearJPSPathVisualization(i);
@@ -592,7 +600,10 @@ void CVX::goalCB(const acl_msgs::TermGoal& msg)
   printf("NEW GOAL************************************************\n");
   term_term_goal_ = Eigen::Vector3d(msg.pos.x, msg.pos.y, msg.pos.z);
   // std::cout << "term_term_goal_=\n" << term_term_goal_ << std::endl;
+  mtx_term_goal.lock();
+ 
   term_goal_ = projectClickedGoal(Eigen::Vector3d(state_.pos.x, state_.pos.y, state_.pos.z));
+  mtx_term_goal.unlock();
   // std::cout << "term_goal_=\n" << term_goal_ << std::endl;
 
   status_ = (status_ == GOAL_REACHED) ? YAWING : TRAVELING;
@@ -604,8 +615,9 @@ void CVX::goalCB(const acl_msgs::TermGoal& msg)
   {
     // printf("GCB: status_ = TRAVELING\n");
   }
-
+  mtx_planner_status_.lock();
   planner_status_ = START_REPLANNING;
+  mtx_planner_status_.unlock();
   force_reset_to_0_ = true;
   printf("GCB: planner_status_ = START_REPLANNING\n");
   goal_click_initialized_ = true;
@@ -874,8 +886,9 @@ void CVX::replanCB(const ros::TimerEvent& e)
       clearJPSPathVisualization(1);
       publishJPSPath(JPS1, 1);
     }
-    /*    printf("Elements of JPS1 are...\n");
+    printf("ReplanCB: Elements of JPS1 are...\n");
         printElementsOfJPS(JPS1);
+/*
         printf("Elements of JPS_old_ are...:\n");
         printElementsOfJPS(JPS_old_);*/
   }
@@ -930,21 +943,22 @@ void CVX::replanCB(const ros::TimerEvent& e)
     //////SOLVING FOR JERK
     // printf("Hola6\n");
     Eigen::Vector3d p = K[i];
-    // printf("Hola6.5, vector p=\n");
-    // std::cout << p.transpose() << std::endl;
+    printf("Hola6.5, vector p=\n");
+    std::cout << p.transpose() << std::endl;
     double xf[9] = { p[0], p[1], p[2], 0, 0, 0, 0, 0, 0 };
     mtx_goals.lock();
     // printf("Hola6.6\n");
+    mtx_initial_cond.lock();
     double x0[9] = { initialCond_.pos.x,   initialCond_.pos.y,   initialCond_.pos.z,
                      initialCond_.vel.x,   initialCond_.vel.y,   initialCond_.vel.z,
                      initialCond_.accel.x, initialCond_.accel.y, initialCond_.accel.z };
+    mtx_initial_cond.unlock();
+    std::cout <<"Before6.7, x0=" << x0[0] << x0[1] << x0[2] <<"xf=" << xf[0] << xf[1] << xf[2] << std::endl;
     mtx_goals.unlock();
     // printf("Hola6.7\n");
     solver_jerk_.set_xf(xf);
     solver_jerk_.set_x0(x0);
     // printf("hola6\n");
-    double max_values[3] = { par_.v_max, par_.a_max, par_.j_max };
-    solver_jerk_.set_max(max_values);
     // printf("Hola6.8\n");
     double t0cvxgen_jerk = ros::Time::now().toSec();
     solver_jerk_.genNewTraj();
@@ -1042,14 +1056,14 @@ void CVX::replanCB(const ros::TimerEvent& e)
         Eigen::Vector3d p = K[i];
         double xf[9] = { p[0], p[1], p[2], 0, 0, 0, 0, 0, 0 };
         mtx_goals.lock();
+        mtx_initial_cond.lock();
         double x0[9] = { initialCond_.pos.x,   initialCond_.pos.y,   initialCond_.pos.z,
                          initialCond_.vel.x,   initialCond_.vel.y,   initialCond_.vel.z,
                          initialCond_.accel.x, initialCond_.accel.y, initialCond_.accel.z };
+        mtx_initial_cond.unlock();
         mtx_goals.unlock();
         solver_jerk_.set_xf(xf);
         solver_jerk_.set_x0(x0);
-        double max_values[3] = { par_.v_max, par_.a_max, par_.j_max };
-        solver_jerk_.set_max(max_values);
         solver_jerk_.genNewTraj();
         U_temp2 = solver_jerk_.getU();
         X_temp2 = solver_jerk_.getX();
@@ -1150,8 +1164,10 @@ void CVX::replanCB(const ros::TimerEvent& e)
   if (have_seen_the_goal1 || need_to_decide == false)
   {
     log_.decision = 1;
+    mtx_X_U_temp.lock();
     U_temp_ = U_temp1;
     X_temp_ = X_temp1;
+    mtx_X_U_temp.unlock();
     JPS_old_ = JPS1;
     mtx_k.lock();
     k_initial_cond_ = k_initial_cond_1_;
@@ -1165,8 +1181,10 @@ void CVX::replanCB(const ros::TimerEvent& e)
   else if (have_seen_the_goal2)
   {
     log_.decision = 2;
+    mtx_X_U_temp.lock();
     U_temp_ = U_temp2;
     X_temp_ = X_temp2;
+    mtx_X_U_temp.unlock();
     JPS_old_ = JPS2;
     mtx_k.lock();
     k_initial_cond_ = k_initial_cond_2_;
@@ -1182,8 +1200,10 @@ void CVX::replanCB(const ros::TimerEvent& e)
     if (J1 <= J2)
     {
       log_.decision = 1;
+      mtx_X_U_temp.lock();
       U_temp_ = U_temp1;
       X_temp_ = X_temp1;
+      mtx_X_U_temp.unlock();
       JPS_old_ = JPS1;
       mtx_k.lock();
       k_initial_cond_ = k_initial_cond_1_;
@@ -1196,8 +1216,10 @@ void CVX::replanCB(const ros::TimerEvent& e)
     else
     {
       log_.decision = 2;
+      mtx_X_U_temp.lock();
       U_temp_ = U_temp2;
       X_temp_ = X_temp2;
+      mtx_X_U_temp.unlock();
       JPS_old_ = JPS2;
       mtx_k.lock();
       k_initial_cond_ = k_initial_cond_2_;
@@ -1210,7 +1232,9 @@ void CVX::replanCB(const ros::TimerEvent& e)
   }
 
   optimized_ = true;
+  mtx_planner_status_.lock();
   planner_status_ = REPLANNED;
+  mtx_planner_status_.unlock();
   // printf("ReplanCB: planner_status_ = REPLANNED\n");
   if (par_.visual == true)
   {
@@ -1242,8 +1266,6 @@ double CVX::solveVelAndGetCost(vec_Vecf<3> path)
     // double u0[3] = { initialCond_.vel.x, initialCond_.vel.y, initialCond_.vel.z };
     solver_vel_.set_xf(xf);
     solver_vel_.set_x0(x0);
-    double max_values[1] = { par_.v_max };
-    solver_vel_.set_max(max_values);
     // solver_vel_.set_u0(u0);
     double t0cvxgen_vel = ros::Time::now().toSec();
     solver_vel_.genNewTraj();
@@ -1262,8 +1284,6 @@ void CVX::modeCB(const acl_msgs::QuadFlightMode& msg)
     printf("LANDING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
     // Solver Vel
     /*    double xf[6] = { quadGoal_.pos.x, quadGoal_.pos.y, z_land_ };
-        double max_values[1] = { par_.v_max };
-        solver_vel_.set_max(max_values);  // TODO: To land, I use u_min_
         solver_vel_.set_xf(xf);
         solver_vel_.genNewTraj();*/
 
@@ -1285,16 +1305,18 @@ void CVX::modeCB(const acl_msgs::QuadFlightMode& msg)
     k_initial_cond_ = std::min(k_ + par_.offset, (int)(X_.rows() - 1));
     // Solver Jerk
     // double xf[9] = { quadGoal_.pos.x, quadGoal_.pos.y, par_.z_land, 0, 0, 0, 0, 0, 0 };
-    double max_values[3] = { par_.v_max, par_.a_max, par_.j_max };
-    solver_jerk_.set_max(max_values);  // TODO: To land, I use u_min_
+    // TODO: To land, I use u_min_
     solver_jerk_.set_x0(x0);
     solver_jerk_.set_xf(xf);
     solver_jerk_.genNewTraj();
     to_land_ = true;
-
+    mtx_X_U_temp.lock();
     U_temp_ = solver_jerk_.getU();
     X_temp_ = solver_jerk_.getX();
+    mtx_X_U_temp.unlock();
+    mtx_planner_status_.lock();
     planner_status_ = REPLANNED;
+    mtx_planner_status_.unlock();
   }
   flight_mode_.mode = msg.mode;
 }
@@ -1311,7 +1333,9 @@ void CVX::stateCB(const acl_msgs::State& msg)
     quadGoal_.vel = msg.vel;
     z_start_ = msg.pos.z;
     z_start_ = std::max(0.0, z_start_);
+    mtx_initial_cond.lock();
     initialCond_.pos = msg.pos;
+    mtx_initial_cond.unlock();
   }
 
   static int i = 0;
@@ -1336,18 +1360,22 @@ void CVX::updateInitialCond(int i)
 {
   if (status_ != GOAL_REACHED)
   {
+    mtx_initial_cond.lock();
     initialCond_.pos = getPos(i);
     initialCond_.vel = getVel(i);
     initialCond_.accel = (par_.use_ff) ? getAccel(i) : vectorNull();
     initialCond_.jerk = (par_.use_ff) ? getJerk(i) : vectorNull();
+    mtx_initial_cond.unlock();
   }
 
   else
   {
+    mtx_initial_cond.lock();
     initialCond_.pos = state_.pos;
     initialCond_.vel = vectorNull();
     initialCond_.accel = vectorNull();
     initialCond_.jerk = vectorNull();
+    mtx_initial_cond.unlock();
   }
 }
 
@@ -1374,9 +1402,11 @@ void CVX::pubCB(const ros::TimerEvent& e)
   quadGoal_.jerk = vectorNull();
   quadGoal_.dyaw = 0;
 
+  mtx_initial_cond.lock(); 
   initialCond_.vel = vectorNull();
   initialCond_.accel = vectorNull();
   initialCond_.jerk = vectorNull();
+  mtx_initial_cond.unlock(); 
 
   // printf("In pubCB3\n");
   if (quadGoal_.cut_power && (flight_mode_.mode == flight_mode_.TAKEOFF || flight_mode_.mode == flight_mode_.GO))
@@ -1398,12 +1428,14 @@ void CVX::pubCB(const ros::TimerEvent& e)
   {
     quadGoal_.cut_power = false;
 
-    // printf("k_ = %d\n", k_);
-    // printf("k_initial_cond_ = %d\n", k_initial_cond_);
-    k_ = std::min(k_, (int)(X_.rows() - 1));
+   
     mtx_k.lock();
+    k_ = std::min(k_, (int)(X_.rows() - 1));
     printf("planner_status_= %d\n", planner_status_);
     printf("to_land_= %d\n", to_land_);
+
+    printf("k_ = %d\n", k_);
+    printf("k_initial_cond_ = %d\n", k_initial_cond_);
 
     if ((planner_status_ == REPLANNED && (k_ == k_initial_cond_ || to_land_ == true)) ||  // Should be k_==
         (force_reset_to_0_ && planner_status_ == REPLANNED))
@@ -1411,19 +1443,26 @@ void CVX::pubCB(const ros::TimerEvent& e)
       to_land_ == false;
       printf("************Reseteando a 0!\n");
       force_reset_to_0_ = false;
+      mtx_X_U_temp.lock();
+      mtx_X_U.lock();
       X_ = X_temp_;
       U_ = U_temp_;
+      mtx_X_U.unlock();
+      mtx_X_U_temp.unlock();
       X_initialized_ = true;
       k_ = 0;  // Start again publishing the waypoints in X_ from the first row
-
+      mtx_planner_status_.lock();
       planner_status_ = START_REPLANNING;
+      mtx_planner_status_.unlock();
       // printf("pucCB2: planner_status_=START_REPLANNING\n");
     }
 
     if ((planner_status_ == REPLANNED && (k_ > k_initial_cond_)))
     {  // I've published what I planned --> plan again
        // printf("Rejecting current plan, planning again. Suggestion: Increase the offset\n");
+      mtx_planner_status_.lock();
       planner_status_ = START_REPLANNING;
+      mtx_planner_status_.unlock();
       // printf("pubCB: planner_status_ = START_REPLANNING\n");
       // printf("********************k_ > k_initial_cond_\n");
     }
@@ -1447,7 +1486,9 @@ void CVX::pubCB(const ros::TimerEvent& e)
 
     if (status_ == YAWING)
     {
+     //mtx_term_goal.lock();
       double desired_yaw = atan2(term_goal_[1] - quadGoal_.pos.y, term_goal_[0] - quadGoal_.pos.x);
+     // mtx_term_goal.unlock();
       double diff = desired_yaw - quadGoal_.yaw;
       angle_wrap(diff);
       yaw(diff, quadGoal_);
@@ -1512,9 +1553,11 @@ geometry_msgs::Vector3 CVX::getPos(int i)
 {
   int input_order = solver_jerk_.getOrder();
   geometry_msgs::Vector3 tmp;
+  mtx_X_U.lock();
   tmp.x = X_(i, 0);
   tmp.y = X_(i, 1);
   tmp.z = X_(i, 2);
+  mtx_X_U.unlock();
   return tmp;
 }
 
@@ -1522,6 +1565,7 @@ geometry_msgs::Vector3 CVX::getVel(int i)
 {
   int input_order = solver_jerk_.getOrder();
   geometry_msgs::Vector3 tmp;
+  mtx_X_U.lock();
   switch (input_order)
   {
     case VEL:
@@ -1540,6 +1584,7 @@ geometry_msgs::Vector3 CVX::getVel(int i)
       tmp.z = X_(i, 5);
       break;
   }
+  mtx_X_U.unlock();
   return tmp;
 }
 
@@ -1547,7 +1592,7 @@ geometry_msgs::Vector3 CVX::getAccel(int i)
 {
   int input_order = solver_jerk_.getOrder();
   geometry_msgs::Vector3 tmp;
-
+  mtx_X_U.lock();
   switch (input_order)
   {
     case VEL:
@@ -1565,6 +1610,7 @@ geometry_msgs::Vector3 CVX::getAccel(int i)
       tmp.z = X_(i, 8);
       break;
   }
+  mtx_X_U.unlock();
 
   return tmp;
 }
@@ -1573,7 +1619,8 @@ geometry_msgs::Vector3 CVX::getJerk(int i)
 {
   int input_order = solver_jerk_.getOrder();
   geometry_msgs::Vector3 tmp;
-
+  
+  mtx_X_U.lock();
   switch (input_order)
   {
     case VEL:
@@ -1592,6 +1639,7 @@ geometry_msgs::Vector3 CVX::getJerk(int i)
       tmp.z = U_(i, 2);
       break;
   }
+  mtx_X_U.unlock();
   return tmp;
 }
 
@@ -2426,9 +2474,9 @@ void CVX::pubActualTraj()
   static geometry_msgs::Point p_last = pointOrigin();
 
   Eigen::Vector3d act_pos(state_.pos.x, state_.pos.y, state_.pos.z);
-  mtx_term_goal.lock();
+  //mtx_term_goal.lock();
   Eigen::Vector3d t_goal = term_goal_;
-  mtx_term_goal.unlock();
+  //mtx_term_goal.unlock();
   float dist_to_goal = (t_goal - act_pos).norm();
 
   if (dist_to_goal < 2 * par_.goal_radius)
@@ -2460,7 +2508,9 @@ void CVX::pubTerminalGoal()
 {
   geometry_msgs::PointStamped p;
   p.header.frame_id = "world";
+  //mtx_term_goal.lock();
   p.point = eigen2point(term_goal_);
+  //mtx_term_goal.unlock();
 
   pub_term_goal_.publish(p);
 }

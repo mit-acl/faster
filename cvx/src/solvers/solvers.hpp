@@ -356,6 +356,7 @@ template <int INPUT_ORDER>
 void Solver<INPUT_ORDER>::genNewTraj()
 {
   // printf("In genNewTraj\n");
+  std::cout <<"callOptimizer, x0_=" << x0_[0] << x0_[1] << x0_[2] <<"xf_=" << xf_[0] << xf_[1] << xf_[2] << std::endl;
   callOptimizer();
   // printf("In genNewTraj0.5\n");
   resetXandU();
@@ -506,6 +507,7 @@ double Solver<INPUT_ORDER>::getDTInitial()
   {
     case JERK:
     {
+      std::cout <<"get DT, x0_=" << x0_[0] << x0_[1] << x0_[2] <<"xf_=" << xf_[0] << xf_[1] << xf_[2] << std::endl;
       float jerkx = copysign(1, xf_[0] - x0_[0]) * j_max_;
       float jerky = copysign(1, xf_[1] - x0_[1]) * j_max_;
       float jerkz = copysign(1, xf_[2] - x0_[2]) * j_max_;
@@ -521,6 +523,8 @@ double Solver<INPUT_ORDER>::getDTInitial()
       Eigen::Vector4d coeffy(x0_[1] - xf_[1], v0y, a0y / 2, jerky / 6);
       Eigen::Vector4d coeffz(x0_[2] - xf_[2], v0z, a0z / 2, jerkz / 6);
 
+      std::cout <<"Coefficients" << coeffx.transpose() << coeffy.transpose() << coeffz.transpose() << std::endl;
+
       Eigen::PolynomialSolver<double, Eigen::Dynamic> psolvex(coeffx);
       Eigen::PolynomialSolver<double, Eigen::Dynamic> psolvey(coeffy);
       Eigen::PolynomialSolver<double, Eigen::Dynamic> psolvez(coeffz);
@@ -531,13 +535,14 @@ double Solver<INPUT_ORDER>::getDTInitial()
       psolvex.realRoots(realRootsx);
       psolvey.realRoots(realRootsy);
       psolvez.realRoots(realRootsz);
-
+      
+      printf("before min elements\n");
       t_jx = *std::min_element(realRootsx.begin(), realRootsx.end());
       t_jy = *std::min_element(realRootsy.begin(), realRootsy.end());
       t_jz = *std::min_element(realRootsz.begin(), realRootsz.end());
 
-      // printf("t_jx, t_jy, t_jz:\n");
-      // std::cout << t_jx << "  " << t_jy << "  " << t_jz << std::endl;
+      printf("after: t_jx, t_jy, t_jz:\n");
+      std::cout << t_jx << "  " << t_jy << "  " << t_jz << std::endl;
 
       // DON'T PUT HERE A BREAK!!
     }

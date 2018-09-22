@@ -53,7 +53,7 @@ inline double angleBetVectors(const Eigen::Vector3d& a, const Eigen::Vector3d& b
 }
 
 // returns the points around B sampled in the sphere with radius r and center center.
-inline std::vector<Eigen::Vector3d> samplePointsSphere(Eigen::Vector3d B, double r, Eigen::Vector3d center)
+inline std::vector<Eigen::Vector3d> samplePointsSphere(Eigen::Vector3d& B, double r, Eigen::Vector3d& center)
 {
   std::vector<Eigen::Vector3d> tmp;
 
@@ -109,6 +109,10 @@ inline std::vector<Eigen::Vector3d> samplePointsSphereWithJPS(Eigen::Vector3d& B
                                                               Eigen::Vector3d& center_sent, vec_Vecf<3>& path_sent,
                                                               int last_index_inside_sphere)
 {
+
+  printf("In samplePointsSphereWithJPS\n");
+  printElementsOfJPS(path_sent);
+
   vec_Vecf<3> path;
 
   for (int i = 0; i < path_sent.size(); i++)
@@ -145,8 +149,7 @@ inline std::vector<Eigen::Vector3d> samplePointsSphereWithJPS(Eigen::Vector3d& B
   Eigen::Vector3d dir;
   double x, y, z;
 
-  // printf("In samplePointsSphereWithJPS\n");
-  // printElementsOfJPS(path);
+
 
   for (int i = last_index_inside_sphere + 1; i >= 1; i--)
   {
@@ -156,8 +159,8 @@ inline std::vector<Eigen::Vector3d> samplePointsSphereWithJPS(Eigen::Vector3d& B
     /*    Eigen::Vector3d& point_i_ref(point_i);      // point i expressed with origin=origin sphere
         Eigen::Vector3d& point_im1_ref(point_im1);  // point i minus 1*/
 
-    // std::cout << "i=" << i << "point_i=" << path[i].transpose() << std::endl;
-    // std::cout << "i=" << i << "point_im1=" << path[i - 1].transpose() << std::endl;
+    std::cout << "i=" << i << "point_i=" << path[i].transpose() << std::endl;
+    std::cout << "i=" << i << "point_im1=" << path[i - 1].transpose() << std::endl;
 
     Eigen::Vector3d a = point_i;
     Eigen::Vector3d b = point_im1;
@@ -169,6 +172,12 @@ inline std::vector<Eigen::Vector3d> samplePointsSphereWithJPS(Eigen::Vector3d& B
       double tmp = a.dot(b) / (a.norm() * b.norm());
       saturate(tmp, -1, 1);
       angle_max = acos(tmp);
+      printf("tmp=%f\n", tmp);
+      printf("angle_max=%f\n", angle_max);
+      if(angle_max<0.02){   
+         samples.push_back(B);
+         continue;
+      }
     }
     else
     {
@@ -191,8 +200,8 @@ inline std::vector<Eigen::Vector3d> samplePointsSphereWithJPS(Eigen::Vector3d& B
         }*/
 
     Eigen::Vector3d perp = (point_i.cross(point_im1)).normalized();  // perpendicular vector to point_i and point_ip1;
-    // printf("Perpendicular vector=\n");
-    // std::cout << perp << std::endl;
+    printf("Perpendicular vector=\n");
+    std::cout << perp << std::endl;
 
     for (double angle = 0; angle < angle_max; angle = angle + 0.34)
     {
@@ -255,12 +264,12 @@ inline std::vector<Eigen::Vector3d> samplePointsSphereWithJPS(Eigen::Vector3d& B
   samples.insert(samples.end(), uniform_samples.begin(),
                  uniform_samples.end());  // concatenate samples and uniform samples
 
-  /*  printf("y despues samples vale:\n");
+    printf("**y despues samples vale:\n");
     for (int i = 0; i < samples.size(); i++)
     {
       std::cout << samples[i].transpose() << std::endl;
     }
-    printf("returning it:\n");*/
+    /*printf("returning it:\n");*/
 
   return samples;
 }
