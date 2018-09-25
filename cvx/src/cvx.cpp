@@ -273,7 +273,9 @@ void CVX::publishJPS2handIntersection(vec_Vecf<3> JPS2, vec_Vecf<3> JPS2_fix, Ei
 
 void CVX::updateJPSMap(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr)
 {
+  mtx_state.lock();
   Vec3f center_map(state_.pos.x, state_.pos.y, state_.pos.z);  // center of the map
+  mtx_state.unlock();
   Vec3i dim(cells_x_, cells_y_, cells_z_);                     //  number of cells in each dimension
   // printf("Before reader\n");
   // printf("Sending dim=\n");
@@ -291,9 +293,11 @@ void CVX::updateJPSMap(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr)
   // printf("After setMapUtil\n");
 }
 
-vec_Vecf<3> CVX::solveJPS3D(Vec3f& start, Vec3f& goal, bool* solved, int i)
+vec_Vecf<3> CVX::solveJPS3D(Vec3f& start_sent, Vec3f& goal_sent, bool* solved, int i)
 {
-  /*  std::cout << "calling JPS3d" << std::endl;*/
+  Eigen::Vector3d start(start_sent[0], start_sent[1], start_sent[2]);
+  Eigen::Vector3d goal(goal_sent[0], goal_sent[1], goal_sent[2]);
+  /*  std::cout << "IN JPS3d" << std::endl;*/
   std::cout << "start=" << start.transpose() << std::endl;
   std::cout << "goal=" << goal.transpose() << std::endl;
 
@@ -449,6 +453,7 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f& start, Vec3f& goal, bool* solved, int i)
       goal = goal + (par_.inflation_jps + 2 * par_.res) * (force.normalized());
 
       // Check if it falls outside the map
+      mtx_state.lock();
       Eigen::Vector3d rel(goal[0] - state_.pos.x, goal[1] - state_.pos.y, goal[2] - state_.pos.z);
       goal[0] = (rel[0] > par_.wdx / 2 + 4 * par_.res) ? state_.pos.x + par_.wdx / 2 + 4 * par_.res : goal[0];
       goal[1] = (rel[1] > par_.wdy / 2 + 4 * par_.res) ? state_.pos.y + par_.wdy / 2 + 4 * par_.res : goal[1];
@@ -456,6 +461,7 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f& start, Vec3f& goal, bool* solved, int i)
       goal[0] = (rel[0] < -par_.wdx / 2 - 4 * par_.res) ? state_.pos.x - par_.wdx / 2 - 4 * par_.res : goal[0];
       goal[1] = (rel[1] > -par_.wdy / 2 - 4 * par_.res) ? state_.pos.y - par_.wdy / 2 - 4 * par_.res : goal[1];
       goal[2] = (rel[2] > -par_.wdz / 2 - 4 * par_.res) ? state_.pos.z - par_.wdz / 2 - 4 * par_.res : goal[2];
+      mtx_state.unlock();
 
       if (goal[2] < par_.z_ground)
       {
@@ -598,11 +604,14 @@ void CVX::vectorOfVectors2MarkerArray(vec_Vecf<3> traj, visualization_msgs::Mark
 void CVX::goalCB(const acl_msgs::TermGoal& msg)
 {
   printf("NEW GOAL************************************************\n");
+  mtx_term_term_goal.lock();
   term_term_goal_ = Eigen::Vector3d(msg.pos.x, msg.pos.y, msg.pos.z);
+  mtx_term_term_goal.unlock();
   // std::cout << "term_term_goal_=\n" << term_term_goal_ << std::endl;
   mtx_term_goal.lock();
- 
+  mtx_state.lock();
   term_goal_ = projectClickedGoal(Eigen::Vector3d(state_.pos.x, state_.pos.y, state_.pos.z));
+  mtx_state.unlock();
   mtx_term_goal.unlock();
   // std::cout << "term_goal_=\n" << term_goal_ << std::endl;
 
@@ -748,9 +757,13 @@ void CVX::replanCB(const ros::TimerEvent& e)
   // Timer time_init(true);
   // printf("In replanCB0\n");
   double t0replanCB = ros::Time::now().toSec();
+  mtx_state.lock();
   Eigen::Vector3d state_pos(state_.pos.x, state_.pos.y, state_.pos.z);  // Local copy of state
+  mtx_state.unlock();
+
   mtx_term_goal.lock();
   term_goal_ = projectClickedGoal(state_pos);
+  std::cout<<"Projected Goal"<<term_goal_.transpose()<<std::endl;
   mtx_term_goal.unlock();
   // printf("In replanCB0.1\n");
   if (par_.visual == true)
@@ -812,7 +825,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   vec_Vecf<3> JPS2;
 
   // printf("init2\n");
-  // std::cout << "terminal goal=" << term_goal.transpose() << std::endl;
+  std::cout << "Running JPS3d to terminal goal=" << term_goal.transpose() << std::endl;
 
   static bool first_time = true;                            // how many times I've solved JPS1
   JPS1 = solveJPS3D(state_pos, term_goal, &solvedjps1, 1);  // Solution is in JPS1
@@ -827,6 +840,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
       {
         printf("Trying to escape from critial situation!!***\n");
         Eigen::Vector3d new_pos(state_pos[0] + i, state_pos[1] + j, state_pos[2]);
+        std::cout << "Running JPS3d to terminal goal=" << term_goal.transpose() << std::endl;
         JPS1 = solveJPS3D(new_pos, term_goal, &solvedjps1, 1);
       }
     }
@@ -858,7 +872,9 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   if (flight_mode_.mode != flight_mode_.GO)
   {
+    mtx_state.lock();
     ra = term_goal[2] - state_.pos.z;
+    mtx_state.unlock();
   }
 
   // printElementsOfJPS(JPS1);
@@ -1293,10 +1309,11 @@ void CVX::modeCB(const acl_msgs::QuadFlightMode& msg)
         solver_accel_.set_max(max_values);  // TODO: To land, I use u_min_
         solver_accel_.set_xf(xf);
         solver_accel_.genNewTraj();*/
-
+    mtx_state.lock();
     double x0[9] = { state_.pos.x, state_.pos.y, state_.pos.z, state_.vel.x, state_.vel.y, state_.vel.z, 0, 0, 0 };
 
     double xf[9] = { state_.pos.x, state_.pos.y, par_.z_land, 0, 0, 0, 0, 0, 0 };
+    mtx_state.unlock();
     mtx_goals.unlock();
     // printf("Hola6.7\n");
     solver_jerk_.set_xf(xf);
@@ -1325,7 +1342,9 @@ void CVX::stateCB(const acl_msgs::State& msg)
 {
   // printf("(State): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", msg.pos.x, msg.pos.y, msg.pos.z, msg.vel.x, msg.vel.y,
   //       msg.vel.z);
+  mtx_state.lock();
   state_ = msg;
+  mtx_state.unlock();
   // Stop updating when we get GO
   if (flight_mode_.mode == flight_mode_.NOT_FLYING || flight_mode_.mode == flight_mode_.KILL)
   {
@@ -1371,7 +1390,9 @@ void CVX::updateInitialCond(int i)
   else
   {
     mtx_initial_cond.lock();
+    mtx_state.lock();
     initialCond_.pos = state_.pos;
+     mtx_state.unlock();
     initialCond_.vel = vectorNull();
     initialCond_.accel = vectorNull();
     initialCond_.jerk = vectorNull();
@@ -2472,8 +2493,9 @@ void CVX::pubActualTraj()
   // printf("In pubActualTraj\n");
 
   static geometry_msgs::Point p_last = pointOrigin();
-
+  mtx_state.lock();
   Eigen::Vector3d act_pos(state_.pos.x, state_.pos.y, state_.pos.z);
+  mtx_state.unlock();
   //mtx_term_goal.lock();
   Eigen::Vector3d t_goal = term_goal_;
   //mtx_term_goal.unlock();
@@ -2661,14 +2683,17 @@ Eigen::Vector3d CVX::projectClickedGoal(Eigen::Vector3d P1)
 {
   //[px1, py1, pz1] is inside the map (it's the center of the map, where the drone is)
   //[px2, py2, pz2] is outside the map
+  mtx_term_term_goal.lock();
   Eigen::Vector3d P2 = term_term_goal_;
+  mtx_term_term_goal.unlock();
   double x_max = P1[0] + par_.wdx / 2;
   double x_min = P1[0] - par_.wdx / 2;
   double y_max = P1[1] + par_.wdy / 2;
   double y_min = P1[1] - par_.wdy / 2;
   double z_max = P1[2] + par_.wdz / 2;
   double z_min = P1[2] - par_.wdz / 2;
-
+  
+  return P2; //TODO: Change this after the HW experiments!
   if ((P2[0] < x_max && P2[0] > x_min) && (P2[1] < y_max && P2[1] > y_min) && (P2[2] < z_max && P2[2] > z_min))
   {
     // Clicked goal is inside the map

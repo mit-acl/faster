@@ -290,8 +290,10 @@ private:
   std::mutex mtx_X_U;
   std::mutex mtx_planner_status_;
   std::mutex mtx_initial_cond;
+  std::mutex mtx_state;
 
   std::mutex mtx_term_goal;
+  std::mutex mtx_term_term_goal;
 
   std::shared_ptr<JPS::VoxelMapUtil> map_util_;
   std::unique_ptr<JPSPlanner3D> planner_ptr_;
