@@ -11,15 +11,7 @@
 // TODO: use the gpu versions of the pcl functions
 // TODO: https://eigen.tuxfamily.org/dox/TopicCUDA.html
 
-// TODO: how to tackle unknown space
-
-// TODO: Quiz'a puedo anadir al potential field otra fuerza que me aleje de los sitios por los cuales ya he pasado?
-
 // TODO: Check the offset or offset-1
-
-// TODO: I'm using only the direction of the force, but not the magnitude. Could I use the magnitude?
-// TODO: If I'm only using the direction of the force, not sure if quadratic+linear separation is needed in the
-// attractive force
 
 #include "cvx.hpp"
 #include "geometry_msgs/PointStamped.h"
@@ -45,6 +37,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
 {
   ros::param::param<bool>("~use_ff", par_.use_ff, 1);
   ros::param::param<bool>("~visual", par_.visual, true);
+  ros::param::param<bool>("~use_vel", par_.use_vel, true);
 
   ros::param::param<double>("~wdx", par_.wdx, 20.0);
   ros::param::param<double>("~wdy", par_.wdy, 20.0);
@@ -58,6 +51,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   ros::param::param<int>("~offset", par_.offset, 5);
 
   ros::param::param<double>("~Ra", par_.Ra, 2.0);
+  ros::param::param<double>("~Ra_max", par_.Ra_max, 2.5);
   ros::param::param<double>("~Rb", par_.Rb, 6.0);
   ros::param::param<double>("~w_max", par_.w_max, 1.0);
   ros::param::param<double>("~alpha_0", par_.alpha_0, 1.0);
@@ -115,16 +109,16 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   setpoint_.scale.y = 0.35;
   setpoint_.scale.z = 0.35;
   setpoint_.color = color(ORANGE_TRANS);
- // mtx_term_goal.lock();
+  // mtx_term_goal.lock();
   term_goal_ << 0, 0, 0;
- // mtx_term_goal.unlock();
+  // mtx_term_goal.unlock();
   term_term_goal_ << 0, 0, 0;
 
   quadGoal_.pos = vectorNull();
   quadGoal_.vel = vectorNull();
   quadGoal_.accel = vectorNull();
   quadGoal_.jerk = vectorNull();
-  
+
   mtx_initial_cond.lock();
   initialCond_.pos = vectorNull();
   initialCond_.vel = vectorNull();
@@ -276,7 +270,7 @@ void CVX::updateJPSMap(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr)
   mtx_state.lock();
   Vec3f center_map(state_.pos.x, state_.pos.y, state_.pos.z);  // center of the map
   mtx_state.unlock();
-  Vec3i dim(cells_x_, cells_y_, cells_z_);                     //  number of cells in each dimension
+  Vec3i dim(cells_x_, cells_y_, cells_z_);  //  number of cells in each dimension
   // printf("Before reader\n");
   // printf("Sending dim=\n");
   std::cout << dim.transpose() << std::endl;
@@ -763,7 +757,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   mtx_term_goal.lock();
   term_goal_ = projectClickedGoal(state_pos);
-  std::cout<<"Projected Goal"<<term_goal_.transpose()<<std::endl;
+  std::cout << "Projected Goal" << term_goal_.transpose() << std::endl;
   mtx_term_goal.unlock();
   // printf("In replanCB0.1\n");
   if (par_.visual == true)
@@ -864,10 +858,16 @@ void CVX::replanCB(const ros::TimerEvent& e)
     // printf("here, flight_mode=%d\n", flight_mode_.mode);
     // double l = getDistanceToFirstCollisionJPSwithUnkonwnspace(JPS1, &dummy);
     ra = (JPS1[1] - JPS1[0]).norm();
-    saturate(ra, par_.Ra, 2.5);
+    saturate(ra, par_.Ra, par_.Ra_max);
   }
 
   ra = std::min(0.96 * dist_to_goal, ra);  // radius of the sphere Sa
+
+  if (par_.use_vel == false)
+  {
+    rb = 1.001 * ra;
+  }
+
   printf("ra vale %f\n", ra);
 
   if (flight_mode_.mode != flight_mode_.GO)
@@ -896,22 +896,22 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   if (solvedjps1 == true)
   {
-    JPS1_solved_=true;
+    JPS1_solved_ = true;
     if (par_.visual == true)
     {
       clearJPSPathVisualization(1);
       publishJPSPath(JPS1, 1);
     }
     printf("ReplanCB: Elements of JPS1 are...\n");
-        printElementsOfJPS(JPS1);
-/*
-        printf("Elements of JPS_old_ are...:\n");
-        printElementsOfJPS(JPS_old_);*/
+    printElementsOfJPS(JPS1);
+    /*
+            printf("Elements of JPS_old_ are...:\n");
+            printElementsOfJPS(JPS_old_);*/
   }
   else
   {
     printf("JPS1 didn't find a solution\n");
-    JPS1_solved_=false;
+    JPS1_solved_ = false;
     return;
   }
 
@@ -969,7 +969,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
                      initialCond_.vel.x,   initialCond_.vel.y,   initialCond_.vel.z,
                      initialCond_.accel.x, initialCond_.accel.y, initialCond_.accel.z };
     mtx_initial_cond.unlock();
-    std::cout <<"Before6.7, x0=" << x0[0] << x0[1] << x0[2] <<"xf=" << xf[0] << xf[1] << xf[2] << std::endl;
+    std::cout << "Before6.7, x0=" << x0[0] << x0[1] << x0[2] << "xf=" << xf[0] << xf[1] << xf[2] << std::endl;
     mtx_goals.unlock();
     // printf("Hola6.7\n");
     solver_jerk_.set_xf(xf);
@@ -1392,7 +1392,7 @@ void CVX::updateInitialCond(int i)
     mtx_initial_cond.lock();
     mtx_state.lock();
     initialCond_.pos = state_.pos;
-     mtx_state.unlock();
+    mtx_state.unlock();
     initialCond_.vel = vectorNull();
     initialCond_.accel = vectorNull();
     initialCond_.jerk = vectorNull();
@@ -1423,11 +1423,11 @@ void CVX::pubCB(const ros::TimerEvent& e)
   quadGoal_.jerk = vectorNull();
   quadGoal_.dyaw = 0;
 
-  mtx_initial_cond.lock(); 
+  mtx_initial_cond.lock();
   initialCond_.vel = vectorNull();
   initialCond_.accel = vectorNull();
   initialCond_.jerk = vectorNull();
-  mtx_initial_cond.unlock(); 
+  mtx_initial_cond.unlock();
 
   // printf("In pubCB3\n");
   if (quadGoal_.cut_power && (flight_mode_.mode == flight_mode_.TAKEOFF || flight_mode_.mode == flight_mode_.GO))
@@ -1449,7 +1449,6 @@ void CVX::pubCB(const ros::TimerEvent& e)
   {
     quadGoal_.cut_power = false;
 
-   
     mtx_k.lock();
     k_ = std::min(k_, (int)(X_.rows() - 1));
     printf("planner_status_= %d\n", planner_status_);
@@ -1507,9 +1506,9 @@ void CVX::pubCB(const ros::TimerEvent& e)
 
     if (status_ == YAWING)
     {
-     //mtx_term_goal.lock();
+      // mtx_term_goal.lock();
       double desired_yaw = atan2(term_goal_[1] - quadGoal_.pos.y, term_goal_[0] - quadGoal_.pos.x);
-     // mtx_term_goal.unlock();
+      // mtx_term_goal.unlock();
       double diff = desired_yaw - quadGoal_.yaw;
       angle_wrap(diff);
       yaw(diff, quadGoal_);
@@ -1533,13 +1532,15 @@ void CVX::pubCB(const ros::TimerEvent& e)
       double desired_yaw = atan2(B_[1] - quadGoal_.pos.y, B_[0] - quadGoal_.pos.x);
       double diff = desired_yaw - quadGoal_.yaw;
       angle_wrap(diff);
-      if(JPS1_solved_==true){
-      yaw(diff, quadGoal_);
+      if (JPS1_solved_ == true)
+      {
+        yaw(diff, quadGoal_);
       }
 
-     if(JPS1_solved_==false){
-       quadGoal_.dyaw=0;
-     }
+      if (JPS1_solved_ == false)
+      {
+        quadGoal_.dyaw = 0;
+      }
     }
 
     mtx_k.lock();
@@ -1640,7 +1641,7 @@ geometry_msgs::Vector3 CVX::getJerk(int i)
 {
   int input_order = solver_jerk_.getOrder();
   geometry_msgs::Vector3 tmp;
-  
+
   mtx_X_U.lock();
   switch (input_order)
   {
@@ -2496,9 +2497,9 @@ void CVX::pubActualTraj()
   mtx_state.lock();
   Eigen::Vector3d act_pos(state_.pos.x, state_.pos.y, state_.pos.z);
   mtx_state.unlock();
-  //mtx_term_goal.lock();
+  // mtx_term_goal.lock();
   Eigen::Vector3d t_goal = term_goal_;
-  //mtx_term_goal.unlock();
+  // mtx_term_goal.unlock();
   float dist_to_goal = (t_goal - act_pos).norm();
 
   if (dist_to_goal < 2 * par_.goal_radius)
@@ -2530,9 +2531,9 @@ void CVX::pubTerminalGoal()
 {
   geometry_msgs::PointStamped p;
   p.header.frame_id = "world";
-  //mtx_term_goal.lock();
+  // mtx_term_goal.lock();
   p.point = eigen2point(term_goal_);
-  //mtx_term_goal.unlock();
+  // mtx_term_goal.unlock();
 
   pub_term_goal_.publish(p);
 }
@@ -2692,8 +2693,8 @@ Eigen::Vector3d CVX::projectClickedGoal(Eigen::Vector3d P1)
   double y_min = P1[1] - par_.wdy / 2;
   double z_max = P1[2] + par_.wdz / 2;
   double z_min = P1[2] - par_.wdz / 2;
-  
-  return P2; //TODO: Change this after the HW experiments!
+
+  // return P2;  // TODO: Change this line after the HW experiments!
   if ((P2[0] < x_max && P2[0] > x_min) && (P2[1] < y_max && P2[1] > y_min) && (P2[2] < z_max && P2[2] > z_min))
   {
     // Clicked goal is inside the map

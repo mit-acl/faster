@@ -48,6 +48,7 @@ struct parameteres
 {
   bool use_ff;
   bool visual;
+  bool use_vel;
 
   double wdx;
   double wdy;
@@ -60,6 +61,7 @@ struct parameteres
 
   int offset;
   double Ra;
+  double Ra_max;
   double Rb;
   double w_max;
   double alpha_0;
@@ -304,5 +306,5 @@ private:
   Eigen::Vector3d B_;
 
   bool to_land_ = false;
-  bool JPS1_solved_=false;
+  bool JPS1_solved_ = false;
 };
