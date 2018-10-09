@@ -604,7 +604,8 @@ void CVX::goalCB(const acl_msgs::TermGoal& msg)
   // std::cout << "term_term_goal_=\n" << term_term_goal_ << std::endl;
   mtx_term_goal.lock();
   mtx_state.lock();
-  term_goal_ = projectClickedGoal(Eigen::Vector3d(state_.pos.x, state_.pos.y, state_.pos.z));
+  Eigen::Vector3d temp(state_.pos.x, state_.pos.y, state_.pos.z);
+  term_goal_ = projectClickedGoal(temp);
   mtx_state.unlock();
   mtx_term_goal.unlock();
   // std::cout << "term_goal_=\n" << term_goal_ << std::endl;
@@ -2680,13 +2681,14 @@ void CVX::pubintersecPoint(Eigen::Vector3d p, bool add)
         }*/
 
 // P1-P2 is the direction used for projection. P2 is the gal clicked
-Eigen::Vector3d CVX::projectClickedGoal(Eigen::Vector3d P1)
+Eigen::Vector3d CVX::projectClickedGoal(Eigen::Vector3d& P1)
 {
   //[px1, py1, pz1] is inside the map (it's the center of the map, where the drone is)
   //[px2, py2, pz2] is outside the map
   mtx_term_term_goal.lock();
   Eigen::Vector3d P2 = term_term_goal_;
   mtx_term_term_goal.unlock();
+  return P2;  // TODO: Change this line after the HW experiments!
   double x_max = P1[0] + par_.wdx / 2;
   double x_min = P1[0] - par_.wdx / 2;
   double y_max = P1[1] + par_.wdy / 2;
@@ -2694,7 +2696,7 @@ Eigen::Vector3d CVX::projectClickedGoal(Eigen::Vector3d P1)
   double z_max = P1[2] + par_.wdz / 2;
   double z_min = P1[2] - par_.wdz / 2;
 
-  // return P2;  // TODO: Change this line after the HW experiments!
+  
   if ((P2[0] < x_max && P2[0] > x_min) && (P2[1] < y_max && P2[1] > y_min) && (P2[2] < z_max && P2[2] > z_min))
   {
     // Clicked goal is inside the map
