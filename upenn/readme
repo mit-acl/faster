@@ -1,0 +1,7 @@
+
+roslaunch acl_sim sim.launch quad:=SQ01s world_name:="office.world"
+roslaunch quad_sim quad_sim.launch gazebo:=true veh:=SQ num:=01 joy:=1 x:=25 y:=10
+roscd acl_sim; rosbag play ./worlds/PointClouds/office.bag -l
+roslaunch mpl_test_node comparison_upenn.launch quad:=SQ01s
+roslaunch mpl_test_node rviz_cloud.launch
+

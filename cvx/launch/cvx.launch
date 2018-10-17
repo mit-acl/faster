@@ -22,7 +22,7 @@
 
 		<!--HARDWARE:    camera/depth/color/points -->
 		<!--SIMULATION:  camera/cloud -->
-		<remap from="~pcloud" to="camera/depth/color/points"/> <!--PointCloud from the camera-->
+		<remap from="~pcloud" to="camera/cloud"/> <!--PointCloud from the camera-->
 
 		<!-- Publications -->
 		<remap from="~traj" to="traj"/>

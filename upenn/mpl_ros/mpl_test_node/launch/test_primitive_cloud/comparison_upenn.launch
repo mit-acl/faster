@@ -18,7 +18,7 @@
     output="screen">
 
     <!--<remap from="~occup_grid" to="global_mapper_ros/occupancy_grid"/>  Input PointCloud-->
-    <remap from="~occup_grid" to="/office_cloud"/> <!--Input PointCloud-->
+    <remap from="~occup_grid" to="/cloud"/> <!--Input PointCloud-->
     <remap from="~drone_pose" to="vicon"/>
     <remap from="~pose" to="/move_base_simple/goal"/>
     <param name="file" value="$(find mpl_test_node)/maps/office/office.bag"/>
@@ -33,6 +33,8 @@
     <param name="goal_x" value="36"/>
     <param name="goal_y" value="40.5"/>
     <param name="goal_z" value="1"/>
+
+    
     <!-- Set range --> <!-- Range defines a box that has the origin has one vertex, and each side has the dimension of range__  -->
     <!-- I think that the box that range defines should be the same as the map limits-->
     <param name="origin_x" value="-9"/>

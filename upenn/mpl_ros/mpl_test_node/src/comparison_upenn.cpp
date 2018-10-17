@@ -110,39 +110,40 @@ public:
 void sub_pcl_plan_class::poseCB(const acl_msgs::ViconState::ConstPtr& pose_ptr)
 {
   // std::cout << "In Pose CALBACK!" << std::endl;
-  /*  acl_msgs::ViconState state = *pose_ptr;
-    state.pose.position.x = -7;
-    state.pose.position.y = 0;
-    state.pose.position.z = 1;
-    // start of the trajectory--> current position of the drone
-    start_x = state.pose.position.x;
-    start_y = state.pose.position.y;
-    start_z = state.pose.position.z;
+  acl_msgs::ViconState state = *pose_ptr;
+  /*    state.pose.position.x = -7;
+      state.pose.position.y = 0;
+      state.pose.position.z = 1;*/
+  // start of the trajectory--> current position of the drone
+  start_x = state.pose.position.x;
+  start_y = state.pose.position.y;
+  start_z = state.pose.position.z;
 
-    // range --> box centered in the drone, with dimensions dim
-    origin(0) = (state.pose.position.x) - dim(0) / 2;
-    origin(1) = (state.pose.position.y) - dim(1) / 2;
-    origin(2) = (state.pose.position.z) - dim(2) / 2;
+  // range --> box centered in the drone, with dimensions dim
+  origin(0) = (state.pose.position.x) - dim(0) / 2;
+  origin(1) = (state.pose.position.y) - dim(1) / 2;
+  origin(2) = (state.pose.position.z) - dim(2) / 2;
 
-    // TODO: change this: goal of the trajectory--> current position of the drone +10 in x
-    goal_x = state.pose.position.x + 13;
-    goal_y = state.pose.position.y + 3;
-    goal_z = state.pose.position.z;
+  /*    // TODO: change this: goal of the trajectory--> current position of the drone +10 in x
+      goal_x = state.pose.position.x + 13;
+      goal_y = state.pose.position.y + 3;
+      goal_z = state.pose.position.z;*/
 
-    start_vx = state.twist.linear.x;
-    start_vy = state.twist.linear.y;
-    start_vz = state.twist.linear.z;*/
+  start_vx = state.twist.linear.x;
+  start_vy = state.twist.linear.y;
+  start_vz = state.twist.linear.z;
 
-  /*  if (pose_ptr->has_accel && use_acc == true)
-    {
-      start_ax = pose_ptr->accel.x;
-      start_ay = pose_ptr->accel.y;
-      start_az = pose_ptr->accel.z;
-    }*/
+  if (pose_ptr->has_accel && use_acc == true)
+  {
+    start_ax = pose_ptr->accel.x;
+    start_ay = pose_ptr->accel.y;
+    start_az = pose_ptr->accel.z;
+  }
 }
 
 void sub_pcl_plan_class::pclCB(const sensor_msgs::PointCloud2ConstPtr& pcl2_msg)
 {
+  printf("CB PointCloud\n");
   if (pcl2_msg->width == 0 || pcl2_msg->height == 0)  // Point Cloud is empty (happens at the beginning)
   {
     return;
@@ -169,7 +170,7 @@ void sub_pcl_plan_class::read_map()
 void sub_pcl_plan_class::initialize_planner()
 {
   // Initialize planner
-
+  printf("InitializePlanner\n");
   planner_.reset(new MPCloudUtil(false));  // true if you want verbose
 
   planner_->setMap(cloud_to_vec(map), robot_radius, robot_height, origin,
@@ -203,8 +204,12 @@ void sub_pcl_plan_class::initialize_planner()
   goal.use_jrk = start.use_jrk;
 
   std::cout << "Initializing planner, values" << std::endl;
-  std::cout << start.pos.transpose() << std::endl;
-  std::cout << goal.pos.transpose() << std::endl;
+  std::cout << "Start: Position" << start.pos.transpose() << std::endl;
+  std::cout << "       Velocity" << start.vel.transpose() << std::endl;
+  std::cout << "       Acceleration" << start.acc.transpose() << std::endl;
+  std::cout << "       Jerk" << start.jrk.transpose() << std::endl;
+
+  std::cout << "Goal" << goal.pos.transpose() << std::endl;
 
   // Prior trajectory
   if (!traj_file_name.empty())
@@ -294,6 +299,7 @@ void sub_pcl_plan_class::publish_stuff()
 
 int main(int argc, char** argv)
 {
+  printf("In main\n");
   ros::init(argc, argv, "test");
   ros::NodeHandle nh("~");
   sub_pcl_plan_class sub_pcl_plan_object(nh);

@@ -3,41 +3,41 @@
 
 #FOR THE REAL HARDWARE
 
-use_ff: true # use feedforward IT HAS TO BE TRUE!!! (if not the program crashes, this is a ToDo)
-visual: true #publish visualization stuff
-use_vel: true # use velocity. If false, r2=r1;
+# use_ff: true # use feedforward IT HAS TO BE TRUE!!! (if not the program crashes, this is a ToDo)
+# visual: true #publish visualization stuff
+# use_vel: true # use velocity. If false, r2=r1;
 
-wdx: 20.0  #[m:] world dimension in x
-wdy: 20.0  #[m] world dimension in y
-wdz: 3.0   #[m] world dimension in z
-res: 0.25  #[m] cell dimension = resolution of the map
-
-
-dc: 0.01            #(seconds) Duration for the interpolation=Value of the timer pubGoal
-goal_radius: 0.2    #(m) Drone has arrived to the goal when distance_to_goal<GOAL_RADIUS
-drone_radius: 0.2  #(m) Used for collision checking
+# wdx: 20.0  #[m:] world dimension in x
+# wdy: 20.0  #[m] world dimension in y
+# wdz: 3.0   #[m] world dimension in z
+# res: 0.25  #[m] cell dimension = resolution of the map
 
 
-offset: 10  # Replanning offset (the initial conditions are taken OFFSET states farther from the last published goal)
-
-Ra: 1            # [m] Minimum radius of the first sphere
-Ra_max: 4            # [m] Maximum radius of the first sphere
-Rb: 6.0             # [m] Radius of the second sphere
-w_max: 0.6            # [rd/s] Maximum angular velocity
-alpha_0: 0.25         #[rd] threshold to ignore current JPS solution, and consider the old one. 0--> always decide
-z_ground: 0.5         #[m] points below this are considered ground
-z_max: 1.8         #[m] JPS is not allowed to give a solution that goes higher than this height
-inflation_jps: 0.5  #[m] The obstacles are inflated (to run JPS) by this amount
-factor_jps: 1  #[m] JPS is run with resolution=factor_jps*(resolution of the map)
+# dc: 0.01            #(seconds) Duration for the interpolation=Value of the timer pubGoal
+# goal_radius: 0.2    #(m) Drone has arrived to the goal when distance_to_goal<GOAL_RADIUS
+# drone_radius: 0.2  #(m) Used for collision checking
 
 
-v_max: 2   #[m/s]  #4 6 10 en los experimentos ultimos
-a_max: 3   #[m/s2]
-j_max: 5  #[m/s3]
+# offset: 10  # Replanning offset (the initial conditions are taken OFFSET states farther from the last published goal)
 
-q: 100000  #[-] weight to the 2nd term of the cost function for cvxgen
+# Ra: 1            # [m] Minimum radius of the first sphere
+# Ra_max: 4            # [m] Maximum radius of the first sphere
+# Rb: 6.0             # [m] Radius of the second sphere
+# w_max: 0.6            # [rd/s] Maximum angular velocity
+# alpha_0: 0.25         #[rd] threshold to ignore current JPS solution, and consider the old one. 0--> always decide
+# z_ground: 0.5         #[m] points below this are considered ground
+# z_max: 1.8         #[m] JPS is not allowed to give a solution that goes higher than this height
+# inflation_jps: 0.5  #[m] The obstacles are inflated (to run JPS) by this amount
+# factor_jps: 1  #[m] JPS is run with resolution=factor_jps*(resolution of the map)
 
-z_land: 0.02 #[m] z goal for landing
+
+# v_max: 2   #[m/s]  #4 6 10 en los experimentos ultimos
+# a_max: 3   #[m/s2]
+# j_max: 5  #[m/s3]
+
+# q: 100000  #[-] weight to the 2nd term of the cost function for cvxgen
+
+# z_land: 0.02 #[m] z goal for landing
 
 #Ways to force the drone to fly faster:
 #increase Ra
@@ -70,38 +70,38 @@ z_land: 0.02 #[m] z goal for landing
 #FOR THE FOREST SIMULATION
 
 
-# use_ff: true # use feedforward
-# visual: true #publish visualization stuff
-# use_vel: false # use velocity. If false, r2=r1;
+use_ff: true # use feedforward
+visual: true #publish visualization stuff
+use_vel: false # use velocity. If false, r2=r1;
 
-# wdx: 20.0  #[m] world dimension in x
-# wdy: 20.0  #[m] world dimension in y
-# wdz: 4.0   #[m] world dimension in z
-# res: 0.10  #[m] cell dimension = resolution of the map
-
-
-# dc: 0.01            #(seconds) Duration for the interpolation=Value of the timer pubGoal
-# goal_radius: 0.2    #(m) Drone has arrived to the goal when distance_to_goal<GOAL_RADIUS
-# drone_radius: 0.42  #(m) Used for collision checking
+wdx: 20.0  #[m] world dimension in x
+wdy: 20.0  #[m] world dimension in y
+wdz: 4.0   #[m] world dimension in z
+res: 0.10  #[m] cell dimension = resolution of the map
 
 
-# offset: 5  # Replanning offset (the initial conditions are taken OFFSET states farther from the last published goal)
-
-# Ra: 0.5            # [m] Minimum radius of the first sphere
-# Ra_max: 4            # [m] Maximum radius of the first sphere
-# Rb: 9.0             # [m] Radius of the second sphere
-# w_max: 1            # [rd/s] Maximum angular velocity
-# alpha_0: 0         #[rd] threshold to ignore current JPS solution, and consider the old one. 0--> always decide
-# z_ground: 0.2         #[m] points below this are considered ground
-# z_max: 2         #[m] JPS is not allowed to give a solution that goes higher than this height
-# inflation_jps: 0.42  #[m] The obstacles are inflated (to run JPS) by this amount
-# factor_jps: 1  #[m] JPS is run with resolution=factor_jps*(resolution of the map)
+dc: 0.01            #(seconds) Duration for the interpolation=Value of the timer pubGoal
+goal_radius: 0.2    #(m) Drone has arrived to the goal when distance_to_goal<GOAL_RADIUS
+drone_radius: 0.42  #(m) Used for collision checking
 
 
-# v_max: 5.0   #[m/s]
-# a_max: 5.0   #[m/s2]
-# j_max: 8.0  #[m/s3]
+offset: 5  # Replanning offset (the initial conditions are taken OFFSET states farther from the last published goal)
 
-# q: 100000  #[-] weight to the 2nd term of the cost function for cvxgen
+Ra: 0.5            # [m] Minimum radius of the first sphere
+Ra_max: 4            # [m] Maximum radius of the first sphere
+Rb: 9.0             # [m] Radius of the second sphere
+w_max: 1            # [rd/s] Maximum angular velocity
+alpha_0: 0         #[rd] threshold to ignore current JPS solution, and consider the old one. 0--> always decide
+z_ground: 0.2         #[m] points below this are considered ground
+z_max: 2         #[m] JPS is not allowed to give a solution that goes higher than this height
+inflation_jps: 0.42  #[m] The obstacles are inflated (to run JPS) by this amount
+factor_jps: 1  #[m] JPS is run with resolution=factor_jps*(resolution of the map)
 
-# z_land: 0.02 #[m] z goal for landing
+
+v_max: 5.0   #[m/s]
+a_max: 5.0   #[m/s2]
+j_max: 8.0  #[m/s3]
+
+q: 100000  #[-] weight to the 2nd term of the cost function for cvxgen
+
+z_land: 0.02 #[m] z goal for landing
