@@ -1,78 +1,94 @@
 #include <decomp_util/iterative_decomp.h>
+#include <chrono>
 
-IterativeDecomp::IterativeDecomp(bool verbose) {
+IterativeDecomp::IterativeDecomp(bool verbose)
+{
   has_bounding_box_ = false;
   verbose_ = verbose;
-  if(verbose_)
+  if (verbose_)
     printf(ANSI_COLOR_GREEN "ITERATIVE DECOMP VERBOSE ON! \n" ANSI_COLOR_RESET);
 }
 
-IterativeDecomp::IterativeDecomp(const Vec3f &origin, const Vec3f &dim, bool verbose){
+IterativeDecomp::IterativeDecomp(const Vec3f& origin, const Vec3f& dim, bool verbose)
+{
   has_bounding_box_ = true;
   min_ = origin;
   max_ = origin + dim;
   verbose_ = verbose;
-  if(verbose_){
+  if (verbose_)
+  {
     printf(ANSI_COLOR_GREEN "ITERATIVE DECOMP VERBOSE ON! \n" ANSI_COLOR_RESET);
     printf("Min: [%f, %f, %f]\n", min_(0), min_(1), min_(2));
     printf("Max: [%f, %f, %f]\n", max_(0), max_(1), max_(2));
   }
 }
 
-bool IterativeDecomp::decomp_iter(const vec_Vec3f& poses, int iter_num, double offset_x){
+bool IterativeDecomp::decomp_iter(const vec_Vec3f& poses, int iter_num, double offset_x)
+{  // path is the original path, but discretized more (with more intermediate waypoints, say N waypoints in total).
+  // If I call decomp() with this path, I obtain N ellipsoids.
   vec_Vec3f path = poses;
   int cnt = 0;
-  for(int i = 0; i < iter_num; i++){
-    if(!decomp(path, offset_x))
+  for (int i = 0; i < iter_num; i++)
+  {
+    auto begin = std::chrono::high_resolution_clock::now();
+    if (!decomp(path, offset_x))
       return false;
-    cnt ++;
+    auto end = std::chrono::high_resolution_clock::now();
+    auto dur = end - begin;
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(dur).count();
+    std::cout << "One iteration takes" << ms << "ms" << std::endl;
+    cnt++;
     vec_Vec3f new_path;
-    if(1)
+    if (1)
       new_path = simplify(center_path_);
     else
       new_path = center_path_;
     bool converge = false;
-    if(new_path.size() == path.size()){
+    if (new_path.size() == path.size())
+    {
       converge = true;
-      for(int j = 0; j < (int) path.size(); j++){
-        if((new_path[j]-path[j]).norm() > 2e-1){
+      for (int j = 0; j < (int)path.size(); j++)
+      {
+        if ((new_path[j] - path[j]).norm() > 2e-1)
+        {
           converge = false;
           break;
         }
       }
     }
-    if(converge)
+    if (converge)
       break;
     else
       path = new_path;
   }
 
-  if(verbose_)
+  if (verbose_)
     printf(ANSI_COLOR_GREEN "takes %d iteration out of %d iteration num\n" ANSI_COLOR_RESET, cnt, iter_num);
   return true;
-
 }
 
-vec_Vec3f IterativeDecomp::simplify(const vec_Vec3f& path){
-  if(path.size() <= 2)
+vec_Vec3f IterativeDecomp::simplify(const vec_Vec3f& path)
+{
+  if (path.size() <= 2)
     return path;
 
   Vec3f ref_pt = path.front();
   vec_Vec3f new_path;
   new_path.push_back(ref_pt);
 
-  for(int i = 2; i < (int) path.size(); i ++){
-    if(inside_polytope(ref_pt, polyhedrons_[i-1], 0) &&
-        cal_closest_dist(ref_pt, polyhedrons_[i-1]) > 1e-1) {
-      if(verbose_)
+  for (int i = 2; i < (int)path.size(); i++)
+  {
+    if (inside_polytope(ref_pt, polyhedrons_[i - 1], 0) && cal_closest_dist(ref_pt, polyhedrons_[i - 1]) > 1e-1)
+    {
+      if (verbose_)
         printf(ANSI_COLOR_GREEN "remove intermediate waypoints\n" ANSI_COLOR_RESET);
     }
-    else{
-      ref_pt = path[i-1];
+    else
+    {
+      ref_pt = path[i - 1];
       new_path.push_back(ref_pt);
     }
   }
   new_path.push_back(path.back());
   return new_path;
 }
-

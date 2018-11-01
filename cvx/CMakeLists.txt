@@ -10,6 +10,21 @@ include_directories(${EIGEN3_INCLUDE_DIR} ${PCL_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 
+#In the ws/ directory there must be the file FindGUROBI.cmake (available https://github.com/joschu/trajopt/blob/master/cmake/modules/FindGUROBI.cmake ). I had to modify it a little bit. 
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}")
+find_package(GUROBI REQUIRED)
+
+if(GUROBI_FOUND)
+  message(STATUS "GUROBI FOUND")
+else(GUROBI_FOUND)
+  message(FATAL_ERROR "!!! GUROBI NOT FOUND !!!")
+endif(GUROBI_FOUND)
+
+
+
+include_directories(${GUROBI_INCLUDE_DIRS})
+#set(GUROBI_LIBRARIES "${GUROBI_CXX_LIBRARY};${GUROBI_LIBRARY}" )
+
 
 find_package(catkin REQUIRED COMPONENTS 
 	roscpp
@@ -33,6 +48,14 @@ include_directories(${catkin_INCLUDE_DIRS})
 add_executable(${PROJECT_NAME}_node src/main.cpp src/cvx.cpp)
 target_link_libraries(${PROJECT_NAME}_node ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${JPS3D_LIBRARIES}  ${CMAKE_CURRENT_LIST_DIR}/src/solvers/cvxgen/libcvx_vel.so ${CMAKE_CURRENT_LIST_DIR}/src/solvers/cvxgen/libcvx_accel.so ${CMAKE_CURRENT_LIST_DIR}/src/solvers/cvxgen/libcvx_jerk.so)
 add_dependencies(${PROJECT_NAME}_node ${catkin_EXPORTED_TARGETS})
+
+
+add_executable(gurobi_exec gurobi.cpp)
+set(GUROBI_LIBRARIES "$ENV{GUROBI_HOME}/lib/libgurobi_c++.a;$ENV{GUROBI_HOME}/lib/libgurobi80.so;$ENV{GUROBI_HOME}/lib/" )
+# target_link_libraries(gurobi_exec ${GUROBI_LIBRARIES})
+target_link_libraries(gurobi_exec ${GUROBI_LIBRARIES})
+
+
 
 #add_executable(${PROJECT_NAME}_deubg_node src/debug.cpp)
 #target_link_libraries(${PROJECT_NAME}_deubg_node ${catkin_LIBRARIES} ${CMAKE_CURRENT_LIST_DIR}/src/libcvx.so)
