@@ -1,18 +1,99 @@
-/* Copyright 2018, Gurobi Optimization, LLC */
-
-/* Facility location: a company currently ships its product from 5 plants
-   to 4 warehouses. It is considering closing some plants to reduce
-   costs. What plant(s) should the company close, in order to minimize
-   transportation and fixed costs?
-
-   Based on an example from Frontline Systems:
-   http://www.solver.com/disfacility.htm
-   Used with permission.
+/* Author: Jesus Tordesillas Torres
+   1-November-2018
+   I tried during 4 hours to implement it using Eigen, but didn't succeed. I think it's possible using NumTraits and
+   ScalarBinaryOpTraits templates of Eigen (to allow "symbolic" multiplications)
  */
 
 #include "gurobi_c++.h"
 #include <sstream>
+#include <Eigen/Dense>
+#include <type_traits>
 using namespace std;
+
+template <typename T>
+GRBQuadExpr GetNorm2(const std::vector<T>& x)  // Return the squared norm of a vector
+{
+  GRBQuadExpr result = 0;
+  for (int i = 0; i < x.size(); i++)
+  {
+    result = result + x[i] * x[i];
+  }
+  return result;
+}
+
+std::vector<GRBLinExpr> MatrixMultiply(const std::vector<std::vector<double>>& A, const std::vector<GRBVar>& x)
+{
+  std::vector<GRBLinExpr> result;
+
+  for (int i = 0; i < A.size(); i++)
+  {
+    GRBLinExpr lin_exp = 0;
+    for (int m = 0; m < x.size(); m++)
+    {
+      lin_exp = lin_exp + A[i][m] * x[m];
+    }
+    result.push_back(lin_exp);
+  }
+  return result;
+}
+
+template <typename T>  // Overload + to sum Elementwise std::vectors
+std::vector<T> operator+(const std::vector<T>& a, const std::vector<T>& b)
+{
+  assert(a.size() == b.size());
+
+  std::vector<T> result;
+  result.reserve(a.size());
+
+  std::transform(a.begin(), a.end(), b.begin(), std::back_inserter(result), std::plus<T>());
+  return result;
+}
+
+template <typename T>  // Overload - to substract Elementwise std::vectors
+std::vector<T> operator-(const std::vector<T>& a, const std::vector<T>& b)
+{
+  assert(a.size() == b.size());
+
+  std::vector<T> result;
+  result.reserve(a.size());
+
+  std::transform(a.begin(), a.end(), b.begin(), std::back_inserter(result), std::minus<T>());
+  return result;
+}
+
+std::vector<GRBLinExpr> operator-(const std::vector<GRBVar>& x, const std::vector<double>& b)
+{
+  std::vector<GRBLinExpr> result;
+  for (int i = 0; i < x.size(); i++)
+  {
+    GRBLinExpr tmp = x[i] - b[i];
+    result.push_back(tmp);
+  }
+  return result;
+}
+
+template <typename T>
+std::vector<T> eigenVector2std(const Eigen::Matrix<T, -1, 1>& x)  // Return the squared norm of a vector
+{
+  std::vector<T> result = 0;
+  for (int i = 0; i < x.rows(); i++)
+  {
+    result.push_back(x(i, 1));
+  }
+  return result;
+}
+
+template <typename T>
+std::vector<T> GetColumn(std::vector<std::vector<T>> x, int column)
+{
+  std::vector<T> result;
+
+  for (int i = 0; i < x.size(); i++)
+  {
+    result.push_back(x[i][column]);
+  }
+  return result;
+}
 
 int main(int argc, char* argv[])
 {
@@ -22,164 +103,129 @@ int main(int argc, char* argv[])
   int transportCt = 0;
   try
   {
-    // Number of plants and warehouses
-    const int nPlants = 5;
-    const int nWarehouses = 4;
-
-    // Warehouse demand in thousands of units
-    double Demand[] = { 15, 18, 14, 20 };
-
-    // Plant capacity in thousands of units
-    double Capacity[] = { 20, 22, 17, 19, 18 };
-
-    // Fixed costs for each plant
-    double FixedCosts[] = { 12000, 15000, 17000, 13000, 16000 };
-
-    // Transportation costs per thousand units
-    double TransCosts[][nPlants] = { { 4000, 2000, 3000, 2500, 4500 },
-                                     { 2500, 2600, 3400, 3000, 4000 },
-                                     { 1200, 1800, 2600, 4100, 3000 },
-                                     { 2200, 2600, 3100, 3700, 3200 } };
-
     // Model
     env = new GRBEnv();
     GRBModel model = GRBModel(*env);
-    model.set(GRB_StringAttr_ModelName, "facility");
+    model.set(GRB_StringAttr_ModelName, "planning");
 
-    // Plant open decision variables: open[p] == 1 if plant p is open.
-    open = model.addVars(nPlants, GRB_BINARY);
+    int N = 20;
+    double umax = 5;
+    double q = 20000000000;
+    double dt = 0.4;
+    double dt2 = dt * dt / 2.0;
+    double dt3 = dt * dt * dt / 6.0;
+    std::vector<std::string> states = { "x", "y", "z", "vx", "vy", "vz", "ax", "ay", "az" };
+    std::vector<std::string> inputs = { "jx", "jy", "jz" };
 
-    int p;
-    for (p = 0; p < nPlants; ++p)
+    std::vector<double> x0 = { 5, 11.5, 0.5, 0, 0, 0, 0, 0, 0 };
+
+    std::vector<double> xf = { 14, 5, 2.5, 0, 0, 0, 0, 0, 0 };
+
+    std::vector<std::vector<double>> As = { { 1, 0, 0, dt, 0, 0, dt2, 0, 0 },  /////////////////////////////////
+                                            { 0, 1, 0, 0, dt, 0, 0, dt2, 0 },  /////////////////////////////////
+                                            { 0, 0, 1, 0, 0, dt, 0, 0, dt2 },  /////////////////////////////////
+                                            { 0, 0, 0, 1, 0, 0, dt, 0, 0 },    /////////////////////////////////
+                                            { 0, 0, 0, 0, 1, 0, 0, dt, 0 },    /////////////////////////////////
+                                            { 0, 0, 0, 0, 0, 1, 0, 0, dt },    /////////////////////////////////
+                                            { 0, 0, 0, 0, 0, 0, 1, 0, 0 },     /////////////////////////////////
+                                            { 0, 0, 0, 0, 0, 0, 0, 1, 0 },     /////////////////////////////////
+                                            { 0, 0, 0, 0, 0, 0, 0, 0, 1 } };
+
+    std::vector<std::vector<double>> Bs = { { dt3, 0, 0 },   /////////////////////////////////
+                                            { 0, dt3, 0 },   /////////////////////////////////
+                                            { 0, 0, dt3 },   /////////////////////////////////
+                                            { dt2, 0, 0 },   /////////////////////////////////
+                                            { 0, dt2, 0 },   /////////////////////////////////
+                                            { 0, 0, dt2 },   /////////////////////////////////
+                                            { dt, 0, 0 },    /////////////////////////////////
+                                            { 0, dt, 0 },    /////////////////////////////////
+                                            { 0, 0, dt } };  /////////////////////////////////
+
+    std::cout << "here1" << std::endl;
+
+    std::vector<std::vector<GRBVar>> x;
+    std::vector<std::vector<GRBVar>> u;
+    for (int i = 0; i < 9; i++)
     {
-      ostringstream vname;
-      vname << "Open" << p;
-      open[p].set(GRB_DoubleAttr_Obj, FixedCosts[p]);
-      open[p].set(GRB_StringAttr_VarName, vname.str());
+      std::vector<GRBVar> row_i;
+      for (int t = 0; t < N + 1; t++)
+      {
+        row_i.push_back(model.addVar(-GRB_INFINITY, GRB_INFINITY, 0, GRB_CONTINUOUS, states[i] + std::to_string(t)));
+      }
+      x.push_back(row_i);
     }
 
-    // Transportation decision variables: how much to transport from
-    // a plant p to a warehouse w
-    transport = new GRBVar*[nWarehouses];
-    int w;
-    for (w = 0; w < nWarehouses; ++w)
+    for (int i = 0; i < 3; i++)
     {
-      transport[w] = model.addVars(nPlants);
-      transportCt++;
-
-      for (p = 0; p < nPlants; ++p)
+      std::vector<GRBVar> row_i;
+      for (int t = 0; t < N; t++)
       {
-        ostringstream vname;
-        vname << "Trans" << p << "." << w;
-        transport[w][p].set(GRB_DoubleAttr_Obj, TransCosts[w][p]);
-        transport[w][p].set(GRB_StringAttr_VarName, vname.str());
+        row_i.push_back(model.addVar(-umax, umax, 0, GRB_CONTINUOUS, inputs[i] + std::to_string(t)));
+      }
+      u.push_back(row_i);
+    }
+
+    // Constraints x_t+1=Ax_t+Bu_t
+    for (int t = 0; t < N; t++)
+    {
+      std::vector<GRBVar> xt = GetColumn(x, t);
+      std::vector<GRBVar> ut = GetColumn(u, t);
+      std::vector<GRBLinExpr> Ax_tm1 = MatrixMultiply(As, xt) + MatrixMultiply(Bs, ut);  //  x_t+1=Ax_t+Bu_t
+
+      for (int i = 0; i < 9; i++)
+      {
+        std::cout << "i=" << i << "  t=" << t << std::endl;
+        // std::cout << "x[i][t]" << x[i][t] << std::endl;
+        model.addConstr(x[i][t + 1] == Ax_tm1[i]);
+        // std::cout << "Abajo" << std::endl;
       }
     }
+    // model.update();
 
-    // The objective is to minimize the total fixed and variable costs
-    model.set(GRB_IntAttr_ModelSense, GRB_MINIMIZE);
-
-    // Production constraints
-    // Note that the right-hand limit sets the production to zero if
-    // the plant is closed
-    for (p = 0; p < nPlants; ++p)
+    // Constraints x_0=x_initial
+    for (int i = 0; i < 9; i++)
     {
-      GRBLinExpr ptot = 0;
-      for (w = 0; w < nWarehouses; ++w)
-      {
-        ptot += transport[w][p];
-      }
-      ostringstream cname;
-      cname << "Capacity" << p;
-      model.addConstr(ptot <= Capacity[p] * open[p], cname.str());
+      model.addConstr(x[i][0] == x0[i]);
     }
 
-    // Demand constraints
-    for (w = 0; w < nWarehouses; ++w)
+    GRBQuadExpr control_cost = 0;
+    for (int t = 0; t < N; t++)
     {
-      GRBLinExpr dtot = 0;
-      for (p = 0; p < nPlants; ++p)
-      {
-        dtot += transport[w][p];
-      }
-      ostringstream cname;
-      cname << "Demand" << w;
-      model.addConstr(dtot == Demand[w], cname.str());
+      std::vector<GRBVar> ut = GetColumn(u, t);
+      control_cost = control_cost + GetNorm2(ut);
     }
 
-    // Guess at the starting point: close the plant with the highest
-    // fixed costs; open all others
+    GRBQuadExpr final_state_cost = 0;
+    std::vector<GRBVar> xFinal = GetColumn(x, N);
+    // std::vector<GRBLinExpr> prueba = xFinal - xf;
+    final_state_cost = GetNorm2(xFinal - xf);
+    final_state_cost = q * final_state_cost;
 
-    // First, open all plants
-    for (p = 0; p < nPlants; ++p)
-    {
-      open[p].set(GRB_DoubleAttr_Start, 1.0);
-    }
+    model.setObjective(control_cost + final_state_cost, GRB_MINIMIZE);
 
-    // Now close the plant with the highest fixed cost
-    cout << "Initial guess:" << endl;
-    double maxFixed = -GRB_INFINITY;
-    for (p = 0; p < nPlants; ++p)
-    {
-      if (FixedCosts[p] > maxFixed)
-      {
-        maxFixed = FixedCosts[p];
-      }
-    }
-    for (p = 0; p < nPlants; ++p)
-    {
-      if (FixedCosts[p] == maxFixed)
-      {
-        open[p].set(GRB_DoubleAttr_Start, 0.0);
-        cout << "Closing plant " << p << endl << endl;
-        break;
-      }
-    }
-
-    // Use barrier to solve root relaxation
-    model.set(GRB_IntParam_Method, GRB_METHOD_BARRIER);
-
-    // Solve
+    // Solve*/
+    model.update();
+    model.write("debug.lp");
     model.optimize();
 
-    // Print solution
-    cout << "\nTOTAL COSTS: " << model.get(GRB_DoubleAttr_ObjVal) << endl;
-    cout << "SOLUTION:" << endl;
-    for (p = 0; p < nPlants; ++p)
+    std::cout << "\nOBJECTIVE: " << model.get(GRB_DoubleAttr_ObjVal) << std::endl;
+    std::cout << "Positions X:" << std::endl;
+    for (int t = 0; t < N + 1; t++)
     {
-      if (open[p].get(GRB_DoubleAttr_X) > 0.99)
-      {
-        cout << "Plant " << p << " open:" << endl;
-        for (w = 0; w < nWarehouses; ++w)
-        {
-          if (transport[w][p].get(GRB_DoubleAttr_X) > 0.0001)
-          {
-            cout << "  Transport " << transport[w][p].get(GRB_DoubleAttr_X) << " units to warehouse " << w << endl;
-          }
-        }
-      }
-      else
-      {
-        cout << "Plant " << p << " closed!" << endl;
-      }
+      std::cout << x[0][t].get(GRB_DoubleAttr_X) << std::endl;
     }
   }
+
   catch (GRBException e)
   {
     cout << "Error code = " << e.getErrorCode() << endl;
     cout << e.getMessage() << endl;
   }
-  catch (...)
+  /*catch (...)
   {
     cout << "Exception during optimization" << endl;
-  }
+  }*/
 
-  delete[] open;
-  for (int i = 0; i < transportCt; ++i)
-  {
-    delete[] transport[i];
-  }
-  delete[] transport;
   delete env;
   return 0;
 }
