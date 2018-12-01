@@ -1,2 +1,0 @@
-Header header
-Path[] paths

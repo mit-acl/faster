@@ -7,7 +7,7 @@ find_package(catkin_simple REQUIRED)
 find_package(cmake_modules)
 find_package(Eigen3 REQUIRED)
 find_package(decomp_util REQUIRED)
-include_directories(${EIGEN3_INCLUDE_DIRS} ${DECOMP_UTIL_INCLUDE_DIRS} include)
+include_directories(${EIGEN3_INCLUDE_DIRS} ${DECOMP_UTIL_INCLUDE_DIRS})
 
 add_definitions(-DQT_NO_KEYWORDS)
 
@@ -28,15 +28,13 @@ endif()
 
 catkin_simple()
 
-
 set(SOURCE_FILES
-  src/ellipsoids_visual.cpp
   src/bound_visual.cpp
   src/mesh_visual.cpp
   src/vector_visual.cpp
-  src/ellipsoids_display.cpp
-  src/polyhedra_display.cpp
-  src/geometry_utils.cpp
+  src/ellipsoid_array_visual.cpp
+  src/ellipsoid_array_display.cpp
+  src/polyhedron_array_display.cpp
   ${MOC_FILES})
 
 cs_add_library(decomp_rviz_plugins ${SOURCE_FILES})
@@ -44,4 +42,5 @@ target_link_libraries(decomp_rviz_plugins ${QT_LIBRARIES} ${catkin_LIBRARIES} ${
 
 cs_install()
 
-cs_export(DEPENDS DECOMP_UTIL)
+#cs_export()
+cs_export(DEPENDS decomp_util)

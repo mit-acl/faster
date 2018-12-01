@@ -9,21 +9,11 @@
   <!-- <maintainer email="jane.doe@example.com">Jane Doe</maintainer> -->
   <maintainer email="sikang@seas.upenn.edu">sikang</maintainer>
 
-
-  <!-- One license tag required, multiple allowed, one license per tag -->
-  <!-- Commonly used license strings: -->
-  <!--   BSD, MIT, Boost Software License, GPLv2, GPLv3, LGPLv2.1, LGPLv3 -->
   <license>TODO</license>
-
 
   <buildtool_depend>catkin</buildtool_depend>
   <build_depend>catkin_simple</build_depend>
-  <depend>rviz</depend>
-  <depend>tf2_ros</depend>
-  <depend>std_msgs</depend>
-  <depend>nav_msgs</depend>
   <depend>geometry_msgs</depend>
-  <depend>sensor_msgs</depend>
   <depend>message_generation</depend>
   <depend>message_runtime</depend>
 

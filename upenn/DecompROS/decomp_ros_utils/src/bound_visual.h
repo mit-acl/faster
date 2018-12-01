@@ -1,7 +1,7 @@
 #ifndef BOUND_VISUAL_H
 #define BOUND_VISUAL_H
 
-#include <decomp_util/data_type.h>
+#include <decomp_basis/data_type.h>
 
 #include <OGRE/OgreVector3.h>
 #include <OGRE/OgreSceneNode.h>
@@ -16,7 +16,7 @@ public:
   BoundVisual(Ogre::SceneManager *scene_manager, Ogre::SceneNode *parent_node);
   ~BoundVisual();
 
-  void setMessage(const BoundVec3f &bds);
+  void setMessage(const vec_E<vec_Vec3f> &bds);
   void setFramePosition(const Ogre::Vector3 &position);
   void setFrameOrientation(const Ogre::Quaternion &orientation);
 

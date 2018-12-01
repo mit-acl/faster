@@ -1,19 +1,27 @@
-# MRSL Decomputil Library
+# MRSL Decomputil Library v1.0
 [![wercker status](https://app.wercker.com/status/89a66f8c94c00db95dc056bae099adb3/s/master "wercker status")](https://app.wercker.com/project/byKey/89a66f8c94c00db95dc056bae099adb3)
 - - -
-Fast convex decomposition in point cloud. In the basic pipeline, it implements ellipsoid based regional inflation to model free space from a given path inside a point cloud.
+A header only c++ library for fast convex decomposition. In the basic pipeline, it implements ellipsoid based regional inflation to model free space from a given path inside a point cloud.
 Detials of the algorithm is proposed in ["S. Liu, M. Watterson, K. Mohta, K. Sun, S. Bhattacharya, C.J. Taylor and V. Kumar. Planning Dynamically Feasible Trajectories for Quadrotors using Safe Flight Corridors in 3-D Complex Environments. ICRA 2017"](http://ieeexplore.ieee.org/document/7839930/).
 
-## Compilation
+## Installation
+DecompUtil is a header only library, several test nodes are compiled during the
+installation.
 #### A) Simple cmake
-```sh
+```bash
 $ mkdir build && cd build && cmake .. && make
 ```
 
 #### B) Using CATKIN (not recognizable by catkin\_make)
-```sh
+```bash
 $ cd mv decomp_util ~/catkin_ws/src
 $ cd ~/catkin_ws & catkin_make_isolated -DCMAKE_BUILD_TYPE=Release
+```
+
+#### CTest
+To check if everything is installed properlly:
+```bash
+$ make test
 ```
 
 #### Include in other projects:
@@ -21,17 +29,18 @@ To link this lib properly, add following in the `CMakeLists.txt`
 ```
 find_package(decomp_util REQUIRED)
 include_directories(${DECOMP_UTIL_INCLUDE_DIRS})
-...
-add_executable(test_xxx src/test_xxx.cpp)
-target_link_libraries(test_xxx ${DECOMP_UTIL_LIBRARIES})
-
 ```
 
-## Example
-The output from `EllipseDecomp` or `IterativeDecomp` can be visualized with ROS Rviz:
+## Examples
+The examples of using `SeedDecomp2D`, `LineSegment2D`, `EllipsoidDecomp2D` and
+`IterativeDecomp2D` are plotted as followings:
 
-<img src="./samples/sample1.png" height="256"> <img src="./samples/sample2.png" height="256">
+SeedDecomp2D | LineSegment2D | EllipsoidDecomp2D | IterativeDecomp2D
+:----------- | :------------ | :---------------- | :----------------
+<img src="./data/example1.png" height="200"> | <img src="./data/example2.png" height="200"> | <img src="./data/example3.png" height="200"> | <img src="./data/example4.png" height="200">
 
+
+The corresponding code for testing can be found in the `test` folder.
 
 ## Doxygen
 For more details, please refer to https://sikang.github.io/DecompUtil/index.html

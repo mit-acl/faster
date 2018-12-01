@@ -6,7 +6,7 @@ build:
       name: install dependencies
       code: |
         sudo apt-get update
-        sudo apt install -y libeigen3-dev cmake
+        sudo apt install -y libeigen3-dev libboost-all-dev cmake
     - script:
       name: build
       code: |

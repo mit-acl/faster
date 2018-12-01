@@ -1,24 +1,8 @@
 var searchData=
 [
-  ['vec2f',['Vec2f',['../data__type_8h.html#a135c596de9b80bec15985876ebd5036e',1,'data_type.h']]],
-  ['vec2i',['Vec2i',['../data__type_8h.html#a08412347a26b00366a9d576672cce68d',1,'data_type.h']]],
-  ['vec3f',['Vec3f',['../data__type_8h.html#afd53e073786661e24985c48b4ef92fcb',1,'data_type.h']]],
-  ['vec3i',['Vec3i',['../data__type_8h.html#a27cc7cd350b4919c77a6803461feb516',1,'data_type.h']]],
-  ['vec4f',['Vec4f',['../data__type_8h.html#a885809dc84c0c55d44fe4836f5cfa39b',1,'data_type.h']]],
-  ['vec6f',['Vec6f',['../data__type_8h.html#a940b1af907878e3cb6d2f7694730ee01',1,'data_type.h']]],
-  ['vec_5fe',['vec_E',['../data__type_8h.html#a6b9210d48a0a541940af71827aad1b41',1,'data_type.h']]],
-  ['vec_5fellipsoid',['vec_Ellipsoid',['../data__type_8h.html#a47ddb28a89d8b9f6aaa729f91e61dbec',1,'data_type.h']]],
-  ['vec_5flinearconstraint3f',['vec_LinearConstraint3f',['../data__type_8h.html#a97477a2716b74d7fa5e03978ea0d03f0',1,'data_type.h']]],
-  ['vec_5fvec2f',['vec_Vec2f',['../data__type_8h.html#af640446aaa0ada84a270bd5639b36a7d',1,'data_type.h']]],
-  ['vec_5fvec2i',['vec_Vec2i',['../data__type_8h.html#a79168c9f029798876a1093e0e53bc36b',1,'data_type.h']]],
-  ['vec_5fvec3f',['vec_Vec3f',['../data__type_8h.html#a62c46ed3e3ab6773b30439f9be38290b',1,'data_type.h']]],
-  ['vec_5fvec3i',['vec_Vec3i',['../data__type_8h.html#aab99928bb9e8a58f0aeaf5d31c4866e4',1,'data_type.h']]],
-  ['vec_5fvecf',['vec_Vecf',['../data__type_8h.html#a0a3b37beb40c06edc02cb4b7339f2b96',1,'data_type.h']]],
-  ['vec_5fveci',['vec_Veci',['../data__type_8h.html#afb24b810e24942cb8cafdd097b8272fb',1,'data_type.h']]],
-  ['vecdf',['VecDf',['../data__type_8h.html#af9c7300efe3567726a373210d4dbc046',1,'data_type.h']]],
-  ['vecf',['Vecf',['../data__type_8h.html#a3a0c45655a5e009e56634ccde0c5c575',1,'data_type.h']]],
-  ['veci',['Veci',['../data__type_8h.html#ac208833a6aa7ec29f39eb5ae142aaede',1,'data_type.h']]],
-  ['virtual_5fx_5f',['virtual_x_',['../classSeedDecomp.html#a47236d43440209ebdc6c02691e1ee34f',1,'SeedDecomp']]],
-  ['virtual_5fy_5f',['virtual_y_',['../classSeedDecomp.html#ad60b4568801050dc2c6d4ce91b211407',1,'SeedDecomp']]],
-  ['virtual_5fz_5f',['virtual_z_',['../classSeedDecomp.html#ac7da93ce2dcce3e710f2803c57475d75',1,'SeedDecomp']]]
+  ['total_5fdistance',['total_distance',['../data__utils_8h.html#a3f82ae87bcf143405fd986be6ca44a68',1,'data_utils.h']]],
+  ['total_5fdistance3f',['total_distance3f',['../data__utils_8h.html#a188bab5f6177f4853e7bff0d5c61cfe6',1,'data_utils.h']]],
+  ['total_5fdistance3i',['total_distance3i',['../data__utils_8h.html#aca4035bd3287a21e2e0a8e7a5a0357f5',1,'data_utils.h']]],
+  ['transform_5fvec',['transform_vec',['../data__utils_8h.html#ac3745ddcc3002193bbcd5caab64cd1df',1,'data_utils.h']]],
+  ['transform_5fvec3',['transform_vec3',['../data__utils_8h.html#a79960a9e7c7bad6ec5641ed1729ad8d0',1,'data_utils.h']]]
 ];

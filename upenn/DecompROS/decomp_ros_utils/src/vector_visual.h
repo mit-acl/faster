@@ -1,7 +1,7 @@
 #ifndef VECTOR_VISUAL_H
 #define VECTOR_VISUAL_H
 
-#include <decomp_util/data_type.h>
+#include <decomp_basis/data_type.h>
 #include <OGRE/OgreVector3.h>
 #include <OGRE/OgreSceneNode.h>
 #include <OGRE/OgreSceneManager.h>

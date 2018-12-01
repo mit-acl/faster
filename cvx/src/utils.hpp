@@ -109,7 +109,6 @@ inline std::vector<Eigen::Vector3d> samplePointsSphereWithJPS(Eigen::Vector3d& B
                                                               Eigen::Vector3d& center_sent, vec_Vecf<3>& path_sent,
                                                               int last_index_inside_sphere)
 {
-
   printf("In samplePointsSphereWithJPS\n");
   printElementsOfJPS(path_sent);
 
@@ -149,8 +148,6 @@ inline std::vector<Eigen::Vector3d> samplePointsSphereWithJPS(Eigen::Vector3d& B
   Eigen::Vector3d dir;
   double x, y, z;
 
-
-
   for (int i = last_index_inside_sphere + 1; i >= 1; i--)
   {
     Eigen::Vector3d point_i = (path[i] - center);        // point i expressed with origin=origin sphere
@@ -174,9 +171,10 @@ inline std::vector<Eigen::Vector3d> samplePointsSphereWithJPS(Eigen::Vector3d& B
       angle_max = acos(tmp);
       printf("tmp=%f\n", tmp);
       printf("angle_max=%f\n", angle_max);
-      if(angle_max<0.02){   
-         samples.push_back(B);
-         continue;
+      if (angle_max < 0.02)
+      {
+        samples.push_back(B);
+        continue;
       }
     }
     else
@@ -264,12 +262,12 @@ inline std::vector<Eigen::Vector3d> samplePointsSphereWithJPS(Eigen::Vector3d& B
   samples.insert(samples.end(), uniform_samples.begin(),
                  uniform_samples.end());  // concatenate samples and uniform samples
 
-    printf("**y despues samples vale:\n");
-    for (int i = 0; i < samples.size(); i++)
-    {
-      std::cout << samples[i].transpose() << std::endl;
-    }
-    /*printf("returning it:\n");*/
+  printf("**y despues samples vale:\n");
+  for (int i = 0; i < samples.size(); i++)
+  {
+    std::cout << samples[i].transpose() << std::endl;
+  }
+  /*printf("returning it:\n");*/
 
   return samples;
 }
@@ -287,6 +285,20 @@ inline pcl::PointXYZ eigenPoint2pclPoint(Eigen::Vector3d p)
   // std::cout << "solving\n" << coeff << std::endl;
   pcl::PointXYZ tmp(p[0], p[1], p[2]);
   return tmp;
+}
+
+inline vec_Vec3f kdtree_to_vec(const pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr_cloud)
+{
+  vec_Vec3f pts;
+  pts.resize(ptr_cloud->points.size());
+  for (unsigned int i = 0; i < ptr_cloud->points.size(); i++)
+  {
+    pts[i](0) = ptr_cloud->points[i].x;
+    pts[i](1) = ptr_cloud->points[i].y;
+    pts[i](2) = ptr_cloud->points[i].z;
+  }
+
+  return pts;
 }
 
 inline float solvePolyOrder2(Eigen::Vector3f coeff)

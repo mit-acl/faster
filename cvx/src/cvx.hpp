@@ -188,6 +188,8 @@ private:
 
   double getDistanceToFirstCollisionJPSwithUnkonwnspace(vec_Vecf<3> path, bool* thereIsIntersection);
 
+  void cvxDecomp(vec_Vecf<3> path);
+
   visualization_msgs::Marker setpoint_;
   acl_msgs::QuadGoal quadGoal_;
   acl_msgs::QuadGoal initialCond_;  // It's the initial condition for the solver
@@ -213,6 +215,9 @@ private:
   ros::Publisher pub_intersec_points_;
   ros::Publisher pub_jps_inters_;
   ros::Publisher pub_log_;
+
+  ros::Publisher cvx_decomp_el_pub_;
+  ros::Publisher cvx_decomp_poly_pub_;
 
   ros::Subscriber sub_goal_;
   ros::Subscriber sub_state_;

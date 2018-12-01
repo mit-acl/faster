@@ -1,4 +1,5 @@
 var searchData=
 [
-  ['seeddecomp',['SeedDecomp',['../classSeedDecomp.html',1,'']]]
+  ['linearconstraint',['LinearConstraint',['../structLinearConstraint.html',1,'']]],
+  ['linesegment',['LineSegment',['../classLineSegment.html',1,'']]]
 ];

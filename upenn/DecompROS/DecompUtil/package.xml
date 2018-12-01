@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="2">
   <name>decomp_util</name>
-  <version>0.1.0</version>
+  <version>1.0.0</version>
   <description>The decomp_util package</description>
 
   <maintainer email="sikang@seas.upenn.edu">sikang</maintainer>

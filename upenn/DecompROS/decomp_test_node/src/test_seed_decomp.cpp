@@ -15,8 +15,8 @@ int main(int argc, char ** argv){
   ros::Publisher map_pub = nh.advertise<sensor_msgs::PointCloud>("cloud", 1, true);
   ros::Publisher marker_pub = nh.advertise<visualization_msgs::MarkerArray>("markers", 1, true);
   ros::Publisher seed_pub = nh.advertise<sensor_msgs::PointCloud>("seed", 1, true);
-  ros::Publisher es_pub = nh.advertise<decomp_ros_msgs::Ellipsoids>("ellipsoids", 1, true);
-  ros::Publisher poly_pub = nh.advertise<decomp_ros_msgs::Polyhedra>("polyhedra", 1, true);
+  ros::Publisher es_pub = nh.advertise<decomp_ros_msgs::EllipsoidArray>("ellipsoid_array", 1, true);
+  ros::Publisher poly_pub = nh.advertise<decomp_ros_msgs::PolyhedronArray>("polyhedron_array", 1, true);
 
   header_.frame_id = std::string("map");
   std::string file_name, topic_name, marker_name, seed_file;
@@ -42,39 +42,32 @@ int main(int argc, char ** argv){
 
   //Read path from txt
   vec_Vec3f seeds;
-  if(!read_path(seed_file, seeds))
+  if(!read_path<3>(seed_file, seeds))
     ROS_ERROR("Fail to read seeds!");
 
   sensor_msgs::PointCloud seed_msg = DecompROS::vec_to_cloud(seeds);
   seed_msg.header = header_;
   seed_pub.publish(seed_msg);
 
-  vec_Ellipsoid es;
-  Polyhedra polys;
+  vec_E<Ellipsoid3D> es;
+  vec_E<Polyhedron3D> polys;
 
   for(const auto& it: seeds) {
     //Using seed decomposition
-    SeedDecomp decomp_util(it);
-    decomp_util.set_obstacles(obs);
+    SeedDecomp3D decomp_util(it);
+    decomp_util.set_obs(obs);
     decomp_util.dilate(5.0);
-    /*
-    Aff3f Rf = Trans3f(0, 0, 0) *
-      Anglef( 0 * M_PI / 180, Vec3f::UnitX()) *
-      Anglef( 10 * M_PI / 180, Vec3f::UnitY()) *
-      Anglef(M_PI/3, Vec3f::UnitZ());
 
-    decomp_util.dilate(Vec3f(0.5, 0.6, 0.1), Rf.rotation());
-    */
-    es.push_back(decomp_util.ellipsoid());
-    polys.push_back(decomp_util.polyhedron());
+    es.push_back(decomp_util.get_ellipsoid());
+    polys.push_back(decomp_util.get_polyhedron());
   }
 
   //Publish visualization msgs
-  decomp_ros_msgs::Ellipsoids es_msg = DecompROS::ellipsoids_to_ros(es);
+  decomp_ros_msgs::EllipsoidArray es_msg = DecompROS::ellipsoid_array_to_ros(es);
   es_msg.header = header_;
   es_pub.publish(es_msg);
 
-  decomp_ros_msgs::Polyhedra poly_msg = DecompROS::polyhedra_to_ros(polys);
+  decomp_ros_msgs::PolyhedronArray poly_msg = DecompROS::polyhedron_array_to_ros(polys);
   poly_msg.header = header_;
   poly_pub.publish(poly_msg);
 

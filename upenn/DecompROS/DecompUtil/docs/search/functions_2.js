@@ -1,6 +1,9 @@
 var searchData=
 [
-  ['decomp',['decomp',['../classEllipseDecomp.html#a0a18f026cde492cc1a2ea257ffac7842',1,'EllipseDecomp']]],
-  ['decomp_5fiter',['decomp_iter',['../classIterativeDecomp.html#a423352f8912b74869f3e0666b90dfb89',1,'IterativeDecomp']]],
-  ['dilate',['dilate',['../classLineSegment.html#a3215b0e2387333e67ccf5101b4514af0',1,'LineSegment::dilate()'],['../classSeedDecomp.html#ae9fe29819c5cc1cf60d45f63399a21fc',1,'SeedDecomp::dilate(decimal_t radius)'],['../classSeedDecomp.html#a2ea337ba81f9d46cc6e5dc6a1f40a00a',1,'SeedDecomp::dilate(const Vec3f &amp;axes, const Mat3f &amp;R)'],['../classSeedDecomp.html#a03dbc106ded47a7690dcf774679c0616',1,'SeedDecomp::dilate(const Ellipsoid &amp;E)']]]
+  ['d',['d',['../structEllipsoid.html#a2cf6b4b66f08415c042be3064d54d6e3',1,'Ellipsoid']]],
+  ['decompbase',['DecompBase',['../classDecompBase.html#a4fdc315275a421b40a84aeffacab4a5a',1,'DecompBase']]],
+  ['dilate',['dilate',['../classDecompBase.html#a8075ef9c927b23309ca1a3d4144250e5',1,'DecompBase::dilate()'],['../classEllipsoidDecomp.html#aaf4731df44249fe6ed026efa12d6bf63',1,'EllipsoidDecomp::dilate()'],['../classLineSegment.html#a3479e2467a33468749971e12aa15c46f',1,'LineSegment::dilate()'],['../classSeedDecomp.html#a94db31b5d02e4ca19f32c3a5bacc25a2',1,'SeedDecomp::dilate()']]],
+  ['dilate_5fiter',['dilate_iter',['../classIterativeDecomp.html#ad735b75d676b2f4ee3b8f2015f95559c',1,'IterativeDecomp']]],
+  ['dist',['dist',['../structEllipsoid.html#aa0d3bfad48b3bedb87dbc308d36f45a3',1,'Ellipsoid::dist()'],['../structHyperplane.html#add0b2123e1bb1923e25cddfb7dd62804',1,'Hyperplane::dist()']]],
+  ['downsample',['downsample',['../classIterativeDecomp.html#a359ab6e36450d30ea16a6ad885f27648',1,'IterativeDecomp']]]
 ];

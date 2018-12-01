@@ -32,7 +32,12 @@ find_package(catkin REQUIRED COMPONENTS
 	acl_msgs
 	sensor_msgs
 	pcl_ros
+	decomp_util
+	decomp_ros_utils
 )
+find_package(decomp_util REQUIRED)
+include_directories(${DECOMP_UTIL_INCLUDE_DIRS})
+
 find_package(jps3d REQUIRED)
 include_directories(${JPS3D_INCLUDE_DIRS})
 
@@ -46,8 +51,8 @@ catkin_package(
 include_directories(${catkin_INCLUDE_DIRS})
 
 add_executable(${PROJECT_NAME}_node src/main.cpp src/cvx.cpp)
-target_link_libraries(${PROJECT_NAME}_node ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${JPS3D_LIBRARIES}  ${CMAKE_CURRENT_LIST_DIR}/src/solvers/cvxgen/libcvx_vel.so ${CMAKE_CURRENT_LIST_DIR}/src/solvers/cvxgen/libcvx_accel.so ${CMAKE_CURRENT_LIST_DIR}/src/solvers/cvxgen/libcvx_jerk.so)
-add_dependencies(${PROJECT_NAME}_node ${catkin_EXPORTED_TARGETS})
+target_link_libraries(${PROJECT_NAME}_node ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${JPS3D_LIBRARIES} ${DECOMP_UTIL_LIBRARIES} ${CMAKE_CURRENT_LIST_DIR}/src/solvers/cvxgen/libcvx_vel.so ${CMAKE_CURRENT_LIST_DIR}/src/solvers/cvxgen/libcvx_accel.so ${CMAKE_CURRENT_LIST_DIR}/src/solvers/cvxgen/libcvx_jerk.so )
+add_dependencies(${PROJECT_NAME}_node ${catkin_EXPORTED_TARGETS} )
 
 
 add_executable(gurobi_continuous_exec gurobi_continuous.cpp)

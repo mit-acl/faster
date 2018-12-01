@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['ellipsoid',['Ellipsoid',['../data__type_8h.html#ab79f3b8f2deea3f9f977cdc99cfc4a76',1,'data_type.h']]]
+  ['quatf',['Quatf',['../data__type_8h.html#a4857a8f36ec316f647bfc006d4799e9a',1,'data_type.h']]]
 ];

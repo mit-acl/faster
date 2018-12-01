@@ -1,0 +1,11 @@
+<launch>
+  <node pkg="decomp_test_node"
+    type="test_path_decomp_3d"
+    name="test_decomp"
+    output="screen">
+    <param name="bag_file" value="$(find decomp_test_node)/data/simple.bag"/>
+    <param name="bag_topic" value="/cloud"/>
+    <param name="path_file" value="$(find decomp_test_node)/data/path3d.txt"/>
+  </node>
+
+</launch>

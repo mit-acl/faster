@@ -1,7 +1,7 @@
 #ifndef MESH_VISUAL_H
 #define MESH_VISUAL_H
 
-#include <decomp_util/data_type.h>
+#include <decomp_geometry/polyhedron.h>
 #include <Eigen/Eigenvalues>
 
 #include <OGRE/OgreVector3.h>
@@ -17,7 +17,7 @@ namespace decomp_rviz_plugins {
 
       virtual ~MeshVisual();
 
-      void setMessage(const BoundVec3f &bds, const std::vector<bool>& passes = std::vector<bool>());
+      void setMessage(const vec_E<vec_Vec3f> &bds);
       void setFramePosition(const Ogre::Vector3 &position);
       void setFrameOrientation(const Ogre::Quaternion &orientation);
 
@@ -25,7 +25,6 @@ namespace decomp_rviz_plugins {
 
     private:
       std::unique_ptr<rviz::MeshShape> obj_;
-      std::unique_ptr<rviz::MeshShape> wall_;
 
       Ogre::SceneNode *frame_node_;
 

@@ -2,6 +2,7 @@
   <node pkg="rviz"
     type="rviz"
     name="rviz"
+    output="screen"
     args="-d $(find decomp_test_node)/launch/test.rviz"/>
 
 </launch>

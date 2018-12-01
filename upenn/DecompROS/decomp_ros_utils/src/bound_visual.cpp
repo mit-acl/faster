@@ -9,16 +9,13 @@ namespace decomp_rviz_plugins {
 
   BoundVisual::~BoundVisual() { scene_manager_->destroySceneNode(frame_node_); }
 
-  void BoundVisual::setMessage(const BoundVec3f &bds) {
+  void BoundVisual::setMessage(const vec_E<vec_Vec3f>& bds) {
     objs_.clear();
 
     if (bds.empty())
       return;
 
-    int num_faces = 0;
-    for(const auto& polyhedron: bds)
-      num_faces += polyhedron.size();
-
+    size_t num_faces = bds.size();
     objs_.resize(num_faces);
     for (auto &it : objs_)
       it.reset(new rviz::BillboardLine(scene_manager_, frame_node_));

@@ -11,11 +11,11 @@ include_directories(${EIGEN3_INCLUDE_DIRS} ${DECOMP_UTIL_INCLUDE_DIRS})
 
 catkin_simple()
 
-cs_add_executable(test_path_decomp src/test_path_decomp.cpp)
-target_link_libraries(test_path_decomp ${DECOMP_UTIL_LIBRARIES})
+cs_add_executable(test_path_decomp_2d src/test_path_decomp_2d.cpp)
+
+cs_add_executable(test_path_decomp_3d src/test_path_decomp_3d.cpp)
 
 cs_add_executable(test_seed_decomp src/test_seed_decomp.cpp)
-target_link_libraries(test_seed_decomp ${DECOMP_UTIL_LIBRARIES})
 
 cs_install()
 

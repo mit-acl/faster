@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['iterativedecomp',['IterativeDecomp',['../classIterativeDecomp.html',1,'']]]
+  ['hyperplane',['Hyperplane',['../structHyperplane.html',1,'']]]
 ];

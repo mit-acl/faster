@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['iterative_5fdecomp_2eh',['iterative_decomp.h',['../iterative__decomp_8h.html',1,'']]]
+  ['geometric_5futils_2eh',['geometric_utils.h',['../geometric__utils_8h.html',1,'']]]
 ];

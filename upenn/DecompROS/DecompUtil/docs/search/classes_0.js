@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['ellipsedecomp',['EllipseDecomp',['../classEllipseDecomp.html',1,'']]]
+  ['decompbase',['DecompBase',['../classDecompBase.html',1,'']]]
 ];

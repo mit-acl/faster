@@ -1,4 +1,5 @@
 var searchData=
 [
-  ['face',['Face',['../classFace.html',1,'']]]
+  ['ellipsoid',['Ellipsoid',['../structEllipsoid.html',1,'']]],
+  ['ellipsoiddecomp',['EllipsoidDecomp',['../classEllipsoidDecomp.html',1,'']]]
 ];

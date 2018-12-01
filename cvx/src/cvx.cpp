@@ -30,6 +30,12 @@
 #include <algorithm>
 #include <vector>
 
+#include <decomp_ros_utils/data_ros_utils.h>
+
+#include <decomp_util/ellipsoid_decomp.h>
+#include <sensor_msgs/point_cloud_conversion.h>
+#include <nav_msgs/Path.h>
+
 using namespace JPS;
 
 CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pub_CB)
@@ -81,6 +87,9 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   pub_actual_traj_ = nh_.advertise<visualization_msgs::Marker>("actual_traj", 1);
   pub_path_jps1_ = nh_.advertise<visualization_msgs::MarkerArray>("path_jps1", 1);
   pub_path_jps2_ = nh_.advertise<visualization_msgs::MarkerArray>("path_jps2", 1);
+
+  cvx_decomp_el_pub_ = nh.advertise<decomp_ros_msgs::EllipsoidArray>("ellipsoid_array", 1, true);
+  cvx_decomp_poly_pub_ = nh.advertise<decomp_ros_msgs::PolyhedronArray>("polyhedron_array", 1, true);
 
   pub_jps_inters_ = nh_.advertise<geometry_msgs::PointStamped>("jps_intersection", 1);
 
@@ -825,6 +834,11 @@ void CVX::replanCB(const ros::TimerEvent& e)
   static bool first_time = true;                            // how many times I've solved JPS1
   JPS1 = solveJPS3D(state_pos, term_goal, &solvedjps1, 1);  // Solution is in JPS1
                                                             // printf("Aqui89\n");
+
+  if (solvedjps1 == true)
+  {
+    cvxDecomp(JPS1);
+  }
   bool previous = solvedjps1;
   if (solvedjps1 ==
       false)  // Happens when the drone is near the obstacles. Let's sample some points to scape from this situation.
@@ -1664,6 +1678,65 @@ geometry_msgs::Vector3 CVX::getJerk(int i)
   }
   mtx_X_U.unlock();
   return tmp;
+}
+
+void CVX::cvxDecomp(vec_Vecf<3> path)
+{
+  if (kdtree_map_initialized_ == false)
+  {
+    return;
+  }
+  printf("In cvxDecomp!");
+  pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr_cloud = kdtree_map_.getInputCloud();
+
+  // Read the point cloud from bag
+  // sensor_msgs::PointCloud cloud = read_bag<sensor_msgs::PointCloud>(file_name, topic_name);
+
+  vec_Vec3f obs = kdtree_to_vec(ptr_cloud);
+
+  // Read path from txt
+  // vec_Vec3f path;
+
+  /*  nav_msgs::Path path_msg = DecompROS::vec_to_path(path);
+    path_msg.header.frame_id = "map";
+    path_pub.publish(path_msg);*/
+
+  // Using ellipsoid decomposition
+  EllipsoidDecomp3D decomp_util;
+  decomp_util.set_obs(obs);
+  decomp_util.set_local_bbox(Vec3f(1, 2, 1));
+  decomp_util.dilate(path);  // Set max iteration number of 10, do fix the path
+
+  // Publish visualization msgs
+  decomp_ros_msgs::EllipsoidArray es_msg = DecompROS::ellipsoid_array_to_ros(decomp_util.get_ellipsoids());
+  es_msg.header.frame_id = "world";
+  cvx_decomp_el_pub_.publish(es_msg);
+
+  decomp_ros_msgs::PolyhedronArray poly_msg = DecompROS::polyhedron_array_to_ros(decomp_util.get_polyhedrons());
+  poly_msg.header.frame_id = "world";
+  cvx_decomp_poly_pub_.publish(poly_msg);
+
+  // Convert to inequality constraints Ax < b
+  auto polys = decomp_util.get_polyhedrons();
+  for (size_t i = 0; i < path.size() - 1; i++)
+  {
+    const auto pt_inside = (path[i] + path[i + 1]) / 2;
+    LinearConstraint3D cs(pt_inside, polys[i].hyperplanes());
+    printf("i: %zu\n", i);
+    std::cout << "A: " << cs.A() << std::endl;
+    std::cout << "b: " << cs.b() << std::endl;
+    std::cout << "point: " << path[i].transpose();
+    if (cs.inside(path[i]))
+      std::cout << " is inside!" << std::endl;
+    else
+      std::cout << " is outside!" << std::endl;
+
+    std::cout << "point: " << path[i + 1].transpose();
+    if (cs.inside(path[i + 1]))
+      std::cout << " is inside!" << std::endl;
+    else
+      std::cout << " is outside!" << std::endl;
+  }
 }
 
 void CVX::pubTraj(double** x)
@@ -2696,7 +2769,6 @@ Eigen::Vector3d CVX::projectClickedGoal(Eigen::Vector3d& P1)
   double z_max = P1[2] + par_.wdz / 2;
   double z_min = P1[2] - par_.wdz / 2;
 
-  
   if ((P2[0] < x_max && P2[0] > x_min) && (P2[1] < y_max && P2[1] > y_min) && (P2[2] < z_max && P2[2] > z_min))
   {
     // Clicked goal is inside the map

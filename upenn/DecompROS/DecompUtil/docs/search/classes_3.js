@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['linesegment',['LineSegment',['../classLineSegment.html',1,'']]]
+  ['iterativedecomp',['IterativeDecomp',['../classIterativeDecomp.html',1,'']]]
 ];

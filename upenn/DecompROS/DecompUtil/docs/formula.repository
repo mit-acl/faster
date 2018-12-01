@@ -1,2 +1,3 @@
-\form#0:$Ax <= b$
-\form#1:$Ax\leq b $
+\form#0:$Ax < b$
+\form#1:$A, b$
+\form#2:$Ax\leq b $
