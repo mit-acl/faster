@@ -65,6 +65,10 @@ set(GUROBI_LIBRARIES "$ENV{GUROBI_HOME}/lib/libgurobi_c++.a;$ENV{GUROBI_HOME}/li
 # target_link_libraries(gurobi_discrete_exec ${GUROBI_LIBRARIES})
 target_link_libraries(gurobi_discrete_exec ${GUROBI_LIBRARIES})
 
+add_executable(solverGurobi_exec src/solvers/solverGurobi.cpp)
+
+target_link_libraries(solverGurobi_exec ${GUROBI_LIBRARIES})
+
 
 
 #add_executable(${PROJECT_NAME}_deubg_node src/debug.cpp)
