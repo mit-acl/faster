@@ -26,6 +26,11 @@
 
 // Solvers includes
 #include "solvers/solvers.hpp"
+#include "solvers/solverGurobi.hpp"
+
+// Convex Decomposition includes
+#include <decomp_ros_utils/data_ros_utils.h>
+#include <decomp_util/ellipsoid_decomp.h>
 
 // status_ : YAWING-->TRAVELING-->GOAL_SEEN-->GOAL_REACHED-->YAWING-->TRAVELING-->...
 #define YAWING 0
@@ -42,6 +47,12 @@ struct kdTreeStamped
 {
   pcl::KdTreeFLANN<pcl::PointXYZ> kdTree;
   ros::Time time;
+};
+
+struct polytope
+{
+  Eigen::MatrixXd A;
+  Eigen::MatrixXd b;
 };
 
 struct parameteres
@@ -120,6 +131,8 @@ private:
   Solver<VEL> solver_vel_;
   Solver<ACCEL> solver_accel_;
   Solver<JERK> solver_jerk_;
+
+  SolverGurobi solver_gurobi_;
   // class methods
   void pubTraj(double** x);
   void pubTraj(Eigen::MatrixXd X);
@@ -240,6 +253,9 @@ private:
   visualization_msgs::MarkerArray path_jps2_;
   visualization_msgs::MarkerArray path_jps2_fix_;
   visualization_msgs::MarkerArray intersec_points_;
+
+  vec_E<Polyhedron<3>> polyhedra_;
+  std::vector<LinearConstraint3D> l_constraints_;  // Polytope (Linear) constraints
 
   int markerID_ = 0;
   int markerID_last_ = 0;

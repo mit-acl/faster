@@ -1,4 +1,5 @@
 #include "solverGurobi.hpp"
+#include "solverGurobi_utils.hpp"  //This must go here, and not in solverGurobi.hpp
 
 SolverGurobi::SolverGurobi()
 {
@@ -36,22 +37,21 @@ SolverGurobi::SolverGurobi()
   double xf[9] = { 14, 5, 2.5, 0, 0, 0, 0, 0, 0 };
   double max_values[3] = { v_max_, a_max_, j_max_ };
 
-  setDC(0.01);
-  setX0(x0);
-  setXf(xf);
-  set_max(max_values);
-  setMaxConstraints();  // Only needed to set once
-  // findDT();
-  dt_ = 5.0 / N_;
-  setConstraintsX0();
-  setConstraintsXf();
-  setPolytopes();
-  setDynamicConstraints();
+  /*  setDC(0.01);  LO HAGO EN CVX
+  set_max(max_values);  LO HAGO EN CVX
 
-  genNewTraj();
+    setX0(x0);   LO HAGO EN CVX
+    setXf(xf);   LO HAGO EN CVX
 
-  resetXandU();
-  fillXandU();
+
+    setMaxConstraints();  // Only needed to set once///////////////////////
+
+
+ // setPolytopes();  LO HAGO EN CVX
+
+    genNewTraj();
+
+
 
   // Solve*/
 
@@ -110,116 +110,52 @@ void SolverGurobi::fillXandU()
     X_temp_.row(i) = states;
   }
 
-  std::cout << "***********The states are***********" << std::endl;
-  std::cout << X_temp_ << std::endl;
-  std::cout << "***********The input is***********" << std::endl;
-  std::cout << U_temp_ << std::endl;
+  /*  std::cout << "***********The states are***********" << std::endl;
+    std::cout << X_temp_ << std::endl;
+    std::cout << "***********The input is***********" << std::endl;
+    std::cout << U_temp_ << std::endl;*/
 }
 
-int SolverGurobi::setPolytopes()
+int SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> l_constraints)
 {
-  Eigen::MatrixXd A1(12, 3);
-  Eigen::MatrixXd A2(10, 3);
-  Eigen::MatrixXd A3(10, 3);
+  std::cout << "Setting POLYTOPES=" << l_constraints.size() << std::endl;
 
-  Eigen::VectorXd b1(12);
-  Eigen::VectorXd b2(10);
-  Eigen::VectorXd b3(10);
+  // Remove previous polytopes constraints
+  for (int i = 0; i < polytopes_cons.size(); i++)
+  {
+    m.remove(polytopes_cons[i]);
+  }
+  std::cout << "abajo 1" << std::endl;
 
-  A1 << -0.0990887, 0.994031, -0.0456529,  ////////////////////////////////////
-      -0.11874, 0.992494, 0.0292636,       ////////////////////////////////////
-      0.315838, 0.947835, -0.0430724,      ////////////////////////////////////
-      0.279625, 0.956348, 0.0849006,       ////////////////////////////////////
-      0.0379941, -0.999235, -0.00925698,   ////////////////////////////////////
-      0.031154, -0.999406, 0.0147274,      ////////////////////////////////////
-      0, -1, 0,                            ////////////////////////////////////
-      -0, 1, -0,                           ////////////////////////////////////
-      0.95448, 0, 0.298275,                ////////////////////////////////////
-      -0.95448, -0, -0.298275,             ////////////////////////////////////
-      0.298275, 0, -0.95448,               ////////////////////////////////////
-      -0.298275, -0, 0.95448;              ////////////////////////////////////
+  polytopes_cons.clear();
 
-  std::cout << "here6.5" << std::endl;
+  std::cout << "abajo 1.5" << std::endl;
+  // Remove previous at_least_1_pol_cons constraints
+  for (int i = 0; i < at_least_1_pol_cons.size(); i++)
+  {
+    m.remove(at_least_1_pol_cons[i]);
+  }
 
-  b1 << 11.2113,
-      11.1351,   ////////////////////////////////////
-      15.1733,   ////////////////////////////////////
-      15.1708,   ////////////////////////////////////
-      -9.26336,  ////////////////////////////////////
-      -9.27607,  ////////////////////////////////////
-      -9.5,      ////////////////////////////////////
-      13.5,      ////////////////////////////////////
-      14.3031,   ////////////////////////////////////
-      -3.92154,  ////////////////////////////////////
-      2.01413,   ////////////////////////////////////
-      -0.014135;
+  at_least_1_pol_cons.clear();
 
-  A1 << -0.0990887, 0.994031, -0.0456529,  ////////////////////////////////////
-      -0.11874, 0.992494, 0.0292636,       ////////////////////////////////////
-      0.315838, 0.947835, -0.0430724,      ////////////////////////////////////
-      0.279625, 0.956348, 0.0849006,       ////////////////////////////////////
-      0.0379941, -0.999235, -0.00925698,   ////////////////////////////////////
-      0.031154, -0.999406, 0.0147274,      ////////////////////////////////////
-      0, -1, 0,                            ////////////////////////////////////
-      -0, 1, -0,                           ////////////////////////////////////
-      0.95448, 0, 0.298275,                ////////////////////////////////////
-      -0.95448, -0, -0.298275,             ////////////////////////////////////
-      0.298275, 0, -0.95448,               ////////////////////////////////////
-      -0.298275, -0, 0.95448;              ////////////////////////////////////
+  std::cout << "abajo 2" << std::endl;
+  // Remove previous binary variables  (They depend on the number of polytopes--> I can't reuse them)
+  for (int i = 0; i < b.size(); i++)
+  {
+    for (int j = 0; j < b[i].size(); j++)
+    {
+      m.remove(b[i][j]);
+    }
+  }
+  b.clear();
 
-  A2 << -0.199658, 0.976518, 0.0809297,  ////////////////////////////////////
-      -0.166117, 0.983608, -0.0701482,   ////////////////////////////////////
-      -0.358298, -0.933434, 0.0179951,   ////////////////////////////////////
-      -0.365568, -0.928824, -0.0603848,  ////////////////////////////////////
-      -0.707107, -0.707107, 0,           ////////////////////////////////////
-      0.707107, 0.707107, -0,            ////////////////////////////////////
-      0.485071, -0.485071, -0.727607,    ////////////////////////////////////
-      -0.485071, 0.485071, 0.727607,     ////////////////////////////////////
-      -0.514496, 0.514496, -0.685994,    ////////////////////////////////////
-      0.514496, -0.514496, 0.685994;     ////////////////////////////////////
+  std::cout << "Cleared everything" << std::endl;
 
-  b2 << 9.06362,  ////////////////////////////////////
-      9.21024,    ////////////////////////////////////
-      -13.5612,   ////////////////////////////////////
-      -13.7295,   ////////////////////////////////////
-      -15.3241,   ////////////////////////////////////
-      19.3241,    ////////////////////////////////////
-      1.60634,    ////////////////////////////////////
-      2.45521,    ////////////////////////////////////
-      -1.82973,   ////////////////////////////////////
-      3.82973;    ////////////////////////////////////
-
-  A3 << -0.999958, 0.00342454, 0.00852636,  ////////////////////////////////////
-      -0.999832, 0.00363672, -0.0179664,    ////////////////////////////////////
-      -0.999778, -0.0204566, 0.00504416,    ////////////////////////////////////
-      -0.999564, -0.0227306, -0.0188383,    ////////////////////////////////////
-      -1, -0, 0,                            ////////////////////////////////////
-      1, 0, -0,                             ////////////////////////////////////
-      0, -0.98387, 0.178885,                ////////////////////////////////////
-      -0, 0.98387, -0.178885,               ////////////////////////////////////
-      0, -0.178885, -0.98387,               ////////////////////////////////////
-      -0, 0.178885, 0.98387;
-
-  b3 << -12.7365,  ////////////////////////////////////
-      -12.7834,    ////////////////////////////////////
-      -12.9236,    ////////////////////////////////////
-      -12.9824,    ////////////////////////////////////
-      -12,         ////////////////////////////////////
-      16,          ////////////////////////////////////
-      -3.47214,    ////////////////////////////////////
-      11.0623,     ////////////////////////////////////
-      -2.3541,     ////////////////////////////////////
-      4.3541;
-
-  std::vector<std::vector<double>> A1std = eigenMatrix2std(A1);
-  std::vector<std::vector<double>> A2std = eigenMatrix2std(A2);
-  std::vector<std::vector<double>> A3std = eigenMatrix2std(A3);
-
-  std::vector<std::vector<GRBVar>> b;
+  // Declare binary variables
   for (int t = 0; t < N_ + 1; t++)
   {
     std::vector<GRBVar> row;
-    for (int i = 0; i < 3; i++)  // For the three polytopes
+    for (int i = 0; i < l_constraints.size(); i++)  // For all the polytopes
     {
       GRBVar variable =
           m.addVar(-GRB_INFINITY, GRB_INFINITY, 0, GRB_BINARY, "s" + std::to_string(i) + "_" + std::to_string(t));
@@ -228,10 +164,10 @@ int SolverGurobi::setPolytopes()
     b.push_back(row);
   }
 
-  std::cout << "here8" << std::endl;
+  std::cout << "2 everything" << std::endl;
 
-  // If is 1 --> in that polytope
-
+  // Polytope constraints (if binary_varible==1 --> In that polytope) and at_least_1_pol_cons (at least one polytope)
+  // constraints
   for (int t = 0; t < N_; t++)
   {
     GRBLinExpr sum = 0;
@@ -239,26 +175,38 @@ int SolverGurobi::setPolytopes()
     {
       sum = sum + b[t][col];
     }
-    m.addConstr(sum == 1);
+    at_least_1_pol_cons.push_back(m.addConstr(sum == 1));
 
     std::vector<GRBLinExpr> pos = { getPos(t, 0, 0, false, x), getPos(t, 0, 1, false, x), getPos(t, 0, 2, false, x) };
 
-    for (int i = 0; i < b1.rows(); i++)
+    std::cout << "going to poly" << std::endl;
+    for (int n_poly = 0; n_poly < l_constraints.size(); n_poly++)  // Loop over the number of polytopes
     {
-      m.addGenConstrIndicator(b[t][0], 1, MatrixMultiply(A1std, pos)[i], '<',
-                              b1[i]);  // If b[t,0]==1, then...
-    }
-    for (int i = 0; i < b2.rows(); i++)
-    {
-      m.addGenConstrIndicator(b[t][1], 1, MatrixMultiply(A2std, pos)[i], '<',
-                              b2[i]);  // If b[t,1]==1, then...
-    }
-    for (int i = 0; i < b3.rows(); i++)
-    {
-      m.addGenConstrIndicator(b[t][2], 1, MatrixMultiply(A3std, pos)[i], '<',
-                              b3[i]);  // If b[t,2]==1, then...
+      // Constraint A1x<=b1
+      Eigen::MatrixXd A1 = l_constraints[n_poly].A();
+      auto b1 = l_constraints[n_poly].b();
+
+      std::vector<std::vector<double>> A1std = eigenMatrix2std(A1);
+
+      std::cout << "mas abajo" << std::endl;
+      for (int i = 0; i < b1.rows(); i++)
+      {
+        polytopes_cons.push_back(m.addGenConstrIndicator(b[t][0], 1, MatrixMultiply(A1std, pos)[i], '<',
+                                                         b1[i]));  // If b[t,0]==1, then...
+      }
+      /*      for (int i = 0; i < b2.rows(); i++)
+            {
+              m.addGenConstrIndicator(b[t][1], 1, MatrixMultiply(A2std, pos)[i], '<',
+                                      b2[i]);  // If b[t,1]==1, then...
+            }
+            for (int i = 0; i < b3.rows(); i++)
+            {
+              m.addGenConstrIndicator(b[t][2], 1, MatrixMultiply(A3std, pos)[i], '<',
+                                      b3[i]);  // If b[t,2]==1, then...
+            }*/
     }
   }
+  std::cout << "10 everything" << std::endl;
 }
 
 int SolverGurobi::getN()
@@ -344,11 +292,7 @@ void SolverGurobi::setXf(double xf[])
 void SolverGurobi::resetXandU()
 {
   int size = (int)(N_)*dt_ / DC;
-  std::cout << "N_=" << N_ << std::endl;
-  std::cout << "dt_=" << dt_ << std::endl;
-  std::cout << "DC=" << DC << std::endl;
-  std::cout << "Size=" << size << std::endl;
-  size = (size < 2) ? 2 : size;  // force size to be at least 2
+  // size = (size < 2) ? 2 : size;  // force size to be at least 2
   U_temp_ = Eigen::MatrixXd::Zero(size, 3);
   X_temp_ = Eigen::MatrixXd::Zero(size, 9);
 }
@@ -392,6 +336,8 @@ void SolverGurobi::set_max(double max_values[3])
   v_max_ = max_values[0];
   a_max_ = max_values[1];
   j_max_ = max_values[2];
+
+  setMaxConstraints();
 }
 
 // var is the type of variable to interpolate (POS=1, VEL=2, ACCEL=3,...)
@@ -474,9 +420,17 @@ void SolverGurobi::set_max(double max_values[3])
 
 void SolverGurobi::genNewTraj()
 {
+  // findDT();
+  dt_ = 5.0 / N_;
+  setConstraintsX0();
+  setConstraintsXf();
+  setDynamicConstraints();
   // printf("In genNewTraj\n");
   std::cout << "callOptimizer, x0_=" << x0_[0] << x0_[1] << x0_[2] << "xf_=" << xf_[0] << xf_[1] << xf_[2] << std::endl;
+
+  resetXandU();
   callOptimizer();
+  fillXandU();
   // printf("In genNewTraj0.5\n");
   /*  resetXandU();
     // printf("In genNewTraj1\n");
@@ -522,8 +476,10 @@ void SolverGurobi::setDynamicConstraints()
 
 void SolverGurobi::callOptimizer()
 {
+  std::cout << "CALLING OPTIMIZER OF GUROBI" << std::endl;
   m.update();
-  m.write("debug.lp");
+  m.write("debug_gurobi.lp");
+  std::cout << "WRITTEN" << std::endl;
   m.optimize();
 
   std::cout << "\nOBJECTIVE: " << m.get(GRB_DoubleAttr_ObjVal) << std::endl;
@@ -635,9 +591,9 @@ double SolverGurobi::getDTInitial()
   float accely = copysign(1, xf_[1] - x0_[1]) * a_max_;
   float accelz = copysign(1, xf_[2] - x0_[2]) * a_max_;
   // Solve equation xf=x0+v0t+0.5*a*t^2
-  t_ax = solvePolyOrder2(Eigen::Vector3f(0.5 * accelx, v0x, x0_[0] - xf_[0]));
-  t_ay = solvePolyOrder2(Eigen::Vector3f(0.5 * accely, v0y, x0_[1] - xf_[1]));
-  t_az = solvePolyOrder2(Eigen::Vector3f(0.5 * accelz, v0z, x0_[2] - xf_[2]));
+  t_ax = solvePolynomialOrder2(Eigen::Vector3f(0.5 * accelx, v0x, x0_[0] - xf_[0]));
+  t_ay = solvePolynomialOrder2(Eigen::Vector3f(0.5 * accely, v0y, x0_[1] - xf_[1]));
+  t_az = solvePolynomialOrder2(Eigen::Vector3f(0.5 * accelz, v0z, x0_[2] - xf_[2]));
 
   dt_initial = std::max({ t_vx, t_vy, t_vz, t_ax, t_ay, t_az, t_jx, t_jy, t_jz }) / N_;
   if (dt_initial > 10000)  // happens when there is no solution to the previous eq.
@@ -649,7 +605,7 @@ double SolverGurobi::getDTInitial()
   return dt_initial;
 }
 
-int main(int argc, char* argv[])
+/*int main(int argc, char* argv[])
 {
   SolverGurobi();
-}
+}*/

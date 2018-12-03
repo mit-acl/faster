@@ -6,16 +6,16 @@
 #include <Eigen/Dense>
 #include <type_traits>
 
-#include "solverGurobi_utils.hpp"
 //#include "../utils.hpp"
-using namespace std;
+// using namespace std;
 
 //#include "mlinterp.hpp"
-
+// Convex Decomposition includes
+#include <decomp_ros_utils/data_ros_utils.h>
 #include <unsupported/Eigen/Polynomials>
 
-// TODO: Remove this function
-inline float solvePolyOrder2(Eigen::Vector3f coeff)
+// TODO: This function is the same as solvePolyOrder2 but with other name (weird conflicts...)
+inline float solvePolynomialOrder2(Eigen::Vector3f coeff)
 {
   // std::cout << "solving\n" << coeff << std::endl;
   float a = coeff[0];
@@ -59,7 +59,7 @@ public:
   double getDTInitial();
   int getN();
   void setDC(double dc);
-  int setPolytopes();
+  int setPolytopes(std::vector<LinearConstraint3D> l_constraints);
   void findDT();
   void setConstraintsXf();
   void setConstraintsX0();
@@ -88,9 +88,12 @@ protected:
   GRBEnv* env = new GRBEnv();
   GRBModel m = GRBModel(*env);
 
+  std::vector<GRBConstr> at_least_1_pol_cons;  // Constraints at least in one polytope
+  std::vector<GRBGenConstr> polytopes_cons;
   std::vector<GRBConstr> dyn_cons;
   std::vector<GRBConstr> init_cons;
   std::vector<GRBConstr> final_cons;
+  std::vector<std::vector<GRBVar>> b;  // binary variables
   std::vector<std::vector<GRBVar>> x;
   std::vector<std::vector<GRBVar>> u;
 };

@@ -6,6 +6,7 @@
 
 // Continuous version, and with polytope constraints.
 
+#pragma once
 #ifndef SOLVER_GUROBI_UTILS_HPP
 #define SOLVER_GUROBI_UTILS_HPP
 
@@ -13,7 +14,7 @@
 #include <sstream>
 #include <Eigen/Dense>
 #include <type_traits>
-using namespace std;
+// using namespace std;
 
 template <typename T>
 GRBQuadExpr GetNorm2(const std::vector<T>& x)  // Return the squared norm of a vector
@@ -26,7 +27,8 @@ GRBQuadExpr GetNorm2(const std::vector<T>& x)  // Return the squared norm of a v
   return result;
 }
 
-std::vector<GRBLinExpr> MatrixMultiply(const std::vector<std::vector<double>>& A, const std::vector<GRBVar>& x)
+template <typename T>
+std::vector<GRBLinExpr> MatrixMultiply(const std::vector<std::vector<double>>& A, const std::vector<T>& x)
 {
   std::vector<GRBLinExpr> result;
 

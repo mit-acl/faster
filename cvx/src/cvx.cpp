@@ -22,6 +22,7 @@
 #include <pcl/filters/filter.h>
 #include <pcl/filters/crop_box.h>
 #include <pcl/filters/passthrough.h>
+#include <Eigen/StdVector>
 
 #include <tf2_sensor_msgs/tf2_sensor_msgs.h>
 
@@ -30,9 +31,6 @@
 #include <algorithm>
 #include <vector>
 
-#include <decomp_ros_utils/data_ros_utils.h>
-
-#include <decomp_util/ellipsoid_decomp.h>
 #include <sensor_msgs/point_cloud_conversion.h>
 #include <nav_msgs/Path.h>
 
@@ -150,8 +148,12 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   solver_vel_.setq(par_.q);
   solver_accel_.setq(par_.q);
   solver_jerk_.setq(par_.q);
+
   double max_values[3] = { par_.v_max, par_.a_max, par_.j_max };
   solver_jerk_.set_max(max_values);
+
+  solver_gurobi_.setDC(par_.dc);
+  solver_gurobi_.set_max(max_values);
 
   double max_values_vel[1] = { par_.v_max };
   solver_vel_.set_max(max_values_vel);
@@ -835,10 +837,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
   JPS1 = solveJPS3D(state_pos, term_goal, &solvedjps1, 1);  // Solution is in JPS1
                                                             // printf("Aqui89\n");
 
-  if (solvedjps1 == true)
-  {
-    cvxDecomp(JPS1);
-  }
+  std::cout << "solvedjps1= " << solvedjps1 << std::endl;
+
   bool previous = solvedjps1;
   if (solvedjps1 ==
       false)  // Happens when the drone is near the obstacles. Let's sample some points to scape from this situation.
@@ -987,8 +987,19 @@ void CVX::replanCB(const ros::TimerEvent& e)
     std::cout << "Before6.7, x0=" << x0[0] << x0[1] << x0[2] << "xf=" << xf[0] << xf[1] << xf[2] << std::endl;
     mtx_goals.unlock();
     // printf("Hola6.7\n");
+
     solver_jerk_.set_xf(xf);
     solver_jerk_.set_x0(x0);
+
+    if (kdtree_map_initialized_ == true)
+    {
+      cvxDecomp(JPS1);  // result saved in l_constraints_
+      solver_gurobi_.setPolytopes(l_constraints_);
+      solver_gurobi_.setXf(xf);
+      solver_gurobi_.setX0(x0);
+      solver_gurobi_.genNewTraj();
+    }
+
     // printf("hola6\n");
     // printf("Hola6.8\n");
     double t0cvxgen_jerk = ros::Time::now().toSec();
@@ -1682,11 +1693,12 @@ geometry_msgs::Vector3 CVX::getJerk(int i)
 
 void CVX::cvxDecomp(vec_Vecf<3> path)
 {
+  std::cout << "In cvxDecomp 0!" << std::endl;
   if (kdtree_map_initialized_ == false)
   {
     return;
   }
-  printf("In cvxDecomp!");
+  std::cout << "In cvxDecomp 1!" << std::endl;
   pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr_cloud = kdtree_map_.getInputCloud();
 
   // Read the point cloud from bag
@@ -1717,25 +1729,33 @@ void CVX::cvxDecomp(vec_Vecf<3> path)
   cvx_decomp_poly_pub_.publish(poly_msg);
 
   // Convert to inequality constraints Ax < b
+  // std::vector<polytope> polytopes;
   auto polys = decomp_util.get_polyhedrons();
+
+  std::cout << "In cvxDecomp 3!" << std::endl;
+  l_constraints_.clear();
+
+  std::cout << "In cvxDecomp 4!" << std::endl;
+
   for (size_t i = 0; i < path.size() - 1; i++)
   {
     const auto pt_inside = (path[i] + path[i + 1]) / 2;
     LinearConstraint3D cs(pt_inside, polys[i].hyperplanes());
-    printf("i: %zu\n", i);
-    std::cout << "A: " << cs.A() << std::endl;
-    std::cout << "b: " << cs.b() << std::endl;
-    std::cout << "point: " << path[i].transpose();
-    if (cs.inside(path[i]))
-      std::cout << " is inside!" << std::endl;
-    else
-      std::cout << " is outside!" << std::endl;
+    l_constraints_.push_back(cs);
+    /*      printf("i: %zu\n", i);
+              std::cout << "A: " << cs.A() << std::endl;
+              std::cout << "b: " << cs.b() << std::endl;
+              std::cout << "point: " << path[i].transpose();
+              if (cs.inside(path[i]))
+                std::cout << " is inside!" << std::endl;
+              else
+                std::cout << " is outside!" << std::endl;
 
-    std::cout << "point: " << path[i + 1].transpose();
-    if (cs.inside(path[i + 1]))
-      std::cout << " is inside!" << std::endl;
-    else
-      std::cout << " is outside!" << std::endl;
+              std::cout << "point: " << path[i + 1].transpose();
+              if (cs.inside(path[i + 1]))
+                std::cout << " is inside!" << std::endl;
+              else
+                std::cout << " is outside!" << std::endl;*/
   }
 }
 
@@ -1940,7 +1960,7 @@ void CVX::pclCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 // Occupied CB
 void CVX::mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 {
-  // printf("***********************************In mapCB\n");
+  printf("***********************************In mapCB\n");
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_map(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::fromROSMsg(*pcl2ptr_msg, *pclptr_map);
@@ -1954,6 +1974,7 @@ void CVX::mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
     return;
   }
 
+  printf("***********************************In mapCB abajo\n");
   // printf("In mapCB2\n");
   mtx_map.lock();
   // printf("Before setting InputCloud\n");
@@ -2761,7 +2782,7 @@ Eigen::Vector3d CVX::projectClickedGoal(Eigen::Vector3d& P1)
   mtx_term_term_goal.lock();
   Eigen::Vector3d P2 = term_term_goal_;
   mtx_term_term_goal.unlock();
-  return P2;  // TODO: Change this line after the HW experiments!
+  // return P2;  // TODO: Comment this line after the HW experiments!
   double x_max = P1[0] + par_.wdx / 2;
   double x_min = P1[0] - par_.wdx / 2;
   double y_max = P1[1] + par_.wdy / 2;
