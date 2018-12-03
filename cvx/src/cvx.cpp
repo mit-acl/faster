@@ -782,6 +782,13 @@ void CVX::replanCB(const ros::TimerEvent& e)
     ROS_WARN("Click a goal to start replanning");
     return;
   }
+
+  if (!kdtree_map_initialized_)
+  {
+    ROS_WARN("Waiting to initialize kdTree_map");
+    return;
+  }
+
   // printf("In replanCB0.3\n");
   mtx_term_goal.lock();
   Eigen::Vector3d term_goal = term_goal_;  // Local copy of the terminal goal
@@ -840,30 +847,26 @@ void CVX::replanCB(const ros::TimerEvent& e)
   std::cout << "solvedjps1= " << solvedjps1 << std::endl;
 
   bool previous = solvedjps1;
-  if (solvedjps1 ==
-      false)  // Happens when the drone is near the obstacles. Let's sample some points to scape from this situation.
-  {
-    for (float i = -0.2; i <= 0.25 && solvedjps1 == false; i = i + 0.2)
+  /*  if (solvedjps1 ==
+        false)  // Happens when the drone is near the obstacles. Let's sample some points to scape from this situation.
     {
-      for (float j = -0.2; j <= 0.25 && solvedjps1 == false; j = j + 0.2)
+      for (float i = -0.2; i <= 0.25 && solvedjps1 == false; i = i + 0.2)
       {
-        printf("Trying to escape from critial situation!!***\n");
-        Eigen::Vector3d new_pos(state_pos[0] + i, state_pos[1] + j, state_pos[2]);
-        std::cout << "Running JPS3d to terminal goal=" << term_goal.transpose() << std::endl;
-        JPS1 = solveJPS3D(new_pos, term_goal, &solvedjps1, 1);
+        for (float j = -0.2; j <= 0.25 && solvedjps1 == false; j = j + 0.2)
+        {
+          printf("Trying to escape from critial situation!!***\n");
+          Eigen::Vector3d new_pos(state_pos[0] + i, state_pos[1] + j, state_pos[2]);
+          std::cout << "Running JPS3d to terminal goal=" << term_goal.transpose() << std::endl;
+          JPS1 = solveJPS3D(new_pos, term_goal, &solvedjps1, 1);
+        }
       }
     }
-  }
-  if (previous == false && solvedjps1 == true)
-  {
-    printf("******************Escaped from critial situation!!***\n");
-    JPS1.insert(JPS1.begin(), state_pos);
-  }
+    if (previous == false && solvedjps1 == true)
+    {
+      printf("******************Escaped from critial situation!!***\n");
+      JPS1.insert(JPS1.begin(), state_pos);
+    }*/
 
-  // printf("init3\n");
-  bool dummy;
-
-  // printf("init4\n");
   // 0.96 and 0.98 are to ensure that ra<rb<dist_to_goal always
   double ra = std::min(0.96 * dist_to_goal, par_.Ra);
   double rb = std::min(0.98 * dist_to_goal, par_.Rb);  // radius of the sphere Sbl
@@ -882,8 +885,6 @@ void CVX::replanCB(const ros::TimerEvent& e)
   {
     rb = 1.001 * ra;
   }
-
-  printf("ra vale %f\n", ra);
 
   if (flight_mode_.mode != flight_mode_.GO)
   {
@@ -944,7 +945,20 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   // printf("Aqui92\n");
 
-  Eigen::Vector3d v1 = B1 - state_pos;     // point i expressed with origin=origin sphere
+  Eigen::Vector3d v1 = B1 - state_pos;  // point i expressed with origin=origin sphere
+
+  /// Solve with GUROBI
+  double x0[9] = { initialCond_.pos.x,   initialCond_.pos.y,   initialCond_.pos.z,
+                   initialCond_.vel.x,   initialCond_.vel.y,   initialCond_.vel.z,
+                   initialCond_.accel.x, initialCond_.accel.y, initialCond_.accel.z };
+  double xf[9] = { B1[0], B1[1], B1[2], 0, 0, 0, 0, 0, 0 };
+  cvxDecomp(JPS1);  // result saved in l_constraints_
+  solver_gurobi_.setPolytopes(l_constraints_);
+  solver_gurobi_.setXf(xf);
+  solver_gurobi_.setX0(x0);
+  solver_gurobi_.genNewTraj();
+  //////
+
   Eigen::Vector3d v2 = B_old - state_pos;  // point i minus 1
 
   double alpha = angleBetVectors(v1, v2);
@@ -974,8 +988,6 @@ void CVX::replanCB(const ros::TimerEvent& e)
     //////SOLVING FOR JERK
     // printf("Hola6\n");
     Eigen::Vector3d p = K[i];
-    printf("Hola6.5, vector p=\n");
-    std::cout << p.transpose() << std::endl;
     double xf[9] = { p[0], p[1], p[2], 0, 0, 0, 0, 0, 0 };
     mtx_goals.lock();
     // printf("Hola6.6\n");
@@ -984,34 +996,20 @@ void CVX::replanCB(const ros::TimerEvent& e)
                      initialCond_.vel.x,   initialCond_.vel.y,   initialCond_.vel.z,
                      initialCond_.accel.x, initialCond_.accel.y, initialCond_.accel.z };
     mtx_initial_cond.unlock();
-    std::cout << "Before6.7, x0=" << x0[0] << x0[1] << x0[2] << "xf=" << xf[0] << xf[1] << xf[2] << std::endl;
+    // std::cout << "Before6.7, x0=" << x0[0] << x0[1] << x0[2] << "xf=" << xf[0] << xf[1] << xf[2] << std::endl;
     mtx_goals.unlock();
     // printf("Hola6.7\n");
 
     solver_jerk_.set_xf(xf);
     solver_jerk_.set_x0(x0);
 
-    if (kdtree_map_initialized_ == true)
-    {
-      cvxDecomp(JPS1);  // result saved in l_constraints_
-      solver_gurobi_.setPolytopes(l_constraints_);
-      solver_gurobi_.setXf(xf);
-      solver_gurobi_.setX0(x0);
-      solver_gurobi_.genNewTraj();
-    }
-
-    // printf("hola6\n");
-    // printf("Hola6.8\n");
     double t0cvxgen_jerk = ros::Time::now().toSec();
     solver_jerk_.genNewTraj();
     log_.cvx_jerk_total_ms = log_.cvx_jerk_total_ms + 1000 * (ros::Time::now().toSec() - t0cvxgen_jerk);
     log_.loops_jerk = log_.loops_jerk + 1;
-    // printf("Hola6.9\n");
     U_temp1 = solver_jerk_.getU();
-    // printf("Hola6.10\n");
     X_temp1 = solver_jerk_.getX();
     //////SOLVED FOR JERK
-    // printf("Hola7\n");
 
     // printf("Calling IsFree 1\n");
     bool isFree = trajIsFree(X_temp1);

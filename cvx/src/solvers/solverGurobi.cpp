@@ -125,11 +125,9 @@ int SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> l_constraints)
   {
     m.remove(polytopes_cons[i]);
   }
-  std::cout << "abajo 1" << std::endl;
 
   polytopes_cons.clear();
 
-  std::cout << "abajo 1.5" << std::endl;
   // Remove previous at_least_1_pol_cons constraints
   for (int i = 0; i < at_least_1_pol_cons.size(); i++)
   {
@@ -138,7 +136,6 @@ int SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> l_constraints)
 
   at_least_1_pol_cons.clear();
 
-  std::cout << "abajo 2" << std::endl;
   // Remove previous binary variables  (They depend on the number of polytopes--> I can't reuse them)
   for (int i = 0; i < b.size(); i++)
   {
@@ -148,8 +145,6 @@ int SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> l_constraints)
     }
   }
   b.clear();
-
-  std::cout << "Cleared everything" << std::endl;
 
   // Declare binary variables
   for (int t = 0; t < N_ + 1; t++)
@@ -164,8 +159,6 @@ int SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> l_constraints)
     b.push_back(row);
   }
 
-  std::cout << "2 everything" << std::endl;
-
   // Polytope constraints (if binary_varible==1 --> In that polytope) and at_least_1_pol_cons (at least one polytope)
   // constraints
   for (int t = 0; t < N_; t++)
@@ -179,7 +172,6 @@ int SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> l_constraints)
 
     std::vector<GRBLinExpr> pos = { getPos(t, 0, 0, false, x), getPos(t, 0, 1, false, x), getPos(t, 0, 2, false, x) };
 
-    std::cout << "going to poly" << std::endl;
     for (int n_poly = 0; n_poly < l_constraints.size(); n_poly++)  // Loop over the number of polytopes
     {
       // Constraint A1x<=b1
@@ -188,7 +180,6 @@ int SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> l_constraints)
 
       std::vector<std::vector<double>> A1std = eigenMatrix2std(A1);
 
-      std::cout << "mas abajo" << std::endl;
       for (int i = 0; i < b1.rows(); i++)
       {
         polytopes_cons.push_back(m.addGenConstrIndicator(b[t][0], 1, MatrixMultiply(A1std, pos)[i], '<',
@@ -206,7 +197,6 @@ int SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> l_constraints)
             }*/
     }
   }
-  std::cout << "10 everything" << std::endl;
 }
 
 int SolverGurobi::getN()
@@ -420,13 +410,16 @@ void SolverGurobi::set_max(double max_values[3])
 
 void SolverGurobi::genNewTraj()
 {
-  // findDT();
-  dt_ = 5.0 / N_;
+  findDT();
+  // dt_ = 5.0 / N_;
+
   setConstraintsX0();
   setConstraintsXf();
   setDynamicConstraints();
   // printf("In genNewTraj\n");
-  std::cout << "callOptimizer, x0_=" << x0_[0] << x0_[1] << x0_[2] << "xf_=" << xf_[0] << xf_[1] << xf_[2] << std::endl;
+  std::cout << "dt is=" << dt_ << std::endl;
+  std::cout << "callOptimizer, x0_=" << x0_[0] << " " << x0_[1] << " " << x0_[2] << " "
+            << "xf_=" << xf_[0] << " " << xf_[1] << " " << xf_[2] << " " << std::endl;
 
   resetXandU();
   callOptimizer();
@@ -446,7 +439,7 @@ void SolverGurobi::genNewTraj()
 
 void SolverGurobi::findDT()
 {
-  double dt = 4 * getDTInitial();
+  double dt = 2 * getDTInitial();
   dt_ = dt;
 }
 
