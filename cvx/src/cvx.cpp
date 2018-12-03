@@ -154,6 +154,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
 
   solver_gurobi_.setDC(par_.dc);
   solver_gurobi_.set_max(max_values);
+  solver_gurobi_.setQ(par_.q);
 
   double max_values_vel[1] = { par_.v_max };
   solver_vel_.set_max(max_values_vel);
@@ -303,8 +304,8 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f& start_sent, Vec3f& goal_sent, bool* solved, i
   Eigen::Vector3d start(start_sent[0], start_sent[1], start_sent[2]);
   Eigen::Vector3d goal(goal_sent[0], goal_sent[1], goal_sent[2]);
   /*  std::cout << "IN JPS3d" << std::endl;*/
-  std::cout << "start=" << start.transpose() << std::endl;
-  std::cout << "goal=" << goal.transpose() << std::endl;
+  /*  std::cout << "start=" << start.transpose() << std::endl;
+    std::cout << "goal=" << goal.transpose() << std::endl;*/
 
   Vec3f originalStart = start;
   if (flight_mode_.mode != flight_mode_.GO)
@@ -315,29 +316,6 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f& start_sent, Vec3f& goal_sent, bool* solved, i
     *solved = true;
     return solution;
   }
-
-  // printf("solveJPS3D2\n");
-
-  // Create a map
-  /*  std::cout << "Solving JPS from start\n" << start << std::endl;
-    std::cout << "To goal\n" << goal << std::endl;*/
-  // Vec3i dim(cells_x_, cells_y_, cells_z_);  //  number of cells in each dimension
-  // Vec3f center_map = start;                 // position of the drone
-  // Read the pointcloud
-
-  // MapReader<Vec3i, Vec3f> reader(pclptr, dim, par_.res, center_map, par_.z_ground, par_.drone_radius);  // Map read
-
-  // std::shared_ptr<VoxelMapUtil> map_util = std::make_shared<VoxelMapUtil>();
-
-  // map_util_->setMap(reader.origin(), reader.dim(), reader.data(), reader.resolution());
-
-  // std::unique_ptr<JPSPlanner3D> planner_ptr(new JPSPlanner3D(false));  // Declare a planner
-
-  // planner_ptr_->setMapUtil(map_util_);  // Set collision checking function
-
-  // Eigen::Vector3d eig_search_point(X(0, 0), X(0, 1), X(0, 2));
-
-  // Timer time_solve_jps_check(true);
 
   pcl::PointXYZ pcl_start = eigenPoint2pclPoint(start);
   pcl::PointXYZ pcl_goal = eigenPoint2pclPoint(goal);
@@ -483,8 +461,8 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f& start_sent, Vec3f& goal_sent, bool* solved, i
   // printf("       JPS check takes: %f ms\n", (double)time_solve_jps_check.Elapsed().count());
   // printf("Out3\n");
 
-  std::cout << "start despues=" << start.transpose() << std::endl;
-  std::cout << "goal despues=" << goal.transpose() << std::endl;
+  /*  std::cout << "start despues=" << start.transpose() << std::endl;
+    std::cout << "goal despues=" << goal.transpose() << std::endl;*/
 
   mtx_map.unlock();
 
@@ -769,7 +747,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   mtx_term_goal.lock();
   term_goal_ = projectClickedGoal(state_pos);
-  std::cout << "Projected Goal" << term_goal_.transpose() << std::endl;
+  // std::cout << "Projected Goal" << term_goal_.transpose() << std::endl;
   mtx_term_goal.unlock();
   // printf("In replanCB0.1\n");
   if (par_.visual == true)
@@ -838,13 +816,17 @@ void CVX::replanCB(const ros::TimerEvent& e)
   vec_Vecf<3> JPS2;
 
   // printf("init2\n");
-  std::cout << "Running JPS3d to terminal goal=" << term_goal.transpose() << std::endl;
+  // std::cout << "Running JPS3d from=" << state_pos.transpose() << std::endl;
+  // std::cout << "Running JPS3d to terminal goal=" << term_goal.transpose() << std::endl;
 
-  static bool first_time = true;                            // how many times I've solved JPS1
+  static bool first_time = true;  // how many times I've solved JPS1
+
+  printf("Running JPS1!!!\n");
   JPS1 = solveJPS3D(state_pos, term_goal, &solvedjps1, 1);  // Solution is in JPS1
                                                             // printf("Aqui89\n");
+  printf("Solved JPS1!!!\n");
 
-  std::cout << "solvedjps1= " << solvedjps1 << std::endl;
+  // std::cout << "solvedjps1= " << solvedjps1 << std::endl;
 
   bool previous = solvedjps1;
   /*  if (solvedjps1 ==
@@ -873,18 +855,16 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   if (solvedjps1 == true && flight_mode_.mode == flight_mode_.GO)
   {
-    // printf("here, flight_mode=%d\n", flight_mode_.mode);
-    // double l = getDistanceToFirstCollisionJPSwithUnkonwnspace(JPS1, &dummy);
     ra = (JPS1[1] - JPS1[0]).norm();
     saturate(ra, par_.Ra, par_.Ra_max);
   }
 
   ra = std::min(0.96 * dist_to_goal, ra);  // radius of the sphere Sa
 
-  if (par_.use_vel == false)
-  {
-    rb = 1.001 * ra;
-  }
+  /*  if (par_.use_vel == false)
+    {
+      rb = 1.001 * ra;
+    }*/
 
   if (flight_mode_.mode != flight_mode_.GO)
   {
@@ -892,11 +872,6 @@ void CVX::replanCB(const ros::TimerEvent& e)
     ra = term_goal[2] - state_.pos.z;
     mtx_state.unlock();
   }
-
-  // printElementsOfJPS(JPS1);
-  // printf("ra=%f\n", ra);
-
-  // printf("init5\n");
 
   if (first_time == true)
   {
@@ -918,8 +893,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
       clearJPSPathVisualization(1);
       publishJPSPath(JPS1, 1);
     }
-    printf("ReplanCB: Elements of JPS1 are...\n");
-    printElementsOfJPS(JPS1);
+    // printf("ReplanCB: Elements of JPS1 are...\n");
+    // printElementsOfJPS(JPS1);
     /*
             printf("Elements of JPS_old_ are...:\n");
             printElementsOfJPS(JPS_old_);*/
@@ -931,47 +906,81 @@ void CVX::replanCB(const ros::TimerEvent& e)
     return;
   }
 
-  // printf("Aqui90\n");
-  // printf("state_pos is:\n");
   std::cout << state_pos.transpose() << std::endl;
   bool noPointsOutsideSphere1;
   bool noPointsOutsideSphere2;
   B1 = getFirstIntersectionWithSphere(JPS1, ra, state_pos, &li1, &noPointsOutsideSphere1);
-  // printf("Aqui91, li1=%f\n", li1);
   B_old = getFirstIntersectionWithSphere(JPS_old_, ra, state_pos, &liold, &noPointsOutsideSphere2);
-  // printf("Aqui92, liold=%f\n", liold);
-  // printf("Aqui92\n");
-  // printElementsOfJPS(JPS1);
-
-  // printf("Aqui92\n");
 
   Eigen::Vector3d v1 = B1 - state_pos;  // point i expressed with origin=origin sphere
 
-  /// Solve with GUROBI
+  //////////// Solve with GUROBI //////////////////////////
+  /////////////////////////////////////////////////////////
+  /////////////////////////////////////////////////////////
+  printf("Running Gurobi!!!\n");
+  if (X_initialized_)  // Needed to skip the first time (X_ still not initialized)
+  {
+    mtx_k.lock();
+    k_initial_cond_1_ = std::min(k_ + par_.offset, (int)(X_.rows() - 1));
+    mtx_k.unlock();
+    updateInitialCond(k_initial_cond_1_);
+  }
+
+  mtx_initial_cond.lock();
   double x0[9] = { initialCond_.pos.x,   initialCond_.pos.y,   initialCond_.pos.z,
                    initialCond_.vel.x,   initialCond_.vel.y,   initialCond_.vel.z,
                    initialCond_.accel.x, initialCond_.accel.y, initialCond_.accel.z };
+  mtx_initial_cond.unlock();
   double xf[9] = { B1[0], B1[1], B1[2], 0, 0, 0, 0, 0, 0 };
+  printf("Running CVXDecomp!!!\n");
+  double before = ros::Time::now().toSec();
   cvxDecomp(JPS1);  // result saved in l_constraints_
+  ROS_WARN("CVXDecomp time: %0.2f ms", 1000 * (ros::Time::now().toSec() - before));
+  printf("Solved CVXDecomp!!!\n");
   solver_gurobi_.setPolytopes(l_constraints_);
   solver_gurobi_.setXf(xf);
   solver_gurobi_.setX0(x0);
   solver_gurobi_.genNewTraj();
-  //////
+
+  log_.decision = 1;
+  mtx_X_U_temp.lock();
+  U_temp_ = solver_gurobi_.getU();
+  X_temp_ = solver_gurobi_.getX();
+  mtx_X_U_temp.unlock();
+  JPS_old_ = JPS1;
+  mtx_k.lock();
+  k_initial_cond_ = k_initial_cond_1_;
+  mtx_k.unlock();
+  B_ = B1;
+  optimized_ = true;
+  mtx_planner_status_.lock();
+  planner_status_ = REPLANNED;
+  mtx_planner_status_.unlock();
+  // printf("ReplanCB: planner_status_ = REPLANNED\n");
+  if (par_.visual == true)
+  {
+    pubTraj(X_temp_);
+  }
+
+  double dist = (term_goal - B1).norm();
+  bool have_seen_the_goal = (dist < par_.goal_radius) ? true : false;
+  if (have_seen_the_goal)
+  {
+    status_ = GOAL_SEEN;
+  }
+  printf("Solved Gurobi!!!\n");
+
+  return;
+  ///////////////////////////////////////////////////////////
+  ///////////////////////////////////////////////////////////
+  ///////////////////////////////////////////////////////////
 
   Eigen::Vector3d v2 = B_old - state_pos;  // point i minus 1
 
   double alpha = angleBetVectors(v1, v2);
   log_.angle = alpha;
 
-  // printf("Aqui92.5\n");
-  // printElementsOfJPS(JPS1);
-
   std::vector<Eigen::Vector3d> K = samplePointsSphereWithJPS(B1, ra, state_pos, JPS1, li1);
-
-  // printf("Aqui93\n");
-
-  // printf("ReplanCB: Med takes %f ms\n", (double)time_init.Elapsed().count());
 
   // Timer time_traj1(true);
 
@@ -1364,6 +1373,7 @@ void CVX::modeCB(const acl_msgs::QuadFlightMode& msg)
 
 void CVX::stateCB(const acl_msgs::State& msg)
 {
+  ROS_ERROR("In state CB");
   // printf("(State): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", msg.pos.x, msg.pos.y, msg.pos.z, msg.vel.x, msg.vel.y,
   //       msg.vel.z);
   mtx_state.lock();
@@ -1453,7 +1463,6 @@ void CVX::pubCB(const ros::TimerEvent& e)
   initialCond_.jerk = vectorNull();
   mtx_initial_cond.unlock();
 
-  // printf("In pubCB3\n");
   if (quadGoal_.cut_power && (flight_mode_.mode == flight_mode_.TAKEOFF || flight_mode_.mode == flight_mode_.GO))
   {
     double then = ros::Time::now().toSec();
@@ -1467,19 +1476,18 @@ void CVX::pubCB(const ros::TimerEvent& e)
       pub_goal_.publish(quadGoal_);
     }
   }
-  // printf("In pubCB4\n");
-  // static int k = 0;
+
   if (optimized_ && flight_mode_.mode != flight_mode_.NOT_FLYING && flight_mode_.mode != flight_mode_.KILL)
   {
     quadGoal_.cut_power = false;
 
     mtx_k.lock();
     k_ = std::min(k_, (int)(X_.rows() - 1));
-    printf("planner_status_= %d\n", planner_status_);
-    printf("to_land_= %d\n", to_land_);
+    // printf("planner_status_= %d\n", planner_status_);
+    // printf("to_land_= %d\n", to_land_);
 
-    printf("k_ = %d\n", k_);
-    printf("k_initial_cond_ = %d\n", k_initial_cond_);
+    // printf("k_ = %d\n", k_);
+    // printf("k_initial_cond_ = %d\n", k_initial_cond_);
 
     if ((planner_status_ == REPLANNED && (k_ == k_initial_cond_ || to_land_ == true)) ||  // Should be k_==
         (force_reset_to_0_ && planner_status_ == REPLANNED))
@@ -1507,8 +1515,6 @@ void CVX::pubCB(const ros::TimerEvent& e)
       mtx_planner_status_.lock();
       planner_status_ = START_REPLANNING;
       mtx_planner_status_.unlock();
-      // printf("pubCB: planner_status_ = START_REPLANNING\n");
-      // printf("********************k_ > k_initial_cond_\n");
     }
 
     k_ = std::min(k_, (int)(X_.rows() - 1));
@@ -1691,12 +1697,12 @@ geometry_msgs::Vector3 CVX::getJerk(int i)
 
 void CVX::cvxDecomp(vec_Vecf<3> path)
 {
-  std::cout << "In cvxDecomp 0!" << std::endl;
+  // std::cout << "In cvxDecomp 0!" << std::endl;
   if (kdtree_map_initialized_ == false)
   {
     return;
   }
-  std::cout << "In cvxDecomp 1!" << std::endl;
+  // std::cout << "In cvxDecomp 1!" << std::endl;
   pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr_cloud = kdtree_map_.getInputCloud();
 
   // Read the point cloud from bag
@@ -1730,10 +1736,10 @@ void CVX::cvxDecomp(vec_Vecf<3> path)
   // std::vector<polytope> polytopes;
   auto polys = decomp_util.get_polyhedrons();
 
-  std::cout << "In cvxDecomp 3!" << std::endl;
+  // std::cout << "In cvxDecomp 3!" << std::endl;
   l_constraints_.clear();
 
-  std::cout << "In cvxDecomp 4!" << std::endl;
+  // std::cout << "In cvxDecomp 4!" << std::endl;
 
   for (size_t i = 0; i < path.size() - 1; i++)
   {
@@ -1894,7 +1900,7 @@ void CVX::clearMarkerSetOfArrows()
 
 void CVX::frontierCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 {
-  // printf("In FrontierCB\n");
+  printf("****In FrontierCB\n");
   if (pcl2ptr_msg->width == 0 || pcl2ptr_msg->height == 0)  // Point Cloud is empty (this happens at the beginning)
   {
     return;
@@ -1958,7 +1964,7 @@ void CVX::pclCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 // Occupied CB
 void CVX::mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 {
-  printf("***********************************In mapCB\n");
+  double before = ros::Time::now().toSec();
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_map(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::fromROSMsg(*pcl2ptr_msg, *pclptr_map);
@@ -1972,7 +1978,7 @@ void CVX::mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
     return;
   }
 
-  printf("***********************************In mapCB abajo\n");
+  // printf("***********************************In mapCB abajo\n");
   // printf("In mapCB2\n");
   mtx_map.lock();
   // printf("Before setting InputCloud\n");
@@ -2013,6 +2019,7 @@ void CVX::mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
   // printf("below\n");
 
   // mtx.unlock();
+  ROS_WARN("MapCB takes: %0.2f ms", 1000 * (ros::Time::now().toSec() - before));
 }
 
 // Unkwown  CB
@@ -2584,7 +2591,7 @@ Eigen::Vector3d CVX::createForceArrow(Eigen::Vector3d x, Eigen::Vector3d f_att, 
 
 void CVX::pubActualTraj()
 {
-  // printf("In pubActualTraj\n");
+  // ROS_ERROR("In pubActualTraj\n");
 
   static geometry_msgs::Point p_last = pointOrigin();
   mtx_state.lock();

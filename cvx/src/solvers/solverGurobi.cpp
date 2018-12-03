@@ -1,12 +1,14 @@
 #include "solverGurobi.hpp"
 #include "solverGurobi_utils.hpp"  //This must go here, and not in solverGurobi.hpp
+#include <chrono>
+#include <unistd.h>
 
 SolverGurobi::SolverGurobi()
 {
   v_max_ = 5;
   a_max_ = 3;
   j_max_ = 5;
-  N_ = 10;
+  N_ = 10;  // Segments: 0,1,...,N_-1
 
   // Model
   /*  env = new GRBEnv();
@@ -15,7 +17,7 @@ SolverGurobi::SolverGurobi()
   std::vector<std::string> coeff = { "ax", "ay", "az", "bx", "by", "bz", "cx", "cy", "cz", "dx", "dy", "dz" };
 
   // Variables: Coefficients of the polynomials
-  for (int t = 0; t < N_ + 1; t++)
+  for (int t = 0; t < N_; t++)
   {
     std::vector<GRBVar> row_t;
     for (int i = 0; i < 12; i++)
@@ -24,14 +26,6 @@ SolverGurobi::SolverGurobi()
     }
     x.push_back(row_t);
   }
-
-  GRBQuadExpr control_cost = 0;
-  for (int t = 0; t < N_; t++)
-  {
-    std::vector<GRBLinExpr> ut = { getJerk(t, 0, 0, false, x), getJerk(t, 0, 1, false, x), getJerk(t, 0, 2, false, x) };
-    control_cost = control_cost + GetNorm2(ut);
-  }
-  m.setObjective(control_cost, GRB_MINIMIZE);
 
   double x0[9] = { 5, 11.5, 0.5, 0, 0, 0, 0, 0, 0 };
   double xf[9] = { 14, 5, 2.5, 0, 0, 0, 0, 0, 0 };
@@ -68,6 +62,29 @@ SolverGurobi::SolverGurobi()
   // delete env;
 }
 
+void SolverGurobi::setObjective()  // I need to set it every time, because the objective depends on the xFinal
+{
+  GRBQuadExpr control_cost = 0;
+  GRBQuadExpr final_state_cost = 0;
+  std::vector<GRBLinExpr> xFinal = {
+    getPos(N_ - 1, 0, 0, false, x),   getPos(N_ - 1, 0, 1, false, x),
+    getPos(N_ - 1, 0, 2, false, x),  //////////////////////////////////
+    getVel(N_ - 1, 0, 0, false, x),   getVel(N_ - 1, 0, 1, false, x),
+    getVel(N_ - 1, 0, 2, false, x),  /////////////////////////////
+    getAccel(N_ - 1, 0, 0, false, x), getAccel(N_ - 1, 0, 1, false, x),
+    getAccel(N_ - 1, 0, 2, false, x)  /////////////////////////////
+  };
+  std::vector<double> xf(std::begin(xf_), std::end(xf_));  // Transform xf_ into a std vector
+  final_state_cost = q_ * GetNorm2(xFinal - xf);
+
+  for (int t = 0; t < N_; t++)
+  {
+    std::vector<GRBLinExpr> ut = { getJerk(t, 0, 0, false, x), getJerk(t, 0, 1, false, x), getJerk(t, 0, 2, false, x) };
+    control_cost = control_cost + GetNorm2(ut);
+  }
+  m.setObjective(control_cost + final_state_cost, GRB_MINIMIZE);
+}
+
 void SolverGurobi::fillXandU()
 {
   double t = 0;
@@ -80,7 +97,7 @@ void SolverGurobi::fillXandU()
     if (t > dt_ * (interval + 1))
     {
       interval = interval + 1;
-      // std::cout << "**Interval=" << interval << std::endl;
+      // std::cout << "*****Interval=" << interval << std::endl;
     }
 
     // std::cout << "t_rel=" << t - interval * dt_ << std::endl;
@@ -110,6 +127,29 @@ void SolverGurobi::fillXandU()
     X_temp_.row(i) = states;
   }
 
+  // Force the final states to be the final conditions
+  Eigen::Matrix<double, 1, 9> final_cond;
+  final_cond << xf_[0], xf_[1], xf_[2], xf_[3], xf_[4], xf_[5], xf_[6], xf_[7], xf_[8];
+  X_temp_.row(X_temp_.rows() - 1) = final_cond;
+
+  // Force the final input to be 0 (I'll keep applying this input if when I arrive to the final state I still
+  // haven't planned again).
+  U_temp_.row(U_temp_.rows() - 1) = Eigen::Vector3d::Zero().transpose();
+
+  /*  std::cout << "***********The final states are***********" << std::endl;
+    std::cout << X_temp_.row(X_temp_.rows() - 1).transpose() << std::endl;
+
+    std::cout << "***********The final conditions were***********" << std::endl;
+    std::cout << xf_[0] << std::endl;
+    std::cout << xf_[1] << std::endl;
+    std::cout << xf_[2] << std::endl;
+    std::cout << xf_[3] << std::endl;
+    std::cout << xf_[4] << std::endl;
+    std::cout << xf_[5] << std::endl;
+    std::cout << xf_[6] << std::endl;
+    std::cout << xf_[7] << std::endl;
+    std::cout << xf_[8] << std::endl;*/
+
   /*  std::cout << "***********The states are***********" << std::endl;
     std::cout << X_temp_ << std::endl;
     std::cout << "***********The input is***********" << std::endl;
@@ -118,7 +158,7 @@ void SolverGurobi::fillXandU()
 
 int SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> l_constraints)
 {
-  std::cout << "Setting POLYTOPES=" << l_constraints.size() << std::endl;
+  // std::cout << "Setting POLYTOPES=" << l_constraints.size() << std::endl;
 
   // Remove previous polytopes constraints
   for (int i = 0; i < polytopes_cons.size(); i++)
@@ -238,6 +278,7 @@ void SolverGurobi::setConstraintsXf()
 
   final_cons.clear();
 
+  // std::cout << "Setting Final Constraints!!" << std::endl;
   // Constraint xT==x_final
   for (int i = 0; i < 3; i++)
   {
@@ -321,6 +362,11 @@ void SolverGurobi::setMaxConstraints()
   }
 }
 
+void SolverGurobi::setQ(double q)
+{
+  q_ = q;
+}
+
 void SolverGurobi::set_max(double max_values[3])
 {
   v_max_ = max_values[0];
@@ -329,84 +375,6 @@ void SolverGurobi::set_max(double max_values[3])
 
   setMaxConstraints();
 }
-
-// var is the type of variable to interpolate (POS=1, VEL=2, ACCEL=3,...)
-/*void SolverGurobi::interpolate(int var, double** u, double** x)
-{
-  int nxd = N_ + 1;
-  int nd[] = { nxd };
-  // printf("N_=%d\n", N_);
-  // printf("dt_=%f\n", dt_);
-  // printf("DC=%f\n", DC);
-  int ni = (int)(N_)*dt_ / DC;  // total number of points
-  // printf("ni=%d", ni);
-  double xd[nxd];
-  double yd[nxd];
-  double xi[ni];
-  double yi[ni];
-  int type_of_var = (var < INPUT_ORDER) ? STATE : INPUT;
-  if (ni <= 2)
-  {
-    // printf("NOT INTERPOLATING. THIS USUALLY HAPPENS WHEN INPUT=VEL, y VEL_MAX IS HIGH, REDUCE IT!\n");
-    for (int axis = 0; axis < 3; axis++)  // var_x,var_y,var_z
-    {
-      int column_x = axis + 3 * var;
-      if (type_of_var == INPUT)
-      {
-        U_temp_(0, axis) = 0;  // u[0][axis];
-        U_temp_(1, axis) = 0;  // Force the last input to be 0
-      }
-      if (type_of_var == STATE)
-      {
-        X_temp_(0, column_x) = x0_[column_x];
-        X_temp_(1, column_x) = x0_[column_x];
-      }
-    }
-    return;
-  }
-  // printf("Tipo de variable=%d", type_of_var);
-  for (int n = 0; n < ni; ++n)
-  {
-    xi[n] = n * DC;
-  }
-
-  for (int axis = 0; axis < 3; axis++)  // var_x,var_y,var_z
-  {
-    int column_x = axis + 3 * var;
-    for (int i = 1; i < nxd; i++)
-    {
-      xd[i] = i * dt_;
-      yd[i] = (type_of_var == INPUT) ? u[i][axis] : x[i][column_x];
-    }
-
-    xd[0] = 0;
-    yd[0] = (type_of_var == INPUT) ? u[0][axis] : x0_[column_x];
-
-
-    mlinterp::interp(nd, ni,  // Number of points
-                     yd, yi,  // Output axis (y)
-                     xd, xi   // Input axis (x)
-    );
-    // Force the last input to be 0, and the last state to be the final state:
-    yi[ni - 1] = (type_of_var == INPUT) ? 0 : xf_[column_x];
-
-    for (int n = 0; n < ni; ++n)
-    {
-      // printf("inside the loop\n");
-      if (type_of_var == INPUT)
-      {
-        U_temp_(n, axis) = yi[n];
-      }
-      if (type_of_var == STATE)
-      {
-        X_temp_(n, column_x) = yi[n];
-      }
-      // printf("%f    %f\n", U(n, 0), yi[n]);
-    }
-    // printf("He asignado X_temp_=\n");
-    // std::cout << X_temp_ << std::endl;
-  }
-}*/
 
 void SolverGurobi::genNewTraj()
 {
@@ -417,9 +385,11 @@ void SolverGurobi::genNewTraj()
   setConstraintsXf();
   setDynamicConstraints();
   // printf("In genNewTraj\n");
-  std::cout << "dt is=" << dt_ << std::endl;
-  std::cout << "callOptimizer, x0_=" << x0_[0] << " " << x0_[1] << " " << x0_[2] << " "
-            << "xf_=" << xf_[0] << " " << xf_[1] << " " << xf_[2] << " " << std::endl;
+  /*  std::cout << "dt is=" << dt_ << std::endl;
+    std::cout << "callOptimizer, x0_=" << x0_[0] << " " << x0_[1] << " " << x0_[2] << " "
+              << "xf_=" << xf_[0] << " " << xf_[1] << " " << xf_[2] << " " << std::endl;*/
+
+  setObjective();
 
   resetXandU();
   callOptimizer();
@@ -453,7 +423,7 @@ void SolverGurobi::setDynamicConstraints()
   dyn_cons.clear();
 
   // Dynamic Constraints
-  for (int t = 0; t < N_ - 1; t++)
+  for (int t = 0; t < N_ - 1; t++)  // From 0....N_-2
   {
     for (int i = 0; i < 3; i++)
     {
@@ -469,18 +439,38 @@ void SolverGurobi::setDynamicConstraints()
 
 void SolverGurobi::callOptimizer()
 {
-  std::cout << "CALLING OPTIMIZER OF GUROBI" << std::endl;
+  // std::cout << "CALLING OPTIMIZER OF GUROBI" << std::endl;
   m.update();
-  m.write("debug_gurobi.lp");
-  std::cout << "WRITTEN" << std::endl;
-  m.optimize();
+  // m.write("/home/jtorde/debug_gurobi.lp");
+  m.set("OutputFlag", "0");  // 1 if you want verbose
 
-  std::cout << "\nOBJECTIVE: " << m.get(GRB_DoubleAttr_ObjVal) << std::endl;
-  std::cout << "Positions X:" << std::endl;
-  for (int t = 0; t < N_ + 1; t++)
-  {
-    std::cout << getPos(t, 0, 0, true, x) << std::endl;
-  }
+  std::cout << "*************************Starting Optimization" << std::endl;
+  auto start = std::chrono::steady_clock::now();
+  m.optimize();
+  auto end = std::chrono::steady_clock::now();
+  std::cout << "*************************Finished Optimization: "
+            << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " ms" << std::endl;
+  // std::cout << "*************************Finished Optimization" << std::endl;
+
+  /*  std::cout << "\nOBJECTIVE: " << m.get(GRB_DoubleAttr_ObjVal) << std::endl;
+    std::cout << "Positions X:" << std::endl;
+    for (int t = 0; t < N_; t++)
+    {
+      std::cout << getPos(t, dt_, 0, true, x) << std::endl;
+    }
+
+    std::cout << "Positions Y:" << std::endl;
+    for (int t = 0; t < N_; t++)
+    {
+      std::cout << getPos(t, dt_, 1, true, x) << std::endl;
+    }
+
+    std::cout << "Positions Z:" << std::endl;
+    for (int t = 0; t < N_; t++)
+    {
+      std::cout << "Beginning of interval" << t << std::endl;
+      std::cout << getPos(t, dt_, 2, true, x) << std::endl;
+    }*/
 
   /*  // printf("In callOptimizer\n");
     bool converged = false;
@@ -543,7 +533,7 @@ double SolverGurobi::getDTInitial()
   // printf("%f\n", t_vy);
   // printf("%f\n", t_vz);
 
-  std::cout << "get DT, x0_=" << x0_[0] << x0_[1] << x0_[2] << "xf_=" << xf_[0] << xf_[1] << xf_[2] << std::endl;
+  // std::cout << "get DT, x0_=" << x0_[0] << x0_[1] << x0_[2] << "xf_=" << xf_[0] << xf_[1] << xf_[2] << std::endl;
   float jerkx = copysign(1, xf_[0] - x0_[0]) * j_max_;
   float jerky = copysign(1, xf_[1] - x0_[1]) * j_max_;
   float jerkz = copysign(1, xf_[2] - x0_[2]) * j_max_;
@@ -559,7 +549,7 @@ double SolverGurobi::getDTInitial()
   Eigen::Vector4d coeffy(x0_[1] - xf_[1], v0y, a0y / 2, jerky / 6);
   Eigen::Vector4d coeffz(x0_[2] - xf_[2], v0z, a0z / 2, jerkz / 6);
 
-  std::cout << "Coefficients" << coeffx.transpose() << coeffy.transpose() << coeffz.transpose() << std::endl;
+  // std::cout << "Coefficients" << coeffx.transpose() << coeffy.transpose() << coeffz.transpose() << std::endl;
 
   Eigen::PolynomialSolver<double, Eigen::Dynamic> psolvex(coeffx);
   Eigen::PolynomialSolver<double, Eigen::Dynamic> psolvey(coeffy);
@@ -572,13 +562,12 @@ double SolverGurobi::getDTInitial()
   psolvey.realRoots(realRootsy);
   psolvez.realRoots(realRootsz);
 
-  printf("before min elements\n");
   t_jx = *std::min_element(realRootsx.begin(), realRootsx.end());
   t_jy = *std::min_element(realRootsy.begin(), realRootsy.end());
   t_jz = *std::min_element(realRootsz.begin(), realRootsz.end());
 
-  printf("after: t_jx, t_jy, t_jz:\n");
-  std::cout << t_jx << "  " << t_jy << "  " << t_jz << std::endl;
+  // printf("after: t_jx, t_jy, t_jz:\n");
+  // std::cout << t_jx << "  " << t_jy << "  " << t_jz << std::endl;
 
   float accelx = copysign(1, xf_[0] - x0_[0]) * a_max_;
   float accely = copysign(1, xf_[1] - x0_[1]) * a_max_;

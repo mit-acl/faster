@@ -49,6 +49,7 @@ public:
   double getCost();
   Eigen::MatrixXd getX();
   Eigen::MatrixXd getU();
+  void setQ(double q);
   void setX0(double x0[]);
   // void set_u0(double u0[]);
   void setXf(double xf[]);
@@ -61,11 +62,12 @@ public:
   void setDC(double dc);
   int setPolytopes(std::vector<LinearConstraint3D> l_constraints);
   void findDT();
+  void fillXandU();
+  void setObjective();
   void setConstraintsXf();
   void setConstraintsX0();
   void setDynamicConstraints();
   void setMaxConstraints();
-  void fillXandU();
 
 protected:
   Eigen::MatrixXd U_temp_;

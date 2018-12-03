@@ -77,7 +77,7 @@ use_vel: false # use velocity. If false, r2=r1;
 wdx: 20.0  #[m] world dimension in x
 wdy: 20.0  #[m] world dimension in y
 wdz: 4.0   #[m] world dimension in z
-res: 0.10  #[m] cell dimension = resolution of the map
+res: 0.35  #[m] cell dimension = resolution of the map
 
 
 dc: 0.01            #(seconds) Duration for the interpolation=Value of the timer pubGoal
@@ -94,7 +94,7 @@ w_max: 1            # [rd/s] Maximum angular velocity
 alpha_0: 0         #[rd] threshold to ignore current JPS solution, and consider the old one. 0--> always decide
 z_ground: 0.2         #[m] points below this are considered ground
 z_max: 2         #[m] JPS is not allowed to give a solution that goes higher than this height
-inflation_jps: 0.42  #[m] The obstacles are inflated (to run JPS) by this amount
+inflation_jps: 0.4  #[m] The obstacles are inflated (to run JPS) by this amount
 factor_jps: 1  #[m] JPS is run with resolution=factor_jps*(resolution of the map)
 
 

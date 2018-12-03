@@ -84,7 +84,8 @@ std::vector<T> operator-(const std::vector<T>& a, const std::vector<T>& b)
   return result;
 }
 
-std::vector<GRBLinExpr> operator-(const std::vector<GRBVar>& x, const std::vector<double>& b)
+template <typename T>
+std::vector<GRBLinExpr> operator-(const std::vector<T>& x, const std::vector<double>& b)
 {
   std::vector<GRBLinExpr> result;
   for (int i = 0; i < x.size(); i++)
