@@ -1749,10 +1749,11 @@ void CVX::cvxDecomp(vec_Vecf<3> path)
   // std::cout << "In cvxDecomp 3!" << std::endl;
   l_constraints_.clear();
 
-  // std::cout << "In cvxDecomp 4!" << std::endl;
-
+  std::cout << "In cvxDecomp, el path llegado es:" << std::endl;
+  printElementsOfJPS(path);
   for (size_t i = 0; i < path.size() - 1; i++)
   {
+    std::cout << "Inserting constraint" << std::endl;
     const auto pt_inside = (path[i] + path[i + 1]) / 2;
     LinearConstraint3D cs(pt_inside, polys[i].hyperplanes());
     l_constraints_.push_back(cs);

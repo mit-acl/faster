@@ -1,0 +1,190 @@
+Tuning log:
+
+	DegenMoves 2
+	PrePasses 1
+
+-------------------------------------------------------------------------------
+
+Optimize a model with 140 rows, 66 columns and 284 nonzeros
+Model has 24 quadratic objective terms
+Model has 30 general constraints
+Variable types: 60 continuous, 6 integer (6 binary)
+Coefficient statistics:
+  Matrix range     [3e-01, 6e+00]
+  Objective range  [2e+05, 3e+06]
+  QObjective range [7e+01, 8e+05]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [2e-03, 2e+01]
+Presolve removed 74 rows and 21 columns
+Presolve time: 0.00s
+Presolved: 66 rows, 45 columns, 213 nonzeros
+Presolved model has 24 quadratic objective terms
+Variable types: 45 continuous, 0 integer (0 binary)
+Presolve removed 21 rows and 3 columns
+Presolve time: 0.00s
+Presolved: 45 rows, 60 columns, 168 nonzeros
+Presolved model has 24 quadratic objective terms
+Root barrier log...
+
+Ordering time: 0.00s
+
+Barrier statistics:
+ AA' NZ     : 1.470e+02
+ Factor NZ  : 4.890e+02
+ Factor Ops : 6.087e+03 (less than 1 second per iteration)
+ Threads    : 1
+
+                  Objective                Residual
+Iter       Primal          Dual         Primal    Dual     Compl     Time
+   0   5.17097158e+06 -4.52151363e+07  2.36e+03 1.96e+02  1.33e+06     0s
+   1   2.26630054e+05 -7.52512391e+06  2.49e+02 2.07e+01  1.58e+05     0s
+   2   7.77760122e+02 -9.74260410e+05  2.57e+00 2.14e-01  9.06e+03     0s
+   3   1.90687697e+01 -8.12561045e+04  2.57e-06 2.14e-07  6.77e+02     0s
+   4   3.56216599e+00 -3.07711806e+02  7.06e-09 5.88e-10  2.59e+00     0s
+   5   2.79167357e+00 -3.21879983e-02  5.26e-11 4.32e-12  2.35e-02     0s
+   6   2.78427747e+00  2.77401163e+00  8.88e-15 2.27e-13  8.55e-05     0s
+   7   2.78427367e+00  2.78426336e+00  4.44e-15 4.55e-13  8.60e-08     0s
+   8   2.78427369e+00  2.78427366e+00  5.33e-15 4.55e-13  8.60e-11     0s
+
+Barrier solved model in 8 iterations and 0.00 seconds
+Optimal objective 2.78427369e+00
+
+
+Root relaxation: objective 2.784274e+00, 0 iterations, 0.00 seconds
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+*    0     0               0       2.7842737    2.78427  0.00%     -    0s
+
+Explored 0 nodes (0 simplex iterations) in 0.00 seconds
+Thread count was 8 (of 8 available processors)
+
+Solution count 1: 2.78427 
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 2.784273691475e+00, best bound 2.784273691475e+00, gap 0.0000%
+
+-------------------------------------------------------------------------------
+
+Optimize a model with 140 rows, 66 columns and 284 nonzeros
+Model has 24 quadratic objective terms
+Model has 30 general constraints
+Variable types: 60 continuous, 6 integer (6 binary)
+Coefficient statistics:
+  Matrix range     [3e-01, 6e+00]
+  Objective range  [2e+05, 3e+06]
+  QObjective range [7e+01, 8e+05]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [2e-03, 2e+01]
+Presolve removed 74 rows and 21 columns
+Presolve time: 0.00s
+Presolved: 66 rows, 45 columns, 213 nonzeros
+Presolved model has 24 quadratic objective terms
+Variable types: 45 continuous, 0 integer (0 binary)
+Presolve removed 21 rows and 3 columns
+Presolve time: 0.00s
+Presolved: 45 rows, 60 columns, 168 nonzeros
+Presolved model has 24 quadratic objective terms
+Root barrier log...
+
+Ordering time: 0.00s
+
+Barrier statistics:
+ AA' NZ     : 1.470e+02
+ Factor NZ  : 4.890e+02
+ Factor Ops : 6.087e+03 (less than 1 second per iteration)
+ Threads    : 1
+
+                  Objective                Residual
+Iter       Primal          Dual         Primal    Dual     Compl     Time
+   0   5.17097158e+06 -4.52151363e+07  2.36e+03 1.96e+02  1.33e+06     0s
+   1   2.26630054e+05 -7.52512391e+06  2.49e+02 2.07e+01  1.58e+05     0s
+   2   7.77760122e+02 -9.74260410e+05  2.57e+00 2.14e-01  9.06e+03     0s
+   3   1.90687697e+01 -8.12561045e+04  2.57e-06 2.14e-07  6.77e+02     0s
+   4   3.56216599e+00 -3.07711806e+02  7.06e-09 5.88e-10  2.59e+00     0s
+   5   2.79167357e+00 -3.21879983e-02  5.26e-11 4.32e-12  2.35e-02     0s
+   6   2.78427747e+00  2.77401163e+00  8.88e-15 2.27e-13  8.55e-05     0s
+   7   2.78427367e+00  2.78426336e+00  4.44e-15 4.55e-13  8.60e-08     0s
+   8   2.78427369e+00  2.78427366e+00  5.33e-15 4.55e-13  8.60e-11     0s
+
+Barrier solved model in 8 iterations and 0.00 seconds
+Optimal objective 2.78427369e+00
+
+
+Root relaxation: objective 2.784274e+00, 0 iterations, 0.00 seconds
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+*    0     0               0       2.7842737    2.78427  0.00%     -    0s
+
+Explored 0 nodes (0 simplex iterations) in 0.00 seconds
+Thread count was 8 (of 8 available processors)
+
+Solution count 1: 2.78427 
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 2.784273691475e+00, best bound 2.784273691475e+00, gap 0.0000%
+
+-------------------------------------------------------------------------------
+
+Optimize a model with 140 rows, 66 columns and 284 nonzeros
+Model has 24 quadratic objective terms
+Model has 30 general constraints
+Variable types: 60 continuous, 6 integer (6 binary)
+Coefficient statistics:
+  Matrix range     [3e-01, 6e+00]
+  Objective range  [2e+05, 3e+06]
+  QObjective range [7e+01, 8e+05]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [2e-03, 2e+01]
+Presolve removed 74 rows and 21 columns
+Presolve time: 0.00s
+Presolved: 66 rows, 45 columns, 213 nonzeros
+Presolved model has 24 quadratic objective terms
+Variable types: 45 continuous, 0 integer (0 binary)
+Presolve removed 21 rows and 3 columns
+Presolve time: 0.00s
+Presolved: 45 rows, 60 columns, 168 nonzeros
+Presolved model has 24 quadratic objective terms
+Root barrier log...
+
+Ordering time: 0.00s
+
+Barrier statistics:
+ AA' NZ     : 1.470e+02
+ Factor NZ  : 4.890e+02
+ Factor Ops : 6.087e+03 (less than 1 second per iteration)
+ Threads    : 1
+
+                  Objective                Residual
+Iter       Primal          Dual         Primal    Dual     Compl     Time
+   0   5.17097158e+06 -4.52151363e+07  2.36e+03 1.96e+02  1.33e+06     0s
+   1   2.26630054e+05 -7.52512391e+06  2.49e+02 2.07e+01  1.58e+05     0s
+   2   7.77760122e+02 -9.74260410e+05  2.57e+00 2.14e-01  9.06e+03     0s
+   3   1.90687697e+01 -8.12561045e+04  2.57e-06 2.14e-07  6.77e+02     0s
+   4   3.56216599e+00 -3.07711806e+02  7.06e-09 5.88e-10  2.59e+00     0s
+   5   2.79167357e+00 -3.21879983e-02  5.26e-11 4.32e-12  2.35e-02     0s
+   6   2.78427747e+00  2.77401163e+00  5.33e-15 2.27e-13  8.55e-05     0s
+   7   2.78427367e+00  2.78426336e+00  4.44e-15 4.55e-13  8.60e-08     0s
+   8   2.78427369e+00  2.78427366e+00  3.55e-15 4.55e-13  8.60e-11     0s
+
+Barrier solved model in 8 iterations and 0.00 seconds
+Optimal objective 2.78427369e+00
+
+
+Root relaxation: objective 2.784274e+00, 0 iterations, 0.00 seconds
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+*    0     0               0       2.7842737    2.78427  0.00%     -    0s
+
+Explored 0 nodes (0 simplex iterations) in 0.00 seconds
+Thread count was 8 (of 8 available processors)
+
+Solution count 1: 2.78427 
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 2.784273691475e+00, best bound 2.784273691475e+00, gap 0.0000%

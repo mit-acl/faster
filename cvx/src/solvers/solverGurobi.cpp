@@ -8,7 +8,7 @@ SolverGurobi::SolverGurobi()
   v_max_ = 5;
   a_max_ = 3;
   j_max_ = 5;
-  N_ = 5;  // Segments: 0,1,...,N_-1
+  N_ = 10;  // Segments: 0,1,...,N_-1
 
   // Model
   /*  env = new GRBEnv();
@@ -158,7 +158,7 @@ void SolverGurobi::fillXandU()
 
 int SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> l_constraints)
 {
-  // std::cout << "Setting POLYTOPES=" << l_constraints.size() << std::endl;
+  std::cout << "Setting POLYTOPES=" << l_constraints.size() << std::endl;
 
   // Remove previous polytopes constraints
   for (int i = 0; i < polytopes_cons.size(); i++)
@@ -222,7 +222,7 @@ int SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> l_constraints)
 
       for (int i = 0; i < b1.rows(); i++)
       {
-        polytopes_cons.push_back(m.addGenConstrIndicator(b[t][0], 1, MatrixMultiply(A1std, pos)[i], '<',
+        polytopes_cons.push_back(m.addGenConstrIndicator(b[t][n_poly], 1, MatrixMultiply(A1std, pos)[i], '<',
                                                          b1[i]));  // If b[t,0]==1, then...
       }
       /*      for (int i = 0; i < b2.rows(); i++)
@@ -440,14 +440,15 @@ void SolverGurobi::setDynamicConstraints()
 void SolverGurobi::callOptimizer()
 {
   // std::cout << "CALLING OPTIMIZER OF GUROBI" << std::endl;
-  m.update();
-  temporal = temporal + 1;
-  m.write("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/model_" + std::to_string(temporal) + ".lp");
-  m.set("OutputFlag", "0");  // 1 if you want verbose
 
   // Select these parameteres with the tuning Tool of Gurobi
   m.set("MIPFocus", "2");
   m.set("PreQLinearize", "1");
+
+  m.update();
+  temporal = temporal + 1;
+  m.write("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/model_" + std::to_string(temporal) + ".lp");
+  m.set("OutputFlag", "0");  // 1 if you want verbose
 
   std::cout << "*************************Starting Optimization" << std::endl;
   auto start = std::chrono::steady_clock::now();
@@ -455,6 +456,8 @@ void SolverGurobi::callOptimizer()
   auto end = std::chrono::steady_clock::now();
   auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
   std::cout << "*************************Finished Optimization: " << elapsed << " ms" << std::endl;
+  std::cout << "*************************Gurobi RUNTIME: " << m.get(GRB_DoubleAttr_Runtime) * 1000 << " ms"
+            << std::endl;
 
   times_log.open("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/times_log.txt", std::ios_base::app);
   times_log << elapsed << "\n";
@@ -468,6 +471,16 @@ void SolverGurobi::callOptimizer()
   if (optimstatus == GRB_OPTIMAL)
   {
     printf("GUROBI SOLUTION: Optimal");
+    std::cout << "Binary Matrix:" << std::endl;
+
+    for (int poly = 0; poly < b[0].size(); poly++)
+    {
+      for (int t = 0; t < N_; t++)
+      {
+        std::cout << b[t][poly].get(GRB_DoubleAttr_X) << " ";
+      }
+      std::cout << std::endl;
+    }
   }
   // std::cout << "*************************Finished Optimization" << std::endl;
 
