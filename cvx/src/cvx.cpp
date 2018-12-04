@@ -855,7 +855,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   if (solvedjps1 == true && flight_mode_.mode == flight_mode_.GO)
   {
-    ra = (JPS1[1] - JPS1[0]).norm();
+    // ra = (JPS1[1] - JPS1[0]).norm();
     saturate(ra, par_.Ra, par_.Ra_max);
   }
 
@@ -910,6 +910,16 @@ void CVX::replanCB(const ros::TimerEvent& e)
   bool noPointsOutsideSphere1;
   bool noPointsOutsideSphere2;
   B1 = getFirstIntersectionWithSphere(JPS1, ra, state_pos, &li1, &noPointsOutsideSphere1);
+
+  printf("ReplanCB: Elements of JPS1 are...\n");
+  printElementsOfJPS(JPS1);
+  printf("B1 is:");
+  std::cout << B1.transpose() << std::endl;
+  vec_Vecf<3> JPS1_inside_sphere(JPS1.begin(), JPS1.begin() + li1 + 1);  // Elements of JPS that are inside the sphere
+  JPS1_inside_sphere.push_back(B1);
+  printf("ReplanCB: Elements of JPS1_inside_sphere are...\n");
+  printElementsOfJPS(JPS1_inside_sphere);
+
   B_old = getFirstIntersectionWithSphere(JPS_old_, ra, state_pos, &liold, &noPointsOutsideSphere2);
 
   Eigen::Vector3d v1 = B1 - state_pos;  // point i expressed with origin=origin sphere
@@ -934,7 +944,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   double xf[9] = { B1[0], B1[1], B1[2], 0, 0, 0, 0, 0, 0 };
   printf("Running CVXDecomp!!!\n");
   double before = ros::Time::now().toSec();
-  cvxDecomp(JPS1);  // result saved in l_constraints_
+  cvxDecomp(JPS1_inside_sphere);  // result saved in l_constraints_
   ROS_WARN("CVXDecomp time: %0.2f ms", 1000 * (ros::Time::now().toSec() - before));
   printf("Solved CVXDecomp!!!\n");
   solver_gurobi_.setPolytopes(l_constraints_);

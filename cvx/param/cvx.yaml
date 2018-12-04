@@ -87,7 +87,7 @@ drone_radius: 0.42  #(m) Used for collision checking
 
 offset: 5  # Replanning offset (the initial conditions are taken OFFSET states farther from the last published goal)
 
-Ra: 0.5            # [m] Minimum radius of the first sphere
+Ra: 2            # [m] Minimum radius of the first sphere
 Ra_max: 4            # [m] Maximum radius of the first sphere
 Rb: 9.0             # [m] Radius of the second sphere
 w_max: 1            # [rd/s] Maximum angular velocity

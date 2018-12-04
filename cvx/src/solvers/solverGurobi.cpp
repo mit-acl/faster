@@ -8,7 +8,7 @@ SolverGurobi::SolverGurobi()
   v_max_ = 5;
   a_max_ = 3;
   j_max_ = 5;
-  N_ = 10;  // Segments: 0,1,...,N_-1
+  N_ = 5;  // Segments: 0,1,...,N_-1
 
   // Model
   /*  env = new GRBEnv();
@@ -409,7 +409,7 @@ void SolverGurobi::genNewTraj()
 
 void SolverGurobi::findDT()
 {
-  double dt = 2 * getDTInitial();
+  double dt = 4 * getDTInitial();
   dt_ = dt;
 }
 
@@ -441,15 +441,34 @@ void SolverGurobi::callOptimizer()
 {
   // std::cout << "CALLING OPTIMIZER OF GUROBI" << std::endl;
   m.update();
-  // m.write("/home/jtorde/debug_gurobi.lp");
+  temporal = temporal + 1;
+  m.write("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/model_" + std::to_string(temporal) + ".lp");
   m.set("OutputFlag", "0");  // 1 if you want verbose
+
+  // Select these parameteres with the tuning Tool of Gurobi
+  m.set("MIPFocus", "2");
+  m.set("PreQLinearize", "1");
 
   std::cout << "*************************Starting Optimization" << std::endl;
   auto start = std::chrono::steady_clock::now();
   m.optimize();
   auto end = std::chrono::steady_clock::now();
-  std::cout << "*************************Finished Optimization: "
-            << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " ms" << std::endl;
+  auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+  std::cout << "*************************Finished Optimization: " << elapsed << " ms" << std::endl;
+
+  times_log.open("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/times_log.txt", std::ios_base::app);
+  times_log << elapsed << "\n";
+  times_log.close();
+
+  int optimstatus = m.get(GRB_IntAttr_Status);
+  if (optimstatus == GRB_INF_OR_UNBD)
+  {
+    printf("GUROBI SOLUTION: Unbounded or Infeasible");
+  }
+  if (optimstatus == GRB_OPTIMAL)
+  {
+    printf("GUROBI SOLUTION: Optimal");
+  }
   // std::cout << "*************************Finished Optimization" << std::endl;
 
   /*  std::cout << "\nOBJECTIVE: " << m.get(GRB_DoubleAttr_ObjVal) << std::endl;

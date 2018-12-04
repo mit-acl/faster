@@ -5,6 +5,7 @@
 #include <sstream>
 #include <Eigen/Dense>
 #include <type_traits>
+#include <fstream>
 
 //#include "../utils.hpp"
 // using namespace std;
@@ -98,5 +99,9 @@ protected:
   std::vector<std::vector<GRBVar>> b;  // binary variables
   std::vector<std::vector<GRBVar>> x;
   std::vector<std::vector<GRBVar>> u;
+
+  std::ofstream times_log;
+
+  int temporal = 0;
 };
 #endif
