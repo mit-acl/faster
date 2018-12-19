@@ -85,7 +85,7 @@ goal_radius: 0.2    #(m) Drone has arrived to the goal when distance_to_goal<GOA
 drone_radius: 0.42  #(m) Used for collision checking
 
 
-offset: 5  # Replanning offset (the initial conditions are taken OFFSET states farther from the last published goal)
+offset: 10  # Replanning offset (the initial conditions are taken OFFSET states farther from the last published goal)
 
 Ra: 5            # [m] Minimum radius of the first sphere
 Ra_max: 4            # [m] Maximum radius of the first sphere

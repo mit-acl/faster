@@ -684,6 +684,16 @@ inline Eigen::Vector3d getLastIntersectionWithSphere(vec_Vecf<3> path, double r,
   return intersection;
 }
 
+inline double getDistancePath(vec_Vecf<3>& path)
+{
+  double distance = 0;
+  for (int i = 0; i < path.size() - 1; i++)
+  {
+    distance = distance + (path[i + 1] - path[i]).norm();
+  }
+  return distance;
+}
+
 // Same as the previous one, but also returns dist = the distance form the last intersection to the goal (following
 // the path)
 inline Eigen::Vector3d getLastIntersectionWithSphere(vec_Vecf<3> path, double r, Eigen::Vector3d center, double* Jdist)

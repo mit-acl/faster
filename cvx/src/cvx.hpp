@@ -43,6 +43,9 @@
 #define START_REPLANNING 1
 #define REPLANNED 2
 
+#define MAP 1          // MAP refers to the occupancy grid
+#define UNKNOWN_MAP 2  // UNKNOWN_MAP refers to the unkown grid
+
 struct kdTreeStamped
 {
   pcl::KdTreeFLANN<pcl::PointXYZ> kdTree;
@@ -167,7 +170,7 @@ private:
   // geometry_msgs::Point eigen2point(Eigen::Vector3d vector);
   void pubActualTraj();
   void vectorOfVectors2MarkerArray(vec_Vecf<3> traj, visualization_msgs::MarkerArray* m_array,
-                                   std_msgs::ColorRGBA color);
+                                   std_msgs::ColorRGBA color, int type = visualization_msgs::Marker::ARROW);
   visualization_msgs::MarkerArray clearArrows();
   // geometry_msgs::Vector3 vectorNull();
   geometry_msgs::Vector3 getPos(int i);
@@ -191,7 +194,7 @@ private:
   void pubTerminalGoal();
 
   void pubJPSIntersection(Eigen::Vector3d inters);
-  Eigen::Vector3d getFirstCollisionJPS(vec_Vecf<3> path, bool* thereIsIntersection);
+  Eigen::Vector3d getFirstCollisionJPS(vec_Vecf<3> path, bool* thereIsIntersection, int& el_eliminated, int map = MAP);
   Eigen::Vector3d projectClickedGoal(Eigen::Vector3d& P1);
 
   void publishJPS2handIntersection(vec_Vecf<3> JPS2, vec_Vecf<3> JPS2_fix, Eigen::Vector3d inter1,
@@ -202,6 +205,8 @@ private:
   double getDistanceToFirstCollisionJPSwithUnkonwnspace(vec_Vecf<3> path, bool* thereIsIntersection);
 
   void cvxDecomp(vec_Vecf<3> path);
+
+  vec_Vecf<3> sampleJPS(vec_Vecf<3>& path, int n);
 
   visualization_msgs::Marker setpoint_;
   acl_msgs::QuadGoal quadGoal_;
@@ -227,6 +232,7 @@ private:
   ros::Publisher pub_planning_vis_;
   ros::Publisher pub_intersec_points_;
   ros::Publisher pub_jps_inters_;
+  ros::Publisher pub_samples_rescue_path_;
   ros::Publisher pub_log_;
 
   ros::Publisher cvx_decomp_el_pub_;
@@ -253,6 +259,7 @@ private:
   visualization_msgs::MarkerArray path_jps2_;
   visualization_msgs::MarkerArray path_jps2_fix_;
   visualization_msgs::MarkerArray intersec_points_;
+  visualization_msgs::MarkerArray samples_rescue_path_;
 
   vec_E<Polyhedron<3>> polyhedra_;
   std::vector<LinearConstraint3D> l_constraints_;  // Polytope (Linear) constraints
