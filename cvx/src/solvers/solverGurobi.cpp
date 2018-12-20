@@ -8,24 +8,12 @@ SolverGurobi::SolverGurobi()
   v_max_ = 5;
   a_max_ = 3;
   j_max_ = 5;
-  N_ = 10;  // Segments: 0,1,...,N_-1
+  // N_ = 10;  // Segments: 0,1,...,N_-1
 
   // Model
   /*  env = new GRBEnv();
     m = GRBModel(*env);*/
   m.set(GRB_StringAttr_ModelName, "planning");
-  std::vector<std::string> coeff = { "ax", "ay", "az", "bx", "by", "bz", "cx", "cy", "cz", "dx", "dy", "dz" };
-
-  // Variables: Coefficients of the polynomials
-  for (int t = 0; t < N_; t++)
-  {
-    std::vector<GRBVar> row_t;
-    for (int i = 0; i < 12; i++)
-    {
-      row_t.push_back(m.addVar(-GRB_INFINITY, GRB_INFINITY, 0, GRB_CONTINUOUS, coeff[i] + std::to_string(t)));
-    }
-    x.push_back(row_t);
-  }
 
   double x0[9] = { 5, 11.5, 0.5, 0, 0, 0, 0, 0, 0 };
   double xf[9] = { 14, 5, 2.5, 0, 0, 0, 0, 0, 0 };
@@ -60,6 +48,27 @@ SolverGurobi::SolverGurobi()
   }*/
 
   // delete env;
+}
+
+void SolverGurobi::setN(int N)
+{
+  N_ = N;
+}
+
+void SolverGurobi::createVars()
+{
+  std::vector<std::string> coeff = { "ax", "ay", "az", "bx", "by", "bz", "cx", "cy", "cz", "dx", "dy", "dz" };
+
+  // Variables: Coefficients of the polynomials
+  for (int t = 0; t < N_; t++)
+  {
+    std::vector<GRBVar> row_t;
+    for (int i = 0; i < 12; i++)
+    {
+      row_t.push_back(m.addVar(-GRB_INFINITY, GRB_INFINITY, 0, GRB_CONTINUOUS, coeff[i] + std::to_string(t)));
+    }
+    x.push_back(row_t);
+  }
 }
 
 void SolverGurobi::setObjective()  // I need to set it every time, because the objective depends on the xFinal
@@ -156,6 +165,48 @@ void SolverGurobi::fillXandU()
     std::cout << U_temp_ << std::endl;*/
 }
 
+void SolverGurobi::setDistances(vec_Vecf<3>& samples,
+                                std::vector<double> dist_near_obs)  // Distance values (used for the
+                                                                    // rescue path, used in the distance constraint4s)
+{
+  samples_ = samples;
+  dist_near_obs_ = dist_near_obs;
+}
+
+void SolverGurobi::setDistanceConstraints()  // Set the distance constraints
+{
+  // Remove previous distance constraints
+  for (int i = 0; i < distances_cons.size(); i++)
+  {
+    m.remove(distances_cons[i]);
+  }
+  distances_cons.clear();
+
+  for (int t = 0; t < samples_.size(); t++)
+  {
+    std::vector<GRBLinExpr> p = { samples_[t][0], samples_[t][1], samples_[t][2] };
+    double tau = 0;
+    double interval = t;
+    if (t == samples_.size() - 1)  // If the last interval --> constraint at the end of that interval
+    {
+      tau = dt_;
+      interval = t - 1;
+    }
+    GRBLinExpr posx = getPos(interval, tau, 0, false, x);
+    GRBLinExpr posy = getPos(interval, tau, 1, false, x);
+    GRBLinExpr posz = getPos(interval, tau, 2, false, x);
+    std::vector<GRBLinExpr> var = { posx, posy, posz };
+    double epsilon = dist_near_obs_[t] * dist_near_obs_[t];
+    printf("Cons with distance=%f ", sqrt(epsilon));
+    std::cout << "For the sample=" << samples_[t].transpose() << std::endl;
+
+    // TODO: THERE IS SOMETHING THAT IS WRONG HERE, IT DOESNT WORK!! Not sure if my fault, or Gurobi's one
+    // ONE POSSIBLE WORKAROUND IS TRANSFORM THIS INTO A BOX CONSTRAINT (WITH ABSOLUTES VALUES, INSTEAD OF A QUADRATIC
+    // CONSTRAINT)
+    distances_cons.push_back(m.addQConstr(GetNorm2(var - p) <= epsilon));
+  }
+}
+
 int SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> l_constraints)
 {
   std::cout << "Setting POLYTOPES=" << l_constraints.size() << std::endl;
@@ -186,55 +237,48 @@ int SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> l_constraints)
   }
   b.clear();
 
-  // Declare binary variables
-  for (int t = 0; t < N_ + 1; t++)
+  if (l_constraints.size() > 0)  // If there are polytope constraintsf
   {
-    std::vector<GRBVar> row;
-    for (int i = 0; i < l_constraints.size(); i++)  // For all the polytopes
+    // Declare binary variables
+    for (int t = 0; t < N_ + 1; t++)
     {
-      GRBVar variable =
-          m.addVar(-GRB_INFINITY, GRB_INFINITY, 0, GRB_BINARY, "s" + std::to_string(i) + "_" + std::to_string(t));
-      row.push_back(variable);
-    }
-    b.push_back(row);
-  }
-
-  // Polytope constraints (if binary_varible==1 --> In that polytope) and at_least_1_pol_cons (at least one polytope)
-  // constraints
-  for (int t = 0; t < N_; t++)
-  {
-    GRBLinExpr sum = 0;
-    for (int col = 0; col < b[0].size(); col++)
-    {
-      sum = sum + b[t][col];
-    }
-    at_least_1_pol_cons.push_back(m.addConstr(sum == 1));
-
-    std::vector<GRBLinExpr> pos = { getPos(t, 0, 0, false, x), getPos(t, 0, 1, false, x), getPos(t, 0, 2, false, x) };
-
-    for (int n_poly = 0; n_poly < l_constraints.size(); n_poly++)  // Loop over the number of polytopes
-    {
-      // Constraint A1x<=b1
-      Eigen::MatrixXd A1 = l_constraints[n_poly].A();
-      auto b1 = l_constraints[n_poly].b();
-
-      std::vector<std::vector<double>> A1std = eigenMatrix2std(A1);
-
-      for (int i = 0; i < b1.rows(); i++)
+      std::vector<GRBVar> row;
+      for (int i = 0; i < l_constraints.size(); i++)  // For all the polytopes
       {
-        polytopes_cons.push_back(m.addGenConstrIndicator(b[t][n_poly], 1, MatrixMultiply(A1std, pos)[i], '<',
-                                                         b1[i]));  // If b[t,0]==1, then...
+        GRBVar variable =
+            m.addVar(-GRB_INFINITY, GRB_INFINITY, 0, GRB_BINARY, "s" + std::to_string(i) + "_" + std::to_string(t));
+        row.push_back(variable);
       }
-      /*      for (int i = 0; i < b2.rows(); i++)
-            {
-              m.addGenConstrIndicator(b[t][1], 1, MatrixMultiply(A2std, pos)[i], '<',
-                                      b2[i]);  // If b[t,1]==1, then...
-            }
-            for (int i = 0; i < b3.rows(); i++)
-            {
-              m.addGenConstrIndicator(b[t][2], 1, MatrixMultiply(A3std, pos)[i], '<',
-                                      b3[i]);  // If b[t,2]==1, then...
-            }*/
+      b.push_back(row);
+    }
+
+    // Polytope constraints (if binary_varible==1 --> In that polytope) and at_least_1_pol_cons (at least one polytope)
+    // constraints
+    for (int t = 0; t < N_; t++)
+    {
+      GRBLinExpr sum = 0;
+      for (int col = 0; col < b[0].size(); col++)
+      {
+        sum = sum + b[t][col];
+      }
+      at_least_1_pol_cons.push_back(m.addConstr(sum == 1));
+
+      std::vector<GRBLinExpr> pos = { getPos(t, 0, 0, false, x), getPos(t, 0, 1, false, x), getPos(t, 0, 2, false, x) };
+
+      for (int n_poly = 0; n_poly < l_constraints.size(); n_poly++)  // Loop over the number of polytopes
+      {
+        // Constraint A1x<=b1
+        Eigen::MatrixXd A1 = l_constraints[n_poly].A();
+        auto b1 = l_constraints[n_poly].b();
+
+        std::vector<std::vector<double>> A1std = eigenMatrix2std(A1);
+
+        for (int i = 0; i < b1.rows(); i++)
+        {
+          polytopes_cons.push_back(m.addGenConstrIndicator(b[t][n_poly], 1, MatrixMultiply(A1std, pos)[i], '<',
+                                                           b1[i]));  // If b[t,0]==1, then...
+        }
+      }
     }
   }
 }
@@ -261,11 +305,26 @@ Eigen::MatrixXd SolverGurobi::getU()
 
 void SolverGurobi::setX0(double x0[])
 {
+  printf("Setting initial condition:\n");
   int input_order = 3;
-  for (int i = 0; i < 3 * input_order; i++)
+  for (int i = 0; i < 9; i++)
   {
+    std::cout << x0[i] << "  ";
     x0_[i] = x0[i];
   }
+  std::cout << std::endl;
+}
+
+void SolverGurobi::setXf(double xf[])
+{
+  printf("Setting final condition:\n");
+
+  for (int i = 0; i < 9; i++)
+  {
+    std::cout << xf[i] << "  ";
+    xf_[i] = xf[i];
+  }
+  std::cout << std::endl;
 }
 
 void SolverGurobi::setConstraintsXf()
@@ -308,15 +367,6 @@ void SolverGurobi::setConstraintsX0()
     init_cons.push_back(m.addConstr(getPos(0, 0, i, false, x) == x0_[i]));        // Initial position
     init_cons.push_back(m.addConstr(getVel(0, 0, i, false, x) == x0_[i + 3]));    // Initial velocity
     init_cons.push_back(m.addConstr(getAccel(0, 0, i, false, x) == x0_[i + 6]));  // Initial acceleration}
-  }
-}
-
-void SolverGurobi::setXf(double xf[])
-{
-  int input_order = 3;
-  for (int i = 0; i < 3 * input_order; i++)
-  {
-    xf_[i] = xf[i];
   }
 }
 
@@ -384,6 +434,7 @@ void SolverGurobi::genNewTraj()
   setConstraintsX0();
   setConstraintsXf();
   setDynamicConstraints();
+  setDistanceConstraints();
   // printf("In genNewTraj\n");
   /*  std::cout << "dt is=" << dt_ << std::endl;
     std::cout << "callOptimizer, x0_=" << x0_[0] << " " << x0_[1] << " " << x0_[2] << " "
@@ -411,6 +462,7 @@ void SolverGurobi::findDT()
 {
   double dt = 4 * getDTInitial();
   dt_ = dt;
+  // dt_ = 1;
 }
 
 void SolverGurobi::setDynamicConstraints()
@@ -447,6 +499,7 @@ void SolverGurobi::callOptimizer()
 
   m.update();
   temporal = temporal + 1;
+  printf("Writing into model.lp number=%d", temporal);
   m.write("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/model_" + std::to_string(temporal) + ".lp");
   m.set("OutputFlag", "0");  // 1 if you want verbose
 
@@ -463,6 +516,7 @@ void SolverGurobi::callOptimizer()
   times_log << elapsed << "\n";
   times_log.close();
 
+  printf("Going to check status");
   int optimstatus = m.get(GRB_IntAttr_Status);
   if (optimstatus == GRB_INF_OR_UNBD)
   {
@@ -471,17 +525,27 @@ void SolverGurobi::callOptimizer()
   if (optimstatus == GRB_OPTIMAL)
   {
     printf("GUROBI SOLUTION: Optimal");
-    std::cout << "Binary Matrix:" << std::endl;
 
-    for (int poly = 0; poly < b[0].size(); poly++)
+    if (polytopes_cons.size() > 0)  // Print the binary matrix only if I've included the polytope constraints
     {
-      for (int t = 0; t < N_; t++)
+      std::cout << "Binary Matrix:" << std::endl;
+
+      for (int poly = 0; poly < b[0].size(); poly++)
       {
-        std::cout << b[t][poly].get(GRB_DoubleAttr_X) << " ";
+        for (int t = 0; t < N_; t++)
+        {
+          std::cout << b[t][poly].get(GRB_DoubleAttr_X) << " ";
+        }
+        std::cout << std::endl;
       }
-      std::cout << std::endl;
     }
   }
+  if (optimstatus == GRB_NUMERIC)
+  {
+    printf("GUROBI Status: Numerical issues");
+    printf("Model may be infeasible or unbounded");  // Taken from the Gurobi documentation
+  }
+  // printf("Going out from callOptimizer, optimstatus= %d\n", optimstatus);
   // std::cout << "*************************Finished Optimization" << std::endl;
 
   /*  std::cout << "\nOBJECTIVE: " << m.get(GRB_DoubleAttr_ObjVal) << std::endl;

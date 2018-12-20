@@ -1,5 +1,5 @@
-// Authors: Jesus Tordesillas and Brett T. Lopez
-// Date: August 2018
+// Authors: Jesus Tordesillas
+// Date: August 2018, December 2018
 
 // TODO: compile cvxgen with the option -03 (see
 // https://stackoverflow.com/questions/19689014/gcc-difference-between-o3-and-os
@@ -39,6 +39,7 @@ using namespace JPS;
 CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pub_CB)
   : nh_(nh), nh_replan_CB_(nh_replan_CB), nh_pub_CB_(nh_pub_CB)
 {
+  printf("Doing the setup\n");
   ros::param::param<bool>("~use_ff", par_.use_ff, 1);
   ros::param::param<bool>("~visual", par_.visual, true);
   ros::param::param<bool>("~use_vel", par_.use_vel, true);
@@ -51,6 +52,8 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   ros::param::param<double>("~dc", par_.dc, 0.01);
   ros::param::param<double>("~goal_radius", par_.goal_radius, 0.2);
   ros::param::param<double>("~drone_radius", par_.drone_radius, 0.15);
+
+  ros::param::param<int>("~N", par_.N, 10);
 
   ros::param::param<int>("~offset", par_.offset, 5);
 
@@ -155,6 +158,8 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   double max_values[3] = { par_.v_max, par_.a_max, par_.j_max };
   solver_jerk_.set_max(max_values);
 
+  solver_gurobi_.setN(par_.N);
+  solver_gurobi_.createVars();
   solver_gurobi_.setDC(par_.dc);
   solver_gurobi_.set_max(max_values);
   solver_gurobi_.setQ(par_.q);
@@ -948,10 +953,16 @@ void CVX::replanCB(const ros::TimerEvent& e)
   cvxDecomp(JPS1_inside_sphere);  // result saved in l_constraints_
   ROS_WARN("CVXDecomp time: %0.2f ms", 1000 * (ros::Time::now().toSec() - before));
   printf("Solved CVXDecomp!!!\n");
+
   solver_gurobi_.setPolytopes(l_constraints_);
+  vec_Vecf<3> samples_empty;
+  std::vector<double> dist_empty;
+  solver_gurobi_.setDistances(samples_empty, dist_empty);  // No distance constraints for the normal path
   solver_gurobi_.setXf(xf);
   solver_gurobi_.setX0(x0);
   solver_gurobi_.genNewTraj();
+
+  printf("Solved Gurobi!!!\n");
 
   log_.decision = 1;
   mtx_X_U_temp.lock();
@@ -982,36 +993,48 @@ void CVX::replanCB(const ros::TimerEvent& e)
   }
 
   // *** RESCUE PATH ***
+
+  int index =
+      ceil(0.04 / par_.dc);  // R is the point of the trajectory 40 ms after the start of the trajectory TODO: change
+                             // 0.04 to parameter
+  Eigen::Vector3d posR(X_temp_(index, 0), X_temp_(index, 1), X_temp_(index, 2));
+  Eigen::Vector3d velR(X_temp_(index, 3), X_temp_(index, 4), X_temp_(index, 5));
+  Eigen::Vector3d accelR(X_temp_(index, 6), X_temp_(index, 7), X_temp_(index, 8));
+
+  vec_Vecf<3> JPS1r = JPS1_inside_sphere;  // JPS1 used for the rescue path
+  JPS1r[0] = posR;
+
   printf("Going to compute rescue path");
   bool thereIsIntersection = false;
-  Eigen::Vector3d inters_with_unk;
+  Eigen::Vector3d I;  // I is the first intersection of JPS with the unknown space
   // TODO: right now the unkown space that cvx receives is only a sphere around the drone, not the whole real unknown
   // space
   // Part of JPS1 in known space
   int el_eliminated;
-  inters_with_unk =
-      getFirstCollisionJPS(JPS1, &thereIsIntersection, el_eliminated, UNKNOWN_MAP);  // Intersection with unkown space
+  I = getFirstCollisionJPS(JPS1r, &thereIsIntersection, el_eliminated, UNKNOWN_MAP);  // Intersection with unkown space
 
   printf("Elements_eliminated=%d\n", el_eliminated);
 
-  vec_Vecf<3> JPS1_in_known_space(JPS1.begin(),
-                                  JPS1.begin() + el_eliminated + 1);  // Element of JPS that are inside the unkown space
+  vec_Vecf<3> JPS1_in_known_space(JPS1r.begin(),
+                                  JPS1r.begin() + el_eliminated +
+                                      1);  // Element of JPS that are inside the unkown space
 
   if (thereIsIntersection == true)
   {
-    JPS1_in_known_space.push_back(inters_with_unk);  // Plus the intersection with the unkown space
+    JPS1_in_known_space.push_back(I);  // Plus the intersection with the unkown space
   }
   else
   {
-    JPS1_in_known_space.push_back(JPS1[JPS1.size() - 1]);  // Plus the last element of JPS
+    JPS1_in_known_space.push_back(JPS1r[JPS1r.size() - 1]);  // Plus the last element of JPS
   }
 
   printf("These is the part of JPS that is in known space:\n");
   printElementsOfJPS(JPS1_in_known_space);
 
-  vec_Vecf<3> samples = sampleJPS(JPS1_in_known_space, 5);  // Take 5 samples along JPS1_in_known_space;
-
-  printf("Solved Gurobi!!!\n");
+  vec_Vecf<3> samples = sampleJPS(JPS1_in_known_space, par_.N + 1);  // Take N +1 samples along JPS1_in_known_space; IT
+                                                                     // has to be N+1, because N is the number of
+                                                                     // segments
+  std::vector<double> dist_near_neig = getDistToNearestObs(samples);
 
   printf("These are the samples along the path:\n");
   printElementsOfJPS(samples);
@@ -1021,332 +1044,53 @@ void CVX::replanCB(const ros::TimerEvent& e)
   vectorOfVectors2MarkerArray(samples, &samples_rescue_path_, color(BLUE), visualization_msgs::Marker::SPHERE);
   pub_samples_rescue_path_.publish(samples_rescue_path_);
 
+  double x0_rescue[9] = { posR[0], posR[1], posR[2], velR[0], velR[1], velR[2], accelR[0], accelR[1], accelR[2] };
+
+  Eigen::Vector3d F = samples[samples.size() - 1];  // F is the final point of the rescue path (will be near I)
+  double xf_rescue[9] = { F[0], F[1], F[2], 0, 0, 0, 0, 0, 0 };
+  // double xf_rescue[9] = { 0, 0, 1, 0, 0, 0, 0, 0, 0 };
+  // double x0_rescue[9] = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
+  std::vector<LinearConstraint3D> empty;
+  solver_gurobi_.setPolytopes(empty);  // No Polytopes constraints for the rescue path
+  // solver_gurobi_.setPolytopes(l_constraints_);
+  solver_gurobi_.setDistances(samples, dist_near_neig);
+  solver_gurobi_.setXf(xf_rescue);
+  solver_gurobi_.setX0(x0_rescue);
+  solver_gurobi_.genNewTraj();
+
   return;
   ///////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////
+}
 
-  Eigen::Vector3d v2 = B_old - state_pos;  // point i minus 1
-
-  double alpha = angleBetVectors(v1, v2);
-  log_.angle = alpha;
-
-  std::vector<Eigen::Vector3d> K = samplePointsSphereWithJPS(B1, ra, state_pos, JPS1, li1);
-
-  // Timer time_traj1(true);
-
-  for (int i = 0; i < K.size(); i++)
+// Get the distance to the nearest obstacle for each point given in the vector "points"
+std::vector<double> CVX::getDistToNearestObs(vec_Vecf<3>& points)
+{
+  mtx_unk.lock();
+  mtx_map.lock();
+  std::vector<double> distances;
+  for (int i = 0; i < points.size(); i++)
   {
-    // printf("hola5\n");
-    if (X_initialized_)  // Needed to skip the first time (X_ still not initialized)
-    {
-      mtx_k.lock();
-      k_initial_cond_1_ = std::min(k_ + par_.offset, (int)(X_.rows() - 1));
-      mtx_k.unlock();
-      updateInitialCond(k_initial_cond_1_);
-    }
-    //////SOLVING FOR JERK
-    // printf("Hola6\n");
-    Eigen::Vector3d p = K[i];
-    double xf[9] = { p[0], p[1], p[2], 0, 0, 0, 0, 0, 0 };
-    mtx_goals.lock();
-    // printf("Hola6.6\n");
-    mtx_initial_cond.lock();
-    double x0[9] = { initialCond_.pos.x,   initialCond_.pos.y,   initialCond_.pos.z,
-                     initialCond_.vel.x,   initialCond_.vel.y,   initialCond_.vel.z,
-                     initialCond_.accel.x, initialCond_.accel.y, initialCond_.accel.z };
-    mtx_initial_cond.unlock();
-    // std::cout << "Before6.7, x0=" << x0[0] << x0[1] << x0[2] << "xf=" << xf[0] << xf[1] << xf[2] << std::endl;
-    mtx_goals.unlock();
-    // printf("Hola6.7\n");
+    int N = 1;
+    pcl::PointXYZ searchPoint(points[i][0], points[i][1], points[i][2]);
+    std::vector<int> id(N);
+    std::vector<float> dist2(N);  // squared distance
+    double distance_map, distance_unk;
 
-    solver_jerk_.set_xf(xf);
-    solver_jerk_.set_x0(x0);
+    // Find nearest obstacles in Unkown space
+    distance_unk = kdtree_unk_.nearestKSearch(searchPoint, N, id, dist2) > 0 ? sqrt(dist2[0]) : 10000;
 
-    double t0cvxgen_jerk = ros::Time::now().toSec();
-    solver_jerk_.genNewTraj();
-    log_.cvx_jerk_total_ms = log_.cvx_jerk_total_ms + 1000 * (ros::Time::now().toSec() - t0cvxgen_jerk);
-    log_.loops_jerk = log_.loops_jerk + 1;
-    U_temp1 = solver_jerk_.getU();
-    X_temp1 = solver_jerk_.getX();
-    //////SOLVED FOR JERK
+    // Find nearest obstacles in MAP
+    distance_map = kdtree_map_.nearestKSearch(searchPoint, N, id, dist2) > 0 ? sqrt(dist2[0]) : 10000;
 
-    // printf("Calling IsFree 1\n");
-    bool isFree = trajIsFree(X_temp1);
-    // printf("Hola8\n");
-    if (par_.visual == true)
-    {
-      createMarkerSetOfArrows(X_temp1, isFree);
-    }
-
-    if (isFree)
-    {
-      // printf("ReplanCB: Find traj1 takes %f ms\n", (double)time_traj1.Elapsed().count());
-      // printf("found free1\n");
-      found_one_1 = true;
-      double dist = (term_goal - p).norm();
-      have_seen_the_goal1 = (dist < par_.goal_radius) ? true : false;
-
-      C1 = getLastIntersectionWithSphere(JPS1, rb, state_pos, &dist1);
-      printf("Distance=%f\n", dist1);
-      JDist1 = dist1 / par_.v_max;
-      if (par_.visual == true)
-      {
-        pubPlanningVisual(state_pos, ra, rb, B1, C1);
-      }
-      //   printf("Angle=%f\n", angleBetVectors(B1 - state_pos, B2 - state_pos));
-      // std::cout << "uno\n" << B1 - state_pos << std::endl;
-      // std::cout << "dos\n" << B2 - state_pos << std::endl;
-
-      // printf("alpha=%f\n", alpha);
-      if (alpha <= par_.alpha_0)
-      {
-        need_to_decide = false;
-      }
-      break;
-    }
+    distances.push_back(std::min(distance_map, distance_unk));
   }
-
-  if (need_to_decide == true && have_seen_the_goal1 == false)
-
-  {
-    // printf("**************Computing costs to decide between 2 jerk trajectories\n");
-    if (found_one_1)
-    {
-      // Timer getCosts1(true);
-      JPrimj1 = solver_jerk_.getCost();
-      WP1 = getPointsBw2Spheres(JPS1, ra, rb, state_pos);
-      WP1.insert(WP1.begin(), B1);
-      WP1.push_back(C1);
-      JPrimv1 = solveVelAndGetCost(WP1);
-      J1 = JPrimj1 + JPrimv1 + JDist1;
-      // printf("ReplanCB: Get Costs for 1 takes %f ms\n", (double)getCosts1.Elapsed().count());
-    }
-
-    // printf("hola1\n");
-
-    // printf("Going to fix\n");
-    // Timer time_fix(true);
-
-    double t0fix = ros::Time::now().toSec();
-    JPS2 = fix(JPS_old_, state_pos, term_goal, &solvedjps2);
-    log_.fix_ms = 1000 * (ros::Time::now().toSec() - t0fix);
-
-    // printf("ReplanCB: Fix JPS_old_ takes %f ms\n", (double)time_fix.Elapsed().count());
-
-    if (solvedjps2 == true)
-    {
-      // printf("hola2\n");
-      B2 = getFirstIntersectionWithSphere(JPS2, ra, state_pos, &li2);
-      K = samplePointsSphere(B2, ra, state_pos);  // radius, center and point
-                                                  // printf("hola3\n");
-
-      // Timer time_traj2(true);
-      for (int i = 0; i < K.size(); i++)
-      {
-        if (X_initialized_)  // Needed to skip the first time (X_ still not initialized)
-        {
-          mtx_k.lock();
-          k_initial_cond_2_ = std::min(k_ + par_.offset, (int)(X_.rows() - 1));
-          mtx_k.unlock();
-          updateInitialCond(k_initial_cond_2_);
-        }
-
-        //////SOLVING FOR JERK
-        Eigen::Vector3d p = K[i];
-        double xf[9] = { p[0], p[1], p[2], 0, 0, 0, 0, 0, 0 };
-        mtx_goals.lock();
-        mtx_initial_cond.lock();
-        double x0[9] = { initialCond_.pos.x,   initialCond_.pos.y,   initialCond_.pos.z,
-                         initialCond_.vel.x,   initialCond_.vel.y,   initialCond_.vel.z,
-                         initialCond_.accel.x, initialCond_.accel.y, initialCond_.accel.z };
-        mtx_initial_cond.unlock();
-        mtx_goals.unlock();
-        solver_jerk_.set_xf(xf);
-        solver_jerk_.set_x0(x0);
-        solver_jerk_.genNewTraj();
-        U_temp2 = solver_jerk_.getU();
-        X_temp2 = solver_jerk_.getX();
-        //////SOLVED FOR JERK
-
-        // printf("Calling IsFree 2\n");
-        bool isFree = trajIsFree(X_temp2);
-
-        if (par_.visual == true)
-        {
-          createMarkerSetOfArrows(X_temp2, isFree);
-        }
-        if (isFree)
-        {
-          // printf("ReplanCB: Find traj2 takes %f ms\n", (double)time_traj2.Elapsed().count());
-          // printf("found free2\n");
-          found_one_2 = true;
-          double dist = (term_goal - p).norm();
-          have_seen_the_goal1 = (dist < par_.goal_radius) ? true : false;
-
-          // printf("dist=%f\n", dist);
-          // Timer getCosts2(true);
-          // printf("h2\n");
-          // std::cout << "JPS2=" << std::endl;
-          // printElementsOfJPS(JPS2);
-          C2 = getLastIntersectionWithSphere(JPS2, rb, state_pos, &dist2);
-          // std::cout << "C2=" << C2.transpose() << std::endl;
-          JDist2 = dist2 / par_.v_max;
-          // printf("h4\n");
-          if (par_.visual == true)
-          {
-            pubPlanningVisual(state_pos, ra, rb, B2, C2);
-            pub_trajs_sphere_.publish(trajs_sphere_);
-          }
-          // printf("h6\n");
-          JPrimj2 = solver_jerk_.getCost();
-          // printf("h7\n");
-          WP2 = getPointsBw2Spheres(JPS2, ra, rb, state_pos);
-          // std::cout << "WP2=" << std::endl;
-          /// printElementsOfJPS(WP2);
-          // printf("h8\n");
-          WP2.insert(WP2.begin(), B2);
-          WP2.push_back(C2);
-          // std::cout << "WP2 despues=" << std::endl;
-          // printElementsOfJPS(WP2);
-          JPrimv2 = solveVelAndGetCost(WP2);
-          J2 = JPrimj2 + JPrimv2 + JDist2;
-          // printf("ReplanCB: Get Costs for 1 takes %f ms\n", (double)getCosts2.Elapsed().count());
-
-          printf("J1=        JPrimj1    +JPrimv1   +JDista1   \n");
-          printf("%10.1f=,%10.1f,%10.1f,%10.1f\n", J1, JPrimj1, JPrimv1, JDist1);
-
-          printf("J2=        JPrimj2    +JPrimv2   +JDista2   \n");
-          printf("%10.1f=,%10.1f,%10.1f,%10.1f\n", J2, JPrimj2, JPrimv2, JDist2);
-
-          log_.computed_both = 1;
-
-          log_.J1_cost = J1;
-          log_.JPrimj1_cost = JPrimj1;
-          log_.JPrimv1_cost = JPrimv1;
-          log_.JDist1_cost = JDist1;
-
-          log_.J2_cost = J2;
-          log_.JPrimj2_cost = JPrimj2;
-          log_.JPrimv2_cost = JPrimv2;
-          log_.JDist2_cost = JDist2;
-
-          break;
-        }
-      }
-    }
-  }
-
-  pub_trajs_sphere_.publish(trajs_sphere_);
-
-  if (found_one_1 == false && found_one_2 == false)  // J1=J2=infinity
-  {
-    ROS_ERROR("************Unable to find a free traj**************************");
-    return;
-  }
-
-  Timer decision_time(true);
-  ////DECISION: Choose 1 or 2?
-  if (have_seen_the_goal1 || have_seen_the_goal2)
-  {
-    status_ = GOAL_SEEN;  // I've found a free path that ends in the goal
-    // printf("CHANGED TO GOAL_SEEN********\n");
-    if (have_seen_the_goal1)
-    {
-      // printf("1 saw the goal\n");
-    }
-    if (have_seen_the_goal2)
-    {
-      // printf("2 saw the goal\n");
-    }
-  }
-
-  if (have_seen_the_goal1 || need_to_decide == false)
-  {
-    log_.decision = 1;
-    mtx_X_U_temp.lock();
-    U_temp_ = U_temp1;
-    X_temp_ = X_temp1;
-    mtx_X_U_temp.unlock();
-    JPS_old_ = JPS1;
-    mtx_k.lock();
-    k_initial_cond_ = k_initial_cond_1_;
-    mtx_k.unlock();
-    B_ = B1;
-    printf("****************************************choosing 1\n");
-    /*   std::cout << "Estas son las 10 1as filas de lo planificado" << std::endl;
-       std::cout << X_temp_.block(0, 0, 10, 1) << std::endl;*/
-    // printf("Copying Xtemp1\n");
-  }
-  else if (have_seen_the_goal2)
-  {
-    log_.decision = 2;
-    mtx_X_U_temp.lock();
-    U_temp_ = U_temp2;
-    X_temp_ = X_temp2;
-    mtx_X_U_temp.unlock();
-    JPS_old_ = JPS2;
-    mtx_k.lock();
-    k_initial_cond_ = k_initial_cond_2_;
-    mtx_k.unlock();
-    B_ = B2;
-    printf("****************************************choosing 2\n");
-    /*    std::cout << "Estas son las 10 1as filas de lo planificado" << std::endl;
-        std::cout << X_temp_.block(0, 0, 10, 1) << std::endl;*/
-    // printf("Copying Xtemp2\n");
-  }
-  else
-  {
-    if (J1 <= J2)
-    {
-      log_.decision = 1;
-      mtx_X_U_temp.lock();
-      U_temp_ = U_temp1;
-      X_temp_ = X_temp1;
-      mtx_X_U_temp.unlock();
-      JPS_old_ = JPS1;
-      mtx_k.lock();
-      k_initial_cond_ = k_initial_cond_1_;
-      mtx_k.unlock();
-      B_ = B1;
-      printf("***************************************choosing 1\n");
-      /*      std::cout << "Estas son las 10 1as filas de lo planificado" << std::endl;
-            std::cout << X_temp_.block(0, 0, 10, 1) << std::endl;*/
-    }
-    else
-    {
-      log_.decision = 2;
-      mtx_X_U_temp.lock();
-      U_temp_ = U_temp2;
-      X_temp_ = X_temp2;
-      mtx_X_U_temp.unlock();
-      JPS_old_ = JPS2;
-      mtx_k.lock();
-      k_initial_cond_ = k_initial_cond_2_;
-      mtx_k.unlock();
-      B_ = B2;
-      printf("**************************************choosing 2\n");
-      /*      std::cout << "Estas son las 10 1as filas de lo planificado" << std::endl;
-            std::cout << X_temp_.block(0, 0, 10, 1) << std::endl;*/
-    }
-  }
-
-  optimized_ = true;
-  mtx_planner_status_.lock();
-  planner_status_ = REPLANNED;
-  mtx_planner_status_.unlock();
-  // printf("ReplanCB: planner_status_ = REPLANNED\n");
-  if (par_.visual == true)
-  {
-    pubTraj(X_temp_);
-  }
-  // printf("replanCB finished\n");
-  // ROS_WARN("solve time: %0.2f ms", 1000 * (ros::Time::now().toSec() - then));
-  // printf("ReplanCB: Deciding takes %f ms\n", (double)decision_time.Elapsed().count());
-  log_.total_ms_replanCB = 1000 * (ros::Time::now().toSec() - t0replanCB);
-  // printf("************ReplanCB: TotalTime= %0.2f ms\n", 1000 * (ros::Time::now().toSec() - t0replanCB));
-  log_.header.stamp = ros::Time::now();
-  pub_log_.publish(log_);
+  std::cout << "Distances computed are: " << distances << std::endl;
+  mtx_unk.unlock();
+  mtx_map.unlock();
+  return distances;
 }
 
 // Sample n points along the path

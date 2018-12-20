@@ -427,6 +427,13 @@ inline geometry_msgs::Point pointOrigin()
   return tmp;
 }
 
+inline Eigen::Vector3d vec2eigen(geometry_msgs::Vector3 vector)
+{
+  Eigen::Vector3d tmp;
+  tmp << vector.x, vector.y, vector.z;
+  return tmp;
+}
+
 inline geometry_msgs::Point eigen2point(Eigen::Vector3d vector)
 {
   geometry_msgs::Point tmp;
@@ -798,6 +805,19 @@ inline vec_Vecf<3> copyJPS(vec_Vecf<3> path)
     tmp.push_back(path[i]);
   }
   return tmp;
+}
+
+// Overload to be able to print a std::vector
+template <typename T>
+std::ostream& operator<<(std::ostream& out, const std::vector<T>& v)
+{
+  if (!v.empty())
+  {
+    out << '[';
+    std::copy(v.begin(), v.end(), std::ostream_iterator<T>(out, ", "));
+    out << "\b\b]";
+  }
+  return out;
 }
 
 #endif

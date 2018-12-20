@@ -73,6 +73,8 @@ struct parameteres
   double goal_radius;
   double drone_radius;
 
+  int N;
+
   int offset;
   double Ra;
   double Ra_max;
@@ -207,6 +209,8 @@ private:
   void cvxDecomp(vec_Vecf<3> path);
 
   vec_Vecf<3> sampleJPS(vec_Vecf<3>& path, int n);
+
+  std::vector<double> getDistToNearestObs(vec_Vecf<3>& points);
 
   visualization_msgs::Marker setpoint_;
   acl_msgs::QuadGoal quadGoal_;
