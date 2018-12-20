@@ -82,6 +82,8 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   pub_goal_ = nh_.advertise<acl_msgs::QuadGoal>("goal", 1);
   pub_term_goal_ = nh_.advertise<geometry_msgs::PointStamped>("term_goal_projected", 1);
   pub_traj_ = nh_.advertise<nav_msgs::Path>("traj", 1);
+  pub_traj_rescue_ = nh_.advertise<nav_msgs::Path>("traj_rescue", 1);
+
   pub_setpoint_ = nh_.advertise<visualization_msgs::Marker>("setpoint", 1);
   pub_trajs_sphere_ = nh_.advertise<visualization_msgs::MarkerArray>("trajs_sphere", 1);
   pub_forces_ = nh_.advertise<visualization_msgs::MarkerArray>("forces", 1);
@@ -982,7 +984,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   // printf("ReplanCB: planner_status_ = REPLANNED\n");
   if (par_.visual == true)
   {
-    pubTraj(X_temp_);
+    pubTraj(X_temp_, WHOLE);
   }
 
   double dist = (term_goal - B1).norm();
@@ -994,9 +996,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   // *** RESCUE PATH ***
 
-  int index =
-      ceil(0.04 / par_.dc);  // R is the point of the trajectory 40 ms after the start of the trajectory TODO: change
-                             // 0.04 to parameter
+  int index = ceil(0.04 / par_.dc);  // R is the point of the trajectory 40 ms after the start of the trajectory
+                                     // TODO: change 0.04 to parameter
   Eigen::Vector3d posR(X_temp_(index, 0), X_temp_(index, 1), X_temp_(index, 2));
   Eigen::Vector3d velR(X_temp_(index, 3), X_temp_(index, 4), X_temp_(index, 5));
   Eigen::Vector3d accelR(X_temp_(index, 6), X_temp_(index, 7), X_temp_(index, 8));
@@ -1048,25 +1049,39 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   Eigen::Vector3d F = samples[samples.size() - 1];  // F is the final point of the rescue path (will be near I)
   double xf_rescue[9] = { F[0], F[1], F[2], 0, 0, 0, 0, 0, 0 };
-  // double xf_rescue[9] = { 0, 0, 1, 0, 0, 0, 0, 0, 0 };
-  // double x0_rescue[9] = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
   std::vector<LinearConstraint3D> empty;
-
-  /*  printf("*************SOLVING WITHOUT CONSTRAINTS************\n");
-    // Debugging: first solve without constraints, and then with constraints
-    solver_gurobi_.setPolytopes(empty);                      // No Polytopes constraints for the rescue path
-    solver_gurobi_.setDistances(samples_empty, dist_empty);  // No distance constraints for the normal path
-    solver_gurobi_.setXf(xf_rescue);
-    solver_gurobi_.setX0(x0_rescue);
-    solver_gurobi_.genNewTraj();*/
-
-  // printf("*************SOLVING WITH CONSTRAINTS************\n");
   solver_gurobi_.setPolytopes(empty);  // No Polytopes constraints for the rescue path
   solver_gurobi_.setDistances(samples, dist_near_neig);
   solver_gurobi_.setXf(xf_rescue);
   solver_gurobi_.setX0(x0_rescue);
   solver_gurobi_.genNewTraj();
+
+  mtx_X_U_rescue.lock();
+  U_rescue_ = solver_gurobi_.getU();
+  X_rescue_ = solver_gurobi_.getX();
+  mtx_X_U_rescue.unlock();
+
+  // And now the trajectory saved is X_temp_ will be the first part corresponding to the X_temp_, and the second part is
+  // X_rescue_
+
+  mtx_X_U_temp.lock();
+  mtx_X_U_rescue.lock();
+
+  printf("Going to resize\n");
+  U_temp_.conservativeResize(index + U_rescue_.rows(), U_temp_.cols());     // Increase the number of rows of U_temp_
+  X_temp_.conservativeResize(index + X_rescue_.rows(), X_temp_.cols());     // Increase the number of rows of X_temp_
+  U_temp_.block(index, 0, U_rescue_.rows(), U_rescue_.cols()) = U_rescue_;  // and copy the part of the rescue path
+  X_temp_.block(index, 0, X_rescue_.rows(), X_rescue_.cols()) = X_rescue_;  // and copy the part of the rescue path
+
+  printf("Copied block\n");
+  mtx_X_U_temp.unlock();
+  mtx_X_U_rescue.unlock();
+
+  if (par_.visual == true)
+  {
+    pubTraj(X_rescue_, RESCUE);
+  }
 
   return;
   ///////////////////////////////////////////////////////////
@@ -1624,9 +1639,9 @@ void CVX::cvxDecomp(vec_Vecf<3> path)
   }
 }
 
-void CVX::pubTraj(double** x)
+/*void CVX::pubTraj(double** x)
 {
-  // printf("In pubTraj\n");
+
   // Trajectory
   nav_msgs::Path traj;
   traj.poses.clear();
@@ -1647,12 +1662,10 @@ void CVX::pubTraj(double** x)
     traj.poses.push_back(temp_path);
   }
   pub_traj_.publish(traj);
-}
+}*/
 
-void CVX::pubTraj(Eigen::MatrixXd X)
+void CVX::pubTraj(Eigen::MatrixXd X, int type)
 {
-  // printf("In pubTraj\n");
-
   // Trajectory
   nav_msgs::Path traj;
   traj.poses.clear();
@@ -1672,7 +1685,16 @@ void CVX::pubTraj(Eigen::MatrixXd X)
     temp_path.pose.orientation.z = 0;
     traj.poses.push_back(temp_path);
   }
-  pub_traj_.publish(traj);
+
+  if (type == WHOLE)
+  {
+    pub_traj_.publish(traj);
+  }
+
+  if (type == RESCUE)
+  {
+    pub_traj_rescue_.publish(traj);
+  }
 }
 
 void CVX::createMarkerSetOfArrows(Eigen::MatrixXd X, bool isFree)

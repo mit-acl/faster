@@ -46,6 +46,9 @@
 #define MAP 1          // MAP refers to the occupancy grid
 #define UNKNOWN_MAP 2  // UNKNOWN_MAP refers to the unkown grid
 
+#define WHOLE 1   // Whole trajectory (part of which is planned on unkonwn space)
+#define RESCUE 2  // Rescue path
+
 struct kdTreeStamped
 {
   pcl::KdTreeFLANN<pcl::PointXYZ> kdTree;
@@ -139,8 +142,8 @@ private:
 
   SolverGurobi solver_gurobi_;
   // class methods
-  void pubTraj(double** x);
-  void pubTraj(Eigen::MatrixXd X);
+  // void pubTraj(double** x);
+  void pubTraj(Eigen::MatrixXd X, int type);
   void goalCB(const acl_msgs::TermGoal& msg);
   void stateCB(const acl_msgs::State& msg);
   void modeCB(const acl_msgs::QuadFlightMode& msg);
@@ -227,6 +230,7 @@ private:
   ros::Publisher pub_term_goal_;
   ros::Publisher pub_goal_;
   ros::Publisher pub_traj_;
+  ros::Publisher pub_traj_rescue_;
   ros::Publisher pub_setpoint_;
   ros::Publisher pub_trajs_sphere_;
   ros::Publisher pub_forces_;
@@ -274,6 +278,8 @@ private:
   Eigen::MatrixXd U_, X_;  // Contains the intepolated input/states that will be sent to the drone
   Eigen::MatrixXd U_temp_,
       X_temp_;  // Contains the intepolated input/states of a traj. If the traj. is free, it will be copied to U_, X_
+
+  Eigen::MatrixXd U_rescue_, X_rescue_;
   bool optimized_;
   double spinup_time_;
   double z_start_;
@@ -321,6 +327,7 @@ private:
   std::mutex mtx_jps_map_util;  // mutex for map_util_ and planner_ptr_
   std::mutex mtx_k;
   std::mutex mtx_X_U_temp;
+  std::mutex mtx_X_U_rescue;
   std::mutex mtx_X_U;
   std::mutex mtx_planner_status_;
   std::mutex mtx_initial_cond;
