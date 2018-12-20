@@ -1036,9 +1036,9 @@ void CVX::replanCB(const ros::TimerEvent& e)
                                                                      // segments
   std::vector<double> dist_near_neig = getDistToNearestObs(samples);
 
-  printf("These are the samples along the path:\n");
-  printElementsOfJPS(samples);
-  printf("**********************");
+  /*  printf("These are the samples along the path:\n");
+    printElementsOfJPS(samples);
+    printf("**********************");*/
 
   clearMarkerArray(&samples_rescue_path_, &pub_samples_rescue_path_);
   vectorOfVectors2MarkerArray(samples, &samples_rescue_path_, color(BLUE), visualization_msgs::Marker::SPHERE);
@@ -1052,8 +1052,17 @@ void CVX::replanCB(const ros::TimerEvent& e)
   // double x0_rescue[9] = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
   std::vector<LinearConstraint3D> empty;
+
+  /*  printf("*************SOLVING WITHOUT CONSTRAINTS************\n");
+    // Debugging: first solve without constraints, and then with constraints
+    solver_gurobi_.setPolytopes(empty);                      // No Polytopes constraints for the rescue path
+    solver_gurobi_.setDistances(samples_empty, dist_empty);  // No distance constraints for the normal path
+    solver_gurobi_.setXf(xf_rescue);
+    solver_gurobi_.setX0(x0_rescue);
+    solver_gurobi_.genNewTraj();*/
+
+  // printf("*************SOLVING WITH CONSTRAINTS************\n");
   solver_gurobi_.setPolytopes(empty);  // No Polytopes constraints for the rescue path
-  // solver_gurobi_.setPolytopes(l_constraints_);
   solver_gurobi_.setDistances(samples, dist_near_neig);
   solver_gurobi_.setXf(xf_rescue);
   solver_gurobi_.setX0(x0_rescue);
@@ -1080,14 +1089,17 @@ std::vector<double> CVX::getDistToNearestObs(vec_Vecf<3>& points)
     double distance_map, distance_unk;
 
     // Find nearest obstacles in Unkown space
-    distance_unk = kdtree_unk_.nearestKSearch(searchPoint, N, id, dist2) > 0 ? sqrt(dist2[0]) : 10000;
+    distance_unk = kdtree_unk_.nearestKSearch(searchPoint, N, id, dist2) > 0 ? sqrt(dist2[0]) : 100;
+    // printf("Distance unkown=%f\n", distance_unk);
 
     // Find nearest obstacles in MAP
-    distance_map = kdtree_map_.nearestKSearch(searchPoint, N, id, dist2) > 0 ? sqrt(dist2[0]) : 10000;
+    distance_map = kdtree_map_.nearestKSearch(searchPoint, N, id, dist2) > 0 ? sqrt(dist2[0]) : 100;
+    // printf("Distance map=%f\n", distance_map);
+    // printf("******");
 
     distances.push_back(std::min(distance_map, distance_unk));
   }
-  std::cout << "Distances computed are: " << distances << std::endl;
+  // std::cout << "Distances computed are: " << distances << std::endl;
   mtx_unk.unlock();
   mtx_map.unlock();
   return distances;

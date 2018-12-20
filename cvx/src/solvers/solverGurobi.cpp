@@ -197,8 +197,8 @@ void SolverGurobi::setDistanceConstraints()  // Set the distance constraints
     GRBLinExpr posz = getPos(interval, tau, 2, false, x);
     std::vector<GRBLinExpr> var = { posx, posy, posz };
     double epsilon = dist_near_obs_[t] * dist_near_obs_[t];
-    printf("Cons with distance=%f ", sqrt(epsilon));
-    std::cout << "For the sample=" << samples_[t].transpose() << std::endl;
+    // printf("Cons with distance=%f ", sqrt(epsilon));
+    // std::cout << "For the sample=" << samples_[t].transpose() << std::endl;
 
     // TODO: THERE IS SOMETHING THAT IS WRONG HERE, IT DOESNT WORK!! Not sure if my fault, or Gurobi's one
     // ONE POSSIBLE WORKAROUND IS TRANSFORM THIS INTO A BOX CONSTRAINT (WITH ABSOLUTES VALUES, INSTEAD OF A QUADRATIC
@@ -494,8 +494,8 @@ void SolverGurobi::callOptimizer()
   // std::cout << "CALLING OPTIMIZER OF GUROBI" << std::endl;
 
   // Select these parameteres with the tuning Tool of Gurobi
-  m.set("MIPFocus", "2");
-  m.set("PreQLinearize", "1");
+  // m.set("MIPFocus", "2");
+  // m.set("PreQLinearize", "1");
 
   m.update();
   temporal = temporal + 1;
@@ -526,19 +526,38 @@ void SolverGurobi::callOptimizer()
   {
     printf("GUROBI SOLUTION: Optimal");
 
-    if (polytopes_cons.size() > 0)  // Print the binary matrix only if I've included the polytope constraints
-    {
-      std::cout << "Binary Matrix:" << std::endl;
+    /*    if (polytopes_cons.size() > 0)  // Print the binary matrix only if I've included the polytope constraints
+        {
+          std::cout << "Solution: Binary Matrix:" << std::endl;
 
-      for (int poly = 0; poly < b[0].size(); poly++)
-      {
+          for (int poly = 0; poly < b[0].size(); poly++)
+          {
+            for (int t = 0; t < N_; t++)
+            {
+              std::cout << b[t][poly].get(GRB_DoubleAttr_X) << " ";
+            }
+            std::cout << std::endl;
+          }
+        }
+        std::cout << "Solution: Positions:" << std::endl;
         for (int t = 0; t < N_; t++)
         {
-          std::cout << b[t][poly].get(GRB_DoubleAttr_X) << " ";
+          std::cout << getPos(t, 0, 0, true, x) << "   ";
+          std::cout << getPos(t, 0, 1, true, x) << "   ";
+          std::cout << getPos(t, 0, 2, true, x) << std::endl;
         }
-        std::cout << std::endl;
-      }
-    }
+
+        std::cout << getPos(N_ - 1, dt_, 0, true, x) << "   ";
+        std::cout << getPos(N_ - 1, dt_, 1, true, x) << "   ";
+        std::cout << getPos(N_ - 1, dt_, 2, true, x) << std::endl;
+
+        std::cout << "Solution: Coefficients d:" << std::endl;
+        for (int t = 0; t < N_; t++)
+        {
+          std::cout << x[t][9].get(GRB_DoubleAttr_X) << "   ";
+          std::cout << x[t][10].get(GRB_DoubleAttr_X) << "   ";
+          std::cout << x[t][11].get(GRB_DoubleAttr_X) << std::endl;
+        }*/
   }
   if (optimstatus == GRB_NUMERIC)
   {
@@ -549,24 +568,9 @@ void SolverGurobi::callOptimizer()
   // std::cout << "*************************Finished Optimization" << std::endl;
 
   /*  std::cout << "\nOBJECTIVE: " << m.get(GRB_DoubleAttr_ObjVal) << std::endl;
-    std::cout << "Positions X:" << std::endl;
-    for (int t = 0; t < N_; t++)
-    {
-      std::cout << getPos(t, dt_, 0, true, x) << std::endl;
-    }
 
-    std::cout << "Positions Y:" << std::endl;
-    for (int t = 0; t < N_; t++)
-    {
-      std::cout << getPos(t, dt_, 1, true, x) << std::endl;
-    }
 
-    std::cout << "Positions Z:" << std::endl;
-    for (int t = 0; t < N_; t++)
-    {
-      std::cout << "Beginning of interval" << t << std::endl;
-      std::cout << getPos(t, dt_, 2, true, x) << std::endl;
-    }*/
+*/
 
   /*  // printf("In callOptimizer\n");
     bool converged = false;

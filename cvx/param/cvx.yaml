@@ -103,6 +103,6 @@ v_max: 5.0   #[m/s]
 a_max: 5.0   #[m/s2]
 j_max: 8.0  #[m/s3]
 
-q: 100000  #[-] weight to the 2nd term of the cost function for cvxgen
+q: 100  #[-] weight to the 2nd term of the cost function. If it's very big (>1000), Gurobi fails!! (numerical issues)
 
 z_land: 0.02 #[m] z goal for landing
