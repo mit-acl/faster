@@ -209,7 +209,7 @@ void SolverGurobi::setDistanceConstraints()  // Set the distance constraints
 
 int SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> l_constraints)
 {
-  std::cout << "Setting POLYTOPES=" << l_constraints.size() << std::endl;
+  // std::cout << "Setting POLYTOPES=" << l_constraints.size() << std::endl;
 
   // Remove previous polytopes constraints
   for (int i = 0; i < polytopes_cons.size(); i++)
@@ -237,7 +237,7 @@ int SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> l_constraints)
   }
   b.clear();
 
-  if (l_constraints.size() > 0)  // If there are polytope constraintsf
+  if (l_constraints.size() > 0)  // If there are polytope constraints
   {
     // Declare binary variables
     for (int t = 0; t < N_ + 1; t++)
@@ -273,10 +273,14 @@ int SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> l_constraints)
 
         std::vector<std::vector<double>> A1std = eigenMatrix2std(A1);
 
+        std::vector<GRBLinExpr> Ax = MatrixMultiply(A1std, pos);
         for (int i = 0; i < b1.rows(); i++)
         {
-          polytopes_cons.push_back(m.addGenConstrIndicator(b[t][n_poly], 1, MatrixMultiply(A1std, pos)[i], '<',
-                                                           b1[i]));  // If b[t,0]==1, then...
+          // Now let's shrink the polytopes with the size of the drone
+          double norm_a = (A1.row(i)).norm();
+          double distance = 0;  ///!!!!CHANGE THIS, SETTING THE DISTANCE TO THE ONE OF THE DRONE
+          polytopes_cons.push_back(m.addGenConstrIndicator(b[t][n_poly], 1, Ax[i], '<',
+                                                           b1[i] - distance * norm_a));  // If b[t,0]==1, then...
         }
       }
     }
@@ -305,14 +309,14 @@ Eigen::MatrixXd SolverGurobi::getU()
 
 void SolverGurobi::setX0(double x0[])
 {
-  printf("Setting initial condition:\n");
+  // printf("Setting initial condition:\n");
   int input_order = 3;
   for (int i = 0; i < 9; i++)
   {
-    std::cout << x0[i] << "  ";
+    // std::cout << x0[i] << "  ";
     x0_[i] = x0[i];
   }
-  std::cout << std::endl;
+  // std::cout << std::endl;
 }
 
 void SolverGurobi::setXf(double xf[])
@@ -426,8 +430,9 @@ void SolverGurobi::set_max(double max_values[3])
   setMaxConstraints();
 }
 
-void SolverGurobi::genNewTraj()
+bool SolverGurobi::genNewTraj()
 {
+  bool solved;
   findDT();
   // dt_ = 5.0 / N_;
 
@@ -443,8 +448,12 @@ void SolverGurobi::genNewTraj()
   setObjective();
 
   resetXandU();
-  callOptimizer();
-  fillXandU();
+  solved = callOptimizer();
+  if (solved == true)
+  {
+    fillXandU();
+  }
+  return solved;
   // printf("In genNewTraj0.5\n");
   /*  resetXandU();
     // printf("In genNewTraj1\n");
@@ -489,8 +498,9 @@ void SolverGurobi::setDynamicConstraints()
   }
 }
 
-void SolverGurobi::callOptimizer()
+bool SolverGurobi::callOptimizer()
 {
+  bool solved = true;
   // std::cout << "CALLING OPTIMIZER OF GUROBI" << std::endl;
 
   // Select these parameteres with the tuning Tool of Gurobi
@@ -518,10 +528,6 @@ void SolverGurobi::callOptimizer()
 
   printf("Going to check status");
   int optimstatus = m.get(GRB_IntAttr_Status);
-  if (optimstatus == GRB_INF_OR_UNBD)
-  {
-    printf("GUROBI SOLUTION: Unbounded or Infeasible");
-  }
   if (optimstatus == GRB_OPTIMAL)
   {
     printf("GUROBI SOLUTION: Optimal");
@@ -559,11 +565,23 @@ void SolverGurobi::callOptimizer()
           std::cout << x[t][11].get(GRB_DoubleAttr_X) << std::endl;
         }*/
   }
-  if (optimstatus == GRB_NUMERIC)
-  {
-    printf("GUROBI Status: Numerical issues");
-    printf("Model may be infeasible or unbounded");  // Taken from the Gurobi documentation
+
+  else
+  {  // No solution
+    solved = false;
+    if (optimstatus == GRB_INF_OR_UNBD)
+    {
+      printf("GUROBI SOLUTION: Unbounded or Infeasible. Maybe too small dt?");
+    }
+
+    if (optimstatus == GRB_NUMERIC)
+    {
+      printf("GUROBI Status: Numerical issues");
+      printf("Model may be infeasible or unbounded");  // Taken from the Gurobi documentation
+    }
   }
+  return solved;
+
   // printf("Going out from callOptimizer, optimstatus= %d\n", optimstatus);
   // std::cout << "*************************Finished Optimization" << std::endl;
 

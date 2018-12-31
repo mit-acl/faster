@@ -57,8 +57,8 @@ public:
   void setXf(double xf[]);
   void resetXandU();
   void set_max(double max_values[3]);
-  void genNewTraj();
-  void callOptimizer();
+  bool genNewTraj();
+  bool callOptimizer();
   double getDTInitial();
   int getN();
   void setDC(double dc);

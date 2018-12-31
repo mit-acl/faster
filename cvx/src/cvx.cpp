@@ -1,6 +1,14 @@
 // Authors: Jesus Tordesillas
 // Date: August 2018, December 2018
 
+// TODO (from December 2018)
+// Put several iterations to find dt (increasing dt in each iteration)
+// right now the unkown space that cvx receives is only a sphere around the drone, not the whole real unknown
+// space
+// Set dt as a constant in the optimization problem (so that many constraints no se tiene que poner de nuevo) (what in
+// Cvxgen is called parameter)
+// Mirar a ver d'onde acaba el goal, parece que est'a acabando 0.2m del real goal.
+
 // TODO: compile cvxgen with the option -03 (see
 // https://stackoverflow.com/questions/19689014/gcc-difference-between-o3-and-os
 // and
@@ -931,9 +939,9 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   Eigen::Vector3d v1 = B1 - state_pos;  // point i expressed with origin=origin sphere
 
-  //////////// Solve with GUROBI //////////////////////////
-  /////////////////////////////////////////////////////////
-  /////////////////////////////////////////////////////////
+  //////////////////////////////////////////////////////////////////////////
+  //////////// Solve with GUROBI Whole trajectory //////////////////////////
+  /////////////////////////////////////////////////////////////////////////
   printf("Running Gurobi!!!\n");
   if (X_initialized_)  // Needed to skip the first time (X_ still not initialized)
   {
@@ -962,39 +970,24 @@ void CVX::replanCB(const ros::TimerEvent& e)
   solver_gurobi_.setDistances(samples_empty, dist_empty);  // No distance constraints for the normal path
   solver_gurobi_.setXf(xf);
   solver_gurobi_.setX0(x0);
-  solver_gurobi_.genNewTraj();
+  bool solved_whole = solver_gurobi_.genNewTraj();
+
+  if (solved_whole == false)
+  {
+    ROS_ERROR("No solution found for the whole trajectory");
+    return;
+  }
 
   printf("Solved Gurobi!!!\n");
 
-  log_.decision = 1;
   mtx_X_U_temp.lock();
   U_temp_ = solver_gurobi_.getU();
   X_temp_ = solver_gurobi_.getX();
   mtx_X_U_temp.unlock();
-  JPS_old_ = JPS1;
-  mtx_k.lock();
-  k_initial_cond_ = k_initial_cond_1_;
-  // printf("Ahora mismo, k_initial_cond_=%d and k_=%d\n", k_initial_cond_, k_);
-  mtx_k.unlock();
-  B_ = B1;
-  optimized_ = true;
-  mtx_planner_status_.lock();
-  planner_status_ = REPLANNED;
-  mtx_planner_status_.unlock();
-  // printf("ReplanCB: planner_status_ = REPLANNED\n");
-  if (par_.visual == true)
-  {
-    pubTraj(X_temp_, WHOLE);
-  }
 
-  double dist = (term_goal - B1).norm();
-  bool have_seen_the_goal = (dist < par_.goal_radius) ? true : false;
-  if (have_seen_the_goal)
-  {
-    status_ = GOAL_SEEN;
-  }
-
-  // *** RESCUE PATH ***
+  ///////////////////////////////////////////////////////////
+  ///////////////       RESCUE PATH    //////////////////////
+  ///////////////////////////////////////////////////////////
 
   int index = ceil(0.04 / par_.dc);  // R is the point of the trajectory 40 ms after the start of the trajectory
                                      // TODO: change 0.04 to parameter
@@ -1008,13 +1001,12 @@ void CVX::replanCB(const ros::TimerEvent& e)
   printf("Going to compute rescue path");
   bool thereIsIntersection = false;
   Eigen::Vector3d I;  // I is the first intersection of JPS with the unknown space
-  // TODO: right now the unkown space that cvx receives is only a sphere around the drone, not the whole real unknown
-  // space
+
   // Part of JPS1 in known space
   int el_eliminated;
   I = getFirstCollisionJPS(JPS1r, &thereIsIntersection, el_eliminated, UNKNOWN_MAP);  // Intersection with unkown space
 
-  printf("Elements_eliminated=%d\n", el_eliminated);
+  // printf("Elements_eliminated=%d\n", el_eliminated);
 
   vec_Vecf<3> JPS1_in_known_space(JPS1r.begin(),
                                   JPS1r.begin() + el_eliminated +
@@ -1029,8 +1021,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
     JPS1_in_known_space.push_back(JPS1r[JPS1r.size() - 1]);  // Plus the last element of JPS
   }
 
-  printf("These is the part of JPS that is in known space:\n");
-  printElementsOfJPS(JPS1_in_known_space);
+  // printf("These is the part of JPS that is in known space:\n");
+  // printElementsOfJPS(JPS1_in_known_space);
 
   vec_Vecf<3> samples = sampleJPS(JPS1_in_known_space, par_.N + 1);  // Take N +1 samples along JPS1_in_known_space; IT
                                                                      // has to be N+1, because N is the number of
@@ -1055,7 +1047,13 @@ void CVX::replanCB(const ros::TimerEvent& e)
   solver_gurobi_.setDistances(samples, dist_near_neig);
   solver_gurobi_.setXf(xf_rescue);
   solver_gurobi_.setX0(x0_rescue);
-  solver_gurobi_.genNewTraj();
+  bool solved_rescue = solver_gurobi_.genNewTraj();
+
+  if (solved_rescue == false)
+  {
+    ROS_ERROR("No solution found for the rescue path");
+    return;
+  }
 
   mtx_X_U_rescue.lock();
   U_rescue_ = solver_gurobi_.getU();
@@ -1068,19 +1066,45 @@ void CVX::replanCB(const ros::TimerEvent& e)
   mtx_X_U_temp.lock();
   mtx_X_U_rescue.lock();
 
-  printf("Going to resize\n");
+  // printf("Going to resize\n");
   U_temp_.conservativeResize(index + U_rescue_.rows(), U_temp_.cols());     // Increase the number of rows of U_temp_
   X_temp_.conservativeResize(index + X_rescue_.rows(), X_temp_.cols());     // Increase the number of rows of X_temp_
   U_temp_.block(index, 0, U_rescue_.rows(), U_rescue_.cols()) = U_rescue_;  // and copy the part of the rescue path
   X_temp_.block(index, 0, X_rescue_.rows(), X_rescue_.cols()) = X_rescue_;  // and copy the part of the rescue path
 
-  printf("Copied block\n");
+  // printf("Copied block\n");
   mtx_X_U_temp.unlock();
   mtx_X_U_rescue.unlock();
 
   if (par_.visual == true)
   {
     pubTraj(X_rescue_, RESCUE);
+  }
+
+  ///////////////////////////////////////////////////////////
+  ///////////////       OTHER STUFF    //////////////////////
+  ///////////////////////////////////////////////////////////
+  JPS_old_ = JPS1;
+  mtx_k.lock();
+  k_initial_cond_ = k_initial_cond_1_;
+  // printf("Ahora mismo, k_initial_cond_=%d and k_=%d\n", k_initial_cond_, k_);
+  mtx_k.unlock();
+  B_ = B1;
+  optimized_ = true;
+  mtx_planner_status_.lock();
+  planner_status_ = REPLANNED;
+  mtx_planner_status_.unlock();
+  // printf("ReplanCB: planner_status_ = REPLANNED\n");
+  if (par_.visual == true)
+  {
+    pubTraj(X_temp_, WHOLE);
+  }
+
+  double dist = (term_goal - B1).norm();
+  bool have_seen_the_goal = (dist < par_.goal_radius) ? true : false;
+  if (have_seen_the_goal)
+  {
+    status_ = GOAL_SEEN;
   }
 
   return;
@@ -1595,8 +1619,9 @@ void CVX::cvxDecomp(vec_Vecf<3> path)
   // Using ellipsoid decomposition
   EllipsoidDecomp3D decomp_util;
   decomp_util.set_obs(obs);
-  decomp_util.set_local_bbox(Vec3f(1, 2, 1));
-  decomp_util.dilate(path);  // Set max iteration number of 10, do fix the path
+  decomp_util.set_local_bbox(
+      Vec3f(2, 2, 1));  // Only try to find cvx decomp in the Mikowsski sum of JPS and this box (I think)
+  decomp_util.dilate(path);
 
   // Publish visualization msgs
   decomp_ros_msgs::EllipsoidArray es_msg = DecompROS::ellipsoid_array_to_ros(decomp_util.get_ellipsoids());
@@ -1783,7 +1808,7 @@ void CVX::clearMarkerSetOfArrows()
 
 void CVX::frontierCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 {
-  printf("****In FrontierCB\n");
+  // printf("****In FrontierCB\n");
   if (pcl2ptr_msg->width == 0 || pcl2ptr_msg->height == 0)  // Point Cloud is empty (this happens at the beginning)
   {
     return;
@@ -1908,7 +1933,7 @@ void CVX::mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 // Unkwown  CB
 void CVX::unkCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 {
-  ROS_WARN("*************************IN unkCB\n");
+  // ROS_WARN("*************************IN unkCB\n");
   if (pcl2ptr_msg->width == 0 || pcl2ptr_msg->height == 0)  // Point Cloud is empty (this happens at the beginning)
   {
     printf("Cloud In has 0 points\n");
