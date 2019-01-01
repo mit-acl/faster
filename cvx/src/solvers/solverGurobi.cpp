@@ -466,7 +466,7 @@ bool SolverGurobi::genNewTraj()
 
 void SolverGurobi::findDT()
 {
-  double dt = 4 * getDTInitial();
+  double dt = 2 * getDTInitial();
   dt_ = dt;
   // dt_ = 1;
 }

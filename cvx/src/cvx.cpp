@@ -5,11 +5,13 @@
 // Put several iterations to find dt (increasing dt in each iteration)
 // right now the unkown space that cvx receives is only a sphere around the drone, not the whole real unknown
 // space
-// Set dt as a constant in the optimization problem (so that many constraints no se tiene que poner de nuevo) (what in
+// Set dt as a constant in the optimization problem (so that many constraints no se tengan que poner de nuevo) (what in
 // Cvxgen is called parameter)
 // Mirar a ver d'onde acaba el goal, parece que est'a acabando 0.2m del real goal.
 // Al hacer shrink de los polyhedra, creo que se puede romper la continuidad (y que 2 polyhedra succesive no overlap
 // between them)
+// Al hacer shrink de los polyhedra, a veces la posición actual del dron queda fuera de los poliedros --> gurobi no
+// encuentra solución
 
 // TODOs antiguos:
 // TODO: compile cvxgen with the option -03 (see

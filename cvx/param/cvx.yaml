@@ -88,7 +88,7 @@ N: 10  #[-] Number of discretization points in the trajectory
 
 offset: 10  # Replanning offset (the initial conditions are taken OFFSET states farther from the last published goal)
 
-Ra: 5            # [m] Minimum radius of the first sphere
+Ra: 3            # [m] Minimum radius of the first sphere
 Ra_max: 4            # [m] Maximum radius of the first sphere
 Rb: 9.0             # [m] Radius of the second sphere
 w_max: 1            # [rd/s] Maximum angular velocity
