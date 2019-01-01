@@ -75,6 +75,8 @@ void SolverGurobi::setObjective()  // I need to set it every time, because the o
 {
   GRBQuadExpr control_cost = 0;
   GRBQuadExpr final_state_cost = 0;
+  GRBQuadExpr distance_to_JPS_cost = 0;
+
   std::vector<GRBLinExpr> xFinal = {
     getPos(N_ - 1, 0, 0, false, x),   getPos(N_ - 1, 0, 1, false, x),
     getPos(N_ - 1, 0, 2, false, x),  //////////////////////////////////
@@ -86,12 +88,26 @@ void SolverGurobi::setObjective()  // I need to set it every time, because the o
   std::vector<double> xf(std::begin(xf_), std::end(xf_));  // Transform xf_ into a std vector
   final_state_cost = q_ * GetNorm2(xFinal - xf);
 
+  for (int t = 0; t < samples_penalize_.size(); t++)  // This loop is not executed when computing the rescue path
+  {
+    std::vector<GRBLinExpr> sample_i = { samples_penalize_[t][0], samples_penalize_[t][1], samples_penalize_[t][2] };
+    printf("in loop %d\n", t);
+
+    double tau = (t == samples_penalize_.size() - 1) ? dt_ : 0;  // If the last interval -->  at the end of it
+    double interval = (t == samples_penalize_.size() - 1) ? t - 1 : t;
+
+    std::vector<GRBLinExpr> pos_i = { getPos(interval, tau, 0, false, x), getPos(interval, tau, 1, false, x),
+                                      getPos(interval, tau, 2, false, x) };
+
+    distance_to_JPS_cost = distance_to_JPS_cost + GetNorm2(sample_i - pos_i);
+  }
+
   for (int t = 0; t < N_; t++)
   {
     std::vector<GRBLinExpr> ut = { getJerk(t, 0, 0, false, x), getJerk(t, 0, 1, false, x), getJerk(t, 0, 2, false, x) };
     control_cost = control_cost + GetNorm2(ut);
   }
-  m.setObjective(control_cost + final_state_cost, GRB_MINIMIZE);
+  m.setObjective(control_cost + final_state_cost + distance_to_JPS_cost, GRB_MINIMIZE);
 }
 
 void SolverGurobi::fillXandU()
@@ -165,6 +181,12 @@ void SolverGurobi::fillXandU()
     std::cout << U_temp_ << std::endl;*/
 }
 
+void SolverGurobi::setSamplesPenalize(vec_Vecf<3>& samples_penalize)
+{
+  samples_penalize_.clear();
+  samples_penalize_ = samples_penalize;
+}
+
 void SolverGurobi::setDistances(vec_Vecf<3>& samples,
                                 std::vector<double> dist_near_obs)  // Distance values (used for the
                                                                     // rescue path, used in the distance constraint4s)
@@ -200,9 +222,6 @@ void SolverGurobi::setDistanceConstraints()  // Set the distance constraints
     // printf("Cons with distance=%f ", sqrt(epsilon));
     // std::cout << "For the sample=" << samples_[t].transpose() << std::endl;
 
-    // TODO: THERE IS SOMETHING THAT IS WRONG HERE, IT DOESNT WORK!! Not sure if my fault, or Gurobi's one
-    // ONE POSSIBLE WORKAROUND IS TRANSFORM THIS INTO A BOX CONSTRAINT (WITH ABSOLUTES VALUES, INSTEAD OF A QUADRATIC
-    // CONSTRAINT)
     distances_cons.push_back(m.addQConstr(GetNorm2(var - p) <= epsilon));
   }
 }

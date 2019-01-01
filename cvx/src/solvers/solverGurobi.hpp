@@ -74,6 +74,9 @@ public:
   void createVars();
 
   void setDistances(vec_Vecf<3>& samples, std::vector<double> dist_near_obs);
+
+  void setSamplesPenalize(vec_Vecf<3>& samples_penalize);
+
   void setDistanceConstraints();
 
 protected:
@@ -109,7 +112,9 @@ protected:
   std::vector<std::vector<GRBVar>> x;
   std::vector<std::vector<GRBVar>> u;
 
-  vec_Vecf<3> samples_;  // Samples along the rescue path
+  vec_Vecf<3> samples_;           // Samples along the rescue path
+  vec_Vecf<3> samples_penalize_;  // Samples along the rescue path
+
   std::vector<double> dist_near_obs_;
 
   std::ofstream times_log;

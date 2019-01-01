@@ -77,7 +77,7 @@ use_vel: false # use velocity. If false, r2=r1;
 wdx: 20.0  #[m] world dimension in x
 wdy: 20.0  #[m] world dimension in y
 wdz: 4.0   #[m] world dimension in z
-res: 0.35  #[m] cell dimension = resolution of the map
+res: 0.15  #[m] cell dimension = resolution of the map
 
 
 dc: 0.01            #(seconds) Duration for the interpolation=Value of the timer pubGoal
