@@ -8,7 +8,10 @@
 // Set dt as a constant in the optimization problem (so that many constraints no se tiene que poner de nuevo) (what in
 // Cvxgen is called parameter)
 // Mirar a ver d'onde acaba el goal, parece que est'a acabando 0.2m del real goal.
+// Al hacer shrink de los polyhedra, creo que se puede romper la continuidad (y que 2 polyhedra succesive no overlap
+// between them)
 
+// TODOs antiguos:
 // TODO: compile cvxgen with the option -03 (see
 // https://stackoverflow.com/questions/19689014/gcc-difference-between-o3-and-os
 // and
@@ -978,6 +981,11 @@ void CVX::replanCB(const ros::TimerEvent& e)
     return;
   }
 
+  if (par_.visual == true)
+  {
+    pubTraj(X_temp_, WHOLE);
+  }
+
   printf("Solved Gurobi!!!\n");
 
   mtx_X_U_temp.lock();
@@ -1095,10 +1103,6 @@ void CVX::replanCB(const ros::TimerEvent& e)
   planner_status_ = REPLANNED;
   mtx_planner_status_.unlock();
   // printf("ReplanCB: planner_status_ = REPLANNED\n");
-  if (par_.visual == true)
-  {
-    pubTraj(X_temp_, WHOLE);
-  }
 
   double dist = (term_goal - B1).norm();
   bool have_seen_the_goal = (dist < par_.goal_radius) ? true : false;
@@ -1620,8 +1624,9 @@ void CVX::cvxDecomp(vec_Vecf<3> path)
   EllipsoidDecomp3D decomp_util;
   decomp_util.set_obs(obs);
   decomp_util.set_local_bbox(
-      Vec3f(2, 2, 1));  // Only try to find cvx decomp in the Mikowsski sum of JPS and this box (I think)
-  decomp_util.dilate(path);
+      Vec3f(2, 2, 1));       // Only try to find cvx decomp in the Mikowsski sum of JPS and this box (I think)
+  decomp_util.dilate(path);  // Find convex polyhedra
+  decomp_util.shrink_polyhedrons(par_.drone_radius);  // Shrink polyhedra by the drone radius
 
   // Publish visualization msgs
   decomp_ros_msgs::EllipsoidArray es_msg = DecompROS::ellipsoid_array_to_ros(decomp_util.get_ellipsoids());
@@ -1639,11 +1644,11 @@ void CVX::cvxDecomp(vec_Vecf<3> path)
   // std::cout << "In cvxDecomp 3!" << std::endl;
   l_constraints_.clear();
 
-  std::cout << "In cvxDecomp, el path llegado es:" << std::endl;
-  printElementsOfJPS(path);
+  // std::cout << "In cvxDecomp, el path llegado es:" << std::endl;
+  // printElementsOfJPS(path);
   for (size_t i = 0; i < path.size() - 1; i++)
   {
-    std::cout << "Inserting constraint" << std::endl;
+    // std::cout << "Inserting constraint" << std::endl;
     const auto pt_inside = (path[i] + path[i + 1]) / 2;
     LinearConstraint3D cs(pt_inside, polys[i].hyperplanes());
     l_constraints_.push_back(cs);

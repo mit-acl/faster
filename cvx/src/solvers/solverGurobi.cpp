@@ -276,11 +276,8 @@ int SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> l_constraints)
         std::vector<GRBLinExpr> Ax = MatrixMultiply(A1std, pos);
         for (int i = 0; i < b1.rows(); i++)
         {
-          // Now let's shrink the polytopes with the size of the drone
-          double norm_a = (A1.row(i)).norm();
-          double distance = 0;  ///!!!!CHANGE THIS, SETTING THE DISTANCE TO THE ONE OF THE DRONE
           polytopes_cons.push_back(m.addGenConstrIndicator(b[t][n_poly], 1, Ax[i], '<',
-                                                           b1[i] - distance * norm_a));  // If b[t,0]==1, then...
+                                                           b1[i]));  // If b[t,0]==1, then...
         }
       }
     }
