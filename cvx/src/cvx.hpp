@@ -79,6 +79,7 @@ struct parameteres
   int N;
 
   int offset;
+  int offset_rp;
   double Ra;
   double Ra_max;
   double Rb;

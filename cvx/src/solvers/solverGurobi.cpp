@@ -91,7 +91,7 @@ void SolverGurobi::setObjective()  // I need to set it every time, because the o
   for (int t = 0; t < samples_penalize_.size(); t++)  // This loop is not executed when computing the rescue path
   {
     std::vector<GRBLinExpr> sample_i = { samples_penalize_[t][0], samples_penalize_[t][1], samples_penalize_[t][2] };
-    printf("in loop %d\n", t);
+    // printf("in loop %d\n", t);
 
     double tau = (t == samples_penalize_.size() - 1) ? dt_ : 0;  // If the last interval -->  at the end of it
     double interval = (t == samples_penalize_.size() - 1) ? t - 1 : t;
@@ -448,45 +448,39 @@ void SolverGurobi::set_max(double max_values[3])
 
 bool SolverGurobi::genNewTraj()
 {
-  bool solved;
+  bool solved = false;
   findDT();
-  // dt_ = 5.0 / N_;
 
+  dt_ = 2 * dt_;
+  // double dt_initial = dt_;
+  // while (solved == false)
+  //{
+  std::cout << "Trying dt_=" << dt_ << std::endl;
   setConstraintsX0();
   setConstraintsXf();
   setDynamicConstraints();
   setDistanceConstraints();
-  // printf("In genNewTraj\n");
-  /*  std::cout << "dt is=" << dt_ << std::endl;
-    std::cout << "callOptimizer, x0_=" << x0_[0] << " " << x0_[1] << " " << x0_[2] << " "
-              << "xf_=" << xf_[0] << " " << xf_[1] << " " << xf_[2] << " " << std::endl;*/
-
   setObjective();
 
   resetXandU();
   solved = callOptimizer();
+  // if (solved == false)
+  //{
+  //  dt_ = 1.2 * dt_;
+  //}
+  //}
+  // std::cout << "dt_final/dt_initial= " << dt_ / dt_initial << std::endl;
   if (solved == true)
   {
     fillXandU();
   }
   return solved;
-  // printf("In genNewTraj0.5\n");
-  /*  resetXandU();
-    // printf("In genNewTraj1\n");
-
-    x_ = jerk_get_state();
-    u_ = jerk_get_control();
-
-    interpolate(POS, u_, x_);    // interpolate POS
-    interpolate(VEL, u_, x_);    // ...
-    interpolate(ACCEL, u_, x_);  // ...
-    interpolate(JERK, u_, x_);*/
 }
 
 void SolverGurobi::findDT()
 {
-  double dt = 2 * getDTInitial();
-  dt_ = dt;
+  // double dt = 2 * getDTInitial();
+  dt_ = getDTInitial();
   // dt_ = 1;
 }
 
@@ -525,24 +519,24 @@ bool SolverGurobi::callOptimizer()
 
   m.update();
   temporal = temporal + 1;
-  printf("Writing into model.lp number=%d", temporal);
-  m.write("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/model_" + std::to_string(temporal) + ".lp");
+  // printf("Writing into model.lp number=%d", temporal);
+  // m.write("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/model_" + std::to_string(temporal) + ".lp");
   m.set("OutputFlag", "0");  // 1 if you want verbose
 
-  std::cout << "*************************Starting Optimization" << std::endl;
+  // std::cout << "*************************Starting Optimization" << std::endl;
   auto start = std::chrono::steady_clock::now();
   m.optimize();
   auto end = std::chrono::steady_clock::now();
   auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-  std::cout << "*************************Finished Optimization: " << elapsed << " ms" << std::endl;
-  std::cout << "*************************Gurobi RUNTIME: " << m.get(GRB_DoubleAttr_Runtime) * 1000 << " ms"
-            << std::endl;
+  // std::cout << "*************************Finished Optimization: " << elapsed << " ms" << std::endl;
+  // std::cout << "*************************Gurobi RUNTIME: " << m.get(GRB_DoubleAttr_Runtime) * 1000 << " ms"<<
+  // std::endl;
 
   times_log.open("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/times_log.txt", std::ios_base::app);
   times_log << elapsed << "\n";
   times_log.close();
 
-  printf("Going to check status");
+  // printf("Going to check status");
   int optimstatus = m.get(GRB_IntAttr_Status);
   if (optimstatus == GRB_OPTIMAL)
   {

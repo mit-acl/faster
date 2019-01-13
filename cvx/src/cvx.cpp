@@ -7,13 +7,16 @@
 // space
 // Set dt as a constant in the optimization problem (so that many constraints no se tengan que poner de nuevo) (what in
 // Cvxgen is called parameter)
-// Mirar a ver d'onde acaba el goal, parece que est'a acabando 0.2m del real goal.
+// Mirar a ver d'onde acaba el goal, parece que est'a acabando 0.2m del real goal. Esto empezo a pasar desde que puse la
+// penalizacion on el JPS
 // Al hacer shrink de los polyhedra, creo que se puede romper la continuidad (y que 2 polyhedra succesive no overlap
 // between them)
 // Al hacer shrink de los polyhedra, a veces la posición actual del dron queda fuera de los poliedros --> gurobi no
 // encuentra solución
 // Check the weight of the penalization wrt JPS in the objective function of Gurobi. Not sure it's working well
 // When taking off, something weird happen (started to happen when I added the penalization to JPS in the obj function)
+// Cuidado que X_temp y U_temp pueden estar usandose incluso cuando rescue path fails --> use other matrix variables
+// Ver si las samples along the JPS (for the rescue path optimization) se est'an haciendo bien, parece que hay algo raro
 
 // TODOs antiguos:
 // TODO: compile cvxgen with the option -03 (see
@@ -71,6 +74,8 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   ros::param::param<int>("~N", par_.N, 10);
 
   ros::param::param<int>("~offset", par_.offset, 5);
+
+  ros::param::param<int>("~offset_rp", par_.offset_rp, 4);
 
   ros::param::param<double>("~Ra", par_.Ra, 2.0);
   ros::param::param<double>("~Ra_max", par_.Ra_max, 2.5);
@@ -1017,8 +1022,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   ///////////////       RESCUE PATH    //////////////////////
   ///////////////////////////////////////////////////////////
 
-  int index = ceil(0.04 / par_.dc);  // R is the point of the trajectory 40 ms after the start of the trajectory
-                                     // TODO: change 0.04 to parameter
+  int index = par_.offset_rp;  // R is the point of the trajectory 40 ms after the start of the trajectory
   Eigen::Vector3d posR(X_temp_(index, 0), X_temp_(index, 1), X_temp_(index, 2));
   Eigen::Vector3d velR(X_temp_(index, 3), X_temp_(index, 4), X_temp_(index, 5));
   Eigen::Vector3d accelR(X_temp_(index, 6), X_temp_(index, 7), X_temp_(index, 8));
@@ -1503,6 +1507,12 @@ void CVX::pubCB(const ros::TimerEvent& e)
 
     mtx_k.lock();
     k_++;
+
+    if (k_ > par_.offset_rp && status_ == TRAVELING)
+    {
+      ROS_WARN("Switched to the RESCUE PATH!!");
+    }
+
     mtx_k.unlock();
   }
   else

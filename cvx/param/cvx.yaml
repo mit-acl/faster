@@ -87,6 +87,7 @@ drone_radius: 0.42  #(m) Used for collision checking
 N: 10  #[-] Number of discretization points in the trajectory
 
 offset: 10  # Replanning offset (the initial conditions are taken OFFSET states farther from the last published goal)
+offset_rp: 30 #The rescue path starts X states ahead of the beginning of the whole trajectory
 
 Ra: 3            # [m] Minimum radius of the first sphere
 Ra_max: 4            # [m] Maximum radius of the first sphere
