@@ -44,7 +44,7 @@ std::vector<GRBLinExpr> MatrixMultiply(const std::vector<std::vector<double>>& A
   return result;
 }
 
-std::vector<GRBLinExpr> MatrixMultiply(const std::vector<std::vector<double>>& A, const std::vector<GRBLinExpr>& x)
+/*std::vector<GRBLinExpr> MatrixMultiply(const std::vector<std::vector<double>>& A, const std::vector<GRBLinExpr>& x)
 {
   std::vector<GRBLinExpr> result;
 
@@ -58,7 +58,7 @@ std::vector<GRBLinExpr> MatrixMultiply(const std::vector<std::vector<double>>& A
     result.push_back(lin_exp);
   }
   return result;
-}
+}*/
 
 template <typename T>  // Overload + to sum Elementwise std::vectors
 std::vector<T> operator+(const std::vector<T>& a, const std::vector<T>& b)
@@ -134,65 +134,6 @@ std::vector<T> GetColumn(std::vector<std::vector<T>> x, int column)
     result.push_back(x[i][column]);
   }
   return result;
-}
-
-GRBLinExpr getPos(int t, double tau, int ii, bool solved, std::vector<std::vector<GRBVar>> x)
-{
-  if (solved == true)
-  {
-    GRBLinExpr pos = (x[t][0 + ii].get(GRB_DoubleAttr_X)) * tau * tau * tau +
-                     (x[t][3 + ii].get(GRB_DoubleAttr_X)) * tau * tau + (x[t][6 + ii].get(GRB_DoubleAttr_X)) * tau +
-                     (x[t][9 + ii].get(GRB_DoubleAttr_X));
-    return pos;
-  }
-  else
-  {
-    GRBLinExpr pos = x[t][0 + ii] * tau * tau * tau + x[t][3 + ii] * tau * tau + x[t][6 + ii] * tau + x[t][9 + ii];
-    return pos;
-  }
-}
-
-GRBLinExpr getVel(int t, double tau, int ii, bool solved, std::vector<std::vector<GRBVar>> x)
-{  // t is the segment, tau is the time inside a specific segment (\in[0,dt], i is the axis)
-  if (solved == true)
-  {
-    GRBLinExpr vel = (3 * x[t][0 + ii].get(GRB_DoubleAttr_X)) * tau * tau +
-                     (2 * x[t][3 + ii].get(GRB_DoubleAttr_X)) * tau + (x[t][6 + ii].get(GRB_DoubleAttr_X));
-    return vel;
-  }
-  else
-  {
-    GRBLinExpr vel = 3 * x[t][0 + ii] * tau * tau + 2 * x[t][3 + ii] * tau + x[t][6 + ii];
-    return vel;
-  }
-}
-
-GRBLinExpr getAccel(int t, double tau, int ii, bool solved, std::vector<std::vector<GRBVar>> x)
-{  // t is the segment, tau is the time inside a specific segment(\in[0, dt], i is the axis)
-  if (solved == true)
-  {
-    GRBLinExpr accel = (6 * x[t][0 + ii].get(GRB_DoubleAttr_X)) * tau + 2 * x[t][3 + ii].get(GRB_DoubleAttr_X);
-    return accel;
-  }
-  else
-  {
-    GRBLinExpr accel = 6 * x[t][0 + ii] * tau + 2 * x[t][3 + ii];
-    return accel;
-  }
-}
-
-GRBLinExpr getJerk(int t, double tau, int ii, bool solved, std::vector<std::vector<GRBVar>> x)
-{  // t is the segment, tau is the time inside a specific segment (\in[0,dt], i is the axis)
-  if (solved == true)
-  {
-    GRBLinExpr jerk = 6 * x[t][0 + ii].get(GRB_DoubleAttr_X);  // Note that here tau doesn't appear (makes sense)
-    return jerk;
-  }
-  else
-  {
-    GRBLinExpr jerk = 6 * x[t][0 + ii];  // Note that here tau doesn't appear (makes sense)
-    return jerk;
-  }
 }
 
 #endif

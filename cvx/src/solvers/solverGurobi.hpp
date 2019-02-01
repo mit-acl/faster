@@ -75,9 +75,24 @@ public:
 
   void setDistances(vec_Vecf<3>& samples, std::vector<double> dist_near_obs);
 
-  void setSamplesPenalize(vec_Vecf<3>& samples_penalize);
+  // void setSamplesPenalize(vec_Vecf<3>& samples_penalize);
 
   void setDistanceConstraints();
+
+  GRBLinExpr getPos(int t, double tau, int ii);
+  GRBLinExpr getVel(int t, double tau, int ii);
+  GRBLinExpr getAccel(int t, double tau, int ii);
+  GRBLinExpr getJerk(int t, double tau, int ii);
+
+  GRBLinExpr getA(int t, int ii);
+  GRBLinExpr getB(int t, int ii);
+  GRBLinExpr getC(int t, int ii);
+  GRBLinExpr getD(int t, int ii);
+
+  std::vector<GRBLinExpr> getCP0(int t);
+  std::vector<GRBLinExpr> getCP1(int t);
+  std::vector<GRBLinExpr> getCP2(int t);
+  std::vector<GRBLinExpr> getCP3(int t);
 
 protected:
   Eigen::MatrixXd U_temp_;

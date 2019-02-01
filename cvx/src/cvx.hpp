@@ -176,7 +176,8 @@ private:
   // geometry_msgs::Point eigen2point(Eigen::Vector3d vector);
   void pubActualTraj();
   void vectorOfVectors2MarkerArray(vec_Vecf<3> traj, visualization_msgs::MarkerArray* m_array,
-                                   std_msgs::ColorRGBA color, int type = visualization_msgs::Marker::ARROW);
+                                   std_msgs::ColorRGBA color, int type = visualization_msgs::Marker::ARROW,
+                                   std::vector<double> radii = std::vector<double>());
   visualization_msgs::MarkerArray clearArrows();
   // geometry_msgs::Vector3 vectorNull();
   geometry_msgs::Vector3 getPos(int i);

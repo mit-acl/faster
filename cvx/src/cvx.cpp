@@ -17,6 +17,8 @@
 // When taking off, something weird happen (started to happen when I added the penalization to JPS in the obj function)
 // Cuidado que X_temp y U_temp pueden estar usandose incluso cuando rescue path fails --> use other matrix variables
 // Ver si las samples along the JPS (for the rescue path optimization) se est'an haciendo bien, parece que hay algo raro
+// Ahroa mismo las pointclouds no las estoy teniendo en cuenta
+// Las point clouds y los maps se actualizan MUY lentamente!!
 
 // TODOs antiguos:
 // TODO: compile cvxgen with the option -03 (see
@@ -350,152 +352,6 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f& start_sent, Vec3f& goal_sent, bool* solved, i
   pcl::PointXYZ pcl_start = eigenPoint2pclPoint(start);
   pcl::PointXYZ pcl_goal = eigenPoint2pclPoint(goal);
 
-  mtx_map.lock();
-  std::vector<int> id_map1(1);
-  std::vector<float> dist2_map1(1);  // squared distance
-  // printf("solveJPS3D3\n");
-
-  /////////////////////////////////////////////////////////////////////////
-  ////////////////////// CHECKS BEFORE RUNNING JPS ////////////////////////
-  /////////////////////////////////////////////////////////////////////////
-
-  /*  if (kdtree_map_.nearestKSearch(pcl_start, 1, id_map1, dist2_map1) > 0)
-    {
-      double r = sqrt(dist2_map1[0]);
-      // printf("nearest obstacle for start is at d=%f\n", r);
-
-      Eigen::Vector3d n_obs;  // nearest obstacle
-      pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr = kdtree_map_.getInputCloud();
-      n_obs << ptr->points[id_map1[0]].x, ptr->points[id_map1[0]].y, ptr->points[id_map1[0]].z;
-
-      Eigen::Array3d dist = ((start - n_obs).array()).abs();  // distances in each component to the nearest obstacle
-      //    std::cout << "n_obs" << n_obs.transpose() << std::endl;
-      //    std::cout << "start" << start.transpose() << std::endl;
-
-      // std::cout << "distances" << distances << std::endl;
-      // printf("solveJPS3D3.5\n");
-      if ((dist < par_.inflation_jps).all() == true)
-      {
-        //      printf("The START is hitting an inflated obstacle or the ground, JPS won't work\n");
-        //      printf("I'm going to try to fix it for you: Start= near point in the opposite direction\n");
-
-        Eigen::Array3d signed_dists = start - n_obs;
-        double signx = copysign(1, signed_dists[0]);
-        double signy = copysign(1, signed_dists[1]);  // sign of signed_dists[1]
-        double signz = copysign(1, signed_dists[2]);  // sign of signed_dists[2]
-
-        //      std::cout << "Obstaculo" << n_obs.transpose() << std::endl;
-        //      std::cout << "Start antes" << start.transpose() << std::endl;
-        //      std::cout << "Dist" << dist.transpose() << std::endl;
-
-        start[0] =
-            (dist[0] < par_.inflation_jps) ? start[0] + signx * (par_.inflation_jps + 2 * par_.res - dist[0]) :
-    start[0]; start[1] = (dist[1] < par_.inflation_jps) ? start[1] + signy * (par_.inflation_jps + 2 * par_.res -
-    dist[1]) : start[1]; start[2] = (dist[2] < par_.inflation_jps) ? start[2] + signz * (par_.inflation_jps + 2 *
-    par_.res - dist[2]) : start[2];
-
-        // std::cout << "Start despues" << start.transpose() << std::endl;
-
-        // std::cout << "otros valores" << std::endl;
-        // std::cout << "signx=" << signx << std::endl;
-        // std::cout << "signy=" << signy << std::endl;
-        // std::cout << "signz=" << signz << std::endl;
-
-        // std::cout << "1=" << start[0] + signx * (par_.inflation_jps + 2 * par_.res - dist[0]) << std::endl;
-        // std::cout << "2=" << signy * (par_.inflation_jps + 1 * par_.res - dist[1]) << std::endl;
-        // std::cout << "3=" << signz * (par_.inflation_jps + 1 * par_.res - dist[2]) << std::endl;
-
-        pcl::PointXYZ pcl_start2 = eigenPoint2pclPoint(start);
-        std::vector<int> idxR;
-        std::vector<float> r2D;  // squared distance
-        Eigen::Vector3d force(0, 0, 0);
-        pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr = kdtree_map_.getInputCloud();
-
-        if (kdtree_map_.radiusSearch(pcl_start2, 1.5 * par_.inflation_jps, idxR, r2D) > 0)  // This is an
-        {
-          for (size_t i = 0; i < idxR.size(); ++i)
-          {
-            Eigen::Vector3d obs(ptr->points[idxR[i]].x, ptr->points[idxR[i]].y, ptr->points[idxR[i]].z);
-            force = force + (start - obs).normalized();
-          }
-          start = start + (par_.inflation_jps + 2 * par_.res - sqrt(r2D[0])) * (force.normalized());
-        }
-
-        // std::cout << "force=" << force.transpose() << std::endl;
-
-        if (start[2] < par_.z_ground)
-        {
-          start[2] = par_.z_ground + 2 * par_.res;
-        }
-      }
-    }
-
-    // printf("solveJPS3D4\n");
-    std::vector<int> id_map2(1);
-    std::vector<float> dist2_map2(1);  // squared distance
-    if (kdtree_map_.nearestKSearch(pcl_goal, 1, id_map2, dist2_map2) > 0)
-    {
-      double r = sqrt(dist2_map2[0]);
-      // printf("nearest obstacle for goal is at d=%f\n", r);
-      Eigen::Vector3d n_obs;  // nearest obstacle
-      pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr = kdtree_map_.getInputCloud();
-      n_obs << ptr->points[id_map2[0]].x, ptr->points[id_map2[0]].y, ptr->points[id_map2[0]].z;
-
-      Eigen::Array3d distances = ((n_obs - goal).array()).abs();  // distances in each component to the nearest obstacle
-
-      if ((distances < par_.inflation_jps).all() == true)
-      {
-        // std::cout << "Goal=" << goal.transpose() << std::endl;
-        // std::cout << "n_obs=" << n_obs.transpose() << std::endl;
-        // std::cout << "distances=" << distances.transpose() << std::endl;
-
-        // printf("The GOAL is hitting an inflated obstacle, JPS won't work\n");
-        // printf("I'm going to try to fix it for you: GOAL= near point in the opposite direction\n");
-        // printf("If the new goal falls outside the map, it won't work neither\n");
-
-        std::vector<int> idxR;
-        std::vector<float> r2D;  // squared distance
-        Eigen::Vector3d force(0, 0, 0);
-        pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr = kdtree_map_.getInputCloud();
-
-        if (kdtree_map_.radiusSearch(pcl_goal, 2 * par_.inflation_jps, idxR, r2D) > 0)  // This is an approximation
-        {
-          for (size_t i = 0; i < idxR.size(); ++i)
-          {
-            Eigen::Vector3d obs(ptr->points[idxR[i]].x, ptr->points[idxR[i]].y, ptr->points[idxR[i]].z);
-            force = force + (start - obs).normalized();
-          }
-        }
-        goal = goal + (par_.inflation_jps + 2 * par_.res) * (force.normalized());
-
-        // Check if it falls outside the map
-        mtx_state.lock();
-        Eigen::Vector3d rel(goal[0] - state_.pos.x, goal[1] - state_.pos.y, goal[2] - state_.pos.z);
-        goal[0] = (rel[0] > par_.wdx / 2 + 4 * par_.res) ? state_.pos.x + par_.wdx / 2 + 4 * par_.res : goal[0];
-        goal[1] = (rel[1] > par_.wdy / 2 + 4 * par_.res) ? state_.pos.y + par_.wdy / 2 + 4 * par_.res : goal[1];
-        goal[2] = (rel[2] > par_.wdz / 2 + 4 * par_.res) ? state_.pos.z + par_.wdz / 2 + 4 * par_.res : goal[2];
-        goal[0] = (rel[0] < -par_.wdx / 2 - 4 * par_.res) ? state_.pos.x - par_.wdx / 2 - 4 * par_.res : goal[0];
-        goal[1] = (rel[1] > -par_.wdy / 2 - 4 * par_.res) ? state_.pos.y - par_.wdy / 2 - 4 * par_.res : goal[1];
-        goal[2] = (rel[2] > -par_.wdz / 2 - 4 * par_.res) ? state_.pos.z - par_.wdz / 2 - 4 * par_.res : goal[2];
-        mtx_state.unlock();
-
-        if (goal[2] < par_.z_ground)
-        {
-          goal[2] = par_.z_ground + 2 * par_.res;
-        }
-
-        if (goal[2] < par_.z_max)
-        {
-          goal[2] = par_.z_max;
-        }
-      }
-    }*/
-
-  // printf("       JPS check takes: %f ms\n", (double)time_solve_jps_check.Elapsed().count());
-  // printf("Out3\n");
-
-  mtx_map.unlock();
-
   ///////////////////////////////////////////////////////////////
   /////////////////////////// RUN JPS ///////////////////////////
   ///////////////////////////////////////////////////////////////
@@ -586,13 +442,14 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f& start_sent, Vec3f& goal_sent, bool* solved, i
 }*/
 
 void CVX::vectorOfVectors2MarkerArray(vec_Vecf<3> traj, visualization_msgs::MarkerArray* m_array,
-                                      std_msgs::ColorRGBA color, int type)
+                                      std_msgs::ColorRGBA color, int type, std::vector<double> radii)
 {
   // printf("In vectorOfVectors2MarkerArray\n");
   geometry_msgs::Point p_last = eigen2point(traj[0]);
 
   bool skip = false;
   int i = 50000;  // large enough to prevent conflict with other markers
+  int j = 0;
 
   for (const auto& it : traj)
   {
@@ -627,12 +484,18 @@ void CVX::vectorOfVectors2MarkerArray(vec_Vecf<3> traj, visualization_msgs::Mark
     }
     else
     {
-      m.scale.x = 0.1;
-      m.scale.y = 0.1;
-      m.scale.z = 0.1;
+      double scale = 0.1;
+      if (radii.size() != 0)
+      {  // If argument provided
+        scale = radii[j];
+      }
+      m.scale.x = scale;
+      m.scale.y = scale;
+      m.scale.z = scale;
       m.pose.position = p;
     }
     (*m_array).markers.push_back(m);
+    j = j + 1;
   }
 }
 
@@ -986,18 +849,20 @@ void CVX::replanCB(const ros::TimerEvent& e)
   double before = ros::Time::now().toSec();
   cvxDecomp(JPS1_inside_sphere);  // result saved in l_constraints_
   ROS_WARN("CVXDecomp time: %0.2f ms", 1000 * (ros::Time::now().toSec() - before));
-  printf("Solved CVXDecomp!!!\n");
+  printf("Finished CVXDecomp!!!\n");
 
-  vec_Vecf<3> samples_penalize =
-      sampleJPS(JPS1, par_.N + 1);  // Samples to penalize the distance from the trajectory to these samples
+  // vec_Vecf<3> samples_penalize =sampleJPS(JPS1, par_.N + 1);  // Samples to penalize the distance from the trajectory
+  // to these samples
 
+  solver_gurobi_.setXf(xf);
+  solver_gurobi_.setX0(x0);
+  solver_gurobi_.findDT();
   solver_gurobi_.setPolytopes(l_constraints_);
   vec_Vecf<3> samples_empty;
   std::vector<double> dist_empty;
   solver_gurobi_.setDistances(samples_empty, dist_empty);  // No distance constraints for the normal path
-  solver_gurobi_.setSamplesPenalize(samples_penalize);     // penalize the distance from the traj to the JPS
-  solver_gurobi_.setXf(xf);
-  solver_gurobi_.setX0(x0);
+  // solver_gurobi_.setSamplesPenalize(samples_penalize);     // penalize the distance from the traj to the JPS
+
   bool solved_whole = solver_gurobi_.genNewTraj();
 
   if (solved_whole == false)
@@ -1022,7 +887,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   ///////////////       RESCUE PATH    //////////////////////
   ///////////////////////////////////////////////////////////
 
-  int index = par_.offset_rp;  // R is the point of the trajectory 40 ms after the start of the trajectory
+  int index = par_.offset_rp;  // R is the point of the trajectory offset_rp ms after the start of the trajectory
   Eigen::Vector3d posR(X_temp_(index, 0), X_temp_(index, 1), X_temp_(index, 2));
   Eigen::Vector3d velR(X_temp_(index, 3), X_temp_(index, 4), X_temp_(index, 5));
   Eigen::Vector3d accelR(X_temp_(index, 6), X_temp_(index, 7), X_temp_(index, 8));
@@ -1056,9 +921,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   // printf("These is the part of JPS that is in known space:\n");
   // printElementsOfJPS(JPS1_in_known_space);
 
-  vec_Vecf<3> samples = sampleJPS(JPS1_in_known_space, par_.N + 1);  // Take N +1 samples along JPS1_in_known_space; IT
-                                                                     // has to be N+1, because N is the number of
-                                                                     // segments
+  vec_Vecf<3> samples = sampleJPS(JPS1_in_known_space, par_.N);  // Take N samples along JPS1_in_known_space;
   std::vector<double> dist_near_neig = getDistToNearestObs(samples);
 
   /*  printf("These are the samples along the path:\n");
@@ -1066,7 +929,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
     printf("**********************");*/
 
   clearMarkerArray(&samples_rescue_path_, &pub_samples_rescue_path_);
-  vectorOfVectors2MarkerArray(samples, &samples_rescue_path_, color(BLUE), visualization_msgs::Marker::SPHERE);
+  vectorOfVectors2MarkerArray(samples, &samples_rescue_path_, color(BLUE), visualization_msgs::Marker::SPHERE,
+                              dist_near_neig);  // the radius will be the distance to the nearest neighbour
   pub_samples_rescue_path_.publish(samples_rescue_path_);
 
   double x0_rescue[9] = { posR[0], posR[1], posR[2], velR[0], velR[1], velR[2], accelR[0], accelR[1], accelR[2] };
@@ -1074,16 +938,22 @@ void CVX::replanCB(const ros::TimerEvent& e)
   Eigen::Vector3d F = samples[samples.size() - 1];  // F is the final point of the rescue path (will be near I)
   double xf_rescue[9] = { F[0], F[1], F[2], 0, 0, 0, 0, 0, 0 };
 
+  solver_gurobi_.setXf(xf_rescue);
+  solver_gurobi_.setX0(x0_rescue);
+  solver_gurobi_.findDT();
   std::vector<LinearConstraint3D> empty;
   solver_gurobi_.setPolytopes(empty);  // No Polytopes constraints for the rescue path
   solver_gurobi_.setDistances(samples, dist_near_neig);
 
-  vec_Vecf<3> samples_penalize_empty;
-  printf("Going to setSamplesPenalize\n");
-  solver_gurobi_.setSamplesPenalize(samples_penalize_empty);  // no penalization in rescue path
+  std::cout << "Punto inicial: " << x0_rescue[0] << ", " << x0_rescue[1] << ", " << x0_rescue[2] << std::endl;
+  std::cout << "Samples:";
+  printElementsOfJPS(samples);
+  std::cout << "Punto final: " << xf_rescue[0] << ", " << xf_rescue[1] << ", " << xf_rescue[2] << std::endl;
 
-  solver_gurobi_.setXf(xf_rescue);
-  solver_gurobi_.setX0(x0_rescue);
+  // vec_Vecf<3> samples_penalize_empty;
+  // printf("Going to setSamplesPenalize\n");
+  // solver_gurobi_.setSamplesPenalize(samples_penalize_empty);  // no penalization in rescue path
+
   bool solved_rescue = solver_gurobi_.genNewTraj();
 
   if (solved_rescue == false)
@@ -1144,221 +1014,6 @@ void CVX::replanCB(const ros::TimerEvent& e)
   ///////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////
-}
-
-// Get the distance to the nearest obstacle for each point given in the vector "points"
-std::vector<double> CVX::getDistToNearestObs(vec_Vecf<3>& points)
-{
-  mtx_unk.lock();
-  mtx_map.lock();
-  std::vector<double> distances;
-  for (int i = 0; i < points.size(); i++)
-  {
-    int N = 1;
-    pcl::PointXYZ searchPoint(points[i][0], points[i][1], points[i][2]);
-    std::vector<int> id(N);
-    std::vector<float> dist2(N);  // squared distance
-    double distance_map, distance_unk;
-
-    // Find nearest obstacles in Unkown space
-    distance_unk = kdtree_unk_.nearestKSearch(searchPoint, N, id, dist2) > 0 ? sqrt(dist2[0]) : 100;
-    // printf("Distance unkown=%f\n", distance_unk);
-
-    // Find nearest obstacles in MAP
-    distance_map = kdtree_map_.nearestKSearch(searchPoint, N, id, dist2) > 0 ? sqrt(dist2[0]) : 100;
-    // printf("Distance map=%f\n", distance_map);
-    // printf("******");
-
-    distances.push_back(std::min(distance_map, distance_unk));
-  }
-  // std::cout << "Distances computed are: " << distances << std::endl;
-  mtx_unk.unlock();
-  mtx_map.unlock();
-  return distances;
-}
-
-// Sample n points along the path
-vec_Vecf<3> CVX::sampleJPS(vec_Vecf<3>& path, int n)
-{
-  std::vector<double> distance;  // vector that contains the distance (going along the path) of each point in the path
-                                 // to the first point of the path
-  distance.push_back(0);
-  for (int i = 1; i < path.size(); i++)
-  {
-    double distance_so_far = distance[distance.size() - 1];
-    distance.push_back(distance_so_far + (path[i] - path[i - 1]).norm());
-  }
-
-  // note that distance and path have the same number of elements
-
-  double total_distance = getDistancePath(path);
-  double d = total_distance / n;  // distance between samples
-
-  vec_Vecf<3> samples;
-  samples.push_back(path[0]);
-  double dist_next_sample = 0;  // Distancia a la que quiero poner el next sample
-
-  Eigen::Vector3d next_peak, previous_peak;
-  double difference;
-  for (int n_samples = 1; n_samples < n; n_samples++)
-  {
-    dist_next_sample = dist_next_sample + d;
-
-    Eigen::Vector3d previous_peak;
-    for (int i = 1; i < distance.size(); i++)
-    {
-      if (distance[i] > dist_next_sample)
-      {
-        previous_peak = path[i - 1];
-        next_peak = path[i];
-        difference = dist_next_sample - distance[i - 1];
-        break;
-      }
-    }
-
-    Eigen::Vector3d v = (next_peak - previous_peak).normalized();
-
-    Eigen::Vector3d last_sample = samples[samples.size() - 1];
-    Eigen::Vector3d new_sample = previous_peak + difference * v;
-    samples.push_back(new_sample);
-  }
-  return samples;
-}
-
-double CVX::solveVelAndGetCost(vec_Vecf<3> path)
-{
-  double cost = 0;
-  /*  printf("Points in the path VEL\n");
-    for (int i = 0; i < path.size() - 1; i++)
-    {
-      std::cout << path[i].transpose(s) << std::endl;
-    }*/
-
-  for (int i = 0; i < path.size() - 1; i++)
-  {
-    double xf[3] = { path[i + 1][0], path[i + 1][1], path[i + 1][2] };
-
-    double x0[3] = { path[i][0], path[i][1], path[i][2] };
-    // double u0[3] = { initialCond_.vel.x, initialCond_.vel.y, initialCond_.vel.z };
-    solver_vel_.set_xf(xf);
-    solver_vel_.set_x0(x0);
-    // solver_vel_.set_u0(u0);
-    double t0cvxgen_vel = ros::Time::now().toSec();
-    solver_vel_.genNewTraj();
-    log_.cvx_vel_total_ms = log_.cvx_vel_total_ms + 1000 * (ros::Time::now().toSec() - t0cvxgen_vel);
-    log_.loops_vel = log_.loops_vel + 1;
-    cost = cost + solver_vel_.getCost();
-  }
-  return cost;
-}
-
-void CVX::modeCB(const acl_msgs::QuadFlightMode& msg)
-{
-  // printf("In modeCB\n");
-  if (msg.mode == msg.LAND && flight_mode_.mode != flight_mode_.LAND)
-  {
-    printf("LANDING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
-    // Solver Vel
-    /*    double xf[6] = { quadGoal_.pos.x, quadGoal_.pos.y, z_land_ };
-        solver_vel_.set_xf(xf);
-        solver_vel_.genNewTraj();*/
-
-    // Solver Accel
-    /*    double xf[6] = { quadGoal_.pos.x, quadGoal_.pos.y, z_land_, 0, 0, 0 };
-        double max_values[2] = { par_.v_max, par_.a_max };
-        solver_accel_.set_max(max_values);  // TODO: To land, I use u_min_
-        solver_accel_.set_xf(xf);
-        solver_accel_.genNewTraj();*/
-    mtx_state.lock();
-    double x0[9] = { state_.pos.x, state_.pos.y, state_.pos.z, state_.vel.x, state_.vel.y, state_.vel.z, 0, 0, 0 };
-
-    double xf[9] = { state_.pos.x, state_.pos.y, par_.z_land, 0, 0, 0, 0, 0, 0 };
-    mtx_state.unlock();
-    mtx_goals.unlock();
-    // printf("Hola6.7\n");
-    solver_jerk_.set_xf(xf);
-    solver_jerk_.set_x0(x0);
-
-    k_initial_cond_ = std::min(k_ + par_.offset, (int)(X_.rows() - 1));
-    // Solver Jerk
-    // double xf[9] = { quadGoal_.pos.x, quadGoal_.pos.y, par_.z_land, 0, 0, 0, 0, 0, 0 };
-    // TODO: To land, I use u_min_
-    solver_jerk_.set_x0(x0);
-    solver_jerk_.set_xf(xf);
-    solver_jerk_.genNewTraj();
-    to_land_ = true;
-    mtx_X_U_temp.lock();
-    U_temp_ = solver_jerk_.getU();
-    X_temp_ = solver_jerk_.getX();
-    mtx_X_U_temp.unlock();
-    mtx_planner_status_.lock();
-    planner_status_ = REPLANNED;
-    mtx_planner_status_.unlock();
-  }
-  flight_mode_.mode = msg.mode;
-}
-
-void CVX::stateCB(const acl_msgs::State& msg)
-{
-  // ROS_ERROR("In state CB");
-  // printf("(State): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", msg.pos.x, msg.pos.y, msg.pos.z, msg.vel.x, msg.vel.y,
-  //       msg.vel.z);
-  mtx_state.lock();
-  state_ = msg;
-  mtx_state.unlock();
-  // Stop updating when we get GO
-  if (flight_mode_.mode == flight_mode_.NOT_FLYING || flight_mode_.mode == flight_mode_.KILL)
-  {
-    quadGoal_.pos = msg.pos;
-    quadGoal_.vel = msg.vel;
-    z_start_ = msg.pos.z;
-    z_start_ = std::max(0.0, z_start_);
-    mtx_initial_cond.lock();
-    initialCond_.pos = msg.pos;
-    mtx_initial_cond.unlock();
-  }
-
-  static int i = 0;
-  i++;
-
-  if (status_ != GOAL_REACHED && par_.visual == true)
-  {
-    pubActualTraj();
-  }
-
-  if (i % 10 == 0)
-  {
-    Eigen::Vector3d actual_pos(msg.pos.x, msg.pos.y, msg.pos.z);
-    log_.total_dist = log_.total_dist + (actual_pos - pos_old_).norm();
-    pos_old_ = actual_pos;
-  }
-  Eigen::Vector3d vel(msg.vel.x, msg.vel.y, msg.vel.z);
-  log_.veloc_norm = vel.norm();
-}
-
-void CVX::updateInitialCond(int i)
-{
-  if (status_ != GOAL_REACHED)
-  {
-    mtx_initial_cond.lock();
-    initialCond_.pos = getPos(i);
-    initialCond_.vel = getVel(i);
-    initialCond_.accel = (par_.use_ff) ? getAccel(i) : vectorNull();
-    initialCond_.jerk = (par_.use_ff) ? getJerk(i) : vectorNull();
-    mtx_initial_cond.unlock();
-  }
-
-  else
-  {
-    mtx_initial_cond.lock();
-    mtx_state.lock();
-    initialCond_.pos = state_.pos;
-    mtx_state.unlock();
-    initialCond_.vel = vectorNull();
-    initialCond_.accel = vectorNull();
-    initialCond_.jerk = vectorNull();
-    mtx_initial_cond.unlock();
-  }
 }
 
 void CVX::pubCB(const ros::TimerEvent& e)
@@ -1539,6 +1194,222 @@ void CVX::pubCB(const ros::TimerEvent& e)
   mtx_goals.unlock();
 }
 
+// Get the distance to the nearest obstacle for each point given in the vector "points"
+std::vector<double> CVX::getDistToNearestObs(vec_Vecf<3>& points)
+{
+  mtx_unk.lock();
+  mtx_map.lock();
+  std::vector<double> distances;
+  for (int i = 0; i < points.size(); i++)
+  {
+    int N = 1;
+    pcl::PointXYZ searchPoint(points[i][0], points[i][1], points[i][2]);
+    std::vector<int> id(N);
+    std::vector<float> dist2(N);  // squared distance
+    double distance_map, distance_unk;
+
+    // Find nearest obstacles in Unkown space
+    distance_unk = kdtree_unk_.nearestKSearch(searchPoint, N, id, dist2) > 0 ? sqrt(dist2[0]) : 100;
+    // printf("Distance unkown=%f\n", distance_unk);
+
+    // Find nearest obstacles in MAP
+    distance_map = kdtree_map_.nearestKSearch(searchPoint, N, id, dist2) > 0 ? sqrt(dist2[0]) : 100;
+    // printf("Distance map=%f\n", distance_map);
+    // printf("******");
+
+    distances.push_back(std::min(distance_map, distance_unk));
+  }
+  // std::cout << "Distances computed are: " << distances << std::endl;
+  mtx_unk.unlock();
+  mtx_map.unlock();
+  return distances;
+}
+
+// Sample n points along the path
+vec_Vecf<3> CVX::sampleJPS(vec_Vecf<3>& path, int n)
+{
+  std::vector<double> distance;  // vector that contains the distance (going along the path) of each vertex in the path
+                                 // to the first point of the path
+  distance.push_back(0);
+  for (int i = 1; i < path.size(); i++)
+  {
+    double distance_so_far = distance[distance.size() - 1];
+    distance.push_back(distance_so_far + (path[i] - path[i - 1]).norm());
+  }
+
+  // note that distance and path have the same number of elements
+
+  double total_distance = getDistancePath(path);
+  double d = total_distance / n;  // distance between samples
+
+  vec_Vecf<3> samples;
+  samples.push_back(path[0]);
+  double dist_next_sample = 0;  // Distancia a la que quiero poner el next sample
+
+  Eigen::Vector3d next_peak, previous_peak;
+  double difference;
+  for (int n_samples = 1; n_samples < n; n_samples++)
+  {
+    dist_next_sample = dist_next_sample + d;
+
+    Eigen::Vector3d previous_peak;
+    for (int i = 1; i < distance.size(); i++)
+    {
+      if (distance[i] > dist_next_sample)
+      {
+        previous_peak = path[i - 1];
+        next_peak = path[i];
+        difference = dist_next_sample - distance[i - 1];
+        break;
+      }
+    }
+
+    Eigen::Vector3d v = (next_peak - previous_peak).normalized();
+
+    Eigen::Vector3d last_sample = samples[samples.size() - 1];
+    Eigen::Vector3d new_sample = previous_peak + difference * v;
+    std::cout << "Adding sample" << new_sample << std::endl;
+    samples.push_back(new_sample);
+  }
+  return samples;
+}
+
+double CVX::solveVelAndGetCost(vec_Vecf<3> path)
+{
+  double cost = 0;
+  /*  printf("Points in the path VEL\n");
+    for (int i = 0; i < path.size() - 1; i++)
+    {
+      std::cout << path[i].transpose(s) << std::endl;
+    }*/
+
+  for (int i = 0; i < path.size() - 1; i++)
+  {
+    double xf[3] = { path[i + 1][0], path[i + 1][1], path[i + 1][2] };
+
+    double x0[3] = { path[i][0], path[i][1], path[i][2] };
+    // double u0[3] = { initialCond_.vel.x, initialCond_.vel.y, initialCond_.vel.z };
+    solver_vel_.set_xf(xf);
+    solver_vel_.set_x0(x0);
+    // solver_vel_.set_u0(u0);
+    double t0cvxgen_vel = ros::Time::now().toSec();
+    solver_vel_.genNewTraj();
+    log_.cvx_vel_total_ms = log_.cvx_vel_total_ms + 1000 * (ros::Time::now().toSec() - t0cvxgen_vel);
+    log_.loops_vel = log_.loops_vel + 1;
+    cost = cost + solver_vel_.getCost();
+  }
+  return cost;
+}
+
+void CVX::modeCB(const acl_msgs::QuadFlightMode& msg)
+{
+  // printf("In modeCB\n");
+  if (msg.mode == msg.LAND && flight_mode_.mode != flight_mode_.LAND)
+  {
+    printf("LANDING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+    // Solver Vel
+    /*    double xf[6] = { quadGoal_.pos.x, quadGoal_.pos.y, z_land_ };
+        solver_vel_.set_xf(xf);
+        solver_vel_.genNewTraj();*/
+
+    // Solver Accel
+    /*    double xf[6] = { quadGoal_.pos.x, quadGoal_.pos.y, z_land_, 0, 0, 0 };
+        double max_values[2] = { par_.v_max, par_.a_max };
+        solver_accel_.set_max(max_values);  // TODO: To land, I use u_min_
+        solver_accel_.set_xf(xf);
+        solver_accel_.genNewTraj();*/
+    mtx_state.lock();
+    double x0[9] = { state_.pos.x, state_.pos.y, state_.pos.z, state_.vel.x, state_.vel.y, state_.vel.z, 0, 0, 0 };
+
+    double xf[9] = { state_.pos.x, state_.pos.y, par_.z_land, 0, 0, 0, 0, 0, 0 };
+    mtx_state.unlock();
+    mtx_goals.unlock();
+    // printf("Hola6.7\n");
+    solver_jerk_.set_xf(xf);
+    solver_jerk_.set_x0(x0);
+
+    k_initial_cond_ = std::min(k_ + par_.offset, (int)(X_.rows() - 1));
+    // Solver Jerk
+    // double xf[9] = { quadGoal_.pos.x, quadGoal_.pos.y, par_.z_land, 0, 0, 0, 0, 0, 0 };
+    // TODO: To land, I use u_min_
+    solver_jerk_.set_x0(x0);
+    solver_jerk_.set_xf(xf);
+    solver_jerk_.genNewTraj();
+    to_land_ = true;
+    mtx_X_U_temp.lock();
+    U_temp_ = solver_jerk_.getU();
+    X_temp_ = solver_jerk_.getX();
+    mtx_X_U_temp.unlock();
+    mtx_planner_status_.lock();
+    planner_status_ = REPLANNED;
+    mtx_planner_status_.unlock();
+  }
+  flight_mode_.mode = msg.mode;
+}
+
+void CVX::stateCB(const acl_msgs::State& msg)
+{
+  // ROS_ERROR("In state CB");
+  // printf("(State): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", msg.pos.x, msg.pos.y, msg.pos.z, msg.vel.x, msg.vel.y,
+  //       msg.vel.z);
+  mtx_state.lock();
+  state_ = msg;
+  mtx_state.unlock();
+  // Stop updating when we get GO
+  if (flight_mode_.mode == flight_mode_.NOT_FLYING || flight_mode_.mode == flight_mode_.KILL)
+  {
+    quadGoal_.pos = msg.pos;
+    quadGoal_.vel = msg.vel;
+    z_start_ = msg.pos.z;
+    z_start_ = std::max(0.0, z_start_);
+    mtx_initial_cond.lock();
+    initialCond_.pos = msg.pos;
+    mtx_initial_cond.unlock();
+  }
+
+  static int i = 0;
+  i++;
+
+  if (status_ != GOAL_REACHED && par_.visual == true)
+  {
+    pubActualTraj();
+  }
+
+  if (i % 10 == 0)
+  {
+    Eigen::Vector3d actual_pos(msg.pos.x, msg.pos.y, msg.pos.z);
+    log_.total_dist = log_.total_dist + (actual_pos - pos_old_).norm();
+    pos_old_ = actual_pos;
+  }
+  Eigen::Vector3d vel(msg.vel.x, msg.vel.y, msg.vel.z);
+  log_.veloc_norm = vel.norm();
+}
+
+void CVX::updateInitialCond(int i)
+{
+  if (status_ != GOAL_REACHED)
+  {
+    mtx_initial_cond.lock();
+    initialCond_.pos = getPos(i);
+    initialCond_.vel = getVel(i);
+    initialCond_.accel = (par_.use_ff) ? getAccel(i) : vectorNull();
+    initialCond_.jerk = (par_.use_ff) ? getJerk(i) : vectorNull();
+    mtx_initial_cond.unlock();
+  }
+
+  else
+  {
+    mtx_initial_cond.lock();
+    mtx_state.lock();
+    initialCond_.pos = state_.pos;
+    mtx_state.unlock();
+    initialCond_.vel = vectorNull();
+    initialCond_.accel = vectorNull();
+    initialCond_.jerk = vectorNull();
+    mtx_initial_cond.unlock();
+  }
+}
+
 geometry_msgs::Vector3 CVX::getPos(int i)
 {
   int input_order = solver_jerk_.getOrder();
@@ -1661,9 +1532,7 @@ void CVX::cvxDecomp(vec_Vecf<3> path)
   decomp_util.set_local_bbox(
       Vec3f(2, 2, 1));       // Only try to find cvx decomp in the Mikowsski sum of JPS and this box (I think)
   decomp_util.dilate(path);  // Find convex polyhedra
-  // decomp_util.shrink_polyhedrons(par_.drone_radius);  // Shrink polyhedra by the drone radius
-
-  decomp_util.shrink_polyhedrons(0);  // Shrink polyhedra
+  decomp_util.shrink_polyhedrons(par_.drone_radius);  // Shrink polyhedra by the drone radius
 
   // Publish visualization msgs
   decomp_ros_msgs::EllipsoidArray es_msg = DecompROS::ellipsoid_array_to_ros(decomp_util.get_ellipsoids());
@@ -1995,63 +1864,6 @@ void CVX::unkCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 
   // printf("Waiting for lock!");
   mtx_unk.lock();
-  /*  // If the drone is nos flying/taking of/..., let's remove a box around it so that it can take off.
-    if (flight_mode_.mode == flight_mode_.LAND || flight_mode_.mode == flight_mode_.TAKEOFF ||
-        flight_mode_.mode == flight_mode_.NOT_FLYING || flight_mode_.mode == flight_mode_.INIT)
-    {*/
-  /*  printf("removing unkown space to allow takeoff\n");
-    // printf("inside\n");
-    // TODO A box filter would be better, I don't know why it doesn't work...
-
-    // Note that this is not visualized in the point cloud
-    float l = par_.drone_radius;
-    Eigen::Vector4f minPoint;
-    minPoint[0] = state_.pos.x - l;  // define minimum point x
-    minPoint[1] = state_.pos.y - l;  // define minimum point y
-    minPoint[2] = state_.pos.z - l;  // define minimum point z
-    minPoint[3] = 1;
-    Eigen::Vector4f maxPoint;
-    maxPoint[0] = state_.pos.x + l;  // define maximum point x
-    maxPoint[1] = state_.pos.y + l;  // define maximum point y
-    maxPoint[2] = state_.pos.z + l;  // define maximum point z
-    maxPoint[3] = 1;
-
-    std::cout << minPoint << std::endl;
-    std::cout << maxPoint << std::endl;
-
-    // pcl::PointCloud<pcl::PointXYZ>::Ptr cloudOut(new pcl::PointCloud<pcl::PointXYZ>);
-
-    pcl::CropBox<pcl::PointXYZ> cropFilter;
-
-    cropFilter.setMin(minPoint);
-    cropFilter.setMax(maxPoint);
-    cropFilter.setInputCloud(cloudIn);
-    cropFilter.filter(*cloudFiltered);
-    //I think I'm missing sth here
-
-    if (cloudFiltered->points.size() == 0)
-    {
-      printf("Cloud filtered has 0 points\n");
-      return;
-    }
-  */
-  /*    // printf("Size before=%d", cloudIn->points.size());
-     pcl::PassThrough<pcl::PointXYZ> pass;
-     pass.setInputCloud(cloudIn);
-     pass.setFilterFieldName("z");
-     pass.setFilterLimits(-1, 1.5);       // TODO: Change this hand-coded values
-     pass.setFilterLimitsNegative(true);  // Forget the unknown space between z=-1 and z=3
-     pass.filter(*pclptr_unk_);
-
-     // printf("Size after=%d", pclptr_unk_->points.size());
-     if (pclptr_unk_->points.size() != 0)
-     {
-       kdtree_unk_.setInputCloud(pclptr_unk_);
-       kdtree_unk_initialized_ = 1;
-     }
-   }
-   else
-   {  // when the drone is flying*/
 
   kdtree_unk_.setInputCloud(cloudIn);
   kdtree_unk_initialized_ = 1;
@@ -2416,115 +2228,6 @@ void CVX::pubJPSIntersection(Eigen::Vector3d inters)
 // TODO: maybe clustering the point cloud is better for the potential field (instead of adding an obstacle in every
 // point of the point cloud)
 
-// g is the goal, x is the point on which I'd like to compute the force=-gradient(potential)
-Eigen::Vector3d CVX::computeForce(Eigen::Vector3d x, Eigen::Vector3d g)
-{
-  // printf("In computeForce\n");
-
-  double k_att = 2;
-  double k_rep = 2;
-  double d0 = 5;   // (m). Change between quadratic and linear potential (between linear and constant force)
-  double rho = 5;  // (m). If the obstacle is further than rho, its f_rep=0
-
-  Eigen::Vector3d f_rep(0, 0, 0);
-  Eigen::Vector3d f_att(0, 0, 0);
-
-  // Compute attractive force
-  float d_goal = (g - x).norm();  // distance to the goal
-  if (d_goal <= d0)
-  {
-    f_att = -k_att * (x - g);
-  }
-  else
-  {
-    f_att = -d0 * k_att * (x - g) / d_goal;
-  }
-
-  // Compute repulsive force
-  std::vector<int> id;                 // pointIdxpar_.RadiusSearch
-  std::vector<float> sd;               // pointpar_.RadiusSquaredDistance
-  pcl::PointXYZ sp(x[0], x[1], x[2]);  // searchPoint=x
-  mtx_map.lock();
-  pcl::KdTree<pcl::PointXYZ>::PointCloudConstPtr cloud_ptr = kdtree_map_.getInputCloud();
-
-  if (kdtree_map_.radiusSearch(sp, rho, id, sd) > 0)  // if further, f_rep=f_rep+0
-  {
-    for (size_t i = 0; i < id.size(); ++i)
-    {
-      if (cloud_ptr->points[id[i]].z < 0.2)  // Ground is not taken into account
-      {
-        continue;
-      }
-      Eigen::Vector3d obs(cloud_ptr->points[id[i]].x, cloud_ptr->points[id[i]].y, cloud_ptr->points[id[i]].z);
-      double d_obst = sqrt(sd[i]);
-      f_rep = f_rep + k_rep * (1 / d_obst - 1 / rho) * (pow(1 / d_obst, 2)) * (x - obs) / d_obst;
-    }
-  }
-  mtx_map.unlock();
-
-  visualization_msgs::MarkerArray forces;
-  createForceArrow(x, f_att, f_rep, &forces);
-
-  pub_forces_.publish(forces);
-  return f_att + f_rep;
-}
-
-// x is the position where the force f=f_att+f_rep is
-Eigen::Vector3d CVX::createForceArrow(Eigen::Vector3d x, Eigen::Vector3d f_att, Eigen::Vector3d f_rep,
-                                      visualization_msgs::MarkerArray* forces)
-{
-  //  printf("In createForceArrow\n");
-
-  const int ATT = 0;
-  const int REP = 1;
-  const int TOTAL = 2;
-  for (int i = 0; i < 3; i++)  // Attractive, Repulsive, Total
-  {
-    visualization_msgs::Marker m;
-    m.type = visualization_msgs::Marker::ARROW;
-    m.action = visualization_msgs::Marker::ADD;
-    m.id = 100000000 + i;  // Large enough to not interfere with the arrows of the trajectories
-
-    m.scale.x = 0.02;
-    m.scale.y = 0.04;
-    // m.scale.z = 1;
-
-    float s = 2;  // scale factor
-    m.header.frame_id = "world";
-    m.header.stamp = ros::Time::now();
-    geometry_msgs::Point p_start;
-    p_start.x = x[0];
-    p_start.y = x[1];
-    p_start.z = x[2];
-    geometry_msgs::Point p_end;
-    switch (i)
-    {
-      case ATT:
-        m.color = color(GREEN);
-        p_end.x = x[0] + s * f_att[0];
-        p_end.y = x[1] + s * f_att[1];
-        p_end.z = x[2] + s * f_att[2];
-        break;
-      case REP:
-        m.color = color(RED);
-        p_end.x = x[0] + s * f_rep[0];
-        p_end.y = x[1] + s * f_rep[1];
-        p_end.z = x[2] + s * f_rep[2];
-        break;
-      case TOTAL:
-        m.color = color(BLUE);
-        p_end.x = x[0] + s * (f_att + f_rep)[0];
-        p_end.y = x[1] + s * (f_att + f_rep)[1];
-        p_end.z = x[2] + s * (f_att + f_rep)[2];
-        break;
-    }
-    m.points.push_back(p_start);
-    m.points.push_back(p_end);
-
-    (*forces).markers.push_back(m);
-  }
-}
-
 void CVX::pubActualTraj()
 {
   // ROS_ERROR("In pubActualTraj\n");
@@ -2658,62 +2361,6 @@ void CVX::pubintersecPoint(Eigen::Vector3d p, bool add)
     intersec_points_.markers.clear();
   }
 }
-
-// If you want the force to be the direction selector
-// Eigen::Vector3d force = computeForce(curr_pos, term_goal);
-// double x = force[0], y = force[1], z = force[2];
-// If you want the JPS3D solution to be the direction selector
-// double x = directionJPS_[0], y = directionJPS_[1], z = directionJPS_[2];
-
-/*      // Solver VEL
-      double xf_sphere[3] = { p2[0], p2[1], p2[2] };
-      mtx_goals.lock();
-      double x0[3] = { initialCond_.pos.x, initialCond_.pos.y, initialCond_.pos.z };
-      //double u0[3] = { initialCond_.vel.x, initialCond_.vel.y, initialCond_.vel.z };
-      mtx_goals.unlock();
-      solver_vel_.set_xf(xf_sphere);
-      solver_vel_.set_x0(x0);
-      printf("x0 is %f, %f, %f\n", x0[0], x0[1], x0[2]);
-      printf("xf is %f, %f, %f\n", xf_sphere[0], xf_sphere[1], xf_sphere[2]);
-      double max_values[1] = { par_.v_max };
-      solver_vel_.set_max(max_values);
-      //solver_vel_.set_u0(u0);
-      solver_vel_.genNewTraj();
-      printf("generated new traj\n");
-      U_temp_ = solver_vel_.getU();
-      printf("got U\n");
-      X_temp_ = solver_vel_.getX();
-      printf("X_temp=\n");
-      std::cout << X_temp_ << std::endl;*/
-
-/*      // Solver ACCEL
-      double xf_sphere[6] = { p2[0], p2[1], p2[2], 0, 0, 0 };
-      mtx_goals.lock();
-      double x0[6] = { initialCond_.pos.x, initialCond_.pos.y, initialCond_.pos.z,
-                       initialCond_.vel.x, initialCond_.vel.y, initialCond_.vel.z };
-      //double u0[3] = { initialCond_.accel.x, initialCond_.accel.y, initialCond_.accel.z };
-      mtx_goals.unlock();
-      solver_accel_.set_xf(xf_sphere);
-      solver_accel_.set_x0(x0);
-      double max_values[2] = { par_.v_max, par_.a_max };
-      solver_accel_.set_max(max_values);
-      //solver_accel_.set_u0(u0);
-      solver_accel_.genNewTraj();
-      U_temp_ = solver_accel_.getU();
-      X_temp_ = solver_accel_.getX();*/
-
-/*      printf("(Optimizando desde): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", initialCond_.pos.x,
-   initialCond_.pos.y, initialCond_.pos.z, initialCond_.vel.x, initialCond_.vel.y, initialCond_.vel.z);
-
-      printf("(State): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", state_.pos.x, state_.pos.y, state_.pos.z,
-             state_.vel.x, state_.vel.y, state_.vel.z);*/
-
-// printf("Current state=%0.2f, %0.2f, %0.2f\n", state_pos[0], state_pos[1], state_pos[2]);
-// printf("Before going to get C1, Points in JPS1\n");
-/*        for (int i = 0; i < path_jps_vector_.size(); i++)
-        {
-          std::cout << path_jps_vector_[i].transpose() << std::endl;
-        }*/
 
 // P1-P2 is the direction used for projection. P2 is the gal clicked
 Eigen::Vector3d CVX::projectClickedGoal(Eigen::Vector3d& P1)
