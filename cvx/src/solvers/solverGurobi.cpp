@@ -74,16 +74,16 @@ void SolverGurobi::createVars()
 void SolverGurobi::setObjective()  // I need to set it every time, because the objective depends on the xFinal
 {
   GRBQuadExpr control_cost = 0;
-  GRBQuadExpr final_state_cost = 0;
-  // GRBQuadExpr distance_to_JPS_cost = 0;
+  /*  GRBQuadExpr final_state_cost = 0;
+    // GRBQuadExpr distance_to_JPS_cost = 0;
 
-  std::vector<GRBLinExpr> xFinal = {
-    getPos(N_ - 1, 0, 0),   getPos(N_ - 1, 0, 1),   getPos(N_ - 1, 0, 2),   //////////////////////////////////
-    getVel(N_ - 1, 0, 0),   getVel(N_ - 1, 0, 1),   getVel(N_ - 1, 0, 2),   /////////////////////////////
-    getAccel(N_ - 1, 0, 0), getAccel(N_ - 1, 0, 1), getAccel(N_ - 1, 0, 2)  /////////////////////////////
-  };
-  std::vector<double> xf(std::begin(xf_), std::end(xf_));  // Transform xf_ into a std vector
-  final_state_cost = q_ * GetNorm2(xFinal - xf);
+    std::vector<GRBLinExpr> xFinal = {
+      getPos(N_ - 1, 0, 0),   getPos(N_ - 1, 0, 1),   getPos(N_ - 1, 0, 2),   //////////////////////////////////
+      getVel(N_ - 1, 0, 0),   getVel(N_ - 1, 0, 1),   getVel(N_ - 1, 0, 2),   /////////////////////////////
+      getAccel(N_ - 1, 0, 0), getAccel(N_ - 1, 0, 1), getAccel(N_ - 1, 0, 2)  /////////////////////////////
+    };
+    std::vector<double> xf(std::begin(xf_), std::end(xf_));  // Transform xf_ into a std vector
+    final_state_cost = q_ * GetNorm2(xFinal - xf);*/
 
   /*  for (int t = 0; t < samples_penalize_.size(); t++)  // This loop is not executed when computing the rescue path
     {
@@ -104,7 +104,7 @@ void SolverGurobi::setObjective()  // I need to set it every time, because the o
     control_cost = control_cost + GetNorm2(ut);
   }
   // m.setObjective(control_cost + final_state_cost + distance_to_JPS_cost, GRB_MINIMIZE);
-  m.setObjective(control_cost + final_state_cost, GRB_MINIMIZE);
+  m.setObjective(control_cost, GRB_MINIMIZE);
 }
 
 void SolverGurobi::fillXandU()
@@ -149,15 +149,17 @@ void SolverGurobi::fillXandU()
     X_temp_.row(i) = states;
   }
 
-  // Force the final states to be the final conditions
-  Eigen::Matrix<double, 1, 9> final_cond;
-  final_cond << xf_[0], xf_[1], xf_[2], xf_[3], xf_[4], xf_[5], xf_[6], xf_[7], xf_[8];
-  X_temp_.row(X_temp_.rows() - 1) = final_cond;
+  /*  int last = X_temp_.rows() - 1;
+
+    // Force the final velocity and acceleration to be exactly the final conditions
+    Eigen::Matrix<double, 1, 9> final_cond;
+    final_cond << X_temp_(last, 0), X_temp_(last, 1), X_temp_(last, 2), xf_[3], xf_[4], xf_[5], xf_[6], xf_[7], xf_[8];
+    X_temp_.row(X_temp_.rows() - 1) = final_cond;
+*/
 
   // Force the final input to be 0 (I'll keep applying this input if when I arrive to the final state I still
   // haven't planned again).
   U_temp_.row(U_temp_.rows() - 1) = Eigen::Vector3d::Zero().transpose();
-
   /*  std::cout << "***********The final states are***********" << std::endl;
     std::cout << X_temp_.row(X_temp_.rows() - 1).transpose() << std::endl;
 
@@ -228,11 +230,11 @@ void SolverGurobi::setDistanceConstraints()  // Set the distance constraints
     // std::cout << "For the sample=" << samples_[t].transpose() << std::endl;
 
     distances_cons.push_back(m.addQConstr(GetNorm2(cp0 - p) <= epsilon));
-    // distances_cons.push_back(m.addQConstr(GetNorm2(cp1 - p) <= epsilon));
-    // distances_cons.push_back(m.addQConstr(GetNorm2(cp2 - p) <= epsilon));
+    /*    distances_cons.push_back(m.addQConstr(GetNorm2(cp1 - p) <= epsilon));
+        distances_cons.push_back(m.addQConstr(GetNorm2(cp2 - p) <= epsilon));*/
     distances_cons.push_back(m.addQConstr(GetNorm2(cp3 - p) <= epsilon));
 
-    std::cout << "Setting Epsilon=" << sqrt(epsilon) << std::endl;
+    // std::cout << "Setting Epsilon=" << sqrt(epsilon) << std::endl;
   }
 }
 
@@ -269,7 +271,7 @@ int SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> l_constraints)
   if (l_constraints.size() > 0)  // If there are polytope constraints
   {
     // Declare binary variables
-    for (int t = 1; t < N_ + 1; t++)  // Start in t=1 (because t=0 is already fixed with the initial condition)
+    for (int t = 0; t < N_ + 1; t++)
     {
       std::vector<GRBVar> row;
       for (int i = 0; i < l_constraints.size(); i++)  // For all the polytopes
@@ -283,7 +285,7 @@ int SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> l_constraints)
 
     // Polytope constraints (if binary_varible==1 --> In that polytope) and at_least_1_pol_cons (at least one polytope)
     // constraints
-    for (int t = 1; t < N_; t++)  // Start in t=1 (because t=0 is already fixed with the initial condition)
+    for (int t = 0; t < N_; t++)  // Start in t=1 (because t=0 is already fixed with the initial condition)
     {
       GRBLinExpr sum = 0;
       for (int col = 0; col < b[0].size(); col++)
@@ -384,14 +386,17 @@ void SolverGurobi::setConstraintsXf()
   // Constraint xT==x_final
   for (int i = 0; i < 3; i++)
   {
-    final_cons.push_back(m.addConstr(getPos(N_ - 1, dt_, i) - xf_[i] <= 0.2));   // Final position
-    final_cons.push_back(m.addConstr(getPos(N_ - 1, dt_, i) - xf_[i] >= -0.2));  // Final position
+    /*    final_cons.push_back(m.addConstr(getPos(N_ - 1, dt_, i) - xf_[i] <= 0.1));   // Final position
+        final_cons.push_back(m.addConstr(getPos(N_ - 1, dt_, i) - xf_[i] >= -0.1));  // Final position
 
-    final_cons.push_back(m.addConstr(getVel(N_ - 1, dt_, i) - xf_[i + 3] <= 0.2));   // Final velocity
-    final_cons.push_back(m.addConstr(getVel(N_ - 1, dt_, i) - xf_[i + 3] >= -0.2));  // Final velocity
+        final_cons.push_back(m.addConstr(getVel(N_ - 1, dt_, i) - xf_[i + 3] <= 0.05));   // Final velocity
+        final_cons.push_back(m.addConstr(getVel(N_ - 1, dt_, i) - xf_[i + 3] >= -0.05));  // Final velocity
 
-    final_cons.push_back(m.addConstr(getAccel(N_ - 1, dt_, i) - xf_[i + 6] <= 0.2));   // Final acceleration
-    final_cons.push_back(m.addConstr(getAccel(N_ - 1, dt_, i) - xf_[i + 6] >= -0.2));  // Final acceleration
+        final_cons.push_back(m.addConstr(getAccel(N_ - 1, dt_, i) - xf_[i + 6] <= 0.05));   // Final acceleration
+        final_cons.push_back(m.addConstr(getAccel(N_ - 1, dt_, i) - xf_[i + 6] >= -0.05));  // Final acceleration*/
+    final_cons.push_back(m.addConstr(getPos(N_ - 1, dt_, i) - xf_[i] == 0));        // Final position
+    final_cons.push_back(m.addConstr(getVel(N_ - 1, dt_, i) - xf_[i + 3] == 0));    // Final velocity
+    final_cons.push_back(m.addConstr(getAccel(N_ - 1, dt_, i) - xf_[i + 6] == 0));  // Final acceleration
   }
 }
 

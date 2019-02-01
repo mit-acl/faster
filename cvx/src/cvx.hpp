@@ -49,6 +49,9 @@
 #define WHOLE 1   // Whole trajectory (part of which is planned on unkonwn space)
 #define RESCUE 2  // Rescue path
 
+#define OCCUPIED_SPACE 1
+#define UNKOWN_AND_OCCUPIED_SPACE 2
+
 struct kdTreeStamped
 {
   pcl::KdTreeFLANN<pcl::PointXYZ> kdTree;
@@ -211,7 +214,7 @@ private:
 
   double getDistanceToFirstCollisionJPSwithUnkonwnspace(vec_Vecf<3> path, bool* thereIsIntersection);
 
-  void cvxDecomp(vec_Vecf<3> path);
+  void cvxDecomp(vec_Vecf<3> path, int type_obstacles);
 
   vec_Vecf<3> sampleJPS(vec_Vecf<3>& path, int n);
 
@@ -245,8 +248,11 @@ private:
   ros::Publisher pub_samples_rescue_path_;
   ros::Publisher pub_log_;
 
-  ros::Publisher cvx_decomp_el_pub_;
-  ros::Publisher cvx_decomp_poly_pub_;
+  ros::Publisher cvx_decomp_el_o_pub__;
+  ros::Publisher cvx_decomp_poly_o_pub_;
+
+  ros::Publisher cvx_decomp_el_uo_pub__;
+  ros::Publisher cvx_decomp_poly_uo_pub_;
 
   ros::Subscriber sub_goal_;
   ros::Subscriber sub_state_;
@@ -272,7 +278,8 @@ private:
   visualization_msgs::MarkerArray samples_rescue_path_;
 
   vec_E<Polyhedron<3>> polyhedra_;
-  std::vector<LinearConstraint3D> l_constraints_;  // Polytope (Linear) constraints
+  std::vector<LinearConstraint3D> l_constraints_o_;   // Polytope (Linear) constraints
+  std::vector<LinearConstraint3D> l_constraints_uo_;  // Polytope (Linear) constraints
 
   int markerID_ = 0;
   int markerID_last_ = 0;

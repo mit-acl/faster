@@ -81,7 +81,7 @@ res: 0.15  #[m] cell dimension = resolution of the map
 
 
 dc: 0.01            #(seconds) Duration for the interpolation=Value of the timer pubGoal
-goal_radius: 0.2    #(m) Drone has arrived to the goal when distance_to_goal<GOAL_RADIUS
+goal_radius: 0.05    #(m) Drone has arrived to the goal when distance_to_goal<GOAL_RADIUS
 drone_radius: 0.42  #(m) Used for collision checking
 
 N: 10  #[-] Number of discretization points in the trajectory

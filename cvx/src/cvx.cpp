@@ -113,8 +113,12 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   pub_path_jps1_ = nh_.advertise<visualization_msgs::MarkerArray>("path_jps1", 1);
   pub_path_jps2_ = nh_.advertise<visualization_msgs::MarkerArray>("path_jps2", 1);
 
-  cvx_decomp_el_pub_ = nh.advertise<decomp_ros_msgs::EllipsoidArray>("ellipsoid_array", 1, true);
-  cvx_decomp_poly_pub_ = nh.advertise<decomp_ros_msgs::PolyhedronArray>("polyhedron_array", 1, true);
+  cvx_decomp_el_o_pub__ = nh.advertise<decomp_ros_msgs::EllipsoidArray>("ellipsoid_array_occupied", 1, true);
+  cvx_decomp_poly_o_pub_ = nh.advertise<decomp_ros_msgs::PolyhedronArray>("polyhedron_array_occupied", 1, true);
+
+  cvx_decomp_el_uo_pub__ = nh.advertise<decomp_ros_msgs::EllipsoidArray>("ellipsoid_array_unk_and_occupied", 1, true);
+  cvx_decomp_poly_uo_pub_ =
+      nh.advertise<decomp_ros_msgs::PolyhedronArray>("polyhedron_array_unk_and_occupied", 1, true);
 
   pub_jps_inters_ = nh_.advertise<geometry_msgs::PointStamped>("jps_intersection", 1);
 
@@ -484,10 +488,10 @@ void CVX::vectorOfVectors2MarkerArray(vec_Vecf<3> traj, visualization_msgs::Mark
     }
     else
     {
-      double scale = 0.1;
+      double scale = 0.1;  // Escale is the diameter of the sphere
       if (radii.size() != 0)
       {  // If argument provided
-        scale = radii[j];
+        scale = 2 * radii[j];
       }
       m.scale.x = scale;
       m.scale.y = scale;
@@ -694,7 +698,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
   double dist_to_goal = (term_goal - state_pos).norm();
 
   /*  std::cout << "rb=" << rb << std::endl;*/
-  // std::cout << "dist_to_goal=" << dist_to_goal << std::endl;
+  std::cout << "dist_to_goal=" << dist_to_goal << std::endl;
+  std::cout << "status_=" << status_ << std::endl;
 
   if (dist_to_goal < par_.goal_radius && status_ != GOAL_REACHED)
   {
@@ -747,13 +752,15 @@ void CVX::replanCB(const ros::TimerEvent& e)
                                                             // printf("Aqui89\n");
   printf("Solved JPS1!!!\n");
 
+  std::cout << "Term Goal: *******************************" << std::endl;
+  std::cout << term_goal << std::endl;
+
   // std::cout << "solvedjps1= " << solvedjps1 << std::endl;
 
   bool previous = solvedjps1;
 
   // 0.96 and 0.98 are to ensure that ra<rb<dist_to_goal always
-  double ra = std::min(0.96 * dist_to_goal, par_.Ra);
-  double rb = std::min(0.98 * dist_to_goal, par_.Rb);  // radius of the sphere Sbl
+  double ra = std::min((dist_to_goal - 0.001), par_.Ra);
 
   if (solvedjps1 == true && flight_mode_.mode == flight_mode_.GO)
   {
@@ -761,7 +768,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
     saturate(ra, par_.Ra, par_.Ra_max);
   }
 
-  ra = std::min(0.96 * dist_to_goal, ra);  // radius of the sphere Sa
+  ra = std::min((dist_to_goal - 0.001), ra);  // radius of the sphere Sa
 
   /*  if (par_.use_vel == false)
     {
@@ -819,6 +826,12 @@ void CVX::replanCB(const ros::TimerEvent& e)
     std::cout << B1.transpose() << std::endl;*/
   vec_Vecf<3> JPS1_inside_sphere(JPS1.begin(), JPS1.begin() + li1 + 1);  // Elements of JPS that are inside the sphere
   JPS1_inside_sphere.push_back(B1);
+
+  std::cout << "JPS1 original: *******************************\n";
+  printElementsOfJPS(JPS1);
+
+  std::cout << "JPS1_inside_sphere: ****************\n";
+  printElementsOfJPS(JPS1_inside_sphere);
   // printf("ReplanCB: Elements of JPS1_inside_sphere are...\n");
   // printElementsOfJPS(JPS1_inside_sphere);
 
@@ -847,9 +860,9 @@ void CVX::replanCB(const ros::TimerEvent& e)
   double xf[9] = { B1[0], B1[1], B1[2], 0, 0, 0, 0, 0, 0 };
   // printf("Running CVXDecomp!!!\n");
   double before = ros::Time::now().toSec();
-  cvxDecomp(JPS1_inside_sphere);  // result saved in l_constraints_
-  ROS_WARN("CVXDecomp time: %0.2f ms", 1000 * (ros::Time::now().toSec() - before));
-  printf("Finished CVXDecomp!!!\n");
+  cvxDecomp(JPS1_inside_sphere, OCCUPIED_SPACE);  // result saved in l_constraints_
+  // ROS_WARN("CVXDecomp time: %0.2f ms", 1000 * (ros::Time::now().toSec() - before));
+  // printf("Finished CVXDecomp!!!\n");
 
   // vec_Vecf<3> samples_penalize =sampleJPS(JPS1, par_.N + 1);  // Samples to penalize the distance from the trajectory
   // to these samples
@@ -857,7 +870,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   solver_gurobi_.setXf(xf);
   solver_gurobi_.setX0(x0);
   solver_gurobi_.findDT();
-  solver_gurobi_.setPolytopes(l_constraints_);
+  solver_gurobi_.setPolytopes(l_constraints_o_);
   vec_Vecf<3> samples_empty;
   std::vector<double> dist_empty;
   solver_gurobi_.setDistances(samples_empty, dist_empty);  // No distance constraints for the normal path
@@ -876,7 +889,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
     pubTraj(X_temp_, WHOLE);
   }
 
-  printf("Solved Gurobi!!!\n");
+  // printf("Solved Gurobi!!!\n");
 
   mtx_X_U_temp.lock();
   U_temp_ = solver_gurobi_.getU();
@@ -895,7 +908,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   vec_Vecf<3> JPS1r = JPS1_inside_sphere;  // JPS1 used for the rescue path
   JPS1r[0] = posR;
 
-  printf("Going to compute rescue path");
+  printf("\nGoing to compute rescue path\n");
   bool thereIsIntersection = false;
   Eigen::Vector3d I;  // I is the first intersection of JPS with the unknown space
 
@@ -909,6 +922,9 @@ void CVX::replanCB(const ros::TimerEvent& e)
                                   JPS1r.begin() + el_eliminated +
                                       1);  // Element of JPS that are inside the unkown space
 
+  std::cout << "JPS1_in_known_space antes: *******************************\n";
+  printElementsOfJPS(JPS1_in_known_space);
+
   if (thereIsIntersection == true)
   {
     JPS1_in_known_space.push_back(I);  // Plus the intersection with the unkown space
@@ -918,8 +934,13 @@ void CVX::replanCB(const ros::TimerEvent& e)
     JPS1_in_known_space.push_back(JPS1r[JPS1r.size() - 1]);  // Plus the last element of JPS
   }
 
+  std::cout << "JPS1_in_known_space despues de anadir I: *******************************\n";
+  printElementsOfJPS(JPS1_in_known_space);
+
   // printf("These is the part of JPS that is in known space:\n");
   // printElementsOfJPS(JPS1_in_known_space);
+
+  cvxDecomp(JPS1_in_known_space, UNKOWN_AND_OCCUPIED_SPACE);
 
   vec_Vecf<3> samples = sampleJPS(JPS1_in_known_space, par_.N);  // Take N samples along JPS1_in_known_space;
   std::vector<double> dist_near_neig = getDistToNearestObs(samples);
@@ -929,7 +950,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
     printf("**********************");*/
 
   clearMarkerArray(&samples_rescue_path_, &pub_samples_rescue_path_);
-  vectorOfVectors2MarkerArray(samples, &samples_rescue_path_, color(BLUE), visualization_msgs::Marker::SPHERE,
+  vectorOfVectors2MarkerArray(samples, &samples_rescue_path_, color(BLUE_TRANS), visualization_msgs::Marker::SPHERE,
                               dist_near_neig);  // the radius will be the distance to the nearest neighbour
   pub_samples_rescue_path_.publish(samples_rescue_path_);
 
@@ -1121,6 +1142,8 @@ void CVX::pubCB(const ros::TimerEvent& e)
 
     // heading_ = atan2(goal_(1) - X_(0, 1), goal_(0) - X_(0, 0));
 
+    std::cout << "status_= " << status_ << std::endl;
+
     if (status_ == YAWING)
     {
       // mtx_term_goal.lock();
@@ -1135,7 +1158,6 @@ void CVX::pubCB(const ros::TimerEvent& e)
       {
         // printf("It's less than 0.2!!\n");
         status_ = TRAVELING;
-        printf("status_=TRAVELING\n");
       }
       else
       {
@@ -1158,6 +1180,11 @@ void CVX::pubCB(const ros::TimerEvent& e)
       {
         quadGoal_.dyaw = 0;
       }
+    }
+    if (status_ == GOAL_REACHED)
+    {
+      quadGoal_.dyaw = 0;
+      quadGoal_.yaw = 0;
     }
 
     mtx_k.lock();
@@ -1268,7 +1295,7 @@ vec_Vecf<3> CVX::sampleJPS(vec_Vecf<3>& path, int n)
 
     Eigen::Vector3d last_sample = samples[samples.size() - 1];
     Eigen::Vector3d new_sample = previous_peak + difference * v;
-    std::cout << "Adding sample" << new_sample << std::endl;
+    // std::cout << "Adding sample" << new_sample << std::endl;
     samples.push_back(new_sample);
   }
   return samples;
@@ -1504,7 +1531,7 @@ geometry_msgs::Vector3 CVX::getJerk(int i)
   return tmp;
 }
 
-void CVX::cvxDecomp(vec_Vecf<3> path)
+void CVX::cvxDecomp(vec_Vecf<3> path, int type_obstacles)
 {
   // std::cout << "In cvxDecomp 0!" << std::endl;
   if (kdtree_map_initialized_ == false)
@@ -1512,12 +1539,21 @@ void CVX::cvxDecomp(vec_Vecf<3> path)
     return;
   }
   // std::cout << "In cvxDecomp 1!" << std::endl;
-  pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr_cloud = kdtree_map_.getInputCloud();
 
-  // Read the point cloud from bag
-  // sensor_msgs::PointCloud cloud = read_bag<sensor_msgs::PointCloud>(file_name, topic_name);
+  vec_Vec3f obs;
 
-  vec_Vec3f obs = kdtree_to_vec(ptr_cloud);
+  if (type_obstacles == OCCUPIED_SPACE)
+  {
+    pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr_cloud_map = kdtree_map_.getInputCloud();
+    vec_Vec3f obs = kdtree_to_vec(ptr_cloud_map);
+  }
+
+  if (type_obstacles == UNKOWN_AND_OCCUPIED_SPACE)
+  {
+    pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr_cloud_map = kdtree_map_.getInputCloud();
+    pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr_cloud_unkown = kdtree_unk_.getInputCloud();
+    vec_Vec3f obs = kdtree_to_vec(ptr_cloud_map, ptr_cloud_unkown);
+  }
 
   // Read path from txt
   // vec_Vec3f path;
@@ -1532,23 +1568,41 @@ void CVX::cvxDecomp(vec_Vecf<3> path)
   decomp_util.set_local_bbox(
       Vec3f(2, 2, 1));       // Only try to find cvx decomp in the Mikowsski sum of JPS and this box (I think)
   decomp_util.dilate(path);  // Find convex polyhedra
-  decomp_util.shrink_polyhedrons(par_.drone_radius);  // Shrink polyhedra by the drone radius
+  // decomp_util.shrink_polyhedrons(par_.drone_radius);  // Shrink polyhedra by the drone radius
 
-  // Publish visualization msgs
+  decomp_util.shrink_polyhedrons(0);  // Shrink polyhedra by the drone radius
+
   decomp_ros_msgs::EllipsoidArray es_msg = DecompROS::ellipsoid_array_to_ros(decomp_util.get_ellipsoids());
   es_msg.header.frame_id = "world";
-  cvx_decomp_el_pub_.publish(es_msg);
 
   decomp_ros_msgs::PolyhedronArray poly_msg = DecompROS::polyhedron_array_to_ros(decomp_util.get_polyhedrons());
   poly_msg.header.frame_id = "world";
-  cvx_decomp_poly_pub_.publish(poly_msg);
 
+  if (type_obstacles == OCCUPIED_SPACE)
+  {
+    // Publish visualization msgs
+    cvx_decomp_el_o_pub__.publish(es_msg);
+    cvx_decomp_poly_o_pub_.publish(poly_msg);
+  }
+  if (type_obstacles == UNKOWN_AND_OCCUPIED_SPACE)
+  {
+    // Publish visualization msgs
+    cvx_decomp_el_uo_pub__.publish(es_msg);
+    cvx_decomp_poly_uo_pub_.publish(poly_msg);
+  }
   // Convert to inequality constraints Ax < b
   // std::vector<polytope> polytopes;
   auto polys = decomp_util.get_polyhedrons();
 
   // std::cout << "In cvxDecomp 3!" << std::endl;
-  l_constraints_.clear();
+  if (type_obstacles == OCCUPIED_SPACE)
+  {
+    l_constraints_o_.clear();
+  }
+  if (type_obstacles == UNKOWN_AND_OCCUPIED_SPACE)
+  {
+    l_constraints_uo_.clear();
+  }
 
   // std::cout << "In cvxDecomp, el path llegado es:" << std::endl;
   // printElementsOfJPS(path);
@@ -1557,7 +1611,16 @@ void CVX::cvxDecomp(vec_Vecf<3> path)
     // std::cout << "Inserting constraint" << std::endl;
     const auto pt_inside = (path[i] + path[i + 1]) / 2;
     LinearConstraint3D cs(pt_inside, polys[i].hyperplanes());
-    l_constraints_.push_back(cs);
+
+    if (type_obstacles == OCCUPIED_SPACE)
+    {
+      l_constraints_o_.push_back(cs);
+    }
+    if (type_obstacles == UNKOWN_AND_OCCUPIED_SPACE)
+    {
+      l_constraints_uo_.push_back(cs);
+    }
+
     /*      printf("i: %zu\n", i);
               std::cout << "A: " << cs.A() << std::endl;
               std::cout << "b: " << cs.b() << std::endl;
@@ -2162,7 +2225,7 @@ Eigen::Vector3d CVX::getFirstCollisionJPS(vec_Vecf<3> path, bool* thereIsInterse
       number_of_neigh = kdtree_unk_.nearestKSearch(pcl_search_point, n, id_map, dist2_map);
     }
 
-    printf("************NearestSearch: TotalTime= %0.2f ms\n", 1000 * (ros::Time::now().toSec() - before));
+    // printf("************NearestSearch: TotalTime= %0.2f ms\n", 1000 * (ros::Time::now().toSec() - before));
 
     if (number_of_neigh > 0)
     {
