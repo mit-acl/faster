@@ -3,6 +3,9 @@
 #include <chrono>
 #include <unistd.h>
 
+#define WHOLE_TRAJ 0
+#define RESCUE_PATH 1
+
 SolverGurobi::SolverGurobi()
 {
   v_max_ = 5;
@@ -53,6 +56,11 @@ SolverGurobi::SolverGurobi()
 void SolverGurobi::setN(int N)
 {
   N_ = N;
+}
+
+void SolverGurobi::setMode(int mode)
+{
+  mode_ = mode;
 }
 
 void SolverGurobi::createVars()
@@ -240,15 +248,22 @@ void SolverGurobi::setDistanceConstraints()  // Set the distance constraints
 
 int SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> l_constraints)
 {
-  // std::cout << "Setting POLYTOPES=" << std::endl;
+  std::cout << "Setting POLYTOPES=" << std::endl;
 
   // Remove previous polytopes constraints
   for (int i = 0; i < polytopes_cons.size(); i++)
   {
     m.remove(polytopes_cons[i]);
   }
-
   polytopes_cons.clear();
+
+  // Remove previous polytopes constraints
+  for (int i = 0; i < polytope_cons.size(); i++)
+  {
+    m.remove(polytope_cons[i]);
+  }
+
+  polytope_cons.clear();
 
   // Remove previous at_least_1_pol_cons constraints
   for (int i = 0; i < at_least_1_pol_cons.size(); i++)
@@ -270,34 +285,43 @@ int SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> l_constraints)
 
   if (l_constraints.size() > 0)  // If there are polytope constraints
   {
-    // Declare binary variables
-    for (int t = 0; t < N_ + 1; t++)
+    if (mode_ == WHOLE_TRAJ)
     {
-      std::vector<GRBVar> row;
-      for (int i = 0; i < l_constraints.size(); i++)  // For all the polytopes
+      // Declare binary variables
+      for (int t = 0; t < N_ + 1; t++)
       {
-        GRBVar variable =
-            m.addVar(-GRB_INFINITY, GRB_INFINITY, 0, GRB_BINARY, "s" + std::to_string(i) + "_" + std::to_string(t));
-        row.push_back(variable);
+        std::vector<GRBVar> row;
+        for (int i = 0; i < l_constraints.size(); i++)  // For all the polytopes
+        {
+          GRBVar variable =
+              m.addVar(-GRB_INFINITY, GRB_INFINITY, 0, GRB_BINARY, "s" + std::to_string(i) + "_" + std::to_string(t));
+          row.push_back(variable);
+        }
+        b.push_back(row);
       }
-      b.push_back(row);
     }
 
     // Polytope constraints (if binary_varible==1 --> In that polytope) and at_least_1_pol_cons (at least one polytope)
     // constraints
     for (int t = 0; t < N_; t++)  // Start in t=1 (because t=0 is already fixed with the initial condition)
     {
-      GRBLinExpr sum = 0;
-      for (int col = 0; col < b[0].size(); col++)
-      {
-        sum = sum + b[t][col];
-      }
-      at_least_1_pol_cons.push_back(m.addConstr(sum == 1));  // at least in one polytope
+      std::cout << "*********************t= " << t << std::endl;
 
+      if (mode_ == WHOLE_TRAJ)
+      {
+        GRBLinExpr sum = 0;
+        for (int col = 0; col < b[0].size(); col++)
+        {
+          sum = sum + b[t][col];
+        }
+        at_least_1_pol_cons.push_back(m.addConstr(sum == 1));  // at least in one polytope
+      }
       std::vector<GRBLinExpr> cp0 = getCP0(t);  // Control Point 0
       std::vector<GRBLinExpr> cp1 = getCP1(t);  // Control Point 1
       std::vector<GRBLinExpr> cp2 = getCP2(t);  // Control Point 2
       std::vector<GRBLinExpr> cp3 = getCP3(t);  // Control Point 3
+
+      std::cout << "NUMBER OF POLYTOPES=" << l_constraints.size() - 1 << std::endl;
 
       for (int n_poly = 0; n_poly < l_constraints.size(); n_poly++)  // Loop over the number of polytopes
       {
@@ -307,6 +331,7 @@ int SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> l_constraints)
 
         std::vector<std::vector<double>> A1std = eigenMatrix2std(A1);
 
+        std::cout << "Before multip for n_poly=" << n_poly << std::endl;
         std::vector<GRBLinExpr> Acp0 = MatrixMultiply(A1std, cp0);  // A times control point 0
         std::vector<GRBLinExpr> Acp1 = MatrixMultiply(A1std, cp1);  // A times control point 1
         std::vector<GRBLinExpr> Acp2 = MatrixMultiply(A1std, cp2);  // A times control point 2
@@ -314,13 +339,25 @@ int SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> l_constraints)
 
         for (int i = 0; i < bb.rows(); i++)
         {
-          // If b[t,0]==1, all the control points are in that polytope
-          // std::cout << "Acp0=" << Acp0[0] << std::endl;
-
-          polytopes_cons.push_back(m.addGenConstrIndicator(b[t][n_poly], 1, Acp0[i], GRB_LESS_EQUAL, bb[i]));
-          polytopes_cons.push_back(m.addGenConstrIndicator(b[t][n_poly], 1, Acp1[i], GRB_LESS_EQUAL, bb[i]));
-          polytopes_cons.push_back(m.addGenConstrIndicator(b[t][n_poly], 1, Acp2[i], GRB_LESS_EQUAL, bb[i]));
-          polytopes_cons.push_back(m.addGenConstrIndicator(b[t][n_poly], 1, Acp3[i], GRB_LESS_EQUAL, bb[i]));
+          std::cout << "Plane=" << i << "out of" << bb.rows() - 1 << std::endl;
+          if (mode_ == WHOLE_TRAJ)
+          {  // If b[t,0]==1, all the control points are in that polytope
+            polytopes_cons.push_back(m.addGenConstrIndicator(b[t][n_poly], 1, Acp0[i], GRB_LESS_EQUAL, bb[i]));
+            polytopes_cons.push_back(m.addGenConstrIndicator(b[t][n_poly], 1, Acp1[i], GRB_LESS_EQUAL, bb[i]));
+            polytopes_cons.push_back(m.addGenConstrIndicator(b[t][n_poly], 1, Acp2[i], GRB_LESS_EQUAL, bb[i]));
+            polytopes_cons.push_back(m.addGenConstrIndicator(b[t][n_poly], 1, Acp3[i], GRB_LESS_EQUAL, bb[i]));
+          }
+          if (mode_ == RESCUE_PATH)  // There will be only one polytope --> all the control points in that polytope
+          {
+            std::cout << "Setting POLYTOPES=3" << std::endl;
+            polytope_cons.push_back(m.addConstr(Acp0[i] <= bb[i]));
+            std::cout << "Setting POLYTOPES=3.5" << std::endl;
+            polytope_cons.push_back(m.addConstr(Acp1[i] <= bb[i]));
+            std::cout << "Setting POLYTOPES=3.6" << std::endl;
+            polytope_cons.push_back(m.addConstr(Acp2[i] <= bb[i]));
+            polytope_cons.push_back(m.addConstr(Acp3[i] <= bb[i]));
+            std::cout << "Setting POLYTOPES=4" << std::endl;
+          }
         }
       }
     }
@@ -369,7 +406,7 @@ void SolverGurobi::setXf(double xf[])
     std::cout << xf[i] << "  ";
     xf_[i] = xf[i];
   }
-  std::cout << std::endl;
+  std::cout << "Final Condtion set" << std::endl;
 }
 
 void SolverGurobi::setConstraintsXf()
@@ -394,7 +431,10 @@ void SolverGurobi::setConstraintsXf()
 
         final_cons.push_back(m.addConstr(getAccel(N_ - 1, dt_, i) - xf_[i + 6] <= 0.05));   // Final acceleration
         final_cons.push_back(m.addConstr(getAccel(N_ - 1, dt_, i) - xf_[i + 6] >= -0.05));  // Final acceleration*/
-    final_cons.push_back(m.addConstr(getPos(N_ - 1, dt_, i) - xf_[i] == 0));        // Final position
+    if (mode_ == WHOLE_TRAJ)
+    {
+      final_cons.push_back(m.addConstr(getPos(N_ - 1, dt_, i) - xf_[i] == 0));  // Final position
+    }
     final_cons.push_back(m.addConstr(getVel(N_ - 1, dt_, i) - xf_[i + 3] == 0));    // Final velocity
     final_cons.push_back(m.addConstr(getAccel(N_ - 1, dt_, i) - xf_[i + 6] == 0));  // Final acceleration
   }

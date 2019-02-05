@@ -25,6 +25,9 @@
 #define ACCEL 2
 #define JERK 3
 
+#define WHOLE_TRAJ 0
+#define RESCUE_PATH 1
+
 // inline is needed to avoid the "multiple definitions" error. Other option is to create the utils.cpp file, and put
 // there the function (and here only the prototype)
 

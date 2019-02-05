@@ -79,6 +79,8 @@ public:
 
   void setDistanceConstraints();
 
+  void setMode(int mode);
+
   GRBLinExpr getPos(int t, double tau, int ii);
   GRBLinExpr getVel(int t, double tau, int ii);
   GRBLinExpr getAccel(int t, double tau, int ii);
@@ -116,7 +118,8 @@ protected:
   GRBModel m = GRBModel(*env);
 
   std::vector<GRBConstr> at_least_1_pol_cons;  // Constraints at least in one polytope
-  std::vector<GRBGenConstr> polytopes_cons;
+  std::vector<GRBGenConstr> polytopes_cons;    // Used for the whole trajectory
+  std::vector<GRBConstr> polytope_cons;        // Used for the rescue path
   std::vector<GRBConstr> dyn_cons;
   std::vector<GRBConstr> init_cons;
   std::vector<GRBConstr> final_cons;
@@ -135,5 +138,6 @@ protected:
   std::ofstream times_log;
 
   int temporal = 0;
+  int mode_;
 };
 #endif

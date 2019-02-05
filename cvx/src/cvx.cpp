@@ -416,19 +416,6 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f& start_sent, Vec3f& goal_sent, bool* solved, i
   mtx_jps_map_util.unlock();
 
   *solved = valid_jps;
-  /*
- Timer time_astar(true);
- bool valid_astar = planner_ptr->plan(start, goal, 1, false);  // Plan from start to goal using A*
- double dt_astar = time_astar.Elapsed().count();
- printf("AStar Planner takes: %f ms\n", dt_astar);
- printf("AStar Path Distance: %f\n", total_distance3f(planner_ptr->getpar_.RawPath()));
- printf("AStar Path: \n");
- auto path_astar = planner_ptr->getpar_.RawPath();
- for (const auto& it : path_astar)
-   std::cout << it.transpose() << std::endl;
-*/
-  // printf("Out of solveJPSD\n");
-  // printf("Out6\n");
   return path;
 }
 
@@ -770,11 +757,6 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   ra = std::min((dist_to_goal - 0.001), ra);  // radius of the sphere Sa
 
-  /*  if (par_.use_vel == false)
-    {
-      rb = 1.001 * ra;
-    }*/
-
   if (flight_mode_.mode != flight_mode_.GO)
   {
     mtx_state.lock();
@@ -789,9 +771,6 @@ void CVX::replanCB(const ros::TimerEvent& e)
     JPS2 = JPS1;
     JPS_old_ = JPS1;
     solvedjps2 = true;  // only the first time
-  }
-  else
-  {
   }
 
   if (solvedjps1 == true)
@@ -867,13 +846,15 @@ void CVX::replanCB(const ros::TimerEvent& e)
   // vec_Vecf<3> samples_penalize =sampleJPS(JPS1, par_.N + 1);  // Samples to penalize the distance from the trajectory
   // to these samples
 
+  solver_gurobi_.setMode(WHOLE_TRAJ);
   solver_gurobi_.setXf(xf);
   solver_gurobi_.setX0(x0);
   solver_gurobi_.findDT();
+
   solver_gurobi_.setPolytopes(l_constraints_o_);
-  vec_Vecf<3> samples_empty;
-  std::vector<double> dist_empty;
-  solver_gurobi_.setDistances(samples_empty, dist_empty);  // No distance constraints for the normal path
+  // vec_Vecf<3> samples_empty;
+  // std::vector<double> dist_empty;
+  // solver_gurobi_.setDistances(samples_empty, dist_empty);  // No distance constraints for the normal path
   // solver_gurobi_.setSamplesPenalize(samples_penalize);     // penalize the distance from the traj to the JPS
 
   bool solved_whole = solver_gurobi_.genNewTraj();
@@ -937,39 +918,50 @@ void CVX::replanCB(const ros::TimerEvent& e)
   std::cout << "JPS1_in_known_space despues de anadir I: *******************************\n";
   printElementsOfJPS(JPS1_in_known_space);
 
+  vec_Vecf<3> first_segment;
+  first_segment.push_back(JPS1_in_known_space[0]);
+  first_segment.push_back(JPS1_in_known_space[1]);
+
+  std::cout << "first_segment!!: *******************************\n";
+  printElementsOfJPS(first_segment);
+
   // printf("These is the part of JPS that is in known space:\n");
   // printElementsOfJPS(JPS1_in_known_space);
 
-  cvxDecomp(JPS1_in_known_space, UNKOWN_AND_OCCUPIED_SPACE);
+  cvxDecomp(first_segment, UNKOWN_AND_OCCUPIED_SPACE);
 
-  vec_Vecf<3> samples = sampleJPS(JPS1_in_known_space, par_.N);  // Take N samples along JPS1_in_known_space;
-  std::vector<double> dist_near_neig = getDistToNearestObs(samples);
+  /*  vec_Vecf<3> samples = sampleJPS(JPS1_in_known_space, par_.N);  // Take N samples along JPS1_in_known_space;
+    std::vector<double> dist_near_neig = getDistToNearestObs(samples);
 
-  /*  printf("These are the samples along the path:\n");
-    printElementsOfJPS(samples);
-    printf("**********************");*/
+      printf("These are the samples along the path:\n");
+      printElementsOfJPS(samples);
+      printf("**********************");
 
-  clearMarkerArray(&samples_rescue_path_, &pub_samples_rescue_path_);
-  vectorOfVectors2MarkerArray(samples, &samples_rescue_path_, color(BLUE_TRANS), visualization_msgs::Marker::SPHERE,
-                              dist_near_neig);  // the radius will be the distance to the nearest neighbour
-  pub_samples_rescue_path_.publish(samples_rescue_path_);
+    clearMarkerArray(&samples_rescue_path_, &pub_samples_rescue_path_);
+    vectorOfVectors2MarkerArray(samples, &samples_rescue_path_, color(BLUE_TRANS), visualization_msgs::Marker::SPHERE,
+                                dist_near_neig);  // the radius will be the distance to the nearest neighbour
+    pub_samples_rescue_path_.publish(samples_rescue_path_);*/
 
   double x0_rescue[9] = { posR[0], posR[1], posR[2], velR[0], velR[1], velR[2], accelR[0], accelR[1], accelR[2] };
 
-  Eigen::Vector3d F = samples[samples.size() - 1];  // F is the final point of the rescue path (will be near I)
+  Eigen::Vector3d F =
+      JPS1_in_known_space[JPS1_in_known_space.size() - 1];  // F is the final point of the rescue path (will be near I)
   double xf_rescue[9] = { F[0], F[1], F[2], 0, 0, 0, 0, 0, 0 };
 
+  solver_gurobi_.setMode(RESCUE_PATH);
   solver_gurobi_.setXf(xf_rescue);
   solver_gurobi_.setX0(x0_rescue);
   solver_gurobi_.findDT();
+  std::cout << "DT FOUND" << std::endl;
   std::vector<LinearConstraint3D> empty;
-  solver_gurobi_.setPolytopes(empty);  // No Polytopes constraints for the rescue path
-  solver_gurobi_.setDistances(samples, dist_near_neig);
+  // solver_gurobi_.setPolytopes(empty);  // No Polytopes constraints for the rescue path
+  // solver_gurobi_.setDistances(samples, dist_near_neig);
+  solver_gurobi_.setPolytopes(l_constraints_uo_);
 
-  std::cout << "Punto inicial: " << x0_rescue[0] << ", " << x0_rescue[1] << ", " << x0_rescue[2] << std::endl;
-  std::cout << "Samples:";
-  printElementsOfJPS(samples);
-  std::cout << "Punto final: " << xf_rescue[0] << ", " << xf_rescue[1] << ", " << xf_rescue[2] << std::endl;
+  /*  std::cout << "Punto inicial: " << x0_rescue[0] << ", " << x0_rescue[1] << ", " << x0_rescue[2] << std::endl;
+    std::cout << "Samples:";
+    printElementsOfJPS(samples);
+    std::cout << "Punto final: " << xf_rescue[0] << ", " << xf_rescue[1] << ", " << xf_rescue[2] << std::endl;*/
 
   // vec_Vecf<3> samples_penalize_empty;
   // printf("Going to setSamplesPenalize\n");
@@ -1544,15 +1536,17 @@ void CVX::cvxDecomp(vec_Vecf<3> path, int type_obstacles)
 
   if (type_obstacles == OCCUPIED_SPACE)
   {
+    std::cout << "Type Obstacles==OCCUPIED_SPACE**************" << std::endl;
     pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr_cloud_map = kdtree_map_.getInputCloud();
-    vec_Vec3f obs = kdtree_to_vec(ptr_cloud_map);
+    obs = kdtree_to_vec(ptr_cloud_map);
   }
 
   if (type_obstacles == UNKOWN_AND_OCCUPIED_SPACE)
   {
+    std::cout << "Type Obstacles==UNKOWN_AND_OCCUPIED_SPACE**************" << std::endl;
     pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr_cloud_map = kdtree_map_.getInputCloud();
     pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr_cloud_unkown = kdtree_unk_.getInputCloud();
-    vec_Vec3f obs = kdtree_to_vec(ptr_cloud_map, ptr_cloud_unkown);
+    obs = kdtree_to_vec(ptr_cloud_map, ptr_cloud_unkown);
   }
 
   // Read path from txt
