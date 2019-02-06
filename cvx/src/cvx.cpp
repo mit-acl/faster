@@ -19,6 +19,8 @@
 // Ver si las samples along the JPS (for the rescue path optimization) se est'an haciendo bien, parece que hay algo raro
 // Ahroa mismo las pointclouds no las estoy teniendo en cuenta
 // Las point clouds y los maps se actualizan MUY lentamente!!
+// Ver si lo de los splines est'a bien, los de los control points (no deber'ian cambiar al cambiar dt??)
+// Por qu'e a veces hay obst'aculos dentro de los polytopes
 
 // TODOs antiguos:
 // TODO: compile cvxgen with the option -03 (see
@@ -112,6 +114,8 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   pub_actual_traj_ = nh_.advertise<visualization_msgs::Marker>("actual_traj", 1);
   pub_path_jps1_ = nh_.advertise<visualization_msgs::MarkerArray>("path_jps1", 1);
   pub_path_jps2_ = nh_.advertise<visualization_msgs::MarkerArray>("path_jps2", 1);
+  pub_path_jps_whole_traj_ = nh_.advertise<visualization_msgs::MarkerArray>("path_jps_whole_traj", 1);
+  pub_path_jps_rescue_ = nh_.advertise<visualization_msgs::MarkerArray>("path_jps_rescue", 1);
 
   cvx_decomp_el_o_pub__ = nh.advertise<decomp_ros_msgs::EllipsoidArray>("ellipsoid_array_occupied", 1, true);
   cvx_decomp_poly_o_pub_ = nh.advertise<decomp_ros_msgs::PolyhedronArray>("polyhedron_array_occupied", 1, true);
@@ -228,14 +232,20 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
 
 void CVX::clearJPSPathVisualization(int i)
 {
-  if (i == 1)
+  switch (i)
   {
-    // printf("going to clear MarkerArray");
-    clearMarkerArray(&path_jps1_, &pub_path_jps1_);
-  }
-  else
-  {
-    clearMarkerArray(&path_jps2_, &pub_path_jps2_);
+    case JPS1_NORMAL:
+      clearMarkerArray(&path_jps1_, &pub_path_jps1_);
+      break;
+    case JPS2_NORMAL:
+      clearMarkerArray(&path_jps2_, &pub_path_jps2_);
+      break;
+    case JPS_WHOLE_TRAJ:
+      clearMarkerArray(&path_jps_whole_traj_, &pub_path_jps_rescue_);
+      break;
+    case JPS_RESCUE:
+      clearMarkerArray(&path_jps_rescue_, &pub_path_jps_whole_traj_);
+      break;
   }
 }
 
@@ -265,16 +275,25 @@ void CVX::publishJPSPath(vec_Vecf<3>& path, int i)
 {
   /*vec_Vecf<3> traj, visualization_msgs::MarkerArray* m_array*/
   clearJPSPathVisualization(i);
-  // path_jps_ = clearArrows();
-  if (i == 1)
+  switch (i)
   {
-    vectorOfVectors2MarkerArray(path, &path_jps1_, color(BLUE));
-    pub_path_jps1_.publish(path_jps1_);
-  }
-  else
-  {
-    vectorOfVectors2MarkerArray(path, &path_jps2_, color(RED));
-    pub_path_jps2_.publish(path_jps2_);
+    case JPS1_NORMAL:
+      vectorOfVectors2MarkerArray(path, &path_jps1_, color(BLUE));
+      pub_path_jps1_.publish(path_jps1_);
+      break;
+
+    case JPS2_NORMAL:
+      vectorOfVectors2MarkerArray(path, &path_jps2_, color(RED));
+      pub_path_jps2_.publish(path_jps2_);
+      break;
+    case JPS_WHOLE_TRAJ:
+      vectorOfVectors2MarkerArray(path, &path_jps_whole_traj_, color(GREEN));
+      pub_path_jps_whole_traj_.publish(path_jps_whole_traj_);
+      break;
+    case JPS_RESCUE:
+      vectorOfVectors2MarkerArray(path, &path_jps_rescue_, color(YELLOW));
+      pub_path_jps_rescue_.publish(path_jps_rescue_);
+      break;
   }
 }
 
@@ -778,8 +797,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
     JPS1_solved_ = true;
     if (par_.visual == true)
     {
-      clearJPSPathVisualization(1);
-      publishJPSPath(JPS1, 1);
+      clearJPSPathVisualization(JPS1_NORMAL);
+      publishJPSPath(JPS1, JPS1_NORMAL);
     }
     // printf("ReplanCB: Elements of JPS1 are...\n");
     // printElementsOfJPS(JPS1);
@@ -794,15 +813,9 @@ void CVX::replanCB(const ros::TimerEvent& e)
     return;
   }
 
-  // std::cout << state_pos.transpose() << std::endl;
   bool noPointsOutsideSphere1;
-  bool noPointsOutsideSphere2;
   B1 = getFirstIntersectionWithSphere(JPS1, ra, state_pos, &li1, &noPointsOutsideSphere1);
 
-  /*  printf("ReplanCB: Elements of JPS1 are...\n");
-    printElementsOfJPS(JPS1);
-    printf("B1 is:");
-    std::cout << B1.transpose() << std::endl;*/
   vec_Vecf<3> JPS1_inside_sphere(JPS1.begin(), JPS1.begin() + li1 + 1);  // Elements of JPS that are inside the sphere
   JPS1_inside_sphere.push_back(B1);
 
@@ -811,12 +824,6 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   std::cout << "JPS1_inside_sphere: ****************\n";
   printElementsOfJPS(JPS1_inside_sphere);
-  // printf("ReplanCB: Elements of JPS1_inside_sphere are...\n");
-  // printElementsOfJPS(JPS1_inside_sphere);
-
-  B_old = getFirstIntersectionWithSphere(JPS_old_, ra, state_pos, &liold, &noPointsOutsideSphere2);
-
-  Eigen::Vector3d v1 = B1 - state_pos;  // point i expressed with origin=origin sphere
 
   //////////////////////////////////////////////////////////////////////////
   //////////// Solve with GUROBI Whole trajectory //////////////////////////
@@ -840,6 +847,12 @@ void CVX::replanCB(const ros::TimerEvent& e)
   // printf("Running CVXDecomp!!!\n");
   double before = ros::Time::now().toSec();
   cvxDecomp(JPS1_inside_sphere, OCCUPIED_SPACE);  // result saved in l_constraints_
+
+  if (par_.visual == true)
+  {
+    clearJPSPathVisualization(JPS_WHOLE_TRAJ);
+    publishJPSPath(JPS1_inside_sphere, JPS_WHOLE_TRAJ);
+  }
   // ROS_WARN("CVXDecomp time: %0.2f ms", 1000 * (ros::Time::now().toSec() - before));
   // printf("Finished CVXDecomp!!!\n");
 
@@ -895,7 +908,12 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   // Part of JPS1 in known space
   int el_eliminated;
-  I = getFirstCollisionJPS(JPS1r, &thereIsIntersection, el_eliminated, UNKNOWN_MAP);  // Intersection with unkown space
+
+  std::cout << "JPS1r: *******************************\n";
+  printElementsOfJPS(JPS1r);
+
+  I = getFirstCollisionJPS(JPS1r, &thereIsIntersection, el_eliminated, UNKNOWN_MAP,
+                           RETURN_INTERSECTION);  // Intersection with unkown space
 
   // printf("Elements_eliminated=%d\n", el_eliminated);
 
@@ -912,6 +930,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   }
   else
   {
+    std::cout << "There is no intersection" << std::endl;
     JPS1_in_known_space.push_back(JPS1r[JPS1r.size() - 1]);  // Plus the last element of JPS
   }
 
@@ -929,6 +948,12 @@ void CVX::replanCB(const ros::TimerEvent& e)
   // printElementsOfJPS(JPS1_in_known_space);
 
   cvxDecomp(first_segment, UNKOWN_AND_OCCUPIED_SPACE);
+
+  if (par_.visual == true)
+  {
+    clearJPSPathVisualization(JPS_RESCUE);
+    publishJPSPath(first_segment, JPS_RESCUE);
+  }
 
   /*  vec_Vecf<3> samples = sampleJPS(JPS1_in_known_space, par_.N);  // Take N samples along JPS1_in_known_space;
     std::vector<double> dist_near_neig = getDistToNearestObs(samples);
@@ -1560,9 +1585,12 @@ void CVX::cvxDecomp(vec_Vecf<3> path, int type_obstacles)
   EllipsoidDecomp3D decomp_util;
   decomp_util.set_obs(obs);
   decomp_util.set_local_bbox(
-      Vec3f(2, 2, 1));       // Only try to find cvx decomp in the Mikowsski sum of JPS and this box (I think)
-  decomp_util.dilate(path);  // Find convex polyhedra
-  // decomp_util.shrink_polyhedrons(par_.drone_radius);  // Shrink polyhedra by the drone radius
+      Vec3f(2, 2, 1));  // Only try to find cvx decomp in the Mikowsski sum of JPS and this box (I think)
+
+  decomp_util.set_inflate_distance(0.5);  // The obstacles are inflated by this distance
+  decomp_util.dilate(path);               // Find convex polyhedra
+  // decomp_util.shrink_polyhedrons(par_.drone_radius);  // Shrink polyhedra by the drone radius. NOT RECOMMENDED (leads
+  // to lack of continuity in path sometimes)
 
   decomp_util.shrink_polyhedrons(0);  // Shrink polyhedra by the drone radius
 
@@ -2175,7 +2203,9 @@ double CVX::getDistanceToFirstCollisionJPSwithUnkonwnspace(vec_Vecf<3> path, boo
 
 // Returns the first collision of JPS with the map (i.e. with the known obstacles). Note that JPS will collide with a
 // map B if JPS was computed using an older map A
-Eigen::Vector3d CVX::getFirstCollisionJPS(vec_Vecf<3> path, bool* thereIsIntersection, int& el_eliminated, int map)
+// If type_return==Intersection, it returns the last point in the JPS path that is at least par_.inflation_jps from map
+Eigen::Vector3d CVX::getFirstCollisionJPS(vec_Vecf<3> path, bool* thereIsIntersection, int& el_eliminated, int map,
+                                          int type_return)
 {
   vec_Vecf<3> original = path;
   /*  printf("*****ORIGINAL******");
@@ -2202,6 +2232,9 @@ Eigen::Vector3d CVX::getFirstCollisionJPS(vec_Vecf<3> path, bool* thereIsInterse
   mtx_unk.lock();
 
   el_eliminated = 0;  // number of elements eliminated
+
+  // Find the next eig_search_point
+  int last_id = 0;  // this is the last index inside the sphere
   while (path.size() > 0)
   {
     pcl_search_point = eigenPoint2pclPoint(path[0]);
@@ -2230,14 +2263,25 @@ Eigen::Vector3d CVX::getFirstCollisionJPS(vec_Vecf<3> path, bool* thereIsInterse
         // printf("Collision detected");  // We will return the search_point
         // pubJPSIntersection(inters);
         // inters = path[0];  // path[0] is the search_point I'm using.
-        result = last_search_point;
+        switch (type_return)
+        {
+          case RETURN_LAST_VERTEX:
+            result = last_search_point;
+            break;
+          case RETURN_INTERSECTION:
+            std::cout << "In Return Intersection, last_id=" << last_id << std::endl;
+            original.erase(original.begin() + last_id + 1,
+                           original.end());  // Now original contains all the elements eliminated
+            original.push_back(path[0]);
+            std::reverse(original.begin(), original.end());  // flip all the vector
+            result = getFirstIntersectionWithSphere(original, par_.inflation_jps, original[0]);
+            break;
+        }
+
         *thereIsIntersection = true;
 
         break;
       }
-
-      // Find the next eig_search_point
-      int last_id;  // this is the last index inside the sphere
 
       bool no_points_outside_sphere = false;
 
@@ -2245,8 +2289,8 @@ Eigen::Vector3d CVX::getFirstCollisionJPS(vec_Vecf<3> path, bool* thereIsInterse
       // printf("**********Found it*****************\n");
       if (no_points_outside_sphere == true)
       {  // JPS doesn't intersect with any obstacle
-        // printf("JPS provided doesn't intersect any obstacles, returning the first element of the path you gave
-        // me\n");
+        *thereIsIntersection = false;
+        printf("JPS provided doesn't intersect any obstacles, returning the first element of the path you gave me\n");
         result = first_element;
         break;
       }
@@ -2261,7 +2305,8 @@ Eigen::Vector3d CVX::getFirstCollisionJPS(vec_Vecf<3> path, bool* thereIsInterse
     }
     else
     {
-      // printf("JPS provided doesn't intersect any obstacles, returning the first element of the path you gave me\n");
+      *thereIsIntersection = false;
+      printf("JPS provided doesn't intersect any obstacles, returning the first element of the path you gave me\n");
       result = first_element;
       break;
     }

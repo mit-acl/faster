@@ -38,6 +38,11 @@ public:
     add_local_bbox(this->polyhedron_);
   }
 
+  void set_inflate_distance(double d)
+  {
+    inflate_distance_ = d;
+  }
+
   /// Get the line
   vec_Vecf<Dim> get_line_segment() const
   {
@@ -141,6 +146,12 @@ protected:
     this->ellipsoid_ = E;
   }
 
+  template <typename T>
+  int sgn(T val)
+  {
+    return (T(0) < val) - (val < T(0));
+  }
+
   /// Find ellipsoid in 3D
   template <int U = Dim>
   typename std::enable_if<U == 3>::type find_ellipsoid(double offset_x)
@@ -163,6 +174,21 @@ protected:
 
     Ellipsoid<Dim> E(C, (p1_ + p2_) / 2);
     auto Rf = Ri;
+
+    ////// Let's inflate the obstacles now: Substitute all the points in obs_ by the nearest vertex of the cube centered
+    /// at that point and paralell to the axis of the ellipsoid
+    for (auto &it : this->obs_)
+    {
+      // std::cout << "Inflating the obstacles!!" << std::endl;
+      Vecf<Dim> p = Ri.transpose() * (it - E.d());  // To Ellipsoid frame
+      Vecf<Dim> tmp;                                // New Point in Ellipsoid frame
+
+      tmp(0) = p(0) - sgn(p(0)) * inflate_distance_;
+      tmp(1) = p(1) - sgn(p(1)) * inflate_distance_;
+      tmp(2) = p(2) - sgn(p(2)) * inflate_distance_;
+      it = Ri * tmp + E.d();  // Substitute previous point by the new Point in World frame
+    }
+    ///// Obstacles inflated
 
     auto obs = E.points_inside(this->obs_);
     auto obs_inside = obs;
@@ -229,6 +255,8 @@ protected:
   Vecf<Dim> p1_;
   /// The other end of line segment, input
   Vecf<Dim> p2_;
+
+  double inflate_distance_ = 0;
 };
 
 typedef LineSegment<2> LineSegment2D;

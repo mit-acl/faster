@@ -52,6 +52,14 @@
 #define OCCUPIED_SPACE 1
 #define UNKOWN_AND_OCCUPIED_SPACE 2
 
+#define JPS1_NORMAL 1
+#define JPS2_NORMAL 2
+#define JPS_WHOLE_TRAJ 3
+#define JPS_RESCUE 4
+
+#define RETURN_LAST_VERTEX 0
+#define RETURN_INTERSECTION 1
+
 struct kdTreeStamped
 {
   pcl::KdTreeFLANN<pcl::PointXYZ> kdTree;
@@ -204,7 +212,8 @@ private:
   void pubTerminalGoal();
 
   void pubJPSIntersection(Eigen::Vector3d inters);
-  Eigen::Vector3d getFirstCollisionJPS(vec_Vecf<3> path, bool* thereIsIntersection, int& el_eliminated, int map = MAP);
+  Eigen::Vector3d getFirstCollisionJPS(vec_Vecf<3> path, bool* thereIsIntersection, int& el_eliminated, int map = MAP,
+                                       int type_return = RETURN_LAST_VERTEX);
   Eigen::Vector3d projectClickedGoal(Eigen::Vector3d& P1);
 
   void publishJPS2handIntersection(vec_Vecf<3> JPS2, vec_Vecf<3> JPS2_fix, Eigen::Vector3d inter1,
@@ -242,6 +251,9 @@ private:
   ros::Publisher pub_actual_traj_;
   ros::Publisher pub_path_jps1_;
   ros::Publisher pub_path_jps2_;
+  ros::Publisher pub_path_jps_rescue_;
+  ros::Publisher pub_path_jps_whole_traj_;
+
   ros::Publisher pub_planning_vis_;
   ros::Publisher pub_intersec_points_;
   ros::Publisher pub_jps_inters_;
@@ -274,6 +286,9 @@ private:
   visualization_msgs::MarkerArray path_jps1_;
   visualization_msgs::MarkerArray path_jps2_;
   visualization_msgs::MarkerArray path_jps2_fix_;
+  visualization_msgs::MarkerArray path_jps_rescue_;
+  visualization_msgs::MarkerArray path_jps_whole_traj_;
+
   visualization_msgs::MarkerArray intersec_points_;
   visualization_msgs::MarkerArray samples_rescue_path_;
 

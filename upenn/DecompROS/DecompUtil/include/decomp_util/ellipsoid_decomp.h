@@ -75,14 +75,14 @@ public:
     return constraints;
   }
 
-  void shrink_polyhedrons(double shrink_distance)  // Jesus added this function
+  void shrink_polyhedrons(double shrink_poly_distance)  // Jesus added this function
   {
     for (unsigned int i = 0; i < polyhedrons_.size(); i++)  // For all the polyhedrons
     {
       vec_E<Hyperplane<Dim>> *hyperplanes_ptr = &(polyhedrons_[i].vs_);
       for (unsigned int j = 0; j < (*hyperplanes_ptr).size(); j++)  // For all the hyperplanes in one polyhedro
       {
-        (*hyperplanes_ptr)[j].p_ = (*hyperplanes_ptr)[j].p_ - shrink_distance * (*hyperplanes_ptr)[j].n_;
+        (*hyperplanes_ptr)[j].p_ = (*hyperplanes_ptr)[j].p_ - shrink_poly_distance * (*hyperplanes_ptr)[j].n_;
       }
     }
   }
@@ -104,8 +104,8 @@ public:
       lines_[i] = std::make_shared<LineSegment<Dim>>(path[i], path[i + 1]);
       lines_[i]->set_local_bbox(local_bbox_);
       lines_[i]->set_obs(obs_);
+      lines_[i]->set_inflate_distance(inflate_distance_);
       lines_[i]->dilate(offset_x);
-
       ellipsoids_[i] = lines_[i]->get_ellipsoid();
       polyhedrons_[i] = lines_[i]->get_polyhedron();
     }
@@ -117,6 +117,11 @@ public:
       for (auto &it : polyhedrons_)
         add_global_bbox(it);
     }
+  }
+
+  void set_inflate_distance(double d)
+  {
+    inflate_distance_ = d;
   }
 
 protected:
@@ -159,6 +164,8 @@ protected:
   Vecf<Dim> local_bbox_{ Vecf<Dim>::Zero() };
   Vecf<Dim> global_bbox_min_{ Vecf<Dim>::Zero() };  // bounding box params
   Vecf<Dim> global_bbox_max_{ Vecf<Dim>::Zero() };
+
+  double inflate_distance_ = 0;
 };
 
 typedef EllipsoidDecomp<2> EllipsoidDecomp2D;

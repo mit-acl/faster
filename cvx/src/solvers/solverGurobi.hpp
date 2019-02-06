@@ -18,7 +18,7 @@
 // TODO: This function is the same as solvePolyOrder2 but with other name (weird conflicts...)
 inline float solvePolynomialOrder2(Eigen::Vector3f coeff)
 {
-  // std::cout << "solving\n" << coeff << std::endl;
+  std::cout << "solving\n" << coeff << std::endl;
   float a = coeff[0];
   float b = coeff[1];
   float c = coeff[2];
