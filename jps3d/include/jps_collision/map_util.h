@@ -73,12 +73,42 @@ public:
 
   void setOccupied(const Veci<Dim> &pn)
   {
-    map_[getIndex(pn)] = 100;
+    int total_size = dim_(0) * dim_(1) * dim_(2);
+    int index = getIndex(pn);
+    if (index >= 0 && index < total_size)
+    {  // check that the point is inside the map
+      map_[getIndex(pn)] = 100;
+    }
   }
 
   void setFree(const Veci<Dim> &pn)
   {
-    map_[getIndex(pn)] = val_free;
+    int total_size = dim_(0) * dim_(1) * dim_(2);
+    int index = getIndex(pn);
+    if (index >= 0 && index < total_size)
+    {  // check that the point is inside the map
+      map_[index] = val_free;
+    }
+  }
+
+  // set Free all the voxels that are in a 3d cube centered at center and with side/2=d
+  void setFreeVoxelAndSurroundings(const Veci<Dim> &center, const float d)
+  {
+    std::cout << "Center is" << center.transpose() << std::endl;
+    int n_voxels = std::round(d / res_ + 0.5);  // convert distance to number of voxels
+    for (int ix = -n_voxels; ix <= n_voxels; ix++)
+    {
+      for (int iy = -n_voxels; iy <= n_voxels; iy++)
+      {
+        for (int iz = -n_voxels; iz <= n_voxels; iz++)
+        {
+          Veci<Dim> voxel = center + Veci<Dim>(ix, iy, iz);  // Int coordinates of the voxel I'm going to clear
+
+          // std::cout << "Clearing" << voxel.transpose() << std::endl;
+          setFree(voxel);
+        }
+      }
+    }
   }
 
   /// Check if the cell is outside by coordinate

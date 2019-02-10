@@ -316,7 +316,7 @@ inline vec_Vec3f kdtree_to_vec(const pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloud
     pts[i](2) = ptr_cloud1->points[i].z;
   }
 
-  for (unsigned int i = 0; i < ptr_cloud2->points.size(); i++)
+  for (unsigned int i = ptr_cloud1->points.size(); i < ptr_cloud2->points.size(); i++)
   {
     pts[i](0) = ptr_cloud2->points[i].x;
     pts[i](1) = ptr_cloud2->points[i].y;
@@ -501,14 +501,14 @@ using vec_Vecf = vec_E<Vecf<N>>;
 inline bool getIntersectionWithPlane(const Eigen::Vector3d& P1, const Eigen::Vector3d& P2, const Eigen::Vector4d& coeff,
                                      Eigen::Vector3d& intersection)
 {
-  std::cout << "Coefficients" << std::endl;
-  std::cout << coeff.transpose() << std::endl;
+  /*  std::cout << "Coefficients" << std::endl;
+    std::cout << coeff.transpose() << std::endl;
 
-  std::cout << "P1" << std::endl;
-  std::cout << P1.transpose() << std::endl;
+    std::cout << "P1" << std::endl;
+    std::cout << P1.transpose() << std::endl;
 
-  std::cout << "P2" << std::endl;
-  std::cout << P2.transpose() << std::endl;
+    std::cout << "P2" << std::endl;
+    std::cout << P2.transpose() << std::endl;*/
 
   double A = coeff[0];
   double B = coeff[1];
@@ -522,18 +522,19 @@ inline bool getIntersectionWithPlane(const Eigen::Vector3d& P1, const Eigen::Vec
   double z1 = P1[2];
   double c = (P2[2] - P1[2]);
   double t = -(A * x1 + B * y1 + C * z1 + D) / (A * a + B * b + C * c);
-  std::cout << "t vale " << t << std::endl;
+  // std::cout << "t vale " << t << std::endl;
   (intersection)[0] = x1 + a * t;
   (intersection)[1] = y1 + b * t;
   (intersection)[2] = z1 + c * t;
   // printf("t=%f\n", t);
   bool result =
       (t < 0 || t > 1) ? false : true;  // False if the intersection is with the line P1-P2, not with the segment P1-P2
-  std::cout << "result vale" << result << std::endl;
-  if (result)
-  {
-    std::cout << "Intersection\n" << intersection(0) << ", " << intersection(1) << ", " << intersection(2) << std::endl;
-  }
+  // std::cout << "result vale" << result << std::endl;
+  /*  if (result)
+    {
+      std::cout << "Intersection\n" << intersection(0) << ", " << intersection(1) << ", " << intersection(2) <<
+    std::endl;
+    }*/
   return result;
 }
 

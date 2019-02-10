@@ -157,7 +157,7 @@ private:
   SolverGurobi sg_rescue_;  // solver gurobi whole trajectory
   // class methods
   // void pubTraj(double** x);
-  void pubTraj(Eigen::MatrixXd X, int type);
+  void pubTraj(Eigen::MatrixXd& X, int type);
   void goalCB(const acl_msgs::TermGoal& msg);
   void stateCB(const acl_msgs::State& msg);
   void modeCB(const acl_msgs::QuadFlightMode& msg);
@@ -232,7 +232,8 @@ private:
 
   std::vector<double> getDistToNearestObs(vec_Vecf<3>& points);
 
-  Eigen::Vector3d getIntersectionJPSwithPolytope(vec_Vecf<3>& path, std::vector<LinearConstraint3D>& constraints);
+  Eigen::Vector3d getIntersectionJPSwithPolytope(vec_Vecf<3>& path, std::vector<LinearConstraint3D>& constraints,
+                                                 bool& thereIsIntersection);
 
   visualization_msgs::Marker setpoint_;
   acl_msgs::QuadGoal quadGoal_;

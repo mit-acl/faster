@@ -202,6 +202,11 @@ void SolverGurobi::setDistances(vec_Vecf<3>& samples,
   dist_near_obs_ = dist_near_obs;
 }
 
+void SolverGurobi::setForceFinalConstraint(bool forceFinalConstraint)
+{
+  forceFinalConstraint_ = forceFinalConstraint;
+}
+
 void SolverGurobi::setDistanceConstraints()  // Set the distance constraints
 {
   // Remove previous distance constraints
@@ -362,7 +367,7 @@ int SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> l_constraints)
       }
     }
   }
-  std::cout << "Done POLYTOPES=" << std::endl;
+  // std::cout << "Done POLYTOPES=" << std::endl;
 }
 
 int SolverGurobi::getN()
@@ -431,8 +436,10 @@ void SolverGurobi::setConstraintsXf()
 
         final_cons.push_back(m.addConstr(getAccel(N_ - 1, dt_, i) - xf_[i + 6] <= 0.05));   // Final acceleration
         final_cons.push_back(m.addConstr(getAccel(N_ - 1, dt_, i) - xf_[i + 6] >= -0.05));  // Final acceleration*/
-    if (mode_ == WHOLE_TRAJ)
+    if (forceFinalConstraint_ == true)
     {
+      std::cout << "*********FORCING FINAL CONSTRAINT******" << std::endl;
+      std::cout << xf_[i] << std::endl;
       final_cons.push_back(m.addConstr(getPos(N_ - 1, dt_, i) - xf_[i] == 0));  // Final position
     }
     final_cons.push_back(m.addConstr(getVel(N_ - 1, dt_, i) - xf_[i + 3] == 0));    // Final velocity

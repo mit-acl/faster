@@ -69,6 +69,7 @@ public:
   void setConstraintsXf();
   void setConstraintsX0();
   void setDynamicConstraints();
+  void setForceFinalConstraint(bool forceFinalConstraint);
 
   void setMaxConstraints();
   void createVars();
@@ -146,5 +147,6 @@ protected:
 
   int temporal = 0;
   int mode_;
+  bool forceFinalConstraint_ = true;
 };
 #endif
