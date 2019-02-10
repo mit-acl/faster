@@ -31,6 +31,7 @@
 // Convex Decomposition includes
 #include <decomp_ros_utils/data_ros_utils.h>
 #include <decomp_util/ellipsoid_decomp.h>
+#include <decomp_util/seed_decomp.h>
 
 // status_ : YAWING-->TRAVELING-->GOAL_SEEN-->GOAL_REACHED-->YAWING-->TRAVELING-->...
 #define YAWING 0
@@ -152,7 +153,8 @@ private:
   Solver<ACCEL> solver_accel_;
   Solver<JERK> solver_jerk_;
 
-  SolverGurobi solver_gurobi_;
+  SolverGurobi sg_whole_;   // solver gurobi whole trajectory
+  SolverGurobi sg_rescue_;  // solver gurobi whole trajectory
   // class methods
   // void pubTraj(double** x);
   void pubTraj(Eigen::MatrixXd X, int type);
@@ -223,11 +225,14 @@ private:
 
   double getDistanceToFirstCollisionJPSwithUnkonwnspace(vec_Vecf<3> path, bool* thereIsIntersection);
 
-  void cvxDecomp(vec_Vecf<3> path, int type_obstacles);
+  void cvxEllipsoidDecompOcc(vec_Vecf<3> path);
+  void cvxSeedDecompUnkOcc(Vecf<3>& seed);
 
   vec_Vecf<3> sampleJPS(vec_Vecf<3>& path, int n);
 
   std::vector<double> getDistToNearestObs(vec_Vecf<3>& points);
+
+  Eigen::Vector3d getIntersectionJPSwithPolytope(vec_Vecf<3>& path, std::vector<LinearConstraint3D>& constraints);
 
   visualization_msgs::Marker setpoint_;
   acl_msgs::QuadGoal quadGoal_;
@@ -263,7 +268,7 @@ private:
   ros::Publisher cvx_decomp_el_o_pub__;
   ros::Publisher cvx_decomp_poly_o_pub_;
 
-  ros::Publisher cvx_decomp_el_uo_pub__;
+  // ros::Publisher cvx_decomp_el_uo_pub__;
   ros::Publisher cvx_decomp_poly_uo_pub_;
 
   ros::Subscriber sub_goal_;

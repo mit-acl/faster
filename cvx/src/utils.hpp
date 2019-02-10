@@ -498,17 +498,17 @@ using vec_Vecf = vec_E<Vecf<N>>;
 // returns 1 if there is an intersection between the segment P1-P2 and the plane given by coeff=[A B C D]
 // (Ax+By+Cz+D==0)  returns 0 if there is no intersection.
 // The intersection point is saved in "intersection"
-inline bool getIntersectionWithPlane(Eigen::Vector3d P1, Eigen::Vector3d P2, Eigen::Vector4d coeff,
-                                     Eigen::Vector3d* inters)
+inline bool getIntersectionWithPlane(const Eigen::Vector3d& P1, const Eigen::Vector3d& P2, const Eigen::Vector4d& coeff,
+                                     Eigen::Vector3d& intersection)
 {
-  /*  std::cout << "Coefficients" << std::endl;
-    std::cout << coeff.transpose() << std::endl;
+  std::cout << "Coefficients" << std::endl;
+  std::cout << coeff.transpose() << std::endl;
 
-    std::cout << "P1" << std::endl;
-    std::cout << P1.transpose() << std::endl;
+  std::cout << "P1" << std::endl;
+  std::cout << P1.transpose() << std::endl;
 
-    std::cout << "P2" << std::endl;
-    std::cout << P2.transpose() << std::endl;*/
+  std::cout << "P2" << std::endl;
+  std::cout << P2.transpose() << std::endl;
 
   double A = coeff[0];
   double B = coeff[1];
@@ -522,16 +522,18 @@ inline bool getIntersectionWithPlane(Eigen::Vector3d P1, Eigen::Vector3d P2, Eig
   double z1 = P1[2];
   double c = (P2[2] - P1[2]);
   double t = -(A * x1 + B * y1 + C * z1 + D) / (A * a + B * b + C * c);
-  (*inters)[0] = x1 + a * t;
-  (*inters)[1] = y1 + b * t;
-  (*inters)[2] = z1 + c * t;
+  std::cout << "t vale " << t << std::endl;
+  (intersection)[0] = x1 + a * t;
+  (intersection)[1] = y1 + b * t;
+  (intersection)[2] = z1 + c * t;
   // printf("t=%f\n", t);
   bool result =
       (t < 0 || t > 1) ? false : true;  // False if the intersection is with the line P1-P2, not with the segment P1-P2
-                                        /*  if (result)
-                                          {
-                                            std::cout << "Intersection\n" << *inters << std::endl;
-                                          }*/
+  std::cout << "result vale" << result << std::endl;
+  if (result)
+  {
+    std::cout << "Intersection\n" << intersection(0) << ", " << intersection(1) << ", " << intersection(2) << std::endl;
+  }
   return result;
 }
 

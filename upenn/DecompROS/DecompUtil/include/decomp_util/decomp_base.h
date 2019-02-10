@@ -81,13 +81,21 @@ protected:
 
   void find_polyhedron()
   {
+    // std::cout << "FINDING POLYHEDRON" << std::endl;
     //**** find half-space
     Polyhedron<Dim> Vs;
     vec_Vecf<Dim> obs_remain = obs_;
+    // std::cout << "Tamano obs is=" << obs_.size() << std::endl;
     while (!obs_remain.empty())
     {
+      // std::cout << "hola" << std::endl;
       const auto v = ellipsoid_.closest_hyperplane(obs_remain);
-      Vs.add(v);
+      if (v.n_.isApprox(Vecf<Dim>::Zero()) == false)  // Will be true when the normal vector is 0,0,0.
+                                                      // This happens when there are no obstacles
+                                                      // Jesus added this check
+      {
+        Vs.add(v);
+      }
       vec_Vecf<Dim> obs_tmp;
       for (const auto &it : obs_remain)
       {
@@ -102,6 +110,7 @@ protected:
     }
 
     polyhedron_ = Vs;
+    // std::cout << "En find_polyhedron polyhedron_ tiene size\n" << polyhedron_.hyperplanes().size() << std::endl;
   }
 
   /// Obstacles, input

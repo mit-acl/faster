@@ -248,7 +248,7 @@ void SolverGurobi::setDistanceConstraints()  // Set the distance constraints
 
 int SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> l_constraints)
 {
-  std::cout << "Setting POLYTOPES=" << std::endl;
+  // std::cout << "Setting POLYTOPES=" << std::endl;
 
   // Remove previous polytopes constraints
   for (int i = 0; i < polytopes_cons.size(); i++)
@@ -305,7 +305,7 @@ int SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> l_constraints)
     // constraints
     for (int t = 0; t < N_; t++)  // Start in t=1 (because t=0 is already fixed with the initial condition)
     {
-      std::cout << "*********************t= " << t << std::endl;
+      // std::cout << "*********************t= " << t << std::endl;
 
       if (mode_ == WHOLE_TRAJ)
       {
@@ -321,7 +321,7 @@ int SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> l_constraints)
       std::vector<GRBLinExpr> cp2 = getCP2(t);  // Control Point 2
       std::vector<GRBLinExpr> cp3 = getCP3(t);  // Control Point 3
 
-      std::cout << "NUMBER OF POLYTOPES=" << l_constraints.size() - 1 << std::endl;
+      // std::cout << "NUMBER OF POLYTOPES=" << l_constraints.size() - 1 << std::endl;
 
       for (int n_poly = 0; n_poly < l_constraints.size(); n_poly++)  // Loop over the number of polytopes
       {
@@ -331,7 +331,7 @@ int SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> l_constraints)
 
         std::vector<std::vector<double>> A1std = eigenMatrix2std(A1);
 
-        std::cout << "Before multip for n_poly=" << n_poly << std::endl;
+        // std::cout << "Before multip for n_poly=" << n_poly << std::endl;
         std::vector<GRBLinExpr> Acp0 = MatrixMultiply(A1std, cp0);  // A times control point 0
         std::vector<GRBLinExpr> Acp1 = MatrixMultiply(A1std, cp1);  // A times control point 1
         std::vector<GRBLinExpr> Acp2 = MatrixMultiply(A1std, cp2);  // A times control point 2
@@ -339,7 +339,7 @@ int SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> l_constraints)
 
         for (int i = 0; i < bb.rows(); i++)
         {
-          std::cout << "Plane=" << i << "out of" << bb.rows() - 1 << std::endl;
+          // std::cout << "Plane=" << i << "out of" << bb.rows() - 1 << std::endl;
           if (mode_ == WHOLE_TRAJ)
           {  // If b[t,0]==1, all the control points are in that polytope
             polytopes_cons.push_back(m.addGenConstrIndicator(b[t][n_poly], 1, Acp0[i], GRB_LESS_EQUAL, bb[i]));
@@ -349,14 +349,14 @@ int SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> l_constraints)
           }
           if (mode_ == RESCUE_PATH)  // There will be only one polytope --> all the control points in that polytope
           {
-            std::cout << "Setting POLYTOPES=3" << std::endl;
+            // std::cout << "Setting POLYTOPES=3" << std::endl;
             polytope_cons.push_back(m.addConstr(Acp0[i] <= bb[i]));
-            std::cout << "Setting POLYTOPES=3.5" << std::endl;
+            // std::cout << "Setting POLYTOPES=3.5" << std::endl;
             polytope_cons.push_back(m.addConstr(Acp1[i] <= bb[i]));
-            std::cout << "Setting POLYTOPES=3.6" << std::endl;
+            // std::cout << "Setting POLYTOPES=3.6" << std::endl;
             polytope_cons.push_back(m.addConstr(Acp2[i] <= bb[i]));
             polytope_cons.push_back(m.addConstr(Acp3[i] <= bb[i]));
-            std::cout << "Setting POLYTOPES=4" << std::endl;
+            // std::cout << "Setting POLYTOPES=4" << std::endl;
           }
         }
       }
@@ -536,10 +536,7 @@ bool SolverGurobi::genNewTraj()
   //}
   //}
   // std::cout << "dt_final/dt_initial= " << dt_ / dt_initial << std::endl;
-  if (solved == true)
-  {
-    fillXandU();
-  }
+
   return solved;
 }
 
@@ -547,6 +544,7 @@ void SolverGurobi::findDT()
 {
   // double dt = 2 * getDTInitial();
   dt_ = 2 * getDTInitial();
+  std::cout << "DT found is=" << dt_ << std::endl;
   // dt_ = 1;
 }
 
@@ -764,9 +762,13 @@ double SolverGurobi::getDTInitial()
   float accely = copysign(1, xf_[1] - x0_[1]) * a_max_;
   float accelz = copysign(1, xf_[2] - x0_[2]) * a_max_;
   // Solve equation xf=x0+v0t+0.5*a*t^2
-  t_ax = solvePolynomialOrder2(Eigen::Vector3f(0.5 * accelx, v0x, x0_[0] - xf_[0]));
-  t_ay = solvePolynomialOrder2(Eigen::Vector3f(0.5 * accely, v0y, x0_[1] - xf_[1]));
-  t_az = solvePolynomialOrder2(Eigen::Vector3f(0.5 * accelz, v0z, x0_[2] - xf_[2]));
+  Eigen::Vector3f coeff3x(0.5 * accelx, v0x, x0_[0] - xf_[0]);
+  Eigen::Vector3f coeff3y(0.5 * accely, v0y, x0_[1] - xf_[1]);
+  Eigen::Vector3f coeff3z(0.5 * accelz, v0z, x0_[2] - xf_[2]);
+
+  t_ax = solvePolynomialOrder2(coeff3x);
+  t_ay = solvePolynomialOrder2(coeff3y);
+  t_az = solvePolynomialOrder2(coeff3z);
 
   dt_initial = std::max({ t_vx, t_vy, t_vz, t_ax, t_ay, t_az, t_jx, t_jy, t_jz }) / N_;
   if (dt_initial > 10000)  // happens when there is no solution to the previous eq.
@@ -807,7 +809,7 @@ GRBLinExpr SolverGurobi::getJerk(int t, double tau, int ii)
   return jerk;
 }
 
-// Coefficient getters: At^3 + Bt^2 + Ct + D
+// Coefficient getters: At^3 + Bt^2 + Ct + D  , t \in [0, dt_]
 GRBLinExpr SolverGurobi::getA(int t, int ii)  // interval, axis
 {
   return x[t][0 + ii];
@@ -828,6 +830,27 @@ GRBLinExpr SolverGurobi::getD(int t, int ii)  // interval, axis
   return x[t][9 + ii];
 }
 
+// Coefficients Normalized: At^3 + Bt^2 + Ct + D  , t \in [0, 1]
+GRBLinExpr SolverGurobi::getAn(int t, int ii)  // interval, axis
+{
+  return x[t][0 + ii] * dt_ * dt_ * dt_;
+}
+
+GRBLinExpr SolverGurobi::getBn(int t, int ii)  // interval, axis
+{
+  return x[t][3 + ii] * dt_ * dt_;
+}
+
+GRBLinExpr SolverGurobi::getCn(int t, int ii)  // interval, axis
+{
+  return x[t][6 + ii] * dt_;
+}
+
+GRBLinExpr SolverGurobi::getDn(int t, int ii)  // interval, axis
+{
+  return x[t][9 + ii];
+}
+
 // Control Points (of the splines) getters
 std::vector<GRBLinExpr> SolverGurobi::getCP0(int t)  // Control Point 0 of interval t
 {                                                    // Control Point 0 is initial position
@@ -838,18 +861,18 @@ std::vector<GRBLinExpr> SolverGurobi::getCP0(int t)  // Control Point 0 of inter
 
 std::vector<GRBLinExpr> SolverGurobi::getCP1(int t)  // Control Point 1 of interval t
 {
-  GRBLinExpr cpx = (getC(t, 0) + 3 * getD(t, 0)) / 3;
-  GRBLinExpr cpy = (getC(t, 1) + 3 * getD(t, 1)) / 3;
-  GRBLinExpr cpz = (getC(t, 2) + 3 * getD(t, 2)) / 3;
+  GRBLinExpr cpx = (getCn(t, 0) + 3 * getDn(t, 0)) / 3;
+  GRBLinExpr cpy = (getCn(t, 1) + 3 * getDn(t, 1)) / 3;
+  GRBLinExpr cpz = (getCn(t, 2) + 3 * getDn(t, 2)) / 3;
   std::vector<GRBLinExpr> cp = { cpx, cpy, cpz };
   return cp;
 }
 
 std::vector<GRBLinExpr> SolverGurobi::getCP2(int t)  // Control Point 2 of interval t
 {
-  GRBLinExpr cpx = (getB(t, 0) + 2 * getC(t, 0) + 3 * getD(t, 0)) / 3;
-  GRBLinExpr cpy = (getB(t, 1) + 2 * getC(t, 1) + 3 * getD(t, 1)) / 3;
-  GRBLinExpr cpz = (getB(t, 2) + 2 * getC(t, 2) + 3 * getD(t, 2)) / 3;
+  GRBLinExpr cpx = (getBn(t, 0) + 2 * getCn(t, 0) + 3 * getDn(t, 0)) / 3;
+  GRBLinExpr cpy = (getBn(t, 1) + 2 * getCn(t, 1) + 3 * getDn(t, 1)) / 3;
+  GRBLinExpr cpz = (getBn(t, 2) + 2 * getCn(t, 2) + 3 * getDn(t, 2)) / 3;
   std::vector<GRBLinExpr> cp = { cpx, cpy, cpz };
   return cp;
 }

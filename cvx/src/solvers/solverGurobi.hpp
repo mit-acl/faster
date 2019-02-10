@@ -16,9 +16,9 @@
 #include <unsupported/Eigen/Polynomials>
 
 // TODO: This function is the same as solvePolyOrder2 but with other name (weird conflicts...)
-inline float solvePolynomialOrder2(Eigen::Vector3f coeff)
+inline float solvePolynomialOrder2(Eigen::Vector3f& coeff)
 {
-  std::cout << "solving\n" << coeff << std::endl;
+  // std::cout << "solving\n" << coeff.transpose() << std::endl;
   float a = coeff[0];
   float b = coeff[1];
   float c = coeff[2];
@@ -91,14 +91,21 @@ public:
   GRBLinExpr getC(int t, int ii);
   GRBLinExpr getD(int t, int ii);
 
+  // Getters of the Normalized coefficients
+  GRBLinExpr getAn(int t, int ii);
+  GRBLinExpr getBn(int t, int ii);
+  GRBLinExpr getCn(int t, int ii);
+  GRBLinExpr getDn(int t, int ii);
+
   std::vector<GRBLinExpr> getCP0(int t);
   std::vector<GRBLinExpr> getCP1(int t);
   std::vector<GRBLinExpr> getCP2(int t);
   std::vector<GRBLinExpr> getCP3(int t);
 
-protected:
   Eigen::MatrixXd U_temp_;
   Eigen::MatrixXd X_temp_;
+
+protected:
   double cost_;
   double dt_;  // time step found by the solver
   int N_ = 10;
