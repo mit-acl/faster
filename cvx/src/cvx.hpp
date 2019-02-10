@@ -179,7 +179,7 @@ private:
   void pclCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg);
   void frontierCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg);
 
-  bool trajIsFree(Eigen::MatrixXd X);
+  // bool trajIsFree(Eigen::MatrixXd X);
   Eigen::Vector3d computeForce(Eigen::Vector3d x, Eigen::Vector3d g);
   // std_msgs::ColorRGBA color(int id);
   Eigen::Vector3d createForceArrow(Eigen::Vector3d x, Eigen::Vector3d f_att, Eigen::Vector3d f_rep,
@@ -198,7 +198,7 @@ private:
   geometry_msgs::Vector3 getAccel(int i);
   geometry_msgs::Vector3 getJerk(int i);
 
-  double solveVelAndGetCost(vec_Vecf<3> path);
+  // double solveVelAndGetCost(vec_Vecf<3> path);
   void updateInitialCond(int i);
   void pubPlanningVisual(Eigen::Vector3d center, double ra, double rb, Eigen::Vector3d B1, Eigen::Vector3d C1);
   void pubintersecPoint(Eigen::Vector3d p, bool add);
@@ -223,14 +223,14 @@ private:
 
   vec_Vecf<3> fix(vec_Vecf<3> JPS_old, Eigen::Vector3d start, Eigen::Vector3d goal, bool* solved);
 
-  double getDistanceToFirstCollisionJPSwithUnkonwnspace(vec_Vecf<3> path, bool* thereIsIntersection);
+  // double getDistanceToFirstCollisionJPSwithUnkonwnspace(vec_Vecf<3> path, bool* thereIsIntersection);
 
   void cvxEllipsoidDecompOcc(vec_Vecf<3> path);
   void cvxSeedDecompUnkOcc(Vecf<3>& seed);
 
-  vec_Vecf<3> sampleJPS(vec_Vecf<3>& path, int n);
+  // vec_Vecf<3> sampleJPS(vec_Vecf<3>& path, int n);
 
-  std::vector<double> getDistToNearestObs(vec_Vecf<3>& points);
+  // std::vector<double> getDistToNearestObs(vec_Vecf<3>& points);
 
   Eigen::Vector3d getIntersectionJPSwithPolytope(vec_Vecf<3>& path, std::vector<LinearConstraint3D>& constraints,
                                                  bool& thereIsIntersection);

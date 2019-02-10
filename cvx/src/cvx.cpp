@@ -22,6 +22,7 @@
 // Ver si lo de los splines est'a bien, los de los control points (no deber'ian cambiar al cambiar dt??)
 // Por qu'e a veces hay obst'aculos dentro de los polytopes
 // Ver si los values del archivo de parametros estan bien
+// Quitar la pcl CB si las point clouds no las estoy usando --> Quitada
 
 // COSAS QUE PONER EN EL PAPER
 // Notese que la WHOLE trajectory NO empieza en la posicion actual, sino un poco más adelante!!
@@ -146,7 +147,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   sub_map_ = nh_.subscribe("occup_grid", 1, &CVX::mapCB, this);
   sub_unk_ = nh_.subscribe("unknown_grid", 1, &CVX::unkCB, this);
   sub_frontier_ = nh_.subscribe("frontier_grid", 1, &CVX::frontierCB, this);
-  sub_pcl_ = nh_.subscribe("pcloud", 1, &CVX::pclCB, this);
+  // sub_pcl_ = nh_.subscribe("pcloud", 1, &CVX::pclCB, this);
 
   pubCBTimer_ = nh_pub_CB_.createTimer(ros::Duration(par_.dc), &CVX::pubCB, this);
 
@@ -540,14 +541,14 @@ void CVX::goalCB(const acl_msgs::TermGoal& msg)
   // std::cout << "term_goal_=\n" << term_goal_ << std::endl;
 
   status_ = (status_ == GOAL_REACHED) ? YAWING : TRAVELING;
-  if (status_ == YAWING)
-  {
-    // printf("GCB: status_ = YAWING\n");
-  }
-  if (status_ == TRAVELING)
-  {
-    // printf("GCB: status_ = TRAVELING\n");
-  }
+  /*  if (status_ == YAWING)
+    {
+      // printf("GCB: status_ = YAWING\n");
+    }
+    if (status_ == TRAVELING)
+    {
+      // printf("GCB: status_ = TRAVELING\n");
+    }*/
   mtx_planner_status_.lock();
   planner_status_ = START_REPLANNING;
   mtx_planner_status_.unlock();
@@ -1289,113 +1290,6 @@ void CVX::pubCB(const ros::TimerEvent& e)
   mtx_goals.unlock();
 }
 
-// Get the distance to the nearest obstacle for each point given in the vector "points"
-std::vector<double> CVX::getDistToNearestObs(vec_Vecf<3>& points)
-{
-  mtx_unk.lock();
-  mtx_map.lock();
-  std::vector<double> distances;
-  for (int i = 0; i < points.size(); i++)
-  {
-    int N = 1;
-    pcl::PointXYZ searchPoint(points[i][0], points[i][1], points[i][2]);
-    std::vector<int> id(N);
-    std::vector<float> dist2(N);  // squared distance
-    double distance_map, distance_unk;
-
-    // Find nearest obstacles in Unkown space
-    distance_unk = kdtree_unk_.nearestKSearch(searchPoint, N, id, dist2) > 0 ? sqrt(dist2[0]) : 100;
-    // printf("Distance unkown=%f\n", distance_unk);
-
-    // Find nearest obstacles in MAP
-    distance_map = kdtree_map_.nearestKSearch(searchPoint, N, id, dist2) > 0 ? sqrt(dist2[0]) : 100;
-    // printf("Distance map=%f\n", distance_map);
-    // printf("******");
-
-    distances.push_back(std::min(distance_map, distance_unk));
-  }
-  // std::cout << "Distances computed are: " << distances << std::endl;
-  mtx_unk.unlock();
-  mtx_map.unlock();
-  return distances;
-}
-
-// Sample n points along the path
-vec_Vecf<3> CVX::sampleJPS(vec_Vecf<3>& path, int n)
-{
-  std::vector<double> distance;  // vector that contains the distance (going along the path) of each vertex in the path
-                                 // to the first point of the path
-  distance.push_back(0);
-  for (int i = 1; i < path.size(); i++)
-  {
-    double distance_so_far = distance[distance.size() - 1];
-    distance.push_back(distance_so_far + (path[i] - path[i - 1]).norm());
-  }
-
-  // note that distance and path have the same number of elements
-
-  double total_distance = getDistancePath(path);
-  double d = total_distance / n;  // distance between samples
-
-  vec_Vecf<3> samples;
-  samples.push_back(path[0]);
-  double dist_next_sample = 0;  // Distancia a la que quiero poner el next sample
-
-  Eigen::Vector3d next_peak, previous_peak;
-  double difference;
-  for (int n_samples = 1; n_samples < n; n_samples++)
-  {
-    dist_next_sample = dist_next_sample + d;
-
-    Eigen::Vector3d previous_peak;
-    for (int i = 1; i < distance.size(); i++)
-    {
-      if (distance[i] > dist_next_sample)
-      {
-        previous_peak = path[i - 1];
-        next_peak = path[i];
-        difference = dist_next_sample - distance[i - 1];
-        break;
-      }
-    }
-
-    Eigen::Vector3d v = (next_peak - previous_peak).normalized();
-
-    Eigen::Vector3d last_sample = samples[samples.size() - 1];
-    Eigen::Vector3d new_sample = previous_peak + difference * v;
-    // std::cout << "Adding sample" << new_sample << std::endl;
-    samples.push_back(new_sample);
-  }
-  return samples;
-}
-
-double CVX::solveVelAndGetCost(vec_Vecf<3> path)
-{
-  double cost = 0;
-  /*  printf("Points in the path VEL\n");
-    for (int i = 0; i < path.size() - 1; i++)
-    {
-      std::cout << path[i].transpose(s) << std::endl;
-    }*/
-
-  for (int i = 0; i < path.size() - 1; i++)
-  {
-    double xf[3] = { path[i + 1][0], path[i + 1][1], path[i + 1][2] };
-
-    double x0[3] = { path[i][0], path[i][1], path[i][2] };
-    // double u0[3] = { initialCond_.vel.x, initialCond_.vel.y, initialCond_.vel.z };
-    solver_vel_.set_xf(xf);
-    solver_vel_.set_x0(x0);
-    // solver_vel_.set_u0(u0);
-    double t0cvxgen_vel = ros::Time::now().toSec();
-    solver_vel_.genNewTraj();
-    log_.cvx_vel_total_ms = log_.cvx_vel_total_ms + 1000 * (ros::Time::now().toSec() - t0cvxgen_vel);
-    log_.loops_vel = log_.loops_vel + 1;
-    cost = cost + solver_vel_.getCost();
-  }
-  return cost;
-}
-
 void CVX::modeCB(const acl_msgs::QuadFlightMode& msg)
 {
   // printf("In modeCB\n");
@@ -1818,16 +1712,13 @@ void CVX::frontierCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
   pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_frontier(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::fromROSMsg(*pcl2ptr_msg, *pclptr_frontier);
 
-  // printf("In mapCB2\n");
   mtx_frontier.lock();
-  // printf("Before setting InputCloud\n");
   kdtree_frontier_.setInputCloud(pclptr_frontier);
   mtx_frontier.unlock();
-  // printf("In mapCB3\n");
   kdtree_frontier_initialized_ = 1;
 }
 
-void CVX::pclCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
+/*void CVX::pclCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 {
   // printf("In pclCB\n");
 
@@ -1868,7 +1759,7 @@ void CVX::pclCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
   {
     ROS_WARN("%s", ex.what());
   }
-}
+}*/
 
 // Occupied CB
 void CVX::mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
@@ -1960,250 +1851,6 @@ void CVX::unkCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
   //}
   mtx_unk.unlock();
   // printf("*************************OUT unkCB\n");
-}
-
-// TODO: check also against unkown space? Be careful because with the new points cloud I may have information of
-// previously-unknown voxels
-bool CVX::trajIsFree(Eigen::MatrixXd X)
-{
-  double t0coll = ros::Time::now().toSec();
-
-  /*    if (flight_mode_.mode == flight_mode_.LAND || flight_mode_.mode == flight_mode_.TAKEOFF ||
-        flight_mode_.mode == flight_mode_.NOT_FLYING || flight_mode_.mode == flight_mode_.INIT)*/
-
-  if (flight_mode_.mode != flight_mode_.GO)
-  {
-    return true;
-  }
-
-  // printf("********In trajIsFree\n");
-  // std::cout << X << std::endl;
-
-  // printf("before ground\n");
-  // TODO: maybe there is a more efficient way to do this (sampling only some points of X?)
-  if (((X.col(2)).array() < 0).any() == true)  // If there is some z < 0. Note that in eigen, first_index=0
-  {
-    printf("Collision with the ground \n");
-    // std::cout << X.col(3) << std::endl << std::endl;
-    return false;  // There is a collision with the ground
-  }
-  // printf("later\n");
-
-  int n = 1;  // Find nearest element
-
-  Eigen::Vector3d eig_search_point(X(0, 0), X(0, 1), X(0, 2));
-  pcl::PointXYZ pcl_search_point = eigenPoint2pclPoint(eig_search_point);
-  double r = 100000;
-  int last_i = 0;
-  // printf("later2\n");
-
-  // printf("later3\n");
-  bool isfree = true;
-
-  double t0mutex = ros::Time::now().toSec();
-  mtx_map.lock();
-  mtx_unk.lock();
-  mtx_inst.lock();
-  // printf("************Time waiting for mutex %0.2f ms\n", 1000 * (ros::Time::now().toSec() - t0mutex));
-  // printf("*************************************\n");
-  while (last_i < X.rows() - 1)
-  {
-    // printf("Inside the loop, last_i=%d\n", last_i);
-    // last point clouds
-    std::vector<int> id_inst(n);
-    std::vector<float> dist2_inst(n);  // squared distance
-    pcl_search_point = eigenPoint2pclPoint(eig_search_point);
-    Eigen::Vector3d intersectionPoint;
-
-    // printf("**********before the lock inst\n");
-
-    // printf("after the lock inst\n");
-    // printf("TisFree: MTX is locked\n");
-
-    for (unsigned i = v_kdtree_new_pcls_.size() - 5; i < v_kdtree_new_pcls_.size() && i >= 0; i = i + 2)
-    {
-      if (i < 0)
-      {
-        continue;
-      }
-      // printf("Inside the loop\n");
-      if (v_kdtree_new_pcls_[i].kdTree.nearestKSearch(pcl_search_point, n, id_inst, dist2_inst) > 0)
-      {
-        // printf("Below\n");
-        if (sqrt(dist2_inst[0]) < r)
-        {
-          r = sqrt(dist2_inst[0]);
-          pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr = v_kdtree_new_pcls_[i].kdTree.getInputCloud();
-          intersectionPoint << ptr->points[id_inst[0]].x, ptr->points[id_inst[0]].y, ptr->points[id_inst[0]].z;
-        }
-        // r = std::min(r, sqrt(dist2_inst[0]));
-      }
-    }
-    // printf("In 1\n");
-    // double r_map = 100000;
-    // occupied (map)
-    std::vector<int> id_map(n);
-    std::vector<float> dist2_map(n);  // squared distance
-
-    if (kdtree_map_.nearestKSearch(pcl_search_point, n, id_map, dist2_map) > 0)
-    {
-      if (sqrt(dist2_map[0]) < r)
-      {
-        r = sqrt(dist2_map[0]);
-        pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr = kdtree_map_.getInputCloud();
-        intersectionPoint << ptr->points[id_map[0]].x, ptr->points[id_map[0]].y, ptr->points[id_map[0]].z;
-      }
-    }
-    // printf("In 2\n");
-
-    /*    printf("TisFree MTX is unlocked\n");
-        mtx.unlock();*/
-
-    // unknwown
-    std::vector<int> id_unk(n);
-    std::vector<float> dist2_unk(n);  // squared distance
-
-    // printf("In 3\n");
-    if (kdtree_unk_.nearestKSearch(pcl_search_point, n, id_unk, dist2_unk) > 0)
-    {
-      if (sqrt(dist2_unk[0]) < r)
-      {
-        r = sqrt(dist2_unk[0]);
-        pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr = kdtree_unk_.getInputCloud();
-        intersectionPoint << ptr->points[id_unk[0]].x, ptr->points[id_unk[0]].y, ptr->points[id_unk[0]].z;
-      }
-    }
-
-    // printf("In 4\n");
-
-    // Now r is the distance to the nearest obstacle (considering unknown space as obstacles)
-    if (r < par_.drone_radius)  // || r_map < par_.inflation_jps
-    {
-      // printf("There is a collision with i=%d out of X.rows=%d\n", last_i, X.rows() - 1);
-      if (par_.visual == true)
-      {
-        pubintersecPoint(intersectionPoint, true);
-      }
-      isfree = false;
-      break;
-    }
-
-    // printf("In 5\n");
-    // Find the next eig_search_point
-    for (int i = last_i; i < X.rows(); i = i + 1)
-    {
-      last_i = i;
-      Eigen::Vector3d traj_point(X(i, 0), X(i, 1), X(i, 2));
-      if ((traj_point - eig_search_point).norm() > r)
-      {  // There may be a collision here
-        eig_search_point << X(i - 1, 0), X(i - 1, 1), X(i - 1, 2);
-        break;
-      }
-    }
-  }
-  // printf("In 6\n");
-  mtx_inst.unlock();
-  mtx_map.unlock();
-  mtx_unk.unlock();
-  // printf("In 7\n");
-  // printf("returning isFree=%d\n", isfree);
-  // mtx.unlock();
-
-  log_.coll_total_ms = log_.coll_total_ms + 1000 * (ros::Time::now().toSec() - t0coll);
-  printf("Time in col checking: %f\n", 1000 * (ros::Time::now().toSec() - t0coll));
-  log_.loops_col = log_.loops_col + 1;
-
-  return isfree;  // It's free!
-}
-
-// Returns the first collision of JPS with the obstacles
-double CVX::getDistanceToFirstCollisionJPSwithUnkonwnspace(vec_Vecf<3> path, bool* thereIsIntersection)
-{
-  if (kdtree_unk_initialized_ == false)
-  {
-    return par_.Ra;
-  }
-  vec_Vecf<3> original = path;
-  // printf("*****ORIGINAL******");
-  // printElementsOfJPS(original);
-
-  Eigen::Vector3d first_element = path[0];
-  Eigen::Vector3d last_search_point = path[0];
-  Eigen::Vector3d inters = path[0];
-  Eigen::Vector3d obst;  // intersection point
-  pcl::PointXYZ pcl_search_point = eigenPoint2pclPoint(path[0]);
-
-  double result;
-
-  // occupied (map)
-  int n = 1;
-  std::vector<int> id_map(n);
-  std::vector<float> dist2_map(n);  // squared distance
-  double r = 1000000;
-  // printElementsOfJPS(path);
-  // printf("In 2\n");
-
-  mtx_unk.lock();
-  int el_eliminated = 0;  // number of elements eliminated
-  while (path.size() > 0)
-  {
-    pcl_search_point = eigenPoint2pclPoint(path[0]);
-
-    // printf("hola1\n");
-    if (kdtree_unk_.nearestKSearch(pcl_search_point, n, id_map, dist2_map) > 0)
-    {
-      // printf("hola2\n");
-      r = sqrt(dist2_map[0]);
-
-      // if (r < par_.drone_radius)  // collision of the JPS path and an inflated obstacle --> take last search point
-      if (r < 0.01)
-      {
-        // printf("WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWw\n");
-        pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr = kdtree_unk_.getInputCloud();
-        obst << ptr->points[id_map[0]].x, ptr->points[id_map[0]].y, ptr->points[id_map[0]].z;
-        // std::cout << "original=" << original[0].transpose() << std::endl;
-        // std::cout << "obst=" << obst.transpose() << std::endl;
-        result = (original[0] - obst).norm();
-        *thereIsIntersection = true;
-
-        break;
-      }
-      // printf("hola2\n");
-
-      // Find the next eig_search_point
-      int last_id;  // this is the last index inside the sphere
-
-      bool no_points_outside_sphere = false;
-
-      inters = getFirstIntersectionWithSphere(path, r, path[0], &last_id, &no_points_outside_sphere);
-      // printf("**********Found it*****************\n");
-      if (no_points_outside_sphere == true)
-      {  // JPS doesn't intersect with any obstacle
-        result = par_.Ra;
-
-        break;
-      }
-      last_search_point = path[0];
-      // Remove all the points of the path whose id is <= to last_id:
-      // printf("last_id=%d\n", last_id);
-      path.erase(path.begin(), path.begin() + last_id + 1);
-      el_eliminated = el_eliminated + last_id;
-      // and add the intersection as the first point of the path
-      path.insert(path.begin(), inters);
-    }
-    else
-    {
-      // printf("JPS provided doesn't intersect any obstacles\n");
-      // printf("Returning the first element of the path you gave me\n");
-      result = par_.Ra;
-      break;
-    }
-  }
-  mtx_unk.unlock();
-
-  // printf("returning l=%f\n", result);
-
-  return result;
 }
 
 // Returns the first collision of JPS with the map (i.e. with the known obstacles). Note that JPS will collide with a
