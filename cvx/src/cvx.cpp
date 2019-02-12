@@ -15,19 +15,26 @@
 // encuentra solución
 // Check the weight of the penalization wrt JPS in the objective function of Gurobi. Not sure it's working well
 // When taking off, something weird happen (started to happen when I added the penalization to JPS in the obj function)
-// Cuidado que X_temp y U_temp pueden estar usandose incluso cuando rescue path fails --> use other matrix variables
-// Ver si las samples along the JPS (for the rescue path optimization) se est'an haciendo bien, parece que hay algo raro
 // Ahroa mismo las pointclouds no las estoy teniendo en cuenta
 // Las point clouds y los maps se actualizan MUY lentamente!!
 // Ver si lo de los splines est'a bien, los de los control points (no deber'ian cambiar al cambiar dt??)
 // Por qu'e a veces hay obst'aculos dentro de los polytopes
 // Ver si los values del archivo de parametros estan bien
 // Quitar la pcl CB si las point clouds no las estoy usando --> Quitada
+// Modificar el timer del maper? Ahora esta a 20 Hz
+// Modificar lo que hice de ir comprobando celda a celda en el ray del mapper
+// A veces (cuando hay muchos polytopes) gurobi no encuentra solucion. Creo que es por el dt, que es muy
+// pequeno-->Implementar Loop
+// Mirar a ver si el punto inicial de la whole trajectory se est'a cogiendo en la solucion conjunta de la iteracion
+// previa
+// La point cloud ya no la estoy usando --> quitarla del launch de la camara
 
 // COSAS QUE PONER EN EL PAPER
 // Notese que la WHOLE trajectory NO empieza en la posicion actual, sino un poco más adelante!!
 // El yaw lo voy a poner apuntando hacia la interseccion JPS-unkown space. NOOOO, quadGoal_ es mejor creo (como esta
 // ahora)
+// Hablar de los tipos de filtros que estoy usando en la depth image
+//
 
 // TODOs antiguos:
 // TODO: compile cvxgen with the option -03 (see
@@ -141,11 +148,16 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
 
   pub_log_ = nh_.advertise<acl_msgs::Cvx>("log_topic", 1);
 
+  occup_grid_sub_.subscribe(nh_, "occup_grid", 1);
+  unknown_grid_sub_.subscribe(nh_, "unknown_grid", 1);
+  sync_.reset(new Sync(MySyncPolicy(10), occup_grid_sub_, unknown_grid_sub_));
+  sync_->registerCallback(boost::bind(&CVX::mapCB, this, _1, _2));
+
   sub_goal_ = nh_.subscribe("term_goal", 1, &CVX::goalCB, this);
   sub_mode_ = nh_.subscribe("flightmode", 1, &CVX::modeCB, this);
   sub_state_ = nh_.subscribe("state", 1, &CVX::stateCB, this);
-  sub_map_ = nh_.subscribe("occup_grid", 1, &CVX::mapCB, this);
-  sub_unk_ = nh_.subscribe("unknown_grid", 1, &CVX::unkCB, this);
+  // sub_map_ = nh_.subscribe("occup_grid", 1, &CVX::mapCB, this);
+  // sub_unk_ = nh_.subscribe("unknown_grid", 1, &CVX::unkCB, this);
   sub_frontier_ = nh_.subscribe("frontier_grid", 1, &CVX::frontierCB, this);
   // sub_pcl_ = nh_.subscribe("pcloud", 1, &CVX::pclCB, this);
 
@@ -215,8 +227,6 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   double max_values_vel[1] = { par_.v_max };
   solver_vel_.set_max(max_values_vel);
 
-  // pcl::PointCloud<pcl::PointXYZ>::Ptr tmp(new pcl::PointCloud<pcl::PointXYZ>);
-  // pclptr_map_ = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
   pclptr_unk_ = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
 
   name_drone_ = ros::this_node::getNamespace();
@@ -246,6 +256,11 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   ROS_INFO("Planner initialized");
 }
 
+/*void CVX::novale(const sensor_msgs::PointCloud2::ConstPtr& data1, const sensor_msgs::PointCloud2::ConstPtr& data2)
+{
+  // Solve all of perception here...
+}
+*/
 void CVX::clearJPSPathVisualization(int i)
 {
   switch (i)
@@ -354,20 +369,23 @@ void CVX::updateJPSMap(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr)
   Vec3f center_map(state_.pos.x, state_.pos.y, state_.pos.z);  // center of the map
   mtx_state.unlock();
   Vec3i dim(cells_x_, cells_y_, cells_z_);  //  number of cells in each dimension
-  // printf("Before reader\n");
-  // printf("Sending dim=\n");
-  std::cout << dim.transpose() << std::endl;
-  MapReader<Vec3i, Vec3f> reader(pclptr, cells_x_, cells_y_, cells_z_, par_.factor_jps * par_.res, center_map,
-                                 par_.z_ground, par_.z_max,
-                                 par_.inflation_jps);  // Map read
-  // std::shared_ptr<VoxelMapUtil> map_util = std::make_shared<VoxelMapUtil>();
-  // printf("Before setMap\n");
+
+  // std::cout << dim.transpose() << std::endl;
+  /*  MapReader<Vec3i, Vec3f> reader(pclptr, cells_x_, cells_y_, cells_z_, par_.factor_jps * par_.res, center_map,
+                                   par_.z_ground, par_.z_max,
+                                   par_.inflation_jps);  // Map read*/
+
   mtx_jps_map_util.lock();
-  map_util_->setMap(reader.origin(), reader.dim(), reader.data(), reader.resolution());
-  // printf("After setMap\n");
+
+  map_util_->readMap(pclptr, cells_x_, cells_y_, cells_z_, par_.factor_jps * par_.res, center_map, par_.z_ground,
+                     par_.z_max,
+                     par_.inflation_jps);  // Map read
+
+  // map_util_->info();
+
+  // map_util_->setMap(reader.origin(), reader.dim(), reader.data(), reader.resolution());
 
   mtx_jps_map_util.unlock();
-  // printf("After setMapUtil\n");
 }
 
 vec_Vecf<3> CVX::solveJPS3D(Vec3f& start_sent, Vec3f& goal_sent, bool* solved, int i)
@@ -708,11 +726,20 @@ void CVX::replanCB(const ros::TimerEvent& e)
     return;
   }
 
+  /*  mtx_term_term_goal.lock();
+    Eigen::Vector3d P2 = term_term_goal_;
+    mtx_term_term_goal.unlock();*/
+
   // printf("In replanCB0.3\n");
   mtx_term_goal.lock();
   Eigen::Vector3d term_goal = term_goal_;  // Local copy of the terminal goal
   mtx_term_goal.unlock();
-  double dist_to_goal = (term_goal - state_pos).norm();
+
+  mtx_term_term_goal.lock();
+  Eigen::Vector3d term_term_goal = term_term_goal_;  // Local copy of the terminal terminal goal
+  mtx_term_term_goal.unlock();
+
+  double dist_to_goal = (term_term_goal - state_pos).norm();
 
   /*  std::cout << "rb=" << rb << std::endl;*/
   std::cout << "dist_to_goal=" << dist_to_goal << std::endl;
@@ -883,8 +910,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   //////////////////////////////////////////////////////////
   ///////////////       RESCUE PATH   //////////////////////
   //////////////////////////////////////////////////////////
-
-  std::cout << "RESCUE PATH" << std::endl;
+  std::cout << "***********RESCUE PATH*********************\n";
   int index = par_.offset_rp;  // R is the point of the trajectory offset_rp ms after the start of the trajectory
   std::cout << "index=" << index << std::endl;
 
@@ -898,18 +924,11 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   mtx_X_U_temp.unlock();
 
-  std::cout << "*********************************************\n";
-  std::cout << "****posR=\n" << posR.transpose() << std::endl;
-  std::cout << "****velR=\n" << velR.transpose() << std::endl;
-  std::cout << "****accelR=\n" << accelR.transpose() << std::endl;
+  std::cout << "****posR=" << posR.transpose() << std::endl;
+  std::cout << "****velR=" << velR.transpose() << std::endl;
+  std::cout << "****accelR=" << accelR.transpose() << std::endl;
 
   cvxSeedDecompUnkOcc(posR);
-
-  std::cout << "Seed Decomp done" << std::endl;
-
-  /*  int n_of_faces = l_constraints_uo_[0].b().rows();
-    MatDNf<3> A = l_constraints_uo_[0].A();
-    VecDf b = l_constraints_uo_[0].b();*/
 
   // std::cout << "Before sending A es\n" << A << std::endl;
 
@@ -917,7 +936,13 @@ void CVX::replanCB(const ros::TimerEvent& e)
   Eigen::Vector3d I = getIntersectionJPSwithPolytope(JPS1, l_constraints_uo_,
                                                      thereIsIntersection);  // Intersection of JPS with polytope
   // If there is no intersection, I will be the last point of JPS (i.e. the intermediate goal)
-  std::cout << "Intersection Found=" << I << std::endl;
+
+  if (thereIsIntersection == false)
+  {
+    I = JPS1[JPS1.size() - 1];
+  }
+  std::cout << "Intersection Found=" << I.transpose() << std::endl;
+  std::cout << "thereIsIntersection= " << thereIsIntersection << std::endl;
 
   double x0_rescue[9] = { posR[0], posR[1], posR[2], velR[0], velR[1], velR[2], accelR[0], accelR[1], accelR[2] };
 
@@ -925,20 +950,17 @@ void CVX::replanCB(const ros::TimerEvent& e)
                                                                  // used to find dt, not as a final condition
 
   std::cout << "Punto inicial: " << x0_rescue[0] << ", " << x0_rescue[1] << ", " << x0_rescue[2] << std::endl;
-
   std::cout << "Punto final: " << xf_rescue[0] << ", " << xf_rescue[1] << ", " << xf_rescue[2] << std::endl;
   sg_rescue_.setXf(xf_rescue);
   sg_rescue_.setX0(x0_rescue);
-  std::cout << "thereIsIntersection= " << thereIsIntersection << std::endl;
+
   sg_rescue_.setForceFinalConstraint(!thereIsIntersection);  // If no intersection --> goal is inside
                                                              // polytope --> force final constraint
 
   sg_rescue_.findDT();
   std::cout << "l_constraints_uo_.size()=" << l_constraints_uo_.size() << std::endl;
   sg_rescue_.setPolytopes(l_constraints_uo_);
-  std::cout << "generating new trajectory" << std::endl;
   bool solved_rescue = sg_rescue_.genNewTraj();
-  std::cout << "New trajectory generated" << std::endl;
 
   if (solved_rescue == false)
   {
@@ -1036,7 +1058,7 @@ Eigen::Vector3d CVX::getIntersectionJPSwithPolytope(vec_Vecf<3>& path, std::vect
   // Each element of cs_vector is a pair (A,b) representing a polytope
   bool there_is_intersection = false;
   int last_id_inside = 0;
-  std::cout << "Inside Finding intersection" << std::endl;
+  // std::cout << "Inside Finding intersection" << std::endl;
   for (size_t i = 0; i < path.size(); i++)
   {
     if (constraint.inside(path[i]) == false)  // If a vertex of the path is not in JPS
@@ -1516,6 +1538,7 @@ void CVX::cvxSeedDecompUnkOcc(Vecf<3>& seed)
   decomp_util.set_obs(obs);
   decomp_util.set_local_bbox(Vec3f(2, 2, 1));
   decomp_util.dilate(0.1);
+  decomp_util.shrink_polyhedron(par_.drone_radius);
 
   vec_E<Polyhedron<3>> polyhedron_as_array;  // This vector will contain only one element
   polyhedron_as_array.push_back(decomp_util.get_polyhedron());
@@ -1555,8 +1578,8 @@ void CVX::cvxEllipsoidDecompOcc(vec_Vecf<3> path)
   decomp_util.set_local_bbox(
       Vec3f(2, 2, 1));  // Only try to find cvx decomp in the Mikowsski sum of JPS and this box (I think)
 
-  decomp_util.set_inflate_distance(0);  // The obstacles are inflated by this distance
-  decomp_util.dilate(path);             // Find convex polyhedra
+  decomp_util.set_inflate_distance(par_.drone_radius);  // The obstacles are inflated by this distance
+  decomp_util.dilate(path);                             // Find convex polyhedra
   // decomp_util.shrink_polyhedrons(par_.drone_radius);  // Shrink polyhedra by the drone radius. NOT RECOMMENDED (leads
   // to lack of continuity in path sometimes)
 
@@ -1762,95 +1785,58 @@ void CVX::frontierCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 }*/
 
 // Occupied CB
-void CVX::mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
+void CVX::mapCB(const sensor_msgs::PointCloud2::ConstPtr& pcl2ptr_map_ros,
+                const sensor_msgs::PointCloud2::ConstPtr& pcl2ptr_unk_ros)
 {
+  // std::cout << "In MAPCB!" << std::endl;
+
   double before = ros::Time::now().toSec();
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_map(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::fromROSMsg(*pcl2ptr_msg, *pclptr_map);
-
+  // double before_copy_to_pcl = ros::Time::now().toSec();
+  pcl::fromROSMsg(*pcl2ptr_map_ros, *pclptr_map);
+  // ROS_WARN("ToPcl takes: %0.2f ms", 1000 * (ros::Time::now().toSec() - before_copy_to_pcl));
   // printf("updating JSPMAP\n");
-  updateJPSMap(pclptr_map);  // UPDATE EVEN WHEN THERE ARE NO POINTS!!
+
+  updateJPSMap(pclptr_map);  // UPDATE EVEN WHEN THERE ARE NO POINTS
+
   // printf("updated!!\n");
 
-  if (pcl2ptr_msg->width == 0 || pcl2ptr_msg->height == 0)  // Point Cloud is empty (this happens at the beginning)
+  if (pcl2ptr_map_ros->width == 0 || pcl2ptr_map_ros->height == 0)  // Point Cloud is empty
   {
     return;
   }
 
-  // printf("***********************************In mapCB abajo\n");
-  // printf("In mapCB2\n");
   mtx_map.lock();
-  // printf("Before setting InputCloud\n");
   kdtree_map_.setInputCloud(pclptr_map);
-  mtx_map.unlock();
-  // printf("In mapCB3\n");
   kdtree_map_initialized_ = 1;
+  mtx_map.unlock();
 
-  // printf("mapCB: MTX is locked\n");
-  // printf("In mapCB4\n");
-  // pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr(new pcl::PointCloud<pcl::PointXYZ>);
-
-  // std::vector<int> index;
-  // TODO: there must be a better way to check this. It's here because (in the simulation) sometimes all the points
-  // are NaN (when the drone is on the ground and stuck moving randomly). If this is not done, the program breaks. I
-  // think it won't be needed in the real drone
-  // printf("In mapCB3\n");
-  // pcl::removeNaNFromPointCloud(*pclptr_map_, *pclptr_map_, index);
-  /*  if (pclptr_map_->size() == 0)
-    {
-      return;
-    }*/
-
-  // printf("In mapCB4, size=%d\n", v_kdtree_new_pcls_.size());
-  mtx_inst.lock();
-  for (unsigned i = 0; i < v_kdtree_new_pcls_.size(); ++i)
+  ///////////Unkown CB/////////////////
+  if (pcl2ptr_unk_ros->width == 0 ||
+      pcl2ptr_unk_ros->height == 0)  // Point Cloud is empty (this happens at the beginning)
   {
-    // printf("antes i=%d\n", i);
-    if (v_kdtree_new_pcls_[i].time <= pcl2ptr_msg->header.stamp)  // if the map already contains that point cloud...
-    {
-      v_kdtree_new_pcls_.erase(v_kdtree_new_pcls_.begin() + i);  // ...erase that point cloud from the vector
-      i = i - 1;  // Needed because I'm changing the vector inside the loop
-    }
-    // printf("despues i=%d\n", i);
-  }
-  mtx_inst.unlock();
-  // printf("***********************************OUT mapCB\n");
-  // printf("below\n");
-
-  // mtx.unlock();
-  ROS_WARN("MapCB takes: %0.2f ms", 1000 * (ros::Time::now().toSec() - before));
-}
-
-// Unkwown  CB
-void CVX::unkCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
-{
-  // ROS_WARN("*************************IN unkCB\n");
-  if (pcl2ptr_msg->width == 0 || pcl2ptr_msg->height == 0)  // Point Cloud is empty (this happens at the beginning)
-  {
-    printf("Cloud In has 0 points\n");
+    printf("Unkown cloud has 0 points\n");
     return;
   }
 
-  pcl::PointCloud<pcl::PointXYZ>::Ptr cloudIn(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::PointCloud<pcl::PointXYZ>::Ptr cloudFiltered(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::fromROSMsg(*pcl2ptr_msg, *cloudIn);
+  pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_unk(new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::fromROSMsg(*pcl2ptr_unk_ros, *pclptr_unk);
   std::vector<int> index;
-  pcl::removeNaNFromPointCloud(*cloudIn, *cloudIn, index);
-  if (cloudIn->points.size() == 0)
+  pcl::removeNaNFromPointCloud(*pclptr_unk, *pclptr_unk, index);
+  if (pclptr_unk->points.size() == 0)
   {
-    printf("Cloud In has 0 points\n");
+    printf("Unkown cloud has 0 points\n");
     return;
   }
 
   // printf("Waiting for lock!");
   mtx_unk.lock();
-
-  kdtree_unk_.setInputCloud(cloudIn);
+  kdtree_unk_.setInputCloud(pclptr_unk);
   kdtree_unk_initialized_ = 1;
-  //}
   mtx_unk.unlock();
-  // printf("*************************OUT unkCB\n");
+
+  ROS_WARN("MapCB takes: %0.2f ms", 1000 * (ros::Time::now().toSec() - before));
 }
 
 // Returns the first collision of JPS with the map (i.e. with the known obstacles). Note that JPS will collide with a

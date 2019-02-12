@@ -13,64 +13,123 @@
  * Dilate around the given point
  */
 template <int Dim>
-class SeedDecomp : public DecompBase<Dim> {
-  public:
-    ///Simple constructor
-    SeedDecomp() {};
-    /**
-     * @brief Basic constructor
-     * @param p1 One end of the line seg
-     * @param p2 The other end of the line seg
-     */
-    SeedDecomp(const Vecf<Dim> &p) : p_(p) {}
-    /**
-     * @brief Inflate the seed with a sphere
-     * @param radius Robot radius
-     */
-    void dilate(decimal_t radius) {
-      this->ellipsoid_ = Ellipsoid<Dim>(radius * Matf<Dim, Dim>::Identity(), p_);
-      this->find_polyhedron();
-      add_local_bbox(this->polyhedron_);
+class SeedDecomp : public DecompBase<Dim>
+{
+public:
+  /// Simple constructor
+  SeedDecomp(){};
+  /**
+   * @brief Basic constructor
+   * @param p1 One end of the line seg
+   * @param p2 The other end of the line seg
+   */
+  SeedDecomp(const Vecf<Dim> &p) : p_(p)
+  {
+  }
+  /**
+   * @brief Inflate the seed with a sphere
+   * @param radius Robot radius
+   */
+  void dilate(decimal_t radius)
+  {
+    this->ellipsoid_ = Ellipsoid<Dim>(radius * Matf<Dim, Dim>::Identity(), p_);
+    this->find_polyhedron();
+    add_local_bbox(this->polyhedron_);
+  }
+
+  /// Get the center
+  Vecf<Dim> get_seed() const
+  {
+    return p_;
+  }
+
+  void shrink_polyhedron(double shrink_poly_distance)  // Jesus added this function
+  {
+    LinearConstraint3D cs1(p_, this->polyhedron_.hyperplanes());
+    /*    printf("i: %zu\n", i);
+        std::cout << "A: " << cs.A() << std::endl;
+        std::cout << "b: " << cs.b() << std::endl;
+        std::cout << "point: " << path[i].transpose();*/
+    if (cs1.inside(p_))
+      std::cout << "*****Before shrinking: The seed point is inside!" << std::endl;
+    else
+      ROS_ERROR("*****Before shrinking: The seed point is outside!*****");
+
+    // vec_E<Hyperplane<Dim>> *hyperplanes_ptr = &(this->polyhedron_.vs_);
+    for (unsigned int j = 0; j < (this->polyhedron_.vs_).size(); j++)  // For all the hyperplanes in one polyhedro
+    {
+      // First compute distance between point and plane
+      Vecf<Dim> n = ((this->polyhedron_.vs_)[j].n_).normalized();  // normal to the plane
+      Vecf<Dim> m = -(this->polyhedron_.vs_)[j].p_;                // m is a point on the plane
+
+      double distance = fabs(n.dot(p_ - m));
+
+      std::cout << "*******************distance antes= " << distance;
+
+      double shrink_distance = std::min(shrink_poly_distance, distance - 0.001);  // 0.001 to avoid numerical issues
+
+      std::cout << ", going to shrink" << shrink_distance << std::endl;
+
+      (this->polyhedron_.vs_)[j].p_ = (this->polyhedron_.vs_)[j].p_ - shrink_distance * (this->polyhedron_.vs_)[j].n_;
     }
 
-    /// Get the center
-    Vecf<Dim> get_seed() const {
-      return p_;
+    for (unsigned int j = 0; j < (this->polyhedron_.vs_).size(); j++)  // For all the hyperplanes in one polyhedro
+    {
+      // First compute distance between point and plane
+      Vecf<Dim> n = (this->polyhedron_.vs_)[j].n_.normalized();  // normal to the plane
+      Vecf<Dim> m = -(this->polyhedron_.vs_)[j].p_;              // m is a point on the plane
+
+      double distance = fabs(n.dot(p_ - m));
+
+      std::cout << "*******************distance despues= " << distance << std::endl;
     }
 
-  protected:
-    ///Add the bounding box
-    void add_local_bbox(Polyhedron<Dim> &Vs) {
-      if(this->local_bbox_.norm() == 0)
-        return;
+    LinearConstraint3D cs(p_, this->polyhedron_.hyperplanes());
+    /*    printf("i: %zu\n", i);
+        std::cout << "A: " << cs.A() << std::endl;
+        std::cout << "b: " << cs.b() << std::endl;
+        std::cout << "point: " << path[i].transpose();*/
+    if (cs.inside(p_))
+      std::cout << "*****Before shrinking: The seed point is inside!" << std::endl;
+    else
+      ROS_ERROR("*****After shrinking: The seed point is outside!*****");
+  }
 
-      //**** virtual walls x-y-z
-      Vecf<Dim> dir = Vecf<Dim>::UnitX();
-      Vecf<Dim> dir_h = Vecf<Dim>::UnitY();
+protected:
+  /// Add the bounding box
+  void add_local_bbox(Polyhedron<Dim> &Vs)
+  {
+    if (this->local_bbox_.norm() == 0)
+      return;
 
-      Vecf<Dim> pp1 = p_ + dir_h * this->local_bbox_(1);
-      Vecf<Dim> pp2 = p_ - dir_h * this->local_bbox_(1);
-      Vs.add(Hyperplane<Dim>(pp1, dir_h));
-      Vs.add(Hyperplane<Dim>(pp2, -dir_h));
+    //**** virtual walls x-y-z
+    Vecf<Dim> dir = Vecf<Dim>::UnitX();
+    Vecf<Dim> dir_h = Vecf<Dim>::UnitY();
 
-      // along y
-      Vecf<Dim> pp3 = p_ + dir * this->local_bbox_(0);
-      Vecf<Dim> pp4 = p_ - dir * this->local_bbox_(0);
-      Vs.add(Hyperplane<Dim>(pp3, dir));
-      Vs.add(Hyperplane<Dim>(pp4, -dir));
+    Vecf<Dim> pp1 = p_ + dir_h * this->local_bbox_(1);
+    Vecf<Dim> pp2 = p_ - dir_h * this->local_bbox_(1);
+    Vs.add(Hyperplane<Dim>(pp1, dir_h));
+    Vs.add(Hyperplane<Dim>(pp2, -dir_h));
 
-      // along z
-      if(Dim > 2) {
-        Vecf<Dim> dir_v = Vecf<Dim>::UnitZ();
-        Vecf<Dim> pp5 = p_ + dir_v * this->local_bbox_(2);
-        Vecf<Dim> pp6 = p_ - dir_v * this->local_bbox_(2);
-        Vs.add(Hyperplane<Dim>(pp5, dir_v));
-        Vs.add(Hyperplane<Dim>(pp6, -dir_v));
-      }
+    // along y
+    Vecf<Dim> pp3 = p_ + dir * this->local_bbox_(0);
+    Vecf<Dim> pp4 = p_ - dir * this->local_bbox_(0);
+    Vs.add(Hyperplane<Dim>(pp3, dir));
+    Vs.add(Hyperplane<Dim>(pp4, -dir));
+
+    // along z
+    if (Dim > 2)
+    {
+      Vecf<Dim> dir_v = Vecf<Dim>::UnitZ();
+      Vecf<Dim> pp5 = p_ + dir_v * this->local_bbox_(2);
+      Vecf<Dim> pp6 = p_ - dir_v * this->local_bbox_(2);
+      Vs.add(Hyperplane<Dim>(pp5, dir_v));
+      Vs.add(Hyperplane<Dim>(pp6, -dir_v));
     }
+  }
 
-    ///Seed location
-    Vecf<Dim> p_;
+  /// Seed location
+  Vecf<Dim> p_;
 };
 
 typedef SeedDecomp<2> SeedDecomp2D;

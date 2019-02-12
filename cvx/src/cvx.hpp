@@ -18,6 +18,12 @@
 #include <acl_msgs/TermGoal.h>
 #include <mutex>
 
+// TimeSynchronizer includes
+#include <message_filters/subscriber.h>
+#include <message_filters/synchronizer.h>
+#include <message_filters/sync_policies/exact_time.h>
+#include <message_filters/sync_policies/approximate_time.h>
+
 // JPS3D includes
 #include "timer.hpp"
 #include "read_map.hpp"
@@ -32,6 +38,9 @@
 #include <decomp_ros_utils/data_ros_utils.h>
 #include <decomp_util/ellipsoid_decomp.h>
 #include <decomp_util/seed_decomp.h>
+
+#include <sensor_msgs/Image.h>
+#include <sensor_msgs/CameraInfo.h>
 
 // status_ : YAWING-->TRAVELING-->GOAL_SEEN-->GOAL_REACHED-->YAWING-->TRAVELING-->...
 #define YAWING 0
@@ -174,11 +183,13 @@ private:
   void createMarkerSetOfArrows(Eigen::MatrixXd X, bool isFree);
   void clearMarkerSetOfArrows();
   void clearMarkerActualTraj();
-  void mapCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg);  // Callback for the occupancy pcloud
-  void unkCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg);  // Callback for the unkown pcloud
+  void mapCB(const sensor_msgs::PointCloud2::ConstPtr& pcl2ptr_msg,
+             const sensor_msgs::PointCloud2::ConstPtr& pcl2ptr_msg2);  // Callback for the occupancy pcloud
+  void unkCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg);     // Callback for the unkown pcloud
   void pclCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg);
   void frontierCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg);
 
+  // void novale(const sensor_msgs::PointCloud2::ConstPtr& data1, const sensor_msgs::PointCloud2::ConstPtr& data2);
   // bool trajIsFree(Eigen::MatrixXd X);
   Eigen::Vector3d computeForce(Eigen::Vector3d x, Eigen::Vector3d g);
   // std_msgs::ColorRGBA color(int id);
@@ -275,9 +286,9 @@ private:
   ros::Subscriber sub_goal_;
   ros::Subscriber sub_state_;
   ros::Subscriber sub_mode_;
-  ros::Subscriber sub_map_;
-  ros::Subscriber sub_unk_;
-  ros::Subscriber sub_pcl_;
+  // ros::Subscriber sub_map_;
+  // ros::Subscriber sub_unk_;
+  // ros::Subscriber sub_pcl_;
   ros::Subscriber sub_frontier_;
   ros::Timer pubCBTimer_;
   ros::Timer replanCBTimer_;
@@ -376,4 +387,11 @@ private:
 
   bool to_land_ = false;
   bool JPS1_solved_ = false;
+
+  message_filters::Subscriber<sensor_msgs::PointCloud2> occup_grid_sub_;
+  message_filters::Subscriber<sensor_msgs::PointCloud2> unknown_grid_sub_;
+  typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::PointCloud2, sensor_msgs::PointCloud2>
+      MySyncPolicy;
+  typedef message_filters::Synchronizer<MySyncPolicy> Sync;
+  boost::shared_ptr<Sync> sync_;
 };
