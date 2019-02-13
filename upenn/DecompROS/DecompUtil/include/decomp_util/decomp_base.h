@@ -38,6 +38,7 @@ public:
   /// Import obstacle points
   void set_obs(const vec_Vecf<Dim> &obs)
   {
+    obs_.clear();
     // only consider points inside local bbox
     Polyhedron<Dim> vs;
     add_local_bbox(vs);

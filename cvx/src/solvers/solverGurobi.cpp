@@ -411,7 +411,7 @@ void SolverGurobi::setXf(double xf[])
     std::cout << xf[i] << "  ";
     xf_[i] = xf[i];
   }
-  std::cout << "Final Condtion set" << std::endl;
+  std::cout << "\nFinal Condtion set" << std::endl;
 }
 
 void SolverGurobi::setConstraintsXf()
@@ -597,8 +597,8 @@ bool SolverGurobi::callOptimizer()
   auto end = std::chrono::steady_clock::now();
   auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
   // std::cout << "*************************Finished Optimization: " << elapsed << " ms" << std::endl;
-  // std::cout << "*************************Gurobi RUNTIME: " << m.get(GRB_DoubleAttr_Runtime) * 1000 << " ms"<<
-  // std::endl;
+  std::cout << "*************************Gurobi RUNTIME: " << m.get(GRB_DoubleAttr_Runtime) * 1000 << " ms"
+            << std::endl;
 
   times_log.open("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/times_log.txt", std::ios_base::app);
   times_log << elapsed << "\n";
@@ -646,6 +646,7 @@ bool SolverGurobi::callOptimizer()
 
   else
   {  // No solution
+    m.write("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/model_" + std::to_string(temporal) + ".lp");
     solved = false;
     if (optimstatus == GRB_INF_OR_UNBD)
     {

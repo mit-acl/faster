@@ -236,7 +236,7 @@ private:
 
   // double getDistanceToFirstCollisionJPSwithUnkonwnspace(vec_Vecf<3> path, bool* thereIsIntersection);
 
-  void cvxEllipsoidDecompOcc(vec_Vecf<3> path);
+  void cvxEllipsoidDecompOcc(vec_Vecf<3>& path);
   void cvxSeedDecompUnkOcc(Vecf<3>& seed);
 
   // vec_Vecf<3> sampleJPS(vec_Vecf<3>& path, int n);
@@ -247,6 +247,8 @@ private:
                                                  bool& thereIsIntersection);
 
   visualization_msgs::Marker setpoint_;
+  visualization_msgs::Marker R_;
+  visualization_msgs::Marker I_;
   acl_msgs::QuadGoal quadGoal_;
   acl_msgs::QuadGoal initialCond_;  // It's the initial condition for the solver
   acl_msgs::QuadFlightMode flight_mode_;
@@ -270,6 +272,8 @@ private:
   ros::Publisher pub_path_jps2_;
   ros::Publisher pub_path_jps_rescue_;
   ros::Publisher pub_path_jps_whole_traj_;
+  ros::Publisher pub_intersectionI_;
+  ros::Publisher pub_start_rescue_path_;
 
   ros::Publisher pub_planning_vis_;
   ros::Publisher pub_intersec_points_;

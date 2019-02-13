@@ -123,6 +123,8 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   pub_traj_rescue_ = nh_.advertise<nav_msgs::Path>("traj_rescue", 1);
 
   pub_setpoint_ = nh_.advertise<visualization_msgs::Marker>("setpoint", 1);
+  pub_intersectionI_ = nh_.advertise<visualization_msgs::Marker>("intersection_I", 1);
+  pub_start_rescue_path_ = nh_.advertise<visualization_msgs::Marker>("start_rescue_path", 1);
   pub_trajs_sphere_ = nh_.advertise<visualization_msgs::MarkerArray>("trajs_sphere", 1);
   pub_forces_ = nh_.advertise<visualization_msgs::MarkerArray>("forces", 1);
   pub_actual_traj_ = nh_.advertise<visualization_msgs::Marker>("actual_traj", 1);
@@ -173,6 +175,25 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   setpoint_.scale.y = 0.35;
   setpoint_.scale.z = 0.35;
   setpoint_.color = color(ORANGE_TRANS);
+
+  // Initialize R marker
+  R_.header.frame_id = "world";
+  R_.id = 0;
+  R_.type = visualization_msgs::Marker::SPHERE;
+  R_.scale.x = 0.35;
+  R_.scale.y = 0.35;
+  R_.scale.z = 0.35;
+  R_.color = color(ORANGE_TRANS);
+
+  // Initialize I marker
+  I_.header.frame_id = "world";
+  I_.id = 0;
+  I_.type = visualization_msgs::Marker::SPHERE;
+  I_.scale.x = 0.35;
+  I_.scale.y = 0.35;
+  I_.scale.z = 0.35;
+  I_.color = color(ORANGE_TRANS);
+
   // mtx_term_goal.lock();
   term_goal_ << 0, 0, 0;
   // mtx_term_goal.unlock();
@@ -689,7 +710,7 @@ vec_Vecf<3> CVX::fix(vec_Vecf<3> JPS_old, Eigen::Vector3d start, Eigen::Vector3d
 
 void CVX::replanCB(const ros::TimerEvent& e)
 {
-  // printf("IN replan CB!!!\n");
+  printf("IN replan CB!!!\n");
 
   log_.cvx_jerk_total_ms = 0;
   log_.cvx_vel_total_ms = 0;
@@ -705,10 +726,12 @@ void CVX::replanCB(const ros::TimerEvent& e)
   // Timer time_init(true);
   // printf("In replanCB0\n");
   double t0replanCB = ros::Time::now().toSec();
+  printf("replanCB: Before mtx_state!!!\n");
   mtx_state.lock();
   Eigen::Vector3d state_pos(state_.pos.x, state_.pos.y, state_.pos.z);  // Local copy of state
   mtx_state.unlock();
 
+  printf("replanCB: Before mtx_term_goal!!!\n");
   mtx_term_goal.lock();
   term_goal_ = projectClickedGoal(state_pos);
   // std::cout << "Projected Goal" << term_goal_.transpose() << std::endl;
@@ -881,7 +904,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
                    initialCond_.vel.x,   initialCond_.vel.y,   initialCond_.vel.z,
                    initialCond_.accel.x, initialCond_.accel.y, initialCond_.accel.z };
   mtx_initial_cond.unlock();
-  double xf[9] = { B1[0], B1[1], B1[2], 0, 0, 0, 0, 0, 0 };
+  double xf[9] = { B1(0), B1(1), B1(2), 0, 0, 0, 0, 0, 0 };
   // printf("Running CVXDecomp!!!\n");
   double before = ros::Time::now().toSec();
   cvxEllipsoidDecompOcc(JPS1_inside_sphere);  // result saved in l_constraints_
@@ -928,11 +951,22 @@ void CVX::replanCB(const ros::TimerEvent& e)
   std::cout << "****velR=" << velR.transpose() << std::endl;
   std::cout << "****accelR=" << accelR.transpose() << std::endl;
 
+  if (par_.visual)
+  {
+    R_.header.stamp = ros::Time::now();
+    R_.pose.position.x = posR(0);
+    R_.pose.position.y = posR(1);
+    R_.pose.position.z = posR(2);
+    pub_start_rescue_path_.publish(R_);
+  }
+
+  std::cout << "****Going to do cvxDecomp" << std::endl;
   cvxSeedDecompUnkOcc(posR);
 
   // std::cout << "Before sending A es\n" << A << std::endl;
 
   bool thereIsIntersection = true;
+  JPS1[0] = posR;  // Force the first element to be posR
   Eigen::Vector3d I = getIntersectionJPSwithPolytope(JPS1, l_constraints_uo_,
                                                      thereIsIntersection);  // Intersection of JPS with polytope
   // If there is no intersection, I will be the last point of JPS (i.e. the intermediate goal)
@@ -1054,6 +1088,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
 Eigen::Vector3d CVX::getIntersectionJPSwithPolytope(vec_Vecf<3>& path, std::vector<LinearConstraint3D>& constraints,
                                                     bool& thereIsIntersection)
 {
+  std::cout << "**IntersectionF:Path given=" << std::endl;
+  printElementsOfJPS(path);
   LinearConstraint3D constraint = constraints[0];
   // Each element of cs_vector is a pair (A,b) representing a polytope
   bool there_is_intersection = false;
@@ -1072,7 +1108,7 @@ Eigen::Vector3d CVX::getIntersectionJPSwithPolytope(vec_Vecf<3>& path, std::vect
     }
   }
 
-  // std::cout << "Out Looop" << std::endl;
+  std::cout << "**IntersectionF: there_is_intersection= " << there_is_intersection << std::endl;
 
   thereIsIntersection = there_is_intersection;
   if (there_is_intersection == false)
@@ -1103,6 +1139,7 @@ Eigen::Vector3d CVX::getIntersectionJPSwithPolytope(vec_Vecf<3>& path, std::vect
     std::cout << "Number of faces " << n_of_faces << std::endl;*/
 
   int j = 0;
+  vec_Vecf<3> intersections;
   for (size_t j = 0; j < n_of_faces; j++)
   {
     bool intersection_with_this_face = false;
@@ -1110,21 +1147,46 @@ Eigen::Vector3d CVX::getIntersectionJPSwithPolytope(vec_Vecf<3>& path, std::vect
     Eigen::Vector3d normal = A.row(j);  // normal vector
     coeff << normal(0), normal(1), normal(2), -b(j);
     // std::cout << "j=" << j << std::endl;
-    // std::cout << "coeff that I'm going to sent=" << coeff.transpose() << std::endl;
+
     intersection_with_this_face =
         getIntersectionWithPlane(path[last_id_inside], path[last_id_inside + 1], coeff, inters);
     // std::cout << "j despues=" << j << std::endl;
     if (intersection_with_this_face == true)
     {
-      // std::cout << "Last Intersection=" << inters.transpose() << " is the correct one!" << std::endl;
-      break;
+      intersections.push_back(inters);
+
+      // break;
     }
   }
-  // std::cout << "Reached this point" << std::endl;
-  if (j == n_of_faces)
+
+  if (intersections.size() == 0)
   {  // There is no intersection
     ROS_ERROR("THIS IS IMPOSSIBLE, THERE SHOULD BE AN INTERSECTION");
   }
+
+  std::vector<double> distances;
+
+  // And now take the nearest intersection
+  for (size_t i = 0; i < intersections.size(); i++)
+  {
+    double distance = (intersections[i] - path[0]).norm();
+    distances.push_back(distance);
+  }
+  int minElementIndex = std::min_element(distances.begin(), distances.end()) - distances.begin();
+  inters = intersections[minElementIndex];
+  // std::cout << "Plane coeff" << coeff.transpose() << std::endl;
+  std::cout << "Intersection=" << inters.transpose() << " is the correct one!" << std::endl;
+  // std::cout << "Reached this point" << std::endl;
+
+  if (par_.visual == true)
+  {
+    I_.header.stamp = ros::Time::now();
+    I_.pose.position.x = inters(0);
+    I_.pose.position.y = inters(1);
+    I_.pose.position.z = inters(2);
+    pub_intersectionI_.publish(I_);
+  }
+
   // std::cout << "Going to return" << inters.transpose() << std::endl;
   return inters;
 }
@@ -1519,12 +1581,12 @@ void CVX::cvxSeedDecompUnkOcc(Vecf<3>& seed)
 {
   double before = ros::Time::now().toSec();
 
-  // std::cout << "In cvxDecomp 0!" << std::endl;
+  std::cout << "In cvxDecomp 0!" << std::endl;
   if (kdtree_map_initialized_ == false)
   {
     return;
   }
-  // std::cout << "In cvxDecomp 1!" << std::endl;
+  std::cout << "In cvxDecomp 1!" << std::endl;
 
   vec_Vec3f obs;
 
@@ -1533,12 +1595,15 @@ void CVX::cvxSeedDecompUnkOcc(Vecf<3>& seed)
   pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr_cloud_unkown = kdtree_unk_.getInputCloud();
   obs = kdtree_to_vec(ptr_cloud_map, ptr_cloud_unkown);
 
-  // Initialize SeedDecomp2D
+  // Initialize SeedDecomp3D
   SeedDecomp3D decomp_util(seed);
   decomp_util.set_obs(obs);
   decomp_util.set_local_bbox(Vec3f(2, 2, 1));
+  std::cout << "In cvxDecomp before dilate!" << std::endl;
   decomp_util.dilate(0.1);
+  std::cout << "In cvxDecomp after dilate!" << std::endl;
   decomp_util.shrink_polyhedron(par_.drone_radius);
+  std::cout << "In cvxDecomp after shrink!" << std::endl;
 
   vec_E<Polyhedron<3>> polyhedron_as_array;  // This vector will contain only one element
   polyhedron_as_array.push_back(decomp_util.get_polyhedron());
@@ -1559,7 +1624,7 @@ void CVX::cvxSeedDecompUnkOcc(Vecf<3>& seed)
   ROS_WARN("SeedDecomp takes: %0.2f ms", 1000 * (ros::Time::now().toSec() - before));
 }
 
-void CVX::cvxEllipsoidDecompOcc(vec_Vecf<3> path)
+void CVX::cvxEllipsoidDecompOcc(vec_Vecf<3>& path)
 {
   // std::cout << "In cvxDecomp 0!" << std::endl;
   if (kdtree_map_initialized_ == false)
@@ -2112,14 +2177,14 @@ Eigen::Vector3d CVX::projectClickedGoal(Eigen::Vector3d& P1)
   Eigen::Vector3d P2 = term_term_goal_;
   mtx_term_term_goal.unlock();
   // return P2;  // TODO: Comment this line after the HW experiments!
-  double x_max = P1[0] + par_.wdx / 2;
-  double x_min = P1[0] - par_.wdx / 2;
-  double y_max = P1[1] + par_.wdy / 2;
-  double y_min = P1[1] - par_.wdy / 2;
-  double z_max = P1[2] + par_.wdz / 2;
-  double z_min = P1[2] - par_.wdz / 2;
+  double x_max = P1(0) + par_.wdx / 2;
+  double x_min = P1(0) - par_.wdx / 2;
+  double y_max = P1(1) + par_.wdy / 2;
+  double y_min = P1(1) - par_.wdy / 2;
+  double z_max = P1(2) + par_.wdz / 2;
+  double z_min = P1(2) - par_.wdz / 2;
 
-  if ((P2[0] < x_max && P2[0] > x_min) && (P2[1] < y_max && P2[1] > y_min) && (P2[2] < z_max && P2[2] > z_min))
+  if ((P2(0) < x_max && P2(0) > x_min) && (P2(1) < y_max && P2(1) > y_min) && (P2(2) < z_max && P2(2) > z_min))
   {
     // Clicked goal is inside the map
     return P2;
@@ -2139,6 +2204,7 @@ Eigen::Vector3d CVX::projectClickedGoal(Eigen::Vector3d& P1)
     {
       std::cout << all_planes[i].transpose() << std::endl;
     }*/
+  std::cout << "Projecting: intersectionPoint" << inters.transpose() << std::endl;
   int axis;  // 1 is x, 2 is y, 3 is z
   for (int i = 0; i < 6; i++)
   {
@@ -2149,8 +2215,6 @@ Eigen::Vector3d CVX::projectClickedGoal(Eigen::Vector3d& P1)
       pcl::PointXYZ searchPoint(inters[0], inters[1], inters[2]);
       std::vector<int> id(N);
       std::vector<float> pointNKNSquaredDistance(N);
-
-      // intersectionPoint << ptr->points[id_map[0]].x, ptr->points[id_map[0]].y, ptr->points[id_map[0]].z;
 
       // Let's find now the nearest free or unkown point to the intersection
       if (kdtree_frontier_initialized_)
@@ -2177,12 +2241,12 @@ Eigen::Vector3d CVX::projectClickedGoal(Eigen::Vector3d& P1)
 
       // std::cout << "sign=" << sign.transpose() << std::endl;
 
-      inters[0] = (axis == 0) ? inters[0] + sign[0] * 1.5 * par_.inflation_jps : inters[0];
-      inters[1] = (axis == 1) ? inters[1] + sign[1] * 1.5 * par_.inflation_jps : inters[1];
-      inters[2] = (axis == 2) ? inters[2] + sign[2] * 1.5 * par_.inflation_jps : inters[2];
+      inters(0) = (axis == 0) ? inters(0) + sign(0) * 1.5 * par_.inflation_jps : inters(0);
+      inters(1) = (axis == 1) ? inters(1) + sign(1) * 1.5 * par_.inflation_jps : inters(1);
+      inters(2) = (axis == 2) ? inters(2) + sign(2) * 1.5 * par_.inflation_jps : inters(2);
 
       // inters = inters + sign * 1.5 * par_.inflation_jps;
-
+      std::cout << "Projecting: returned" << inters.transpose() << std::endl;
       return inters;
     }
   }

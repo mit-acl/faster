@@ -62,7 +62,8 @@ public:
       Vecf<Dim> n = ((this->polyhedron_.vs_)[j].n_).normalized();  // normal to the plane
       Vecf<Dim> m = -(this->polyhedron_.vs_)[j].p_;                // m is a point on the plane
 
-      double distance = fabs(n.dot(p_ - m));
+      double dot_product = n.dot(p_ - m);  // will be positive if n is pointing towards the interior of the polytope
+      double distance = fabs(dot_product);
 
       std::cout << "*******************distance antes= " << distance;
 
@@ -70,7 +71,11 @@ public:
 
       std::cout << ", going to shrink" << shrink_distance << std::endl;
 
-      (this->polyhedron_.vs_)[j].p_ = (this->polyhedron_.vs_)[j].p_ - shrink_distance * (this->polyhedron_.vs_)[j].n_;
+      int sign =
+          std::copysign(1.0, dot_product);  // will be positive if n is pointing towards the interior of the polytope
+
+      (this->polyhedron_.vs_)[j].p_ =
+          (this->polyhedron_.vs_)[j].p_ - shrink_distance * sign * (this->polyhedron_.vs_)[j].n_;
     }
 
     for (unsigned int j = 0; j < (this->polyhedron_.vs_).size(); j++)  // For all the hyperplanes in one polyhedro
@@ -90,7 +95,7 @@ public:
         std::cout << "b: " << cs.b() << std::endl;
         std::cout << "point: " << path[i].transpose();*/
     if (cs.inside(p_))
-      std::cout << "*****Before shrinking: The seed point is inside!" << std::endl;
+      std::cout << "*****After shrinking: The seed point is inside!" << std::endl;
     else
       ROS_ERROR("*****After shrinking: The seed point is outside!*****");
   }
