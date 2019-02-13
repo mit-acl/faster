@@ -249,6 +249,7 @@ private:
   visualization_msgs::Marker setpoint_;
   visualization_msgs::Marker R_;
   visualization_msgs::Marker I_;
+  visualization_msgs::Marker B1_;
   acl_msgs::QuadGoal quadGoal_;
   acl_msgs::QuadGoal initialCond_;  // It's the initial condition for the solver
   acl_msgs::QuadFlightMode flight_mode_;
@@ -274,6 +275,7 @@ private:
   ros::Publisher pub_path_jps_whole_traj_;
   ros::Publisher pub_intersectionI_;
   ros::Publisher pub_start_rescue_path_;
+  ros::Publisher pub_point_B1_;
 
   ros::Publisher pub_planning_vis_;
   ros::Publisher pub_intersec_points_;

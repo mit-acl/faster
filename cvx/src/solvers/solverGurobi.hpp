@@ -63,7 +63,7 @@ public:
   int getN();
   void setDC(double dc);
   int setPolytopes(std::vector<LinearConstraint3D> l_constraints);
-  void findDT();
+  void findDT(int factor);
   void fillXandU();
   void setObjective();
   void setConstraintsXf();
@@ -105,10 +105,11 @@ public:
 
   Eigen::MatrixXd U_temp_;
   Eigen::MatrixXd X_temp_;
+  double dt_;  // time step found by the solver
 
 protected:
   double cost_;
-  double dt_;  // time step found by the solver
+
   int N_ = 10;
   double xf_[3 * 3];
   double x0_[3 * 3];

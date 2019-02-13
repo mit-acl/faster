@@ -124,6 +124,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
 
   pub_setpoint_ = nh_.advertise<visualization_msgs::Marker>("setpoint", 1);
   pub_intersectionI_ = nh_.advertise<visualization_msgs::Marker>("intersection_I", 1);
+  pub_point_B1_ = nh_.advertise<visualization_msgs::Marker>("point_B1", 1);
   pub_start_rescue_path_ = nh_.advertise<visualization_msgs::Marker>("start_rescue_path", 1);
   pub_trajs_sphere_ = nh_.advertise<visualization_msgs::MarkerArray>("trajs_sphere", 1);
   pub_forces_ = nh_.advertise<visualization_msgs::MarkerArray>("forces", 1);
@@ -193,6 +194,15 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   I_.scale.y = 0.35;
   I_.scale.z = 0.35;
   I_.color = color(ORANGE_TRANS);
+
+  // Initialize T marker
+  B1_.header.frame_id = "world";
+  B1_.id = 0;
+  B1_.type = visualization_msgs::Marker::SPHERE;
+  B1_.scale.x = 0.35;
+  B1_.scale.y = 0.35;
+  B1_.scale.z = 0.35;
+  B1_.color = color(RED);
 
   // mtx_term_goal.lock();
   term_goal_ << 0, 0, 0;
@@ -911,13 +921,37 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   // ROS_WARN("CVXDecomp time: %0.2f ms", 1000 * (ros::Time::now().toSec() - before));
 
+  if (par_.visual)
+  {
+    B1_.header.stamp = ros::Time::now();
+    B1_.pose.position.x = B1(0);
+    B1_.pose.position.y = B1(1);
+    B1_.pose.position.z = B1(2);
+    pub_point_B1_.publish(B1_);
+  }
+
   sg_whole_.setXf(xf);
   sg_whole_.setX0(x0);
-  sg_whole_.findDT();
-  std::cout << "l_constraints_o_.size()=" << l_constraints_o_.size() << std::endl;
-  sg_whole_.setPolytopes(l_constraints_o_);
-  bool solved_whole = sg_whole_.genNewTraj();
+  std::cout << "*********************************" << std::endl;
+  bool solved_whole = false;
+  for (int i = 2; i < 5; i++)
+  {
+    sg_whole_.findDT(i);
+    sg_whole_.setPolytopes(l_constraints_o_);
+    solved_whole = sg_whole_.genNewTraj();
+    if (solved_whole == false)
+    {
+      std::cout << "DT= " << sg_whole_.dt_ << "does not work" << std::endl;
+    }
+    else
+    {
+      std::cout << "DT= " << sg_whole_.dt_ << "works!" << std::endl;
+      break;
+    }
+  }
+  std::cout << "*********************************" << std::endl;
 
+  std::cout << "l_constraints_o_.size()=" << l_constraints_o_.size() << std::endl;
   if (solved_whole == false)
   {
     ROS_ERROR("No solution found for the whole trajectory");
@@ -991,7 +1025,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   sg_rescue_.setForceFinalConstraint(!thereIsIntersection);  // If no intersection --> goal is inside
                                                              // polytope --> force final constraint
 
-  sg_rescue_.findDT();
+  sg_rescue_.findDT(2);
   std::cout << "l_constraints_uo_.size()=" << l_constraints_uo_.size() << std::endl;
   sg_rescue_.setPolytopes(l_constraints_uo_);
   bool solved_rescue = sg_rescue_.genNewTraj();
@@ -1295,7 +1329,7 @@ void CVX::pubCB(const ros::TimerEvent& e)
 
     // heading_ = atan2(goal_(1) - X_(0, 1), goal_(0) - X_(0, 0));
 
-    std::cout << "status_= " << status_ << std::endl;
+    // std::cout << "status_= " << status_ << std::endl;
 
     if (status_ == YAWING)
     {

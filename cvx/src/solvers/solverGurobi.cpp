@@ -404,14 +404,14 @@ void SolverGurobi::setX0(double x0[])
 
 void SolverGurobi::setXf(double xf[])
 {
-  printf("Setting final condition:\n");
+  // printf("Setting final condition:\n");
 
   for (int i = 0; i < 9; i++)
   {
-    std::cout << xf[i] << "  ";
+    // std::cout << xf[i] << "  ";
     xf_[i] = xf[i];
   }
-  std::cout << "\nFinal Condtion set" << std::endl;
+  // std::cout << "\nFinal Condtion set" << std::endl;
 }
 
 void SolverGurobi::setConstraintsXf()
@@ -438,8 +438,8 @@ void SolverGurobi::setConstraintsXf()
         final_cons.push_back(m.addConstr(getAccel(N_ - 1, dt_, i) - xf_[i + 6] >= -0.05));  // Final acceleration*/
     if (forceFinalConstraint_ == true)
     {
-      std::cout << "*********FORCING FINAL CONSTRAINT******" << std::endl;
-      std::cout << xf_[i] << std::endl;
+      // std::cout << "*********FORCING FINAL CONSTRAINT******" << std::endl;
+      // std::cout << xf_[i] << std::endl;
       final_cons.push_back(m.addConstr(getPos(N_ - 1, dt_, i) - xf_[i] == 0));  // Final position
     }
     final_cons.push_back(m.addConstr(getVel(N_ - 1, dt_, i) - xf_[i + 3] == 0));    // Final velocity
@@ -547,11 +547,11 @@ bool SolverGurobi::genNewTraj()
   return solved;
 }
 
-void SolverGurobi::findDT()
+void SolverGurobi::findDT(int factor)
 {
   // double dt = 2 * getDTInitial();
-  dt_ = 2 * getDTInitial();
-  std::cout << "DT found is=" << dt_ << std::endl;
+  dt_ = factor * getDTInitial();
+  // std::cout << "Trying dt=" << dt_ << std::endl;
   // dt_ = 1;
 }
 
@@ -597,8 +597,8 @@ bool SolverGurobi::callOptimizer()
   auto end = std::chrono::steady_clock::now();
   auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
   // std::cout << "*************************Finished Optimization: " << elapsed << " ms" << std::endl;
-  std::cout << "*************************Gurobi RUNTIME: " << m.get(GRB_DoubleAttr_Runtime) * 1000 << " ms"
-            << std::endl;
+  // std::cout << "*************************Gurobi RUNTIME: " << m.get(GRB_DoubleAttr_Runtime) * 1000 << " ms"
+  //          << std::endl;
 
   times_log.open("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/times_log.txt", std::ios_base::app);
   times_log << elapsed << "\n";
@@ -650,13 +650,13 @@ bool SolverGurobi::callOptimizer()
     solved = false;
     if (optimstatus == GRB_INF_OR_UNBD)
     {
-      printf("GUROBI SOLUTION: Unbounded or Infeasible. Maybe too small dt?");
+      printf("GUROBI SOLUTION: Unbounded or Infeasible. Maybe too small dt?\n");
     }
 
     if (optimstatus == GRB_NUMERIC)
     {
-      printf("GUROBI Status: Numerical issues");
-      printf("Model may be infeasible or unbounded");  // Taken from the Gurobi documentation
+      printf("GUROBI Status: Numerical issues\n");
+      printf("Model may be infeasible or unbounded\n");  // Taken from the Gurobi documentation
     }
   }
   return solved;

@@ -60,34 +60,36 @@ public:
     {
       // First compute distance between point and plane
       Vecf<Dim> n = ((this->polyhedron_.vs_)[j].n_).normalized();  // normal to the plane
-      Vecf<Dim> m = -(this->polyhedron_.vs_)[j].p_;                // m is a point on the plane
+      Vecf<Dim> m = (this->polyhedron_.vs_)[j].p_;                 // m is a point on the plane
 
-      double dot_product = n.dot(p_ - m);  // will be positive if n is pointing towards the interior of the polytope
+      /*      std::cout << "n= " << n << std::endl;
+            std::cout << "Point_in_plane= " << n << std::endl;*/
+
+      double dot_product = n.dot(p_ - m);
       double distance = fabs(dot_product);
 
-      std::cout << "*******************distance antes= " << distance;
+      // std::cout << "*******************distance antes= " << distance;
 
       double shrink_distance = std::min(shrink_poly_distance, distance - 0.001);  // 0.001 to avoid numerical issues
 
-      std::cout << ", going to shrink" << shrink_distance << std::endl;
+      // std::cout << ", going to shrink" << shrink_distance << std::endl;
 
-      int sign =
-          std::copysign(1.0, dot_product);  // will be positive if n is pointing towards the interior of the polytope
+      int sign = std::copysign(1.0, dot_product);
 
       (this->polyhedron_.vs_)[j].p_ =
-          (this->polyhedron_.vs_)[j].p_ - shrink_distance * sign * (this->polyhedron_.vs_)[j].n_;
+          (this->polyhedron_.vs_)[j].p_ + shrink_distance * sign * (this->polyhedron_.vs_)[j].n_;
     }
 
-    for (unsigned int j = 0; j < (this->polyhedron_.vs_).size(); j++)  // For all the hyperplanes in one polyhedro
-    {
-      // First compute distance between point and plane
-      Vecf<Dim> n = (this->polyhedron_.vs_)[j].n_.normalized();  // normal to the plane
-      Vecf<Dim> m = -(this->polyhedron_.vs_)[j].p_;              // m is a point on the plane
+    /*    for (unsigned int j = 0; j < (this->polyhedron_.vs_).size(); j++)  // For all the hyperplanes in one polyhedro
+        {
+          // First compute distance between point and plane
+          Vecf<Dim> n = (this->polyhedron_.vs_)[j].n_.normalized();  // normal to the plane
+          Vecf<Dim> m = (this->polyhedron_.vs_)[j].p_;               // m is a point on the plane
 
-      double distance = fabs(n.dot(p_ - m));
+          double distance = fabs(n.dot(p_ - m));
 
-      std::cout << "*******************distance despues= " << distance << std::endl;
-    }
+          std::cout << "*******************distance despues= " << distance << std::endl;
+        }*/
 
     LinearConstraint3D cs(p_, this->polyhedron_.hyperplanes());
     /*    printf("i: %zu\n", i);
