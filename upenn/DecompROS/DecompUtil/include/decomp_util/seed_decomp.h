@@ -51,9 +51,13 @@ public:
         std::cout << "b: " << cs.b() << std::endl;
         std::cout << "point: " << path[i].transpose();*/
     if (cs1.inside(p_))
-      std::cout << "*****Before shrinking: The seed point is inside!" << std::endl;
+    {
+      // std::cout << "*****Before shrinking: The seed point is inside!" << std::endl;
+    }
     else
+    {
       ROS_ERROR("*****Before shrinking: The seed point is outside!*****");
+    }
 
     // vec_E<Hyperplane<Dim>> *hyperplanes_ptr = &(this->polyhedron_.vs_);
     for (unsigned int j = 0; j < (this->polyhedron_.vs_).size(); j++)  // For all the hyperplanes in one polyhedro
@@ -97,9 +101,13 @@ public:
         std::cout << "b: " << cs.b() << std::endl;
         std::cout << "point: " << path[i].transpose();*/
     if (cs.inside(p_))
-      std::cout << "*****After shrinking: The seed point is inside!" << std::endl;
+    {
+      // std::cout << "*****After shrinking: The seed point is inside!" << std::endl;
+    }
     else
+    {
       ROS_ERROR("*****After shrinking: The seed point is outside!*****");
+    }
   }
 
 protected:

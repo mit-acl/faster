@@ -5,6 +5,7 @@
 #include <std_msgs/ColorRGBA.h>
 #include <geometry_msgs/Vector3.h>
 #include <geometry_msgs/Point.h>
+#include "termcolor.hpp"
 
 #define RED 1
 #define RED_TRANS 2

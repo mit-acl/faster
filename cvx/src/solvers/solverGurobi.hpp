@@ -6,6 +6,7 @@
 #include <Eigen/Dense>
 #include <type_traits>
 #include <fstream>
+#include "./../termcolor.hpp"
 
 //#include "../utils.hpp"
 // using namespace std;
@@ -14,6 +15,7 @@
 // Convex Decomposition includes
 #include <decomp_ros_utils/data_ros_utils.h>
 #include <unsupported/Eigen/Polynomials>
+using namespace termcolor;
 
 // TODO: This function is the same as solvePolyOrder2 but with other name (weird conflicts...)
 inline float solvePolynomialOrder2(Eigen::Vector3f& coeff)
@@ -62,7 +64,8 @@ public:
   double getDTInitial();
   int getN();
   void setDC(double dc);
-  int setPolytopes(std::vector<LinearConstraint3D> l_constraints);
+  void setPolytopes(std::vector<LinearConstraint3D> polytopes);
+  void setPolytopesConstraints();
   void findDT(int factor);
   void fillXandU();
   void setObjective();
@@ -81,6 +84,7 @@ public:
   void setDistanceConstraints();
 
   void setMode(int mode);
+  void setFactorInitialAndFinal(int factor_initial, int factor_final);
 
   GRBLinExpr getPos(int t, double tau, int ii);
   GRBLinExpr getVel(int t, double tau, int ii);
@@ -106,6 +110,7 @@ public:
   Eigen::MatrixXd U_temp_;
   Eigen::MatrixXd X_temp_;
   double dt_;  // time step found by the solver
+  int trials_ = 0;
 
 protected:
   double cost_;
@@ -143,11 +148,14 @@ protected:
   vec_Vecf<3> samples_penalize_;  // Samples along the rescue path
 
   std::vector<double> dist_near_obs_;
+  std::vector<LinearConstraint3D> polytopes_;
 
   std::ofstream times_log;
 
   int temporal = 0;
   int mode_;
   bool forceFinalConstraint_ = true;
+  int factor_initial_ = 2;
+  int factor_final_ = 2;
 };
 #endif

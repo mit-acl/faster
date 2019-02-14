@@ -244,7 +244,7 @@ public:
   // set Free all the voxels that are in a 3d cube centered at center and with side/2=d
   void setFreeVoxelAndSurroundings(const Veci<Dim> &center, const float d)
   {
-    std::cout << "Center is" << center.transpose() << std::endl;
+    // std::cout << "Center is" << center.transpose() << std::endl;
     int n_voxels = std::round(d / res_ + 0.5);  // convert distance to number of voxels
     for (int ix = -n_voxels; ix <= n_voxels; ix++)
     {

@@ -251,7 +251,12 @@ void SolverGurobi::setDistanceConstraints()  // Set the distance constraints
   }
 }
 
-int SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> l_constraints)
+void SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> polytopes)
+{
+  polytopes_ = polytopes;
+}
+
+void SolverGurobi::setPolytopesConstraints()
 {
   // std::cout << "Setting POLYTOPES=" << std::endl;
 
@@ -288,7 +293,7 @@ int SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> l_constraints)
   }
   b.clear();
 
-  if (l_constraints.size() > 0)  // If there are polytope constraints
+  if (polytopes_.size() > 0)  // If there are polytope constraints
   {
     if (mode_ == WHOLE_TRAJ)
     {
@@ -296,7 +301,7 @@ int SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> l_constraints)
       for (int t = 0; t < N_ + 1; t++)
       {
         std::vector<GRBVar> row;
-        for (int i = 0; i < l_constraints.size(); i++)  // For all the polytopes
+        for (int i = 0; i < polytopes_.size(); i++)  // For all the polytopes
         {
           GRBVar variable =
               m.addVar(-GRB_INFINITY, GRB_INFINITY, 0, GRB_BINARY, "s" + std::to_string(i) + "_" + std::to_string(t));
@@ -326,13 +331,13 @@ int SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> l_constraints)
       std::vector<GRBLinExpr> cp2 = getCP2(t);  // Control Point 2
       std::vector<GRBLinExpr> cp3 = getCP3(t);  // Control Point 3
 
-      // std::cout << "NUMBER OF POLYTOPES=" << l_constraints.size() - 1 << std::endl;
+      // std::cout << "NUMBER OF POLYTOPES=" << polytopes_.size() - 1 << std::endl;
 
-      for (int n_poly = 0; n_poly < l_constraints.size(); n_poly++)  // Loop over the number of polytopes
+      for (int n_poly = 0; n_poly < polytopes_.size(); n_poly++)  // Loop over the number of polytopes
       {
         // Constraint A1x<=b1
-        Eigen::MatrixXd A1 = l_constraints[n_poly].A();
-        auto bb = l_constraints[n_poly].b();
+        Eigen::MatrixXd A1 = polytopes_[n_poly].A();
+        auto bb = polytopes_[n_poly].b();
 
         std::vector<std::vector<double>> A1std = eigenMatrix2std(A1);
 
@@ -521,22 +526,45 @@ void SolverGurobi::set_max(double max_values[3])
   setMaxConstraints();
 }
 
+void SolverGurobi::setFactorInitialAndFinal(int factor_initial, int factor_final)
+{
+  factor_initial_ = factor_initial;
+  factor_final_ = factor_final;
+}
+
 bool SolverGurobi::genNewTraj()
 {
   bool solved = false;
-  // findDT();
+
+  // std::cout << "Factor_initial= " << factor_initial_ << std::endl;
+  // std::cout << "Factor_final= " << factor_final_ << std::endl;
+  trials_ = 0;
+  for (int i = factor_initial_; i <= factor_final_ && solved == false; i++)
+  {
+    trials_ = trials_ + 1;
+    findDT(i);
+    setPolytopesConstraints();
+    setConstraintsX0();
+    setConstraintsXf();
+    setDynamicConstraints();
+    setDistanceConstraints();
+    setObjective();
+    resetXandU();
+    solved = callOptimizer();
+    if (solved == true)
+    {
+      // std::cout << "Factor= " << i << "(dt_= " << dt_ << ")---> worked" << std::endl;
+    }
+    else
+    {
+      // std::cout << "Factor= " << i << "(dt_= " << dt_ << ")---> didn't worked" << std::endl;
+    }
+  }
 
   // double dt_initial = dt_;
   // while (solved == false)
   //{
-  setConstraintsX0();
-  setConstraintsXf();
-  setDynamicConstraints();
-  setDistanceConstraints();
-  setObjective();
 
-  resetXandU();
-  solved = callOptimizer();
   // if (solved == false)
   //{
   //  dt_ = 1.2 * dt_;
@@ -608,7 +636,7 @@ bool SolverGurobi::callOptimizer()
   int optimstatus = m.get(GRB_IntAttr_Status);
   if (optimstatus == GRB_OPTIMAL)
   {
-    printf("GUROBI SOLUTION: Optimal");
+    // printf("GUROBI SOLUTION: Optimal");
 
     /*    if (polytopes_cons.size() > 0)  // Print the binary matrix only if I've included the polytope constraints
         {
@@ -646,17 +674,17 @@ bool SolverGurobi::callOptimizer()
 
   else
   {  // No solution
-    m.write("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/model_" + std::to_string(temporal) + ".lp");
+    // m.write("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/model_" + std::to_string(temporal) + ".lp");
     solved = false;
     if (optimstatus == GRB_INF_OR_UNBD)
     {
-      printf("GUROBI SOLUTION: Unbounded or Infeasible. Maybe too small dt?\n");
+      // printf("GUROBI SOLUTION: Unbounded or Infeasible. Maybe too small dt?\n");
     }
 
     if (optimstatus == GRB_NUMERIC)
     {
-      printf("GUROBI Status: Numerical issues\n");
-      printf("Model may be infeasible or unbounded\n");  // Taken from the Gurobi documentation
+      // printf("GUROBI Status: Numerical issues\n");
+      // printf("Model may be infeasible or unbounded\n");  // Taken from the Gurobi documentation
     }
   }
   return solved;

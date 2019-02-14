@@ -117,6 +117,12 @@ struct parameteres
   double q;
 
   double z_land;
+
+  int factor_initial_whole;
+  int factor_final_whole;
+
+  int factor_initial_rescue;
+  int factor_final_rescue;
 };
 
 /*struct log_values
