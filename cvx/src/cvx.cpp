@@ -268,6 +268,8 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
 
   pclptr_unk_ = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
 
+  pclptr_map_ = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
+
   name_drone_ = ros::this_node::getNamespace();
   name_drone_.erase(0, 2);  // Erase slashes
 
@@ -1644,9 +1646,15 @@ void CVX::cvxSeedDecompUnkOcc(Vecf<3>& seed)
   vec_Vec3f obs;
 
   // std::cout << "Type Obstacles==UNKOWN_AND_OCCUPIED_SPACE**************" << std::endl;
-  pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr_cloud_map = kdtree_map_.getInputCloud();
-  pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr_cloud_unkown = kdtree_unk_.getInputCloud();
-  obs = kdtree_to_vec(ptr_cloud_map, ptr_cloud_unkown);
+
+  // pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr_cloud_map = kdtree_map_.getInputCloud();
+  // pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr_cloud_unkown = kdtree_unk_.getInputCloud();
+
+  // std::cout << "Number of elements in unkCloud" < < < < std::endl;
+
+  obs = kdtree_to_vec(pclptr_map_, pclptr_unk_);
+  std::cout << "Points in mapCloud=" << (*pclptr_map_).points.size() << std::endl;
+  std::cout << "Points in unkCloud=" << (*pclptr_unk_).points.size() << std::endl;
 
   // Initialize SeedDecomp3D
   SeedDecomp3D decomp_util(seed);
@@ -1655,7 +1663,7 @@ void CVX::cvxSeedDecompUnkOcc(Vecf<3>& seed)
   // std::cout << "In cvxDecomp before dilate!" << std::endl;
   decomp_util.dilate(0.1);
   // std::cout << "In cvxDecomp after dilate!" << std::endl;
-  decomp_util.shrink_polyhedron(par_.drone_radius);
+  // decomp_util.shrink_polyhedron(0);
   // std::cout << "In cvxDecomp after shrink!" << std::endl;
 
   vec_E<Polyhedron<3>> polyhedron_as_array;  // This vector will contain only one element
@@ -1909,17 +1917,20 @@ void CVX::frontierCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 void CVX::mapCB(const sensor_msgs::PointCloud2::ConstPtr& pcl2ptr_map_ros,
                 const sensor_msgs::PointCloud2::ConstPtr& pcl2ptr_unk_ros)
 {
-  // std::cout << "In MAPCB!" << std::endl;
+  /*  std::cout << "In MAPCB!" << std::endl;
+    std::cout << "Width mapPCL=" << pcl2ptr_map_ros->width << std::endl;
+    std::cout << "Height mapPCL=" << pcl2ptr_map_ros->height << std::endl;*/
 
   double before = ros::Time::now().toSec();
 
-  pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_map(new pcl::PointCloud<pcl::PointXYZ>);
   // double before_copy_to_pcl = ros::Time::now().toSec();
-  pcl::fromROSMsg(*pcl2ptr_map_ros, *pclptr_map);
+  mtx_map.lock();
+  pcl::fromROSMsg(*pcl2ptr_map_ros, *pclptr_map_);
+  mtx_map.unlock();
   // ROS_WARN("ToPcl takes: %0.2f ms", 1000 * (ros::Time::now().toSec() - before_copy_to_pcl));
   // printf("updating JSPMAP\n");
 
-  updateJPSMap(pclptr_map);  // UPDATE EVEN WHEN THERE ARE NO POINTS
+  updateJPSMap(pclptr_map_);  // UPDATE EVEN WHEN THERE ARE NO POINTS
 
   // printf("updated!!\n");
 
@@ -1929,10 +1940,13 @@ void CVX::mapCB(const sensor_msgs::PointCloud2::ConstPtr& pcl2ptr_map_ros,
   }
 
   mtx_map.lock();
-  kdtree_map_.setInputCloud(pclptr_map);
+  kdtree_map_.setInputCloud(pclptr_map_);
   kdtree_map_initialized_ = 1;
   mtx_map.unlock();
 
+  mtx_unk.lock();
+  pcl::fromROSMsg(*pcl2ptr_unk_ros, *pclptr_unk_);
+  mtx_unk.unlock();
   ///////////Unkown CB/////////////////
   if (pcl2ptr_unk_ros->width == 0 ||
       pcl2ptr_unk_ros->height == 0)  // Point Cloud is empty (this happens at the beginning)
@@ -1941,11 +1955,13 @@ void CVX::mapCB(const sensor_msgs::PointCloud2::ConstPtr& pcl2ptr_map_ros,
     return;
   }
 
-  pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_unk(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::fromROSMsg(*pcl2ptr_unk_ros, *pclptr_unk);
+  // pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_unk(new pcl::PointCloud<pcl::PointXYZ>);
+
   std::vector<int> index;
-  pcl::removeNaNFromPointCloud(*pclptr_unk, *pclptr_unk, index);
-  if (pclptr_unk->points.size() == 0)
+  mtx_unk.lock();
+  pcl::removeNaNFromPointCloud(*pclptr_unk_, *pclptr_unk_, index);
+  mtx_unk.unlock();
+  if (pclptr_unk_->points.size() == 0)
   {
     printf("Unkown cloud has 0 points\n");
     return;
@@ -1953,7 +1969,7 @@ void CVX::mapCB(const sensor_msgs::PointCloud2::ConstPtr& pcl2ptr_map_ros,
 
   // printf("Waiting for lock!");
   mtx_unk.lock();
-  kdtree_unk_.setInputCloud(pclptr_unk);
+  kdtree_unk_.setInputCloud(pclptr_unk_);
   kdtree_unk_initialized_ = 1;
   mtx_unk.unlock();
 

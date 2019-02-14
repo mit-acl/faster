@@ -406,4 +406,6 @@ private:
       MySyncPolicy;
   typedef message_filters::Synchronizer<MySyncPolicy> Sync;
   boost::shared_ptr<Sync> sync_;
+
+  pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_map_;
 };

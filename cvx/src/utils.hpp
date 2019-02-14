@@ -309,7 +309,7 @@ inline vec_Vec3f kdtree_to_vec(const pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloud
                                const pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr_cloud2)
 {
   vec_Vec3f pts;
-  pts.resize(ptr_cloud1->points.size() + ptr_cloud2->points.size());
+  pts.reserve(ptr_cloud1->points.size() + ptr_cloud2->points.size());
   for (unsigned int i = 0; i < ptr_cloud1->points.size(); i++)
   {
     pts[i](0) = ptr_cloud1->points[i].x;

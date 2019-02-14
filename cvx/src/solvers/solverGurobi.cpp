@@ -311,6 +311,11 @@ void SolverGurobi::setPolytopesConstraints()
       }
     }
 
+    // std::cout << "NUMBER OF POLYTOPES=" << polytopes_.size() << std::endl;
+    // std::cout << "NUMBER OF FACES of the first polytope=" << polytopes_[0].A().rows() << std::endl;
+    // std::cout << "A es esto:\n";
+    // std::cout << "Number of rows= " << bb.rows() << std::endl;
+    // std::cout << polytopes_[0].A() << std::endl;
     // Polytope constraints (if binary_varible==1 --> In that polytope) and at_least_1_pol_cons (at least one polytope)
     // constraints
     for (int t = 0; t < N_; t++)  // Start in t=1 (because t=0 is already fixed with the initial condition)
@@ -324,14 +329,12 @@ void SolverGurobi::setPolytopesConstraints()
         {
           sum = sum + b[t][col];
         }
-        at_least_1_pol_cons.push_back(m.addConstr(sum == 1));  // at least in one polytope
+        at_least_1_pol_cons.push_back(m.addConstr(sum == 1, "At_least_1_pol"));  // at least in one polytope
       }
       std::vector<GRBLinExpr> cp0 = getCP0(t);  // Control Point 0
       std::vector<GRBLinExpr> cp1 = getCP1(t);  // Control Point 1
       std::vector<GRBLinExpr> cp2 = getCP2(t);  // Control Point 2
       std::vector<GRBLinExpr> cp3 = getCP3(t);  // Control Point 3
-
-      // std::cout << "NUMBER OF POLYTOPES=" << polytopes_.size() - 1 << std::endl;
 
       for (int n_poly = 0; n_poly < polytopes_.size(); n_poly++)  // Loop over the number of polytopes
       {
@@ -349,23 +352,32 @@ void SolverGurobi::setPolytopesConstraints()
 
         for (int i = 0; i < bb.rows(); i++)
         {
+          std::string name0 =
+              "Poly" + std::to_string(n_poly) + "_face" + std::to_string(i) + "_t" + std::to_string(t) + "_cp0";
+          std::string name1 =
+              "Poly" + std::to_string(n_poly) + "_face" + std::to_string(i) + "_t" + std::to_string(t) + "_cp1";
+          std::string name2 =
+              "Poly" + std::to_string(n_poly) + "_face" + std::to_string(i) + "_t" + std::to_string(t) + "_cp2";
+          std::string name3 =
+              "Poly" + std::to_string(n_poly) + "_face" + std::to_string(i) + "_t" + std::to_string(t) + "_cp3";
           // std::cout << "Plane=" << i << "out of" << bb.rows() - 1 << std::endl;
           if (mode_ == WHOLE_TRAJ)
           {  // If b[t,0]==1, all the control points are in that polytope
-            polytopes_cons.push_back(m.addGenConstrIndicator(b[t][n_poly], 1, Acp0[i], GRB_LESS_EQUAL, bb[i]));
-            polytopes_cons.push_back(m.addGenConstrIndicator(b[t][n_poly], 1, Acp1[i], GRB_LESS_EQUAL, bb[i]));
-            polytopes_cons.push_back(m.addGenConstrIndicator(b[t][n_poly], 1, Acp2[i], GRB_LESS_EQUAL, bb[i]));
-            polytopes_cons.push_back(m.addGenConstrIndicator(b[t][n_poly], 1, Acp3[i], GRB_LESS_EQUAL, bb[i]));
+
+            polytopes_cons.push_back(m.addGenConstrIndicator(b[t][n_poly], 1, Acp0[i], GRB_LESS_EQUAL, bb[i], name0));
+            polytopes_cons.push_back(m.addGenConstrIndicator(b[t][n_poly], 1, Acp1[i], GRB_LESS_EQUAL, bb[i], name1));
+            polytopes_cons.push_back(m.addGenConstrIndicator(b[t][n_poly], 1, Acp2[i], GRB_LESS_EQUAL, bb[i], name2));
+            polytopes_cons.push_back(m.addGenConstrIndicator(b[t][n_poly], 1, Acp3[i], GRB_LESS_EQUAL, bb[i], name3));
           }
           if (mode_ == RESCUE_PATH)  // There will be only one polytope --> all the control points in that polytope
           {
             // std::cout << "Setting POLYTOPES=3" << std::endl;
-            polytope_cons.push_back(m.addConstr(Acp0[i] <= bb[i]));
+            polytope_cons.push_back(m.addConstr(Acp0[i] <= bb[i], name0));
             // std::cout << "Setting POLYTOPES=3.5" << std::endl;
-            polytope_cons.push_back(m.addConstr(Acp1[i] <= bb[i]));
+            polytope_cons.push_back(m.addConstr(Acp1[i] <= bb[i], name1));
             // std::cout << "Setting POLYTOPES=3.6" << std::endl;
-            polytope_cons.push_back(m.addConstr(Acp2[i] <= bb[i]));
-            polytope_cons.push_back(m.addConstr(Acp3[i] <= bb[i]));
+            polytope_cons.push_back(m.addConstr(Acp2[i] <= bb[i], name2));
+            polytope_cons.push_back(m.addConstr(Acp3[i] <= bb[i], name3));
             // std::cout << "Setting POLYTOPES=4" << std::endl;
           }
         }
@@ -445,10 +457,13 @@ void SolverGurobi::setConstraintsXf()
     {
       // std::cout << "*********FORCING FINAL CONSTRAINT******" << std::endl;
       // std::cout << xf_[i] << std::endl;
-      final_cons.push_back(m.addConstr(getPos(N_ - 1, dt_, i) - xf_[i] == 0));  // Final position
+      final_cons.push_back(m.addConstr(getPos(N_ - 1, dt_, i) - xf_[i] == 0,
+                                       "FinalPosAxis_" + std::to_string(i)));  // Final position
     }
-    final_cons.push_back(m.addConstr(getVel(N_ - 1, dt_, i) - xf_[i + 3] == 0));    // Final velocity
-    final_cons.push_back(m.addConstr(getAccel(N_ - 1, dt_, i) - xf_[i + 6] == 0));  // Final acceleration
+    final_cons.push_back(m.addConstr(getVel(N_ - 1, dt_, i) - xf_[i + 3] == 0,
+                                     "FinalVelAxis_" + std::to_string(i)));  // Final velocity
+    final_cons.push_back(m.addConstr(getAccel(N_ - 1, dt_, i) - xf_[i + 6] == 0,
+                                     "FinalAccel_" + std::to_string(i)));  // Final acceleration
   }
 }
 
@@ -464,9 +479,12 @@ void SolverGurobi::setConstraintsX0()
   // Constraint x0==x_initial
   for (int i = 0; i < 3; i++)
   {
-    init_cons.push_back(m.addConstr(getPos(0, 0, i) == x0_[i]));        // Initial position
-    init_cons.push_back(m.addConstr(getVel(0, 0, i) == x0_[i + 3]));    // Initial velocity
-    init_cons.push_back(m.addConstr(getAccel(0, 0, i) == x0_[i + 6]));  // Initial acceleration}
+    init_cons.push_back(m.addConstr(getPos(0, 0, i) == x0_[i],
+                                    "InitialPosAxis_" + std::to_string(i)));  // Initial position
+    init_cons.push_back(m.addConstr(getVel(0, 0, i) == x0_[i + 3],
+                                    "InitialVelAxis_" + std::to_string(i)));  // Initial velocity
+    init_cons.push_back(m.addConstr(getAccel(0, 0, i) == x0_[i + 6],
+                                    "InitialAccelAxis_" + std::to_string(i)));  // Initial acceleration}
   }
 }
 
@@ -500,14 +518,14 @@ void SolverGurobi::setMaxConstraints()
   {
     for (int i = 0; i < 3; i++)
     {
-      m.addConstr(getVel(t, dt_, i) <= v_max_);
-      m.addConstr(getVel(t, dt_, i) >= -v_max_);
+      m.addConstr(getVel(t, dt_, i) <= v_max_, "MaxVel_t" + std::to_string(t) + "_axis_" + std::to_string(i));
+      m.addConstr(getVel(t, dt_, i) >= -v_max_, "MinVel_t" + std::to_string(t) + "_axis_" + std::to_string(i));
 
-      m.addConstr(getAccel(t, dt_, i) <= a_max_);
-      m.addConstr(getAccel(t, dt_, i) >= -a_max_);
+      m.addConstr(getAccel(t, dt_, i) <= a_max_, "MaxAccel_t" + std::to_string(t) + "_axis_" + std::to_string(i));
+      m.addConstr(getAccel(t, dt_, i) >= -a_max_, "MinAccel_t" + std::to_string(t) + "_axis_" + std::to_string(i));
 
-      m.addConstr(getJerk(t, dt_, i) <= j_max_);
-      m.addConstr(getJerk(t, dt_, i) >= -j_max_);
+      m.addConstr(getJerk(t, dt_, i) <= j_max_, "MaxJerk_t" + std::to_string(t) + "_axis_" + std::to_string(i));
+      m.addConstr(getJerk(t, dt_, i) >= -j_max_, "MinJerk_t" + std::to_string(t) + "_axis_" + std::to_string(i));
     }
   }
 }
@@ -597,9 +615,15 @@ void SolverGurobi::setDynamicConstraints()
   {
     for (int i = 0; i < 3; i++)
     {
-      dyn_cons.push_back(m.addConstr(getPos(t, dt_, i) == getPos(t + 1, 0, i)));      // Continuity in position
-      dyn_cons.push_back(m.addConstr(getVel(t, dt_, i) == getVel(t + 1, 0, i)));      // Continuity in velocity
-      dyn_cons.push_back(m.addConstr(getAccel(t, dt_, i) == getAccel(t + 1, 0, i)));  // Continuity in acceleration
+      dyn_cons.push_back(
+          m.addConstr(getPos(t, dt_, i) == getPos(t + 1, 0, i),
+                      "ContPos_t" + std::to_string(t) + "_axis" + std::to_string(i)));  // Continuity in position
+      dyn_cons.push_back(
+          m.addConstr(getVel(t, dt_, i) == getVel(t + 1, 0, i),
+                      "ContVel_t" + std::to_string(t) + "_axis" + std::to_string(i)));  // Continuity in velocity
+      dyn_cons.push_back(
+          m.addConstr(getAccel(t, dt_, i) == getAccel(t + 1, 0, i),
+                      "ContAccel_t" + std::to_string(t) + "_axis" + std::to_string(i)));  // Continuity in acceleration
     }
   }
 }
@@ -674,7 +698,10 @@ bool SolverGurobi::callOptimizer()
 
   else
   {  // No solution
-    // m.write("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/model_" + std::to_string(temporal) + ".lp");
+    if (mode_ == RESCUE_PATH)
+    {
+      m.write("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/model_rp" + std::to_string(temporal) + ".lp");
+    }
     solved = false;
     if (optimstatus == GRB_INF_OR_UNBD)
     {
