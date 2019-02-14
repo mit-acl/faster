@@ -6,6 +6,7 @@ class Timer
 {
   typedef std::chrono::high_resolution_clock high_resolution_clock;
   typedef std::chrono::milliseconds milliseconds;
+  typedef std::chrono::microseconds microseconds;
 
 public:
   explicit Timer(bool run = false)

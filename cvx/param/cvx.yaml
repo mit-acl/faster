@@ -110,5 +110,5 @@ z_land: 0.02 #[m] z goal for landing
 
 factor_initial_whole: 2
 factor_final_whole: 5
-factor_initial_rescue: 2
-factor_final_rescue: 5
+factor_initial_rescue: 0.1
+factor_final_rescue: 50

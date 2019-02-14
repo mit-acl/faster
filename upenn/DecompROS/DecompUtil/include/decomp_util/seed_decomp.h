@@ -34,8 +34,8 @@ public:
   {
     this->ellipsoid_ = Ellipsoid<Dim>(radius * Matf<Dim, Dim>::Identity(), p_);
     this->find_polyhedron();
-    std::cout << "Number of obstacles" << this->obs_.size() << std::endl;
-    std::cout << "Before adding the local box, matrix A=" << std::endl;
+    // std::cout << "Number of obstacles" << this->obs_.size() << std::endl;
+    // std::cout << "Before adding the local box, matrix A=" << std::endl;
     for (unsigned int j = 0; j < (this->polyhedron_.vs_).size(); j++)  // For all the hyperplanes in one polyhedro
     {
       std::cout << (this->polyhedron_.vs_)[j].n_.transpose() << std::endl;
@@ -48,6 +48,11 @@ public:
   Vecf<Dim> get_seed() const
   {
     return p_;
+  }
+
+  void set_seed(Vecf<Dim> seed)
+  {
+    p_ = seed;
   }
 
   void shrink_polyhedron(double shrink_poly_distance)  // Jesus added this function

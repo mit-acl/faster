@@ -963,7 +963,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   Timer whole_gurobi_t(true);
   solved_whole = sg_whole_.genNewTraj();
   std::cout << bold << blue << "WholeGurobi:  " << std::fixed << whole_gurobi_t << "ms, " << reset << sg_whole_.trials_
-            << " trials" << std::endl;
+            << " trials (dt=" << sg_whole_.dt_ << ")" << std::endl;
 
   // std::cout << "l_constraints_o_.size()=" << l_constraints_o_.size() << std::endl;
   if (solved_whole == false)
@@ -1035,13 +1035,21 @@ void CVX::replanCB(const ros::TimerEvent& e)
   double xf_rescue[9] = { I[0], I[1], I[2], 0, 0, 0, 0, 0, 0 };  // Note that the final position of xf_rescue is only
                                                                  // used to find dt, not as a final condition
 
-  // std::cout << "Punto inicial: " << x0_rescue[0] << ", " << x0_rescue[1] << ", " << x0_rescue[2] << std::endl;
-  // std::cout << "Punto final: " << xf_rescue[0] << ", " << xf_rescue[1] << ", " << xf_rescue[2] << std::endl;
+  std::cout << "Punto inicial: " << x0_rescue[0] << ", " << x0_rescue[1] << ", " << x0_rescue[2] << std::endl;
+  std::cout << "Punto final: " << xf_rescue[0] << ", " << xf_rescue[1] << ", " << xf_rescue[2] << std::endl;
   sg_rescue_.setXf(xf_rescue);
   sg_rescue_.setX0(x0_rescue);
   sg_rescue_.setPolytopes(l_constraints_uo_);
   sg_rescue_.setForceFinalConstraint(!thereIsIntersection);  // If no intersection --> goal is inside
                                                              // polytope --> force final constraint
+
+  if (l_constraints_uo_[0].inside(posR) == false)
+  {
+    std::cout << red << "First point of rescue traj is outside" << reset << std::endl;
+  }
+  // std::cout<<"Constraints "
+  // MatDNf<3> A = cs.A();
+  // std::cout << "Incluso antes A es\n" << A << std::endl;
 
   // sg_rescue_.findDT(2);
   // std::cout << "l_constraints_uo_.size()=" << l_constraints_uo_.size() << std::endl;
@@ -1049,7 +1057,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   Timer rescue_gurobi_t(true);
   bool solved_rescue = sg_rescue_.genNewTraj();
   std::cout << bold << blue << "RescueGurobi:  " << std::fixed << rescue_gurobi_t << "ms, " << reset
-            << sg_rescue_.trials_ << " trials" << std::endl;
+            << sg_rescue_.trials_ << " trials (dt=" << sg_rescue_.dt_ << ")" << std::endl;
 
   if (solved_rescue == false)
   {
@@ -1643,7 +1651,7 @@ void CVX::cvxSeedDecompUnkOcc(Vecf<3>& seed)
   }
   // std::cout << "In cvxDecomp 1!" << std::endl;
 
-  vec_Vec3f obs;
+  // vec_Vec3f obs;
 
   // std::cout << "Type Obstacles==UNKOWN_AND_OCCUPIED_SPACE**************" << std::endl;
 
@@ -1652,28 +1660,29 @@ void CVX::cvxSeedDecompUnkOcc(Vecf<3>& seed)
 
   // std::cout << "Number of elements in unkCloud" < < < < std::endl;
 
-  obs = kdtree_to_vec(pclptr_map_, pclptr_unk_);
-  std::cout << "Points in mapCloud=" << (*pclptr_map_).points.size() << std::endl;
-  std::cout << "Points in unkCloud=" << (*pclptr_unk_).points.size() << std::endl;
+  /*  obs = pclptr_to_vec(pclptr_map_, pclptr_unk_);
+    std::cout << "Points in mapCloud=" << (*pclptr_map_).points.size() << std::endl;
+    std::cout << "Points in unkCloud=" << (*pclptr_unk_).points.size() << std::endl;*/
 
   // Initialize SeedDecomp3D
-  SeedDecomp3D decomp_util(seed);
-  decomp_util.set_obs(obs);
-  decomp_util.set_local_bbox(Vec3f(2, 2, 1));
+
+  seed_decomp_util_.set_seed(seed);
+  seed_decomp_util_.set_obs(vec_uo_);
+  seed_decomp_util_.set_local_bbox(Vec3f(2, 2, 1));
   // std::cout << "In cvxDecomp before dilate!" << std::endl;
-  decomp_util.dilate(0.1);
+  seed_decomp_util_.dilate(0.1);
   // std::cout << "In cvxDecomp after dilate!" << std::endl;
-  // decomp_util.shrink_polyhedron(0);
+  seed_decomp_util_.shrink_polyhedron(par_.drone_radius);
   // std::cout << "In cvxDecomp after shrink!" << std::endl;
 
   vec_E<Polyhedron<3>> polyhedron_as_array;  // This vector will contain only one element
-  polyhedron_as_array.push_back(decomp_util.get_polyhedron());
+  polyhedron_as_array.push_back(seed_decomp_util_.get_polyhedron());
   decomp_ros_msgs::PolyhedronArray poly_msg = DecompROS::polyhedron_array_to_ros(polyhedron_as_array);
   poly_msg.header.frame_id = "world";
 
   // Publish visualization msgs
   cvx_decomp_poly_uo_pub_.publish(poly_msg);
-  auto poly = decomp_util.get_polyhedron();
+  auto poly = seed_decomp_util_.get_polyhedron();
   // std::cout << "Incluso antes A es\n" << poly.hyperplanes()[0].n_.transpose() << std::endl;
   l_constraints_uo_.clear();
   LinearConstraint3D cs(seed, poly.hyperplanes());
@@ -1693,28 +1702,28 @@ void CVX::cvxEllipsoidDecompOcc(vec_Vecf<3>& path)
     return;
   }
 
-  vec_Vec3f obs;
+  // vec_Vec3f obs;
   // std::cout << "Type Obstacles==OCCUPIED_SPACE**************" << std::endl;
-  pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr_cloud_map = kdtree_map_.getInputCloud();
-  obs = kdtree_to_vec(ptr_cloud_map);
+  // pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr_cloud_map = kdtree_map_.getInputCloud();
+  // obs = pclptr_to_vec(ptr_cloud_map);
 
   // Using ellipsoid decomposition
-  EllipsoidDecomp3D decomp_util;
-  decomp_util.set_obs(obs);
-  decomp_util.set_local_bbox(
+  ellip_decomp_util_.set_obs(vec_o_);
+  ellip_decomp_util_.set_local_bbox(
       Vec3f(2, 2, 1));  // Only try to find cvx decomp in the Mikowsski sum of JPS and this box (I think)
                         // par_.drone_radius
-  decomp_util.set_inflate_distance(0);  // The obstacles are inflated by this distance
-  decomp_util.dilate(path);             // Find convex polyhedra
+  ellip_decomp_util_.set_inflate_distance(0);  // The obstacles are inflated by this distance
+  ellip_decomp_util_.dilate(path);             // Find convex polyhedra
   // decomp_util.shrink_polyhedrons(par_.drone_radius);  // Shrink polyhedra by the drone radius. NOT RECOMMENDED (leads
   // to lack of continuity in path sometimes)
 
   if (par_.visual == true)
   {
-    decomp_ros_msgs::EllipsoidArray es_msg = DecompROS::ellipsoid_array_to_ros(decomp_util.get_ellipsoids());
+    decomp_ros_msgs::EllipsoidArray es_msg = DecompROS::ellipsoid_array_to_ros(ellip_decomp_util_.get_ellipsoids());
     es_msg.header.frame_id = "world";
 
-    decomp_ros_msgs::PolyhedronArray poly_msg = DecompROS::polyhedron_array_to_ros(decomp_util.get_polyhedrons());
+    decomp_ros_msgs::PolyhedronArray poly_msg =
+        DecompROS::polyhedron_array_to_ros(ellip_decomp_util_.get_polyhedrons());
     poly_msg.header.frame_id = "world";
 
     // Publish visualization msgs
@@ -1723,7 +1732,7 @@ void CVX::cvxEllipsoidDecompOcc(vec_Vecf<3>& path)
   }
   // Convert to inequality constraints Ax < b
   // std::vector<polytope> polytopes;
-  auto polys = decomp_util.get_polyhedrons();
+  auto polys = ellip_decomp_util_.get_polyhedrons();
 
   l_constraints_o_.clear();
 
@@ -1917,61 +1926,59 @@ void CVX::frontierCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 void CVX::mapCB(const sensor_msgs::PointCloud2::ConstPtr& pcl2ptr_map_ros,
                 const sensor_msgs::PointCloud2::ConstPtr& pcl2ptr_unk_ros)
 {
-  /*  std::cout << "In MAPCB!" << std::endl;
-    std::cout << "Width mapPCL=" << pcl2ptr_map_ros->width << std::endl;
-    std::cout << "Height mapPCL=" << pcl2ptr_map_ros->height << std::endl;*/
-
-  double before = ros::Time::now().toSec();
-
-  // double before_copy_to_pcl = ros::Time::now().toSec();
+  Timer mapCB_t(true);
   mtx_map.lock();
+  mtx_unk.lock();
+
+  // double before = ros::Time::now().toSec();
+
   pcl::fromROSMsg(*pcl2ptr_map_ros, *pclptr_map_);
-  mtx_map.unlock();
+
   // ROS_WARN("ToPcl takes: %0.2f ms", 1000 * (ros::Time::now().toSec() - before_copy_to_pcl));
-  // printf("updating JSPMAP\n");
 
   updateJPSMap(pclptr_map_);  // UPDATE EVEN WHEN THERE ARE NO POINTS
 
-  // printf("updated!!\n");
-
-  if (pcl2ptr_map_ros->width == 0 || pcl2ptr_map_ros->height == 0)  // Point Cloud is empty
+  if (pcl2ptr_map_ros->width != 0 && pcl2ptr_map_ros->height != 0)  // Point Cloud is empty
   {
-    return;
+    kdtree_map_.setInputCloud(pclptr_map_);
+    kdtree_map_initialized_ = 1;
+
+    // Option 1 to convert pcl to a vector
+
+    /*  Timer timer1(true);
+      Eigen::MatrixXd mat = (pclptr_map_->getMatrixXfMap()).cast<double>();
+      int cols = pclptr_map_->points.size();
+      std::vector<Eigen::Vector3d> v(pclptr_map_->points.size());
+      Eigen::Matrix<double, 3, Eigen::Dynamic>::Map(v.data()->data(), 3, cols) = mat;
+      std::cout << bold << blue << "With map:  " << timer1 << "ms" << reset << std::endl;*/
+
+    // Option 2 (faster):
+
+    // Timer timer2(true);
+    vec_o_ = pclptr_to_vec(pclptr_map_);
+    // std::cout << bold << blue << "With pclptr_to_vec:  " << timer2 << "ms" << reset << std::endl;
   }
 
-  mtx_map.lock();
-  kdtree_map_.setInputCloud(pclptr_map_);
-  kdtree_map_initialized_ = 1;
-  mtx_map.unlock();
-
-  mtx_unk.lock();
-  pcl::fromROSMsg(*pcl2ptr_unk_ros, *pclptr_unk_);
-  mtx_unk.unlock();
   ///////////Unkown CB/////////////////
-  if (pcl2ptr_unk_ros->width == 0 ||
-      pcl2ptr_unk_ros->height == 0)  // Point Cloud is empty (this happens at the beginning)
+  pcl::fromROSMsg(*pcl2ptr_unk_ros, *pclptr_unk_);
+  if (pcl2ptr_unk_ros->width != 0 && pcl2ptr_unk_ros->height != 0)
   {
-    printf("Unkown cloud has 0 points\n");
-    return;
+    /*    std::vector<int> index;
+        pcl::removeNaNFromPointCloud(*pclptr_unk_, *pclptr_unk_, index);
+        if (pclptr_unk_->points.size() == 0)
+        {
+          printf("Unkown cloud has 0 points\n");
+          return;
+        }*/
+
+    // kdtree_unk_.setInputCloud(pclptr_unk_); Commented this to improve speed
+    kdtree_unk_initialized_ = 1;
+    vec_uo_ = pclptr_to_vec(pclptr_unk_);                         // insert unknown space
+    vec_uo_.insert(vec_uo_.end(), vec_o_.begin(), vec_o_.end());  // append known space
   }
-
-  // pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_unk(new pcl::PointCloud<pcl::PointXYZ>);
-
-  std::vector<int> index;
-  mtx_unk.lock();
-  pcl::removeNaNFromPointCloud(*pclptr_unk_, *pclptr_unk_, index);
+  mtx_map.unlock();
   mtx_unk.unlock();
-  if (pclptr_unk_->points.size() == 0)
-  {
-    printf("Unkown cloud has 0 points\n");
-    return;
-  }
-
-  // printf("Waiting for lock!");
-  mtx_unk.lock();
-  kdtree_unk_.setInputCloud(pclptr_unk_);
-  kdtree_unk_initialized_ = 1;
-  mtx_unk.unlock();
+  std::cout << bold << blue << "MapCB:  " << mapCB_t << "ms" << reset << std::endl;
 
   // ROS_WARN("MapCB takes: %0.2f ms", 1000 * (ros::Time::now().toSec() - before));
 }

@@ -291,7 +291,7 @@ inline pcl::PointXYZ eigenPoint2pclPoint(Eigen::Vector3d p)
   return tmp;
 }
 
-inline vec_Vec3f kdtree_to_vec(const pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr_cloud)
+inline vec_Vec3f pclptr_to_vec(const pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr_cloud)
 {
   vec_Vec3f pts;
   pts.resize(ptr_cloud->points.size());
@@ -305,7 +305,7 @@ inline vec_Vec3f kdtree_to_vec(const pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloud
   return pts;
 }
 
-inline vec_Vec3f kdtree_to_vec(const pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr_cloud1,
+inline vec_Vec3f pclptr_to_vec(const pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr_cloud1,
                                const pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr_cloud2)
 {
   vec_Vec3f pts;
