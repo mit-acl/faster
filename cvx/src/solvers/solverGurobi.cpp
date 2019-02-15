@@ -313,9 +313,7 @@ void SolverGurobi::setPolytopesConstraints()
 
     // std::cout << "NUMBER OF POLYTOPES=" << polytopes_.size() << std::endl;
     // std::cout << "NUMBER OF FACES of the first polytope=" << polytopes_[0].A().rows() << std::endl;
-    // std::cout << "A es esto:\n";
-    // std::cout << "Number of rows= " << bb.rows() << std::endl;
-    // std::cout << polytopes_[0].A() << std::endl;
+
     // Polytope constraints (if binary_varible==1 --> In that polytope) and at_least_1_pol_cons (at least one polytope)
     // constraints
     for (int t = 0; t < N_; t++)  // Start in t=1 (because t=0 is already fixed with the initial condition)
@@ -557,6 +555,15 @@ bool SolverGurobi::genNewTraj()
   // std::cout << "Factor_initial= " << factor_initial_ << std::endl;
   // std::cout << "Factor_final= " << factor_final_ << std::endl;
   trials_ = 0;
+
+  /*  std::cout << "A es esto:\n";
+    // std::cout << "Number of rows= " << bb.rows() << std::endl;
+    std::cout << polytopes_[0].A() << std::endl;
+    std::cout << "B es esto:\n";
+    std::cout << polytopes_[0].b().transpose() << std::endl;*/
+
+  // if (mode_ == WHOLE_TRAJ)
+  //{
   for (int i = factor_initial_; i <= factor_final_ && solved == false; i++)
   {
     trials_ = trials_ + 1;
@@ -565,7 +572,7 @@ bool SolverGurobi::genNewTraj()
     setConstraintsX0();
     setConstraintsXf();
     setDynamicConstraints();
-    setDistanceConstraints();
+    // setDistanceConstraints();
     setObjective();
     resetXandU();
     solved = callOptimizer();
@@ -578,6 +585,32 @@ bool SolverGurobi::genNewTraj()
       // std::cout << "Factor= " << i << "(dt_= " << dt_ << ")---> didn't worked" << std::endl;
     }
   }
+  //}
+
+  /*  if (mode_ == RESCUE_PATH)
+    {
+      for (float t = 0; t <= 5 && solved == false; t = t + 0.05)
+      {
+        trials_ = trials_ + 1;
+        dt_ = t;
+        setPolytopesConstraints();
+        setConstraintsX0();
+        setConstraintsXf();
+        setDynamicConstraints();
+        // setDistanceConstraints();
+        setObjective();
+        resetXandU();
+        solved = callOptimizer();
+        if (solved == true)
+        {
+          // std::cout << "Factor= " << i << "(dt_= " << dt_ << ")---> worked" << std::endl;
+        }
+        else
+        {
+          // std::cout << "Factor= " << i << "(dt_= " << dt_ << ")---> didn't worked" << std::endl;
+        }
+      }
+    }*/
 
   // double dt_initial = dt_;
   // while (solved == false)
@@ -634,11 +667,21 @@ bool SolverGurobi::callOptimizer()
   // std::cout << "CALLING OPTIMIZER OF GUROBI" << std::endl;
 
   // Select these parameteres with the tuning Tool of Gurobi
-  // m.set("MIPFocus", "2");
-  // m.set("PreQLinearize", "1");
+
+  if (mode_ == RESCUE_PATH)
+  {
+    m.set("NumericFocus", "3");
+    m.set("Presolve", "0");
+  }
+
+  if (mode_ == WHOLE_TRAJ)
+  {
+    m.set("NumericFocus", "3");
+    m.set("Presolve", "0");
+  }
 
   m.update();
-  temporal = temporal + 1;
+  temporal_ = temporal_ + 1;
   // printf("Writing into model.lp number=%d", temporal);
   // m.write("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/model_" + std::to_string(temporal) + ".lp");
   m.set("OutputFlag", "0");  // 1 if you want verbose
@@ -652,6 +695,8 @@ bool SolverGurobi::callOptimizer()
   // std::cout << "*************************Gurobi RUNTIME: " << m.get(GRB_DoubleAttr_Runtime) * 1000 << " ms"
   //          << std::endl;
 
+  runtime_ms_ = m.get(GRB_DoubleAttr_Runtime) * 1000;
+
   times_log.open("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/times_log.txt", std::ios_base::app);
   times_log << elapsed << "\n";
   times_log.close();
@@ -660,6 +705,14 @@ bool SolverGurobi::callOptimizer()
   int optimstatus = m.get(GRB_IntAttr_Status);
   if (optimstatus == GRB_OPTIMAL)
   {
+    if (mode_ == WHOLE_TRAJ)
+    {
+      m.write("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/model_wt" + std::to_string(temporal_) + ".lp");
+    }
+    if (mode_ == RESCUE_PATH)
+    {
+      m.write("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/model_rp" + std::to_string(temporal_) + ".lp");
+    }
     // printf("GUROBI SOLUTION: Optimal");
 
     /*    if (polytopes_cons.size() > 0)  // Print the binary matrix only if I've included the polytope constraints
@@ -697,10 +750,14 @@ bool SolverGurobi::callOptimizer()
   }
 
   else
-  {  // No solution
+  {
+    // total_not_solved = total_not_solved + 1;
+    // std::cout << "TOTAL NOT SOLVED" << total_not_solved << std::endl;
+    // No solution
     if (mode_ == RESCUE_PATH)
     {
-      m.write("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/model_rp" + std::to_string(temporal) + ".lp");
+      // m.write("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/model_rp" + std::to_string(temporal_) +
+      //         "dt=" + std::to_string(dt_) + ".lp");
     }
     solved = false;
     if (optimstatus == GRB_INF_OR_UNBD)

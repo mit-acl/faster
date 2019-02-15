@@ -111,6 +111,8 @@ public:
   Eigen::MatrixXd X_temp_;
   double dt_;  // time step found by the solver
   int trials_ = 0;
+  int temporal_ = 0;
+  double runtime_ms_ = 0;
 
 protected:
   double cost_;
@@ -152,10 +154,10 @@ protected:
 
   std::ofstream times_log;
 
-  int temporal = 0;
   int mode_;
   bool forceFinalConstraint_ = true;
   int factor_initial_ = 2;
   int factor_final_ = 2;
+  int total_not_solved = 0;
 };
 #endif

@@ -90,7 +90,8 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   ros::param::param<double>("~goal_radius", par_.goal_radius, 0.2);
   ros::param::param<double>("~drone_radius", par_.drone_radius, 0.15);
 
-  ros::param::param<int>("~N", par_.N, 10);
+  ros::param::param<int>("~N_rescue", par_.N_rescue, 10);
+  ros::param::param<int>("~N_whole", par_.N_whole, 10);
 
   ros::param::param<int>("~offset", par_.offset, 5);
 
@@ -119,6 +120,8 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   ros::param::param<int>("~factor_final_whole", par_.factor_final_whole, 2);
   ros::param::param<int>("~factor_initial_rescue", par_.factor_initial_rescue, 2);
   ros::param::param<int>("~factor_final_rescue", par_.factor_final_rescue, 2);
+
+  ros::param::param<int>("~max_poly", par_.max_poly, 4);
 
   optimized_ = false;
   flight_mode_.mode = flight_mode_.NOT_FLYING;
@@ -172,7 +175,10 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
 
   pubCBTimer_ = nh_pub_CB_.createTimer(ros::Duration(par_.dc), &CVX::pubCB, this);
 
-  replanCBTimer_ = nh_replan_CB.createTimer(ros::Duration(par_.dc), &CVX::replanCB, this);
+  replanCBTimer_ = nh_.createTimer(ros::Duration(par_.dc), &CVX::replanCB, this);
+
+  // If you want another thread for the replanCB: replanCBTimer_ = nh_.createTimer(ros::Duration(par_.dc),
+  // &CVX::replanCB, this);
 
   // Initialize setpoint marker
   setpoint_.header.frame_id = "world";
@@ -246,7 +252,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   double max_values[3] = { par_.v_max, par_.a_max, par_.j_max };
   solver_jerk_.set_max(max_values);
 
-  sg_whole_.setN(par_.N);
+  sg_whole_.setN(par_.N_whole);
   sg_whole_.createVars();
   sg_whole_.setDC(par_.dc);
   sg_whole_.set_max(max_values);
@@ -255,7 +261,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   sg_whole_.setForceFinalConstraint(true);
   sg_whole_.setFactorInitialAndFinal(par_.factor_initial_whole, par_.factor_final_whole);
 
-  sg_rescue_.setN(par_.N);
+  sg_rescue_.setN(par_.N_rescue);
   sg_rescue_.createVars();
   sg_rescue_.setDC(par_.dc);
   sg_rescue_.set_max(max_values);
@@ -913,8 +919,13 @@ void CVX::replanCB(const ros::TimerEvent& e)
   }
 
   bool noPointsOutsideSphere1;
+  std::cout << "here, ra=" << ra << std::endl;
+  std::cout << "here, state_pos=" << state_pos << std::endl;
+  printElementsOfJPS(JPS1);
+
   B1 = getFirstIntersectionWithSphere(JPS1, ra, state_pos, &li1, &noPointsOutsideSphere1);
 
+  std::cout << "here2" << std::endl;
   vec_Vecf<3> JPS1_inside_sphere(JPS1.begin(), JPS1.begin() + li1 + 1);  // Elements of JPS that are inside the sphere
   JPS1_inside_sphere.push_back(B1);
 
@@ -930,11 +941,23 @@ void CVX::replanCB(const ros::TimerEvent& e)
   std::cout << bold << green << "***********WHOLE TRAJ*********************" << reset << std::endl;
   // printf("Running Gurobi!!!\n");
 
-  double xf[9] = { B1(0), B1(1), B1(2), 0, 0, 0, 0, 0, 0 };
   // printf("Running CVXDecomp!!!\n");
   double before = ros::Time::now().toSec();
 
   Timer cvx_ellip_decomp_t(true);
+  if (JPS1_inside_sphere.size() > par_.max_poly + 1)  // If I have more than (par_.max_poly + 1) vertexes
+  {
+    std::cout << "ANTES" << std::endl;
+    printElementsOfJPS(JPS1_inside_sphere);
+    JPS1_inside_sphere.erase(JPS1_inside_sphere.begin() + par_.max_poly + 1,
+                             JPS1_inside_sphere.end());  // Force JPS to have less than par_.max_poly elements
+    B1 = JPS1_inside_sphere[JPS1_inside_sphere.size() - 1];
+    std::cout << "JPS1_inside_sphere tiene " << JPS1_inside_sphere.size() << "polytopes" << std::endl;
+    std::cout << "DESPUES" << std::endl;
+    printElementsOfJPS(JPS1_inside_sphere);
+  }
+  double xf[9] = { B1(0), B1(1), B1(2), 0, 0, 0, 0, 0, 0 };
+
   cvxEllipsoidDecompOcc(JPS1_inside_sphere);  // result saved in l_constraints_
   std::cout << bold << blue << "CVXDecompWhole:  " << std::fixed << cvx_ellip_decomp_t << "ms" << reset << std::endl;
 
@@ -962,8 +985,9 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   Timer whole_gurobi_t(true);
   solved_whole = sg_whole_.genNewTraj();
-  std::cout << bold << blue << "WholeGurobi:  " << std::fixed << whole_gurobi_t << "ms, " << reset << sg_whole_.trials_
-            << " trials (dt=" << sg_whole_.dt_ << ")" << std::endl;
+  std::cout << bold << blue << "WholeGurobi:  " << std::fixed << whole_gurobi_t << "ms, (" << std::fixed
+            << sg_whole_.runtime_ms_ << " ms), " << reset << sg_whole_.trials_ << " trials (dt=" << sg_whole_.dt_ << ")"
+            << std::endl;
 
   // std::cout << "l_constraints_o_.size()=" << l_constraints_o_.size() << std::endl;
   if (solved_whole == false)
@@ -983,7 +1007,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   //////////////////////////////////////////////////////////
   std::cout << bold << green << "***********RESCUE PATH*********************" << reset << std::endl;
 
-  int index = par_.offset_rp;  // R is the point of the trajectory offset_rp ms after the start of the trajectory
+  int index = par_.offset_rp;  // R is the point of the trajectory offset_rp ms after the start of the  whole trajectory
   // std::cout << "index=" << index << std::endl;
 
   Eigen::Vector3d posR(sg_whole_.X_temp_(index, 0), sg_whole_.X_temp_(index, 1), sg_whole_.X_temp_(index, 2));
@@ -1056,8 +1080,9 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   Timer rescue_gurobi_t(true);
   bool solved_rescue = sg_rescue_.genNewTraj();
-  std::cout << bold << blue << "RescueGurobi:  " << std::fixed << rescue_gurobi_t << "ms, " << reset
-            << sg_rescue_.trials_ << " trials (dt=" << sg_rescue_.dt_ << ")" << std::endl;
+  std::cout << bold << blue << "RescueGurobi:  " << std::fixed << rescue_gurobi_t << "ms, (" << std::fixed
+            << sg_rescue_.runtime_ms_ << " ms), " << reset << sg_rescue_.trials_ << " trials (dt=" << sg_rescue_.dt_
+            << ")" << std::endl;
 
   if (solved_rescue == false)
   {
@@ -1712,8 +1737,8 @@ void CVX::cvxEllipsoidDecompOcc(vec_Vecf<3>& path)
   ellip_decomp_util_.set_local_bbox(
       Vec3f(2, 2, 1));  // Only try to find cvx decomp in the Mikowsski sum of JPS and this box (I think)
                         // par_.drone_radius
-  ellip_decomp_util_.set_inflate_distance(0);  // The obstacles are inflated by this distance
-  ellip_decomp_util_.dilate(path);             // Find convex polyhedra
+  ellip_decomp_util_.set_inflate_distance(par_.drone_radius);  // The obstacles are inflated by this distance
+  ellip_decomp_util_.dilate(path);                             // Find convex polyhedra
   // decomp_util.shrink_polyhedrons(par_.drone_radius);  // Shrink polyhedra by the drone radius. NOT RECOMMENDED (leads
   // to lack of continuity in path sometimes)
 

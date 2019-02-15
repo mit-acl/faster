@@ -84,7 +84,8 @@ dc: 0.01            #(seconds) Duration for the interpolation=Value of the timer
 goal_radius: 0.05    #(m) Drone has arrived to the goal when distance_to_goal<GOAL_RADIUS
 drone_radius: 0.42  #(m) Used for collision checking
 
-N: 10  #[-] Number of discretization points in the trajectory
+N_whole: 5  #[-] Number of discretization points in the whole trajectory
+N_rescue: 4  #[-] Number of discretization points in the rescue path
 
 offset: 10  # Replanning offset (the initial conditions are taken OFFSET states farther from the last published goal)
 offset_rp: 30 #The rescue path starts X states ahead of the beginning of the whole trajectory
@@ -100,15 +101,17 @@ inflation_jps: 0.7  #[m] The obstacles are inflated (to run JPS) by this amount
 factor_jps: 1  #[m] JPS is run with resolution=factor_jps*(resolution of the map)
 
 
-v_max: 5.0   #[m/s]
-a_max: 5.0   #[m/s2]
-j_max: 8.0  #[m/s3]
+v_max: 5.0   #[m/s]  5
+a_max: 5.0   #[m/s2] 5
+j_max: 12.0  #[m/s3]  8
 
 q: 100  #[-] weight to the 2nd term of the cost function. If it's very big (>1000), Gurobi fails!! (numerical issues)
 
 z_land: 0.02 #[m] z goal for landing
 
 factor_initial_whole: 2
-factor_final_whole: 5
-factor_initial_rescue: 0.1
-factor_final_rescue: 50
+factor_final_whole: 3
+factor_initial_rescue: 2
+factor_final_rescue: 2
+
+max_poly: 2

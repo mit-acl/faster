@@ -97,7 +97,8 @@ struct parameteres
   double goal_radius;
   double drone_radius;
 
-  int N;
+  int N_whole;
+  int N_rescue;
 
   int offset;
   int offset_rp;
@@ -123,6 +124,8 @@ struct parameteres
 
   int factor_initial_rescue;
   int factor_final_rescue;
+
+  int max_poly;
 };
 
 /*struct log_values
