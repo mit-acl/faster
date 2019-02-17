@@ -47,8 +47,8 @@
   <build_depend>jps3d</build_depend>
   <build_depend>jps3d</build_depend>
 
-  <run_depend>roscpp</run_depend>
-  <run_depend>rospy</run_depend>
+  <build_depend>acl_msgs</build_depend>
+  <build_depend>acl_msgs</build_depend>
 
   <build_depend>decomp_util</build_depend>
   <build_depend>decomp_ros_utils</build_depend>

@@ -170,7 +170,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   sub_state_ = nh_.subscribe("state", 1, &CVX::stateCB, this);
   // sub_map_ = nh_.subscribe("occup_grid", 1, &CVX::mapCB, this);
   // sub_unk_ = nh_.subscribe("unknown_grid", 1, &CVX::unkCB, this);
-  sub_frontier_ = nh_.subscribe("frontier_grid", 1, &CVX::frontierCB, this);
+ // sub_frontier_ = nh_.subscribe("frontier_grid", 1, &CVX::frontierCB, this);
   // sub_pcl_ = nh_.subscribe("pcloud", 1, &CVX::pclCB, this);
 
   pubCBTimer_ = nh_pub_CB_.createTimer(ros::Duration(par_.dc), &CVX::pubCB, this);
@@ -466,7 +466,8 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f& start_sent, Vec3f& goal_sent, bool* solved, i
   const Veci<3> start_int = map_util_->floatToInt(start);
   const Veci<3> goal_int = map_util_->floatToInt(goal);
   map_util_->setFreeVoxelAndSurroundings(start_int, par_.inflation_jps);
-  map_util_->setFree(goal_int);
+  map_util_->setFreeVoxelAndSurroundings(goal_int, par_.inflation_jps);
+  //map_util_->setFree(goal_int);
 
   planner_ptr_->setMapUtil(map_util_);  // Set collision checking function
   planner_ptr_->updateMap();
@@ -923,7 +924,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   std::cout << "here, state_pos=" << state_pos << std::endl;
   printElementsOfJPS(JPS1);
 
-  B1 = getFirstIntersectionWithSphere(JPS1, ra, state_pos, &li1, &noPointsOutsideSphere1);
+  B1 = getFirstIntersectionWithSphere(JPS1, ra, JPS1[0], &li1, &noPointsOutsideSphere1);
 
   std::cout << "here2" << std::endl;
   vec_Vecf<3> JPS1_inside_sphere(JPS1.begin(), JPS1.begin() + li1 + 1);  // Elements of JPS that are inside the sphere
@@ -1887,7 +1888,7 @@ void CVX::clearMarkerSetOfArrows()
   markerID_ = 0;
 }
 
-void CVX::frontierCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
+/*void CVX::frontierCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 {
   // printf("****In FrontierCB\n");
   if (pcl2ptr_msg->width == 0 || pcl2ptr_msg->height == 0)  // Point Cloud is empty (this happens at the beginning)
@@ -1902,7 +1903,7 @@ void CVX::frontierCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
   kdtree_frontier_.setInputCloud(pclptr_frontier);
   mtx_frontier.unlock();
   kdtree_frontier_initialized_ = 1;
-}
+}*/
 
 /*void CVX::pclCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
 {
@@ -2303,6 +2304,8 @@ Eigen::Vector3d CVX::projectClickedGoal(Eigen::Vector3d& P1)
     Eigen::Vector4d(0, 0, -1, z_min)   // Plane Z down
   };
 
+
+vec_Vecf<3> intersections;
   /*  std::cout << "The planes" << std::endl;
     for (int i = 0; i < 6; i++)
     {
@@ -2314,14 +2317,31 @@ Eigen::Vector3d CVX::projectClickedGoal(Eigen::Vector3d& P1)
   {
     if (getIntersectionWithPlane(P1, P2, all_planes[i], inters) == true)
     {
-      axis = (int)(i / 2);
-      int N = 1;
-      pcl::PointXYZ searchPoint(inters[0], inters[1], inters[2]);
-      std::vector<int> id(N);
-      std::vector<float> pointNKNSquaredDistance(N);
+      intersections.push_back(inters);
+    }
+  }
+
+  if (intersections.size() == 0)
+  {  // There is no intersection
+    ROS_ERROR("THIS IS IMPOSSIBLE, THERE SHOULD BE AN INTERSECTION");
+  }
+    std::vector<double> distances;
+    // And now take the nearest intersection
+  for (size_t i = 0; i < intersections.size(); i++)
+  {
+    double distance = (intersections[i] -P1).norm();
+    distances.push_back(distance);
+  }
+  int minElementIndex = std::min_element(distances.begin(), distances.end()) - distances.begin();
+  inters = intersections[minElementIndex];
+      //axis = (int)(i / 2);
+      //int N = 1;
+      //pcl::PointXYZ searchPoint(inters[0], inters[1], inters[2]);
+      //std::vector<int> id(N);
+      //std::vector<float> pointNKNSquaredDistance(N);
 
       // Let's find now the nearest free or unkown point to the intersection
-      if (kdtree_frontier_initialized_)
+/*      if (kdtree_frontier_initialized_)
       {
         mtx_frontier.lock();
         pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr = kdtree_frontier_.getInputCloud();
@@ -2338,21 +2358,21 @@ Eigen::Vector3d CVX::projectClickedGoal(Eigen::Vector3d& P1)
       {
         printf("Run the mapper, returning Clicked Goal\n");
         return P2;
-      }
+      }*/
 
       // Now let's put the intersection 1.8 * par_.inflation_jps meters away from the end of the map.
       Eigen::Vector3d sign(inters[0] / fabs(inters[0]), inters[1] / fabs(inters[1]), inters[2] / fabs(inters[2]));
 
       // std::cout << "sign=" << sign.transpose() << std::endl;
 
-      inters(0) = (axis == 0) ? inters(0) + sign(0) * 1.5 * par_.inflation_jps : inters(0);
+/*      inters(0) = (axis == 0) ? inters(0) + sign(0) * 1.5 * par_.inflation_jps : inters(0);
       inters(1) = (axis == 1) ? inters(1) + sign(1) * 1.5 * par_.inflation_jps : inters(1);
-      inters(2) = (axis == 2) ? inters(2) + sign(2) * 1.5 * par_.inflation_jps : inters(2);
+      inters(2) = (axis == 2) ? inters(2) + sign(2) * 1.5 * par_.inflation_jps : inters(2);*/
 
       // inters = inters + sign * 1.5 * par_.inflation_jps;
-      // std::cout << "Projecting: returned" << inters.transpose() << std::endl;
+      std::cout << "*****Projecting: returned" << inters.transpose() << std::endl;
+      pubTerminalGoal();
       return inters;
-    }
-  }
-  printf("Neither the goal is inside the map nor it has a projection into it, this is impossible");
+    
+
 }

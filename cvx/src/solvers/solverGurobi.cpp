@@ -2,6 +2,7 @@
 #include "solverGurobi_utils.hpp"  //This must go here, and not in solverGurobi.hpp
 #include <chrono>
 #include <unistd.h>
+#include <ros/package.h>
 
 #define WHOLE_TRAJ 0
 #define RESCUE_PATH 1
@@ -327,7 +328,7 @@ void SolverGurobi::setPolytopesConstraints()
         {
           sum = sum + b[t][col];
         }
-        at_least_1_pol_cons.push_back(m.addConstr(sum == 1, "At_least_1_pol"));  // at least in one polytope
+        at_least_1_pol_cons.push_back(m.addConstr(sum == 1, "At_least_1_pol_t_"+ std::to_string(t)));  // at least in one polytope
       }
       std::vector<GRBLinExpr> cp0 = getCP0(t);  // Control Point 0
       std::vector<GRBLinExpr> cp1 = getCP1(t);  // Control Point 1
@@ -682,8 +683,8 @@ bool SolverGurobi::callOptimizer()
 
   m.update();
   temporal_ = temporal_ + 1;
-  // printf("Writing into model.lp number=%d", temporal);
-  // m.write("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/model_" + std::to_string(temporal) + ".lp");
+  printf("Writing into model.lp number=%d\n", temporal_);
+  m.write(ros::package::getPath("cvx")+"/models/model_" + std::to_string(temporal_) + ".lp");
   m.set("OutputFlag", "0");  // 1 if you want verbose
 
   // std::cout << "*************************Starting Optimization" << std::endl;
@@ -691,27 +692,27 @@ bool SolverGurobi::callOptimizer()
   m.optimize();
   auto end = std::chrono::steady_clock::now();
   auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-  // std::cout << "*************************Finished Optimization: " << elapsed << " ms" << std::endl;
+  std::cout << "*************************Finished Optimization: " << elapsed << " ms" << std::endl;
   // std::cout << "*************************Gurobi RUNTIME: " << m.get(GRB_DoubleAttr_Runtime) * 1000 << " ms"
   //          << std::endl;
 
   runtime_ms_ = m.get(GRB_DoubleAttr_Runtime) * 1000;
 
-  times_log.open("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/times_log.txt", std::ios_base::app);
+/*  times_log.open("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/times_log.txt", std::ios_base::app);
   times_log << elapsed << "\n";
-  times_log.close();
+  times_log.close();*/
 
   // printf("Going to check status");
   int optimstatus = m.get(GRB_IntAttr_Status);
   if (optimstatus == GRB_OPTIMAL)
   {
     if (mode_ == WHOLE_TRAJ)
-    {
-      m.write("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/model_wt" + std::to_string(temporal_) + ".lp");
+    {  
+      m.write( ros::package::getPath("cvx")+"/models/model_wt" + std::to_string(temporal_) + ".lp");
     }
     if (mode_ == RESCUE_PATH)
     {
-      m.write("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/model_rp" + std::to_string(temporal_) + ".lp");
+      m.write( ros::package::getPath("cvx")+"/models/model_rp" + std::to_string(temporal_) + ".lp");
     }
     // printf("GUROBI SOLUTION: Optimal");
 

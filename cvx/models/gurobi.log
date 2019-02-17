@@ -3624,3 +3624,72 @@ Presolve time: 0.00s
 
 Solved in 0 iterations and 0.00 seconds
 Infeasible model
+
+Gurobi 8.1.0 (linux64) logging started Sat Feb 16 23:49:06 2019
+
+Academic license - for non-commercial use only
+
+Gurobi Optimizer version 8.1.0 build v8.1.0rc1 (linux64)
+Copyright (c) 2018, Gurobi Optimization, LLC
+
+Read LP format model from file model_1.lp
+Reading time = 0.00 seconds
+: 131 rows, 66 columns, 257 nonzeros
+Optimize a model with 131 rows, 66 columns and 257 nonzeros
+Model has 15 quadratic objective terms
+Model has 120 general constraints
+Variable types: 60 continuous, 6 integer (6 binary)
+Coefficient statistics:
+  Matrix range     [3e-02, 6e+00]
+  Objective range  [0e+00, 0e+00]
+  QObjective range [7e+01, 7e+01]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [7e-06, 1e+01]
+Presolve removed 90 rows and 33 columns
+Presolve time: 0.00s
+Presolved: 41 rows, 33 columns, 201 nonzeros
+Presolved model has 15 quadratic objective terms
+Variable types: 33 continuous, 0 integer (0 binary)
+Presolve removed 7 rows and 0 columns
+Presolve time: 0.01s
+Presolved: 34 rows, 40 columns, 154 nonzeros
+Presolved model has 15 quadratic objective terms
+Root barrier log...
+
+Ordering time: 0.00s
+
+Barrier statistics:
+ AA' NZ     : 1.760e+02
+ Factor NZ  : 3.430e+02
+ Factor Ops : 4.001e+03 (less than 1 second per iteration)
+ Threads    : 1
+
+                  Objective                Residual
+Iter       Primal          Dual         Primal    Dual     Compl     Time
+   0   2.10970730e+06 -3.01335676e+06  2.82e+03 1.92e+02  8.84e+05     0s
+   1   4.15484300e+02 -9.06984204e+05  2.21e+00 1.50e-01  1.20e+04     0s
+   2   4.03406051e+02 -1.04805248e+04  6.29e-03 4.28e-04  1.36e+02     0s
+   3   2.87051711e+02 -2.84900760e+03  6.29e-09 4.28e-10  3.92e+01     0s
+   4   2.80008081e+02  1.86020522e+02  1.23e-10 8.35e-12  1.17e+00     0s
+   5   2.79315333e+02  2.78860742e+02  7.33e-15 4.39e-14  5.68e-03     0s
+   6   2.79315268e+02  2.79314813e+02  6.22e-15 8.48e-14  5.69e-06     0s
+   7   2.79315268e+02  2.79315268e+02  3.95e-14 2.85e-14  5.69e-09     0s
+
+Barrier solved model in 7 iterations and 0.01 seconds
+Optimal objective 2.79315268e+02
+
+
+Root relaxation: objective 2.793153e+02, 0 iterations, 0.00 seconds
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+*    0     0               0     279.3152680  279.31527  0.00%     -    0s
+
+Explored 0 nodes (0 simplex iterations) in 0.01 seconds
+Thread count was 8 (of 8 available processors)
+
+Solution count 1: 279.315 
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 2.793152679787e+02, best bound 2.793152679787e+02, gap 0.0000%
