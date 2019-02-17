@@ -1,1 +1,2 @@
-MinRelNodes  20000000
+Heuristics  0.5
+PreQLinearize  2

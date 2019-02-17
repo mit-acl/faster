@@ -50,7 +50,7 @@ catkin_package(
 
 include_directories(${catkin_INCLUDE_DIRS})
 
-set(GUROBI_LIBRARIES "$ENV{GUROBI_HOME}/lib/libgurobi_c++.a;$ENV{GUROBI_HOME}/lib/libgurobi80.so;$ENV{GUROBI_HOME}/lib/" )
+set(GUROBI_LIBRARIES "$ENV{GUROBI_HOME}/lib/libgurobi_c++.a;$ENV{GUROBI_HOME}/lib/libgurobi81.so;$ENV{GUROBI_HOME}/lib/" )
 
 add_executable(${PROJECT_NAME}_node src/main.cpp src/cvx.cpp src/solvers/solverGurobi.cpp)
 target_link_libraries(${PROJECT_NAME}_node ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${JPS3D_LIBRARIES} ${DECOMP_UTIL_LIBRARIES} ${CMAKE_CURRENT_LIST_DIR}/src/solvers/cvxgen/libcvx_vel.so ${CMAKE_CURRENT_LIST_DIR}/src/solvers/cvxgen/libcvx_accel.so ${CMAKE_CURRENT_LIST_DIR}/src/solvers/cvxgen/libcvx_jerk.so ${GUROBI_LIBRARIES})
