@@ -28,7 +28,7 @@ public:
   }
 
   void readMap(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr, int cells_x, int cells_y, int cells_z, double res,
-               const Vec3f center_map, double z_ground, double z_max, double inflation)
+               const Vec3f &center_map, double z_ground, double z_max, double inflation)
   {
     // printf("reading_map\n");
     // **Box of the map --> it's the box with which the map moves.
@@ -55,39 +55,45 @@ public:
     Vec3i dim(cells_x, cells_y, cells_z);
     // printf("dim[0] before is %d\n", dim[0]);
 
-    dim[0] = dim[0] + (int)(5 * (inflation * 1.0) / res);
-    dim[1] = dim[1] + (int)(5 * (inflation * 1.0) / res);
+    dim(0) = dim(0) + (int)(5 * (inflation * 1.0) / res);
+    dim(1) = dim(1) + (int)(5 * (inflation * 1.0) / res);
 
     // printf("dim[0] is %d\n", dim[0]);
 
-    int dim2_down = dim[2] / 2.0;
-    int dim2_up = dim[2] / 2.0;
+    int dim2_down = dim(2) / 2.0;
+    int dim2_up = dim(2) / 2.0;
 
     // printf("reading_map1\n");
-    if (center_map[2] - res * dim[2] / 2.0 < 0)
+    if (center_map[2] - res * dim(2) / 2.0 < 0)
     {
       // printf("modyfing");
-      dim2_down = (int)((center_map[2] - z_ground) / res) + 1;  //+1 to avoid problems when taking off
+      dim2_down = (int)((center_map(2) - z_ground) / res) + 1;  //+1 to avoid problems when taking off
       // dim2_up = (int)(dim[2] / 2.0);
     }
 
-    if (center_map[2] + res * dim[2] / 2.0 > z_max)
+    if (center_map(2) + res * dim(2) / 2.0 > z_max)
     {
       // printf("modyfing");
       // dim2_down = (int)((center_map[2] - z_ground) / res) + 1;  //+1 to avoid problems when taking off
-      dim2_up = (int)((z_max - center_map[2]) / res);  //+1 to avoid problems when taking off
+      dim2_up = (int)((z_max - center_map(2)) / res);  //+1 to avoid problems when taking off
       dim2_up = (dim2_up > 0) ? dim2_up : 1;           // Force it to be >= 1
       // dim[2] = dim2_down + dim2_up;
     }
     // printf("z_max is %f\n", z_max);
     // printf("Dim_up is %d\n", dim2_up);
-    dim[2] = dim2_down + dim2_up;
-    // printf("*******Dim is\n");
-    // std::cout << dim << std::endl;
+    dim(2) = dim2_down + dim2_up;
+    printf("*******Dim is\n");
+    std::cout << dim.transpose() << std::endl;
+
+    printf("*******Center antes is\n");
+    std::cout << center_map.transpose() << std::endl;
     // printf("reading_map2\n");
-    origin_d_(0) = center_map[0] - res * dim[0] / 2.0;
-    origin_d_(1) = center_map[1] - res * dim[1] / 2.0;
-    origin_d_(2) = center_map[2] - res * dim2_down;
+    origin_d_(0) = center_map(0) - res * dim(0) / 2.0;
+    origin_d_(1) = center_map(1) - res * dim(1) / 2.0;
+    origin_d_(2) = center_map(2) - res * dim2_down;
+
+    printf("*******Corner despues is\n");
+    std::cout << origin_d_.transpose() << std::endl;
 
     /*        double or2 = origin_(2);*/
 
@@ -106,7 +112,7 @@ public:
     // printf("reading_map2\n");
     for (unsigned int i = 0; i < 3; i++)
     {
-      dim_(i) = dim[i];
+      dim_(i) = dim(i);
     }
     // printf("reading_map4\n");
 
@@ -117,8 +123,8 @@ public:
     // std::cout << dim_ << std::endl;
     // printf("reading_map3\n");
     res_ = res;
-    map_.resize(dim[0] * dim[1] * dim[2], 0);
-    int total_size = dim[0] * dim[1] * dim[2];
+    map_.resize(dim(0) * dim(1) * dim(2), 0);
+    int total_size = dim(0) * dim(1) * dim(2);
     // printf("In reader3, size=%f, %f, %f\n", dim[0], dim[1], dim[2]);
     // printf("reading_map4\n");
     for (size_t i = 0; i < pclptr->points.size(); ++i)

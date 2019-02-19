@@ -687,8 +687,8 @@ bool SolverGurobi::callOptimizer()
 
   m.update();
   temporal_ = temporal_ + 1;
-  printf("Writing into model.lp number=%d\n", temporal_);
-  m.write(ros::package::getPath("cvx") + "/models/model_" + std::to_string(temporal_) + ".lp");
+  // printf("Writing into model.lp number=%d\n", temporal_);
+  // m.write(ros::package::getPath("cvx") + "/models/model_" + std::to_string(temporal_) + ".lp");
   m.set("OutputFlag", "0");  // 1 if you want verbose
 
   // std::cout << "*************************Starting Optimization" << std::endl;
@@ -712,11 +712,11 @@ bool SolverGurobi::callOptimizer()
   {
     if (mode_ == WHOLE_TRAJ)
     {
-      m.write(ros::package::getPath("cvx") + "/models/model_wt" + std::to_string(temporal_) + ".lp");
+      // m.write(ros::package::getPath("cvx") + "/models/model_wt" + std::to_string(temporal_) + ".lp");
     }
     if (mode_ == RESCUE_PATH)
     {
-      m.write(ros::package::getPath("cvx") + "/models/model_rp" + std::to_string(temporal_) + ".lp");
+      // m.write(ros::package::getPath("cvx") + "/models/model_rp" + std::to_string(temporal_) + ".lp");
     }
     // printf("GUROBI SOLUTION: Optimal");
 

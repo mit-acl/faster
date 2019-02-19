@@ -422,4 +422,5 @@ private:
   EllipsoidDecomp3D ellip_decomp_util_;
 
   vec_Vecf<3> JPS_k_m_1_;
+  bool takeoff_done_ = false;
 };

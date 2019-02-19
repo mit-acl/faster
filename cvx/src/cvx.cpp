@@ -22,6 +22,7 @@
 // Mirar a ver si el punto inicial de la whole trajectory se est'a cogiendo en la solucion conjunta de la iteracion
 // previa
 // La point cloud ya no la estoy usando --> quitarla del launch de la camara
+// hay algo raro en el flight_status_, lo del takeoff est'a hand-coded ahora mismo
 
 // COSAS QUE PONER EN EL PAPER
 // Notese que la WHOLE trajectory NO empieza en la posicion actual, sino un poco más adelante!!
@@ -283,7 +284,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   name_drone_.erase(0, 2);  // Erase slashes
 
   map_util_ = std::make_shared<VoxelMapUtil>();
-  planner_ptr_ = std::unique_ptr<JPSPlanner3D>(new JPSPlanner3D(false));
+  planner_ptr_ = std::unique_ptr<JPSPlanner3D>(new JPSPlanner3D(true));
 
   JPS_old_.clear();
 
@@ -417,6 +418,7 @@ void CVX::updateJPSMap(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr)
 {
   mtx_state.lock();
   Vec3f center_map(state_.pos.x, state_.pos.y, state_.pos.z);  // center of the map
+  std::cout << "updateJPSMap, center_map=" << center_map.transpose() << std::endl;
   mtx_state.unlock();
   Vec3i dim(cells_x_, cells_y_, cells_z_);  //  number of cells in each dimension
 
@@ -426,6 +428,8 @@ void CVX::updateJPSMap(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr)
                                    par_.inflation_jps);  // Map read*/
 
   mtx_jps_map_util.lock();
+
+  std::cout << "Updating updateJPSMap, size=" << pclptr->size() << std::endl;
 
   map_util_->readMap(pclptr, cells_x_, cells_y_, cells_z_, par_.factor_jps * par_.res, center_map, par_.z_ground,
                      par_.z_max,
@@ -440,14 +444,20 @@ void CVX::updateJPSMap(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr)
 
 vec_Vecf<3> CVX::solveJPS3D(Vec3f& start_sent, Vec3f& goal_sent, bool* solved, int i)
 {
-  Eigen::Vector3d start(start_sent[0], start_sent[1], start_sent[2]);
-  Eigen::Vector3d goal(goal_sent[0], goal_sent[1], goal_sent[2]);
+  Eigen::Vector3d start(start_sent(0), start_sent(1), std::max(start_sent(2), 0.0));
+  Eigen::Vector3d goal(goal_sent(0), goal_sent(1), std::max(goal_sent(2), 0.0));
   std::cout << "IN JPS3d" << std::endl;
   std::cout << "start=" << start.transpose() << std::endl;
   std::cout << "goal=" << goal.transpose() << std::endl;
 
   Vec3f originalStart = start;
-  if (flight_mode_.mode != flight_mode_.GO)
+
+  if (flight_mode_.mode == flight_mode_.TAKEOFF)
+  {
+    std::cout << "flight_mode_.TAKEOFF=" << std::endl;
+  }
+
+  if (flight_mode_.mode != flight_mode_.GO || takeoff_done_ == false)
   {
     vec_Vecf<3> solution;
     solution.push_back(start);
@@ -813,14 +823,20 @@ void CVX::replanCB(const ros::TimerEvent& e)
   mtx_term_term_goal.unlock();
 
   double dist_to_goal = (term_term_goal - state_pos).norm();
+  // double dist_to_goal_commanded = (term_term_goal - quadGoal_).norm();
 
   /*  std::cout << "rb=" << rb << std::endl;*/
-  // std::cout << "dist_to_goal=" << dist_to_goal << std::endl;
+  std::cout << "dist_to_goal=" << dist_to_goal << std::endl;
+  // std::cout << "dist_to_goal_commanded=" << dist_to_goal_commanded << std::endl;
   // std::cout << "status_=" << status_ << std::endl;
 
   if (dist_to_goal < par_.goal_radius && status_ != GOAL_REACHED)
   {
     status_ = GOAL_REACHED;
+    if (takeoff_done_ == false)
+    {
+      takeoff_done_ = true;
+    }
     // printf("STATUS=GOAL_REACHED\n");
   }
   // printf("Entering in replanCB, planner_status_=%d\n", planner_status_);
@@ -885,7 +901,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   static bool first_time = true;  // how many times I've solved JPS1
 
-  // printf("Running JPS1!!!\n");
+  std::cout << "Running JPS above" << std::endl;
   Timer timer_jps(true);
   JPS1 = solveJPS3D(InitPos, term_goal, &solvedjps1, 1);  // Solution is in JPS1
   std::cout << bold << blue << "JPS:  " << std::fixed << timer_jps << "ms\n" << reset;
@@ -918,30 +934,30 @@ void CVX::replanCB(const ros::TimerEvent& e)
     Eigen::Vector3d C = getFirstIntersectionWithSphere(JPSa, ra, JPSa[0], &lia);
     Eigen::Vector3d C_old = getFirstIntersectionWithSphere(JPS_k_m_1_, ra, JPS_k_m_1_[0], &lik_m_1);
 
-    Eigen::Vector3d v1 = C - state_pos;      // point i expressed with origin=origin sphere
-    Eigen::Vector3d v2 = C_old - state_pos;  // point i minus 1
-    double alpha = angleBetVectors(v1, v2);
+    // Eigen::Vector3d v1 = C - JPSa[0];            // point i expressed with origin=origin sphere
+    // Eigen::Vector3d v2 = C_old - JPS_k_m_1_[0];  // point i minus 1
+    // double alpha = angleBetVectors(v1, v2);
 
-    JPSb = fix(JPS_k_m_1_, state_pos, term_goal, &solvedjpsb);
-    Eigen::Vector3d D = getFirstIntersectionWithSphere(JPSb, ra, state_pos, &lib);
-    dist_a = normJPS(JPSa, lia + 1);
-    dist_b = normJPS(JPSb, lib + 1);
+    // JPSb = fix(JPS_k_m_1_, state_pos, term_goal, &solvedjpsb);
+    /*   Eigen::Vector3d D = getFirstIntersectionWithSphere(JPSb, ra, state_pos, &lib);
+       dist_a = normJPS(JPSa, lia + 1);
+       dist_b = normJPS(JPSb, lib + 1);
 
-    double C_vector[9] = { C(0), C(1), C(2), 0, 0, 0, 0, 0, 0 };
-    sg_whole_.setXf(C_vector);
-    sg_whole_.findDT(1);
-    double dta = sg_whole_.dt_;
-    Ja = dta + dist_a / par_.v_max;
+       double C_vector[9] = { C(0), C(1), C(2), 0, 0, 0, 0, 0, 0 };
+       sg_whole_.setXf(C_vector);
+       sg_whole_.findDT(1);
+       double dta = sg_whole_.dt_;
+       Ja = dta + dist_a / par_.v_max;
 
-    double D_vector[9] = { D(0), D(1), D(2), 0, 0, 0, 0, 0, 0 };
-    sg_whole_.setXf(D_vector);
-    sg_whole_.findDT(1);
-    double dtb = sg_whole_.dt_;
-    Jb = dtb + dist_b / par_.v_max;
+       double D_vector[9] = { D(0), D(1), D(2), 0, 0, 0, 0, 0, 0 };
+       sg_whole_.setXf(D_vector);
+       sg_whole_.findDT(1);
+       double dtb = sg_whole_.dt_;
+       Jb = dtb + dist_b / par_.v_max;
 
-    // Decision:
-    JPSk = (Ja < Jb) ? JPSa : JPSb;
-    std::cout << green << "Ja=  " << std::fixed << Ja << ", Jb=  " << std::fixed << Jb << reset << std::endl;
+       // Decision:
+       JPSk = (Ja < Jb) ? JPSa : JPSb;
+       std::cout << green << "Ja=  " << std::fixed << Ja << ", Jb=  " << std::fixed << Jb << reset << std::endl;*/
   }
 
   JPS_k_m_1_ = JPSa;  // saved for the next iteration
@@ -2053,7 +2069,7 @@ void CVX::mapCB(const sensor_msgs::PointCloud2::ConstPtr& pcl2ptr_map_ros,
 
   if (pcl2ptr_map_ros->width != 0 && pcl2ptr_map_ros->height != 0)  // Point Cloud is empty
   {
-    std::cout << "Updating kdtree_map_" << std::endl;
+    std::cout << "Updating kdtree_map_, size=" << pclptr_map_->size() << std::endl;
     kdtree_map_.setInputCloud(pclptr_map_);
     kdtree_map_initialized_ = 1;
 
