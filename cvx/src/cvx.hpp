@@ -30,8 +30,10 @@
 #include <jps_basis/data_utils.h>
 #include <jps_planner/jps_planner/jps_planner.h>
 
+#include "utils.hpp"
+
 // Solvers includes
-#include "solvers/solvers.hpp"
+//#include "solvers/solvers.hpp" CVXGEN solver interface
 #include "solvers/solverGurobi.hpp"
 
 // Convex Decomposition includes
@@ -167,9 +169,10 @@ public:
   CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pub_CB);
 
 private:
-  Solver<VEL> solver_vel_;
-  Solver<ACCEL> solver_accel_;
-  Solver<JERK> solver_jerk_;
+  // CVXGEN solvers
+  // Solver<VEL> solver_vel_;
+  // Solver<ACCEL> solver_accel_;
+  // Solver<JERK> solver_jerk_;
 
   SolverGurobi sg_whole_;   // solver gurobi whole trajectory
   SolverGurobi sg_rescue_;  // solver gurobi whole trajectory
@@ -234,14 +237,14 @@ private:
   void pubTerminalGoal();
 
   void pubJPSIntersection(Eigen::Vector3d inters);
-  Eigen::Vector3d getFirstCollisionJPS(vec_Vecf<3> path, bool* thereIsIntersection, int& el_eliminated, int map = MAP,
+  Eigen::Vector3d getFirstCollisionJPS(vec_Vecf<3>& path, bool* thereIsIntersection, int& el_eliminated, int map = MAP,
                                        int type_return = RETURN_LAST_VERTEX);
   Eigen::Vector3d projectClickedGoal(Eigen::Vector3d& P1);
 
   void publishJPS2handIntersection(vec_Vecf<3> JPS2, vec_Vecf<3> JPS2_fix, Eigen::Vector3d inter1,
                                    Eigen::Vector3d inter2, bool solvedFix);
 
-  vec_Vecf<3> fix(vec_Vecf<3> JPS_old, Eigen::Vector3d start, Eigen::Vector3d goal, bool* solved);
+  vec_Vecf<3> fix(vec_Vecf<3>& JPS_old, Eigen::Vector3d& start, Eigen::Vector3d& goal, bool* solved);
 
   // double getDistanceToFirstCollisionJPSwithUnkonwnspace(vec_Vecf<3> path, bool* thereIsIntersection);
 
@@ -417,4 +420,6 @@ private:
 
   SeedDecomp3D seed_decomp_util_;
   EllipsoidDecomp3D ellip_decomp_util_;
+
+  vec_Vecf<3> JPS_k_m_1_;
 };

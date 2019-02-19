@@ -284,7 +284,7 @@ inline void angle_wrap(double& diff)
   diff -= M_PI;
 }
 
-inline pcl::PointXYZ eigenPoint2pclPoint(Eigen::Vector3d p)
+inline pcl::PointXYZ eigenPoint2pclPoint(Eigen::Vector3d& p)
 {
   // std::cout << "solving\n" << coeff << std::endl;
   pcl::PointXYZ tmp(p[0], p[1], p[2]);
@@ -539,6 +539,16 @@ inline bool getIntersectionWithPlane(const Eigen::Vector3d& P1, const Eigen::Vec
   return result;
 }
 
+inline double normJPS(vec_Vecf<3>& path, int index_start)
+{
+  double distance = 0;
+  for (int i = index_start; i < path.size() - 1; i++)
+  {
+    distance = distance + (path[i + 1] - path[i]).norm();
+  }
+  return distance;
+}
+
 // given 2 points (A inside and B outside the sphere) it computes the intersection of the lines between
 // that 2 points and the sphere
 inline Eigen::Vector3d getIntersectionWithSphere(Eigen::Vector3d& A, Eigen::Vector3d& B, double r,
@@ -615,11 +625,10 @@ inline Eigen::Vector3d getFirstIntersectionWithSphere(vec_Vecf<3>& path, double 
                                                       int* last_index_inside_sphere = NULL,
                                                       bool* noPointsOutsideSphere = NULL)
 {
-
-   printf("In getFirstIntersectionWithSphere\n");
-    printElementsOfJPS(path);
-     std::cout<<"center="<<center.transpose()<<std::endl;
-   printf("here\n");
+  printf("In getFirstIntersectionWithSphere\n");
+  printElementsOfJPS(path);
+  // std::cout << "center=" << center.transpose() << std::endl;
+  // printf("here\n");
   if (noPointsOutsideSphere != NULL)
   {  // this argument has been provided
     *noPointsOutsideSphere = false;
@@ -629,12 +638,12 @@ inline Eigen::Vector3d getFirstIntersectionWithSphere(vec_Vecf<3>& path, double 
   int index = -1;
   for (int i = 0; i < path.size(); i++)
   {
-    std::cout<<"path[i]="<<path[i].transpose()<<std::endl;
+    // std::cout << "path[i]=" << path[i].transpose() << std::endl;
     double dist = (path[i] - center).norm();
-    std::cout<<"dist="<<dist<<std::endl;
+    // std::cout << "dist=" << dist << std::endl;
     if (dist > r)
     {
-      std::cout<<"dist>r!"<<std::endl;
+      // std::cout << "dist>r!" << std::endl;
       index = i;  // This is the first point outside the sphere
       break;
     }

@@ -328,7 +328,8 @@ void SolverGurobi::setPolytopesConstraints()
         {
           sum = sum + b[t][col];
         }
-        at_least_1_pol_cons.push_back(m.addConstr(sum == 1, "At_least_1_pol_t_"+ std::to_string(t)));  // at least in one polytope
+        at_least_1_pol_cons.push_back(
+            m.addConstr(sum == 1, "At_least_1_pol_t_" + std::to_string(t)));  // at least in one polytope
       }
       std::vector<GRBLinExpr> cp0 = getCP0(t);  // Control Point 0
       std::vector<GRBLinExpr> cp1 = getCP1(t);  // Control Point 1
@@ -513,18 +514,18 @@ void SolverGurobi::resetXandU()
 void SolverGurobi::setMaxConstraints()
 {
   // Constraint v<=vmax, a<=amax, u<=umax
-  for (int t = 0; t < N_ - 1; t++)
+  for (int t = 0; t < N_; t++)
   {
     for (int i = 0; i < 3; i++)
     {
-      m.addConstr(getVel(t, dt_, i) <= v_max_, "MaxVel_t" + std::to_string(t) + "_axis_" + std::to_string(i));
-      m.addConstr(getVel(t, dt_, i) >= -v_max_, "MinVel_t" + std::to_string(t) + "_axis_" + std::to_string(i));
+      m.addConstr(getVel(t, 0, i) <= v_max_, "MaxVel_t" + std::to_string(t) + "_axis_" + std::to_string(i));
+      m.addConstr(getVel(t, 0, i) >= -v_max_, "MinVel_t" + std::to_string(t) + "_axis_" + std::to_string(i));
 
-      m.addConstr(getAccel(t, dt_, i) <= a_max_, "MaxAccel_t" + std::to_string(t) + "_axis_" + std::to_string(i));
-      m.addConstr(getAccel(t, dt_, i) >= -a_max_, "MinAccel_t" + std::to_string(t) + "_axis_" + std::to_string(i));
+      m.addConstr(getAccel(t, 0, i) <= a_max_, "MaxAccel_t" + std::to_string(t) + "_axis_" + std::to_string(i));
+      m.addConstr(getAccel(t, 0, i) >= -a_max_, "MinAccel_t" + std::to_string(t) + "_axis_" + std::to_string(i));
 
-      m.addConstr(getJerk(t, dt_, i) <= j_max_, "MaxJerk_t" + std::to_string(t) + "_axis_" + std::to_string(i));
-      m.addConstr(getJerk(t, dt_, i) >= -j_max_, "MinJerk_t" + std::to_string(t) + "_axis_" + std::to_string(i));
+      m.addConstr(getJerk(t, 0, i) <= j_max_, "MaxJerk_t" + std::to_string(t) + "_axis_" + std::to_string(i));
+      m.addConstr(getJerk(t, 0, i) >= -j_max_, "MinJerk_t" + std::to_string(t) + "_axis_" + std::to_string(i));
     }
   }
 }
@@ -539,6 +540,9 @@ void SolverGurobi::set_max(double max_values[3])
   v_max_ = max_values[0];
   a_max_ = max_values[1];
   j_max_ = max_values[2];
+  std::cout << "MAX Values:" << v_max_ << std::endl;
+  std::cout << "MAX Values:" << a_max_ << std::endl;
+  std::cout << "MAX Values:" << j_max_ << std::endl;
 
   setMaxConstraints();
 }
@@ -684,7 +688,7 @@ bool SolverGurobi::callOptimizer()
   m.update();
   temporal_ = temporal_ + 1;
   printf("Writing into model.lp number=%d\n", temporal_);
-  m.write(ros::package::getPath("cvx")+"/models/model_" + std::to_string(temporal_) + ".lp");
+  m.write(ros::package::getPath("cvx") + "/models/model_" + std::to_string(temporal_) + ".lp");
   m.set("OutputFlag", "0");  // 1 if you want verbose
 
   // std::cout << "*************************Starting Optimization" << std::endl;
@@ -698,21 +702,21 @@ bool SolverGurobi::callOptimizer()
 
   runtime_ms_ = m.get(GRB_DoubleAttr_Runtime) * 1000;
 
-/*  times_log.open("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/times_log.txt", std::ios_base::app);
-  times_log << elapsed << "\n";
-  times_log.close();*/
+  /*  times_log.open("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/times_log.txt", std::ios_base::app);
+    times_log << elapsed << "\n";
+    times_log.close();*/
 
   // printf("Going to check status");
   int optimstatus = m.get(GRB_IntAttr_Status);
   if (optimstatus == GRB_OPTIMAL)
   {
     if (mode_ == WHOLE_TRAJ)
-    {  
-      m.write( ros::package::getPath("cvx")+"/models/model_wt" + std::to_string(temporal_) + ".lp");
+    {
+      m.write(ros::package::getPath("cvx") + "/models/model_wt" + std::to_string(temporal_) + ".lp");
     }
     if (mode_ == RESCUE_PATH)
     {
-      m.write( ros::package::getPath("cvx")+"/models/model_rp" + std::to_string(temporal_) + ".lp");
+      m.write(ros::package::getPath("cvx") + "/models/model_rp" + std::to_string(temporal_) + ".lp");
     }
     // printf("GUROBI SOLUTION: Optimal");
 
