@@ -123,13 +123,13 @@ void SolverGurobi::fillXandU()
   for (int i = 0; i < U_temp_.rows(); i++)
   {
     // std::cout << "t=" << t << std::endl;
-
-    interval = floor(t / dt_);
-    /*    if (t > dt_ * (interval + 1))
-        {
-          interval = interval + 1;
-          // std::cout << "*****Interval=" << interval << std::endl;
-        }*/
+    t = t + DC;
+    // interval = floor(t / dt_);
+    if (t > dt_ * (interval + 1))
+    {
+      interval = interval + 1;
+      // std::cout << "*****Interval=" << interval << std::endl;
+    }
     // std::cout << "interval=" << interval << std::endl;
     // std::cout << "row=" << i << "out of" << U_temp_.rows() << std::endl;
 
@@ -162,7 +162,6 @@ void SolverGurobi::fillXandU()
     Eigen::Matrix<double, 1, 9> states;
     states << posx, posy, posz, velx, vely, velz, accelx, accely, accelz;
     X_temp_.row(i) = states;
-    t = t + DC;
   }
 
   /*  int last = X_temp_.rows() - 1;
@@ -644,9 +643,9 @@ void SolverGurobi::findDT(int factor)
   dt_ = factor * getDTInitial();
 
   // And now, round dt_ such that it's a multiple of DC:
-  int mini_intervals = ceil(dt_ / (1.0 * DC));
-  dt_ = mini_intervals * DC;
-
+  /*  int mini_intervals = ceil(dt_ / (1.0 * DC));
+    dt_ = mini_intervals * DC;
+  */
   // std::cout << "dt rounded=" << dt_ << std::endl;
   // dt_ = 1;
 }
