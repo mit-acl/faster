@@ -81,7 +81,7 @@ res: 0.15  #[m] cell dimension = resolution of the map
 
 
 dc: 0.01            #(seconds) Duration for the interpolation=Value of the timer pubGoal
-goal_radius: 0.05    #(m) Drone has arrived to the goal when distance_to_goal<GOAL_RADIUS
+goal_radius: 0.2    #(m) Drone has arrived to the goal when distance_to_goal<GOAL_RADIUS
 drone_radius: 0.42  #(m) Used for collision checking
 
 N_whole: 5  #[-] Number of discretization points in the whole trajectory
@@ -90,20 +90,20 @@ N_rescue: 4  #[-] Number of discretization points in the rescue path
 offset: 10  # Replanning offset (the initial conditions are taken OFFSET states farther from the last published goal)
 offset_rp: 30 #The rescue path starts X states ahead of the beginning of the whole trajectory
 
-Ra: 3            # [m] Minimum radius of the first sphere
+Ra: 0.5            # [m] Minimum radius of the first sphere
 Ra_max: 4            # [m] Maximum radius of the first sphere
 Rb: 9.0             # [m] Radius of the second sphere
 w_max: 1            # [rd/s] Maximum angular velocity
-alpha_0: 0         #[rd] threshold to ignore current JPS solution, and consider the old one. 0--> always decide
+alpha_0: 0.25         #[rd] threshold to ignore current JPS solution, and consider the old one. 0--> always decide
 z_ground: 0.2         #[m] points below this are considered ground
 z_max: 2         #[m] JPS is not allowed to give a solution that goes higher than this height
-inflation_jps: 0.7  #[m] The obstacles are inflated (to run JPS) by this amount
+inflation_jps: 0.6  #[m] The obstacles are inflated (to run JPS) by this amount
 factor_jps: 1  #[m] JPS is run with resolution=factor_jps*(resolution of the map)
 
 
 v_max: 5.0   #[m/s]  5
 a_max: 5.0   #[m/s2] 5
-j_max: 12.0  #[m/s3]  8
+j_max: 8.0  #[m/s3]  8
 
 q: 100  #[-] weight to the 2nd term of the cost function. If it's very big (>1000), Gurobi fails!! (numerical issues)
 

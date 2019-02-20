@@ -64,7 +64,7 @@
 #define OCCUPIED_SPACE 1
 #define UNKOWN_AND_OCCUPIED_SPACE 2
 
-#define JPS1_NORMAL 1
+#define JPSk_NORMAL 1
 #define JPS2_NORMAL 2
 #define JPS_WHOLE_TRAJ 3
 #define JPS_RESCUE 4
@@ -241,8 +241,8 @@ private:
                                        int type_return = RETURN_LAST_VERTEX);
   Eigen::Vector3d projectClickedGoal(Eigen::Vector3d& P1);
 
-  void publishJPS2handIntersection(vec_Vecf<3> JPS2, vec_Vecf<3> JPS2_fix, Eigen::Vector3d inter1,
-                                   Eigen::Vector3d inter2, bool solvedFix);
+  void publishJPS2handIntersection(vec_Vecf<3> JPS2_fix, Eigen::Vector3d& inter1, Eigen::Vector3d& inter2,
+                                   bool solvedFix);
 
   vec_Vecf<3> fix(vec_Vecf<3>& JPS_old, Eigen::Vector3d& start, Eigen::Vector3d& goal, bool* solved);
 
@@ -257,6 +257,9 @@ private:
 
   Eigen::Vector3d getIntersectionJPSwithPolytope(vec_Vecf<3>& path, std::vector<LinearConstraint3D>& constraints,
                                                  bool& thereIsIntersection);
+
+  std::vector<Eigen::Vector3d> simulateForward(Eigen::Vector3d& pos_init, Eigen::Vector3d& vel_init,
+                                               Eigen::Vector3d& accel_init, Eigen::MatrixXd& jerk_sent);
 
   visualization_msgs::Marker setpoint_;
   visualization_msgs::Marker R_;
@@ -304,6 +307,10 @@ private:
   ros::Subscriber sub_goal_;
   ros::Subscriber sub_state_;
   ros::Subscriber sub_mode_;
+  ros::Subscriber sub_vicon_;
+
+  Eigen::Vector3d accel_vicon_;
+
   // ros::Subscriber sub_map_;
   // ros::Subscriber sub_unk_;
   // ros::Subscriber sub_pcl_;
@@ -404,7 +411,7 @@ private:
   Eigen::Vector3d B_;
 
   bool to_land_ = false;
-  bool JPS1_solved_ = false;
+  bool JPSk_solved_ = false;
 
   message_filters::Subscriber<sensor_msgs::PointCloud2> occup_grid_sub_;
   message_filters::Subscriber<sensor_msgs::PointCloud2> unknown_grid_sub_;

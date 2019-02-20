@@ -219,7 +219,7 @@ int main(int argc, char* argv[])
 
     std::vector<double> xf = { 14, 5, 2.5, 0, 0, 0, 0, 0, 0 };
 
-    std::cout << "here1" << std::endl;
+    // std::cout << "here1" << std::endl;
 
     std::vector<std::vector<GRBVar>> x;
     std::vector<std::vector<GRBVar>> u;
@@ -234,7 +234,7 @@ int main(int argc, char* argv[])
       x.push_back(row_t);
     }
 
-    std::cout << "here2" << std::endl;
+    // std::cout << "here2" << std::endl;
 
     /*    for (int i = 0; i < 3; i++)
         {
@@ -257,7 +257,7 @@ int main(int argc, char* argv[])
       }
     }
 
-    std::cout << "here3" << std::endl;
+    // std::cout << "here3" << std::endl;
     // Constraint x0==x_initial
 
     for (int i = 0; i < 3; i++)
@@ -267,7 +267,7 @@ int main(int argc, char* argv[])
       m.addConstr(getAccel(0, 0, i, false, x) == x0[i + 6]);  // Initial acceleration}
     }
 
-    std::cout << "here4" << std::endl;
+    //  std::cout << "here4" << std::endl;
 
     // Constraint xT==x_final
     for (int i = 0; i < 3; i++)
@@ -282,7 +282,7 @@ int main(int argc, char* argv[])
       m.addConstr(getAccel(N - 1, dt, i, false, x) - xf[i + 6] >= -0.2);  // Final acceleration
     }
 
-    std::cout << "here5" << std::endl;
+    // std::cout << "here5" << std::endl;
     // Constraint v<=vmax, a<=amax, u<=umax
     for (int t = 0; t < N - 1; t++)
     {
@@ -299,7 +299,7 @@ int main(int argc, char* argv[])
       }
     }
 
-    std::cout << "here6" << std::endl;
+    //  std::cout << "here6" << std::endl;
 
     /*    Eigen::Matrix<double, -1, 3> A1;
         Eigen::Matrix<double, -1, 3> A2;

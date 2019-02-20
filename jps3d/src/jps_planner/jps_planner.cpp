@@ -165,31 +165,31 @@ vec_Vecf<Dim> JPSPlanner<Dim>::getAllSet() const
 template <int Dim>
 void JPSPlanner<Dim>::updateMap()
 {
-  Veci<Dim> dim = map_util_->getDim();
+  /*  Veci<Dim> dim = map_util_->getDim();
 
-  if (Dim == 3)
-  {
-    cmap_.resize(dim(0) * dim(1) * dim(2));
-    for (int z = 0; z < dim(2); ++z)
+    if (Dim == 3)
     {
-      for (int y = 0; y < dim(1); ++y)
+      cmap_.resize(dim(0) * dim(1) * dim(2));
+      for (int z = 0; z < dim(2); ++z)
       {
-        for (int x = 0; x < dim(0); ++x)
+        for (int y = 0; y < dim(1); ++y)
         {
-          Veci<Dim> pn;
-          pn << x, y, z;
-          cmap_[x + y * dim(0) + z * dim(0) * dim(1)] = map_util_->isOccupied(pn) ? 1 : 0;
+          for (int x = 0; x < dim(0); ++x)
+          {
+            Veci<Dim> pn;
+            pn << x, y, z;
+            cmap_[x + y * dim(0) + z * dim(0) * dim(1)] = map_util_->isOccupied(pn) ? 1 : 0;
+          }
         }
       }
     }
-  }
-  else
-  {
-    cmap_.resize(dim(0) * dim(1));
-    for (int y = 0; y < dim(1); ++y)
-      for (int x = 0; x < dim(0); ++x)
-        cmap_[x + y * dim(0)] = map_util_->isOccupied(Veci<Dim>(x, y)) ? 1 : 0;
-  }
+    else
+    {
+      cmap_.resize(dim(0) * dim(1));
+      for (int y = 0; y < dim(1); ++y)
+        for (int x = 0; x < dim(0); ++x)
+          cmap_[x + y * dim(0)] = map_util_->isOccupied(Veci<Dim>(x, y)) ? 1 : 0;
+    }*/
 }
 
 template <int Dim>
@@ -236,10 +236,10 @@ bool JPSPlanner<Dim>::plan(const Vecf<Dim> &start, const Vecf<Dim> &goal, decima
     return false;
   }
 
-  if (cmap_.empty())
+  if ((map_util_->map_).empty())
   {
     if (planner_verbose_)
-      printf(ANSI_COLOR_RED "need to set cmap, call updateMap()!\n" ANSI_COLOR_RESET);
+      printf(ANSI_COLOR_RED "need to set the map!\n" ANSI_COLOR_RESET);
     return -1;
   }
 
@@ -247,7 +247,8 @@ bool JPSPlanner<Dim>::plan(const Vecf<Dim> &start, const Vecf<Dim> &goal, decima
 
   if (Dim == 3)
   {
-    graph_search_ = std::make_shared<JPS::GraphSearch>(cmap_.data(), dim(0), dim(1), dim(2), eps, planner_verbose_);
+    graph_search_ =
+        std::make_shared<JPS::GraphSearch>((map_util_->map_).data(), dim(0), dim(1), dim(2), eps, planner_verbose_);
     graph_search_->plan(start_int(0), start_int(1), start_int(2), goal_int(0), goal_int(1), goal_int(2), use_jps);
   }
   else

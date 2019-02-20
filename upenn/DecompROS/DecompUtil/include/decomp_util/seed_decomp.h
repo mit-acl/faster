@@ -36,11 +36,11 @@ public:
     this->find_polyhedron();
     // std::cout << "Number of obstacles" << this->obs_.size() << std::endl;
     // std::cout << "Before adding the local box, matrix A=" << std::endl;
-    for (unsigned int j = 0; j < (this->polyhedron_.vs_).size(); j++)  // For all the hyperplanes in one polyhedro
-    {
-      std::cout << (this->polyhedron_.vs_)[j].n_.transpose() << std::endl;
-    }
-
+    /*    for (unsigned int j = 0; j < (this->polyhedron_.vs_).size(); j++)  // For all the hyperplanes in one polyhedro
+        {
+          std::cout << (this->polyhedron_.vs_)[j].n_.transpose() << std::endl;
+        }
+    */
     add_local_bbox(this->polyhedron_);
   }
 

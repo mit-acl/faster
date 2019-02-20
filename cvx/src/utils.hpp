@@ -114,7 +114,7 @@ inline std::vector<Eigen::Vector3d> samplePointsSphereWithJPS(Eigen::Vector3d& B
                                                               int last_index_inside_sphere)
 {
   printf("In samplePointsSphereWithJPS\n");
-  printElementsOfJPS(path_sent);
+  // printElementsOfJPS(path_sent);
 
   vec_Vecf<3> path;
 
@@ -625,8 +625,8 @@ inline Eigen::Vector3d getFirstIntersectionWithSphere(vec_Vecf<3>& path, double 
                                                       int* last_index_inside_sphere = NULL,
                                                       bool* noPointsOutsideSphere = NULL)
 {
-  printf("In getFirstIntersectionWithSphere\n");
-  printElementsOfJPS(path);
+  /*  printf("In getFirstIntersectionWithSphere\n");
+    printElementsOfJPS(path);*/
   // std::cout << "center=" << center.transpose() << std::endl;
   // printf("here\n");
   if (noPointsOutsideSphere != NULL)

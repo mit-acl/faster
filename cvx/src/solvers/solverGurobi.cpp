@@ -122,14 +122,20 @@ void SolverGurobi::fillXandU()
   int interval = 0;
   for (int i = 0; i < U_temp_.rows(); i++)
   {
-    // std::cout << "row=" << i << std::endl;
-    t = t + DC;
     // std::cout << "t=" << t << std::endl;
-    if (t > dt_ * (interval + 1))
-    {
-      interval = interval + 1;
-      // std::cout << "*****Interval=" << interval << std::endl;
-    }
+
+    interval = floor(t / dt_);
+    /*    if (t > dt_ * (interval + 1))
+        {
+          interval = interval + 1;
+          // std::cout << "*****Interval=" << interval << std::endl;
+        }*/
+    // std::cout << "interval=" << interval << std::endl;
+    // std::cout << "row=" << i << "out of" << U_temp_.rows() << std::endl;
+
+    // std::cout << "N=" << N_ << "  dt_=" << dt_ << std::endl;
+
+    ///  size = (int)(N_)*dt_ / DC;
 
     // std::cout << "t_rel=" << t - interval * dt_ << std::endl;
     double jerkx = getJerk(interval, t - interval * dt_, 0).getValue();
@@ -156,6 +162,7 @@ void SolverGurobi::fillXandU()
     Eigen::Matrix<double, 1, 9> states;
     states << posx, posy, posz, velx, vely, velz, accelx, accely, accelz;
     X_temp_.row(i) = states;
+    t = t + DC;
   }
 
   /*  int last = X_temp_.rows() - 1;
@@ -421,14 +428,14 @@ void SolverGurobi::setX0(double x0[])
 
 void SolverGurobi::setXf(double xf[])
 {
-  // printf("Setting final condition:\n");
+  std::cout << "Setting final condition:\n";
 
   for (int i = 0; i < 9; i++)
   {
-    // std::cout << xf[i] << "  ";
+    std::cout << xf[i] << ",  ";
     xf_[i] = xf[i];
   }
-  // std::cout << "\nFinal Condtion set" << std::endl;
+  std::cout << "\nFinal Condtion set" << std::endl;
 }
 
 void SolverGurobi::setConstraintsXf()
@@ -635,7 +642,12 @@ void SolverGurobi::findDT(int factor)
 {
   // double dt = 2 * getDTInitial();
   dt_ = factor * getDTInitial();
-  // std::cout << "Trying dt=" << dt_ << std::endl;
+
+  // And now, round dt_ such that it's a multiple of DC:
+  int mini_intervals = ceil(dt_ / (1.0 * DC));
+  dt_ = mini_intervals * DC;
+
+  // std::cout << "dt rounded=" << dt_ << std::endl;
   // dt_ = 1;
 }
 
@@ -696,7 +708,7 @@ bool SolverGurobi::callOptimizer()
   m.optimize();
   auto end = std::chrono::steady_clock::now();
   auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-  std::cout << "*************************Finished Optimization: " << elapsed << " ms" << std::endl;
+  // std::cout << "*************************Finished Optimization: " << elapsed << " ms" << std::endl;
   // std::cout << "*************************Gurobi RUNTIME: " << m.get(GRB_DoubleAttr_Runtime) * 1000 << " ms"
   //          << std::endl;
 
@@ -761,8 +773,8 @@ bool SolverGurobi::callOptimizer()
     // No solution
     if (mode_ == RESCUE_PATH)
     {
-      // m.write("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/model_rp" + std::to_string(temporal_) +
-      //         "dt=" + std::to_string(dt_) + ".lp");
+      m.write("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/model_rp" + std::to_string(temporal_) +
+              "dt=" + std::to_string(dt_) + ".lp");
     }
     solved = false;
     if (optimstatus == GRB_INF_OR_UNBD)
@@ -902,6 +914,7 @@ double SolverGurobi::getDTInitial()
     dt_initial = 0;
   }
   // printf("dt_initial=%f", dt_initial);
+
   return dt_initial;
 }
 

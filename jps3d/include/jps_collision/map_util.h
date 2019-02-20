@@ -13,7 +13,7 @@
 namespace JPS
 {
 /// The type of map data Tmap is defined as a 1D array
-using Tmap = std::vector<signed char>;
+using Tmap = std::vector<char>;
 /**
  * @biref The map util class for collision checking
  * @param Dim is the dimension of the workspace
@@ -82,18 +82,18 @@ public:
     // printf("z_max is %f\n", z_max);
     // printf("Dim_up is %d\n", dim2_up);
     dim(2) = dim2_down + dim2_up;
-    printf("*******Dim is\n");
-    std::cout << dim.transpose() << std::endl;
-
-    printf("*******Center antes is\n");
-    std::cout << center_map.transpose() << std::endl;
+    /*    printf("*******Dim is\n");
+        std::cout << dim.transpose() << std::endl;*/
+    /*
+        printf("*******Center antes is\n");
+        std::cout << center_map.transpose() << std::endl;*/
     // printf("reading_map2\n");
     origin_d_(0) = center_map(0) - res * dim(0) / 2.0;
     origin_d_(1) = center_map(1) - res * dim(1) / 2.0;
     origin_d_(2) = center_map(2) - res * dim2_down;
 
-    printf("*******Corner despues is\n");
-    std::cout << origin_d_.transpose() << std::endl;
+    /*    printf("*******Corner despues is\n");
+        std::cout << origin_d_.transpose() << std::endl;*/
 
     /*        double or2 = origin_(2);*/
 
