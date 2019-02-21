@@ -94,7 +94,7 @@ Ra: 0.5            # [m] Minimum radius of the first sphere
 Ra_max: 4            # [m] Maximum radius of the first sphere
 Rb: 9.0             # [m] Radius of the second sphere
 w_max: 1            # [rd/s] Maximum angular velocity
-alpha_0: 0.25         #[rd] threshold to ignore current JPS solution, and consider the old one. 0--> always decide
+alpha_0_deg: 15         #[deg] threshold to ignore current JPS solution, and consider the old one. 0--> always decide
 z_ground: 0.2         #[m] points below this are considered ground
 z_max: 2         #[m] JPS is not allowed to give a solution that goes higher than this height
 inflation_jps: 0.5  #[m] The obstacles are inflated (to run JPS) by this amount

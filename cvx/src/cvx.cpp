@@ -101,7 +101,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   ros::param::param<double>("~Ra_max", par_.Ra_max, 2.5);
   ros::param::param<double>("~Rb", par_.Rb, 6.0);
   ros::param::param<double>("~w_max", par_.w_max, 1.0);
-  ros::param::param<double>("~alpha_0", par_.alpha_0, 1.0);
+  ros::param::param<double>("~alpha_0_deg", par_.alpha_0_deg, 15);
   ros::param::param<double>("~z_ground", par_.z_ground, 0.0);
   ros::param::param<double>("~z_max", par_.z_max, 5.0);
   ros::param::param<double>("~inflation_jps", par_.inflation_jps, 0.8);
@@ -1107,51 +1107,60 @@ void CVX::replanCB(const ros::TimerEvent& e)
       return;
     }
 
-    /*   Eigen::Vector3d C = getFirstIntersectionWithSphere(JPSa, ra, JPSa[0], &lia);
-        Eigen::Vector3d C_old = getFirstIntersectionWithSphere(JPS_k_m_1_, ra, JPS_k_m_1_[0], &lik_m_1);
+    Eigen::Vector3d C = getFirstIntersectionWithSphere(JPSa, ra, JPSa[0], &lia);
+    Eigen::Vector3d C_old = getFirstIntersectionWithSphere(JPS_k_m_1_, ra, JPS_k_m_1_[0], &lik_m_1);
 
-        Eigen::Vector3d v1 = C - JPSa[0];            // point i expressed with origin=origin sphere
-        Eigen::Vector3d v2 = C_old - JPS_k_m_1_[0];  // point i minus 1
-        double alpha = angleBetVectors(v1, v2);
+    Eigen::Vector3d v1 = C - JPSa[0];            // point i expressed with origin=origin sphere
+    Eigen::Vector3d v2 = C_old - JPS_k_m_1_[0];  // point i minus 1
+    double alpha = angleBetVectors(v1, v2);
 
-        std::cout << "Esto es lo que voy a arreglar:" << std::endl;
-        printElementsOfJPS(JPS_k_m_1_);
+    if (alpha <= par_.alpha_0_deg * 3.14 / 180)
+    {
+      clearJPSPathVisualization(2);
+      JPSk = JPSa;
+    }
+    else
+    {
+      // Going to decide
+      std::cout << "Esto es lo que voy a arreglar:" << std::endl;
+      printElementsOfJPS(JPS_k_m_1_);
 
-        bool solvedjpsb;
+      bool solvedjpsb;
 
-        JPSb = fix(JPS_k_m_1_, InitPos, term_goal, &solvedjpsb);
-        if (solvedjpsb == true)
-        {
-          std::cout << "Esto es JPSb (lo arreglado):" << std::endl;
-          printElementsOfJPS(JPSb);
-          Eigen::Vector3d D = getFirstIntersectionWithSphere(JPSb, ra, state_pos, &lib);
-          dist_a = normJPS(JPSa, lia + 1);
-          dist_b = normJPS(JPSb, lib + 1);
+      JPSb = fix(JPS_k_m_1_, InitPos, term_goal, &solvedjpsb);
+      if (solvedjpsb == true)
+      {
+        std::cout << "Esto es JPSb (lo arreglado):" << std::endl;
+        printElementsOfJPS(JPSb);
+        Eigen::Vector3d D = getFirstIntersectionWithSphere(JPSb, ra, state_pos, &lib);
+        dist_a = normJPS(JPSa, lia + 1);
+        dist_b = normJPS(JPSb, lib + 1);
 
-          double C_vector[9] = { C(0), C(1), C(2), 0, 0, 0, 0, 0, 0 };
-          sg_whole_.setXf(C_vector);
-          sg_whole_.findDT(1);
-          double dta = sg_whole_.dt_;
-          Ja = dta + dist_a / par_.v_max;
+        double C_vector[9] = { C(0), C(1), C(2), 0, 0, 0, 0, 0, 0 };
+        sg_whole_.setXf(C_vector);
+        sg_whole_.findDT(1);
+        double dta = sg_whole_.dt_;
+        Ja = dta + dist_a / par_.v_max;
 
-          double D_vector[9] = { D(0), D(1), D(2), 0, 0, 0, 0, 0, 0 };
-          sg_whole_.setXf(D_vector);
-          sg_whole_.findDT(1);
-          double dtb = sg_whole_.dt_;
-          Jb = dtb + dist_b / par_.v_max;
+        double D_vector[9] = { D(0), D(1), D(2), 0, 0, 0, 0, 0, 0 };
+        sg_whole_.setXf(D_vector);
+        sg_whole_.findDT(1);
+        double dtb = sg_whole_.dt_;
+        Jb = dtb + dist_b / par_.v_max;
 
-          // Decision:
-          JPSk = (Ja < Jb) ? JPSa : JPSb;
-          std::cout << green << "Ja=  " << std::fixed << Ja << ", Jb=  " << std::fixed << Jb << reset << std::endl;
+        // Decision:
+        JPSk = (Ja < Jb) ? JPSa : JPSb;
+        std::cout << green << "Ja=  " << std::fixed << Ja << ", Jb=  " << std::fixed << Jb << reset << std::endl;
+      }
+      else
+      {
+        std::cout << bold << red << "JPSb didn't find a solution" << reset << std::endl;
+        JPSk = JPSa;
+      }
+    }
   }
-  else
-  {
-    std::cout << bold << red << "JPSb didn't find a solution" << reset << std::endl;
-    JPSk = JPSa;
-  }*/
-  }
 
-  JPSk = JPSa;  // Quitar esto despues
+  // JPSk = JPSa;  // Quitar esto despues
   /*  std::cout << "Esto es JPS_k_m_1_:" << std::endl;
     printElementsOfJPS(JPS_k_m_1_);*/
 

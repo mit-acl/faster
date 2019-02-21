@@ -108,7 +108,7 @@ struct parameteres
   double Ra_max;
   double Rb;
   double w_max;
-  double alpha_0;
+  double alpha_0_deg;
   double z_ground;
   double z_max;
   double inflation_jps;
