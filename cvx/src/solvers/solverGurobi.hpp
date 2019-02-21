@@ -66,7 +66,7 @@ public:
   void setDC(double dc);
   void setPolytopes(std::vector<LinearConstraint3D> polytopes);
   void setPolytopesConstraints();
-  void findDT(int factor);
+  void findDT(double factor);
   void fillXandU();
   void setObjective();
   void setConstraintsXf();
@@ -76,6 +76,8 @@ public:
 
   void setMaxConstraints();
   void createVars();
+  void setThreads(int threads);
+  void setVerbose(int verbose);
 
   void setDistances(vec_Vecf<3>& samples, std::vector<double> dist_near_obs);
 
@@ -84,7 +86,7 @@ public:
   void setDistanceConstraints();
 
   void setMode(int mode);
-  void setFactorInitialAndFinal(int factor_initial, int factor_final);
+  void setFactorInitialAndFinalAndIncrement(double factor_initial, double factor_final, double factor_increment);
 
   GRBLinExpr getPos(int t, double tau, int ii);
   GRBLinExpr getVel(int t, double tau, int ii);
@@ -113,6 +115,7 @@ public:
   int trials_ = 0;
   int temporal_ = 0;
   double runtime_ms_ = 0;
+  double factor_that_worked_ = 0;
 
 protected:
   double cost_;
@@ -156,8 +159,10 @@ protected:
 
   int mode_;
   bool forceFinalConstraint_ = true;
-  int factor_initial_ = 2;
-  int factor_final_ = 2;
+  double factor_initial_ = 2;
+  double factor_final_ = 2;
+  double factor_increment_ = 2;
+
   int total_not_solved = 0;
 };
 #endif

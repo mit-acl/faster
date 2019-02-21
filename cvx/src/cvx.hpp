@@ -121,13 +121,20 @@ struct parameteres
 
   double z_land;
 
-  int factor_initial_whole;
-  int factor_final_whole;
+  double factor_initial_whole;
+  double factor_final_whole;
 
-  int factor_initial_rescue;
-  int factor_final_rescue;
+  double factor_initial_rescue;
+  double factor_final_rescue;
+
+  double factor_increment_rescue;
+  double factor_increment_whole;
 
   int max_poly;
+  double dist_max_vertexes;
+
+  int gurobi_threads;
+  int gurobi_verbose;
 };
 
 /*struct log_values
@@ -248,6 +255,7 @@ private:
 
   // double getDistanceToFirstCollisionJPSwithUnkonwnspace(vec_Vecf<3> path, bool* thereIsIntersection);
 
+  void cvxEllipsoidDecompUnkOcc2(vec_Vecf<3>& path);
   void cvxEllipsoidDecompOcc(vec_Vecf<3>& path);
   void cvxSeedDecompUnkOcc(Vecf<3>& seed);
 
@@ -261,10 +269,13 @@ private:
   std::vector<Eigen::Vector3d> simulateForward(Eigen::Vector3d& pos_init, Eigen::Vector3d& vel_init,
                                                Eigen::Vector3d& accel_init, Eigen::MatrixXd& jerk_sent);
 
+  void createMoreVertexes(vec_Vecf<3>& path, double d);
+
   visualization_msgs::Marker setpoint_;
   visualization_msgs::Marker R_;
   visualization_msgs::Marker I_;
   visualization_msgs::Marker B1_;
+  visualization_msgs::Marker M_;
   acl_msgs::QuadGoal quadGoal_;
   acl_msgs::QuadGoal initialCond_;  // It's the initial condition for the solver
   acl_msgs::QuadFlightMode flight_mode_;
@@ -290,6 +301,7 @@ private:
   ros::Publisher pub_path_jps_whole_traj_;
   ros::Publisher pub_intersectionI_;
   ros::Publisher pub_start_rescue_path_;
+  ros::Publisher pub_pointM_;
   ros::Publisher pub_point_B1_;
 
   ros::Publisher pub_planning_vis_;
@@ -301,9 +313,10 @@ private:
   ros::Publisher cvx_decomp_el_o_pub__;
   ros::Publisher cvx_decomp_poly_o_pub_;
 
-  // ros::Publisher cvx_decomp_el_uo_pub__;
-  ros::Publisher cvx_decomp_poly_uo_pub_;
+  ros::Publisher cvx_decomp_el_uo2_pub__;
+  ros::Publisher cvx_decomp_poly_uo2_pub_;
 
+  ros::Publisher cvx_decomp_poly_uo_pub_;
   ros::Subscriber sub_goal_;
   ros::Subscriber sub_state_;
   ros::Subscriber sub_mode_;
@@ -335,8 +348,9 @@ private:
   visualization_msgs::MarkerArray samples_rescue_path_;
 
   vec_E<Polyhedron<3>> polyhedra_;
-  std::vector<LinearConstraint3D> l_constraints_o_;   // Polytope (Linear) constraints
-  std::vector<LinearConstraint3D> l_constraints_uo_;  // Polytope (Linear) constraints
+  std::vector<LinearConstraint3D> l_constraints_o_;    // Polytope (Linear) constraints
+  std::vector<LinearConstraint3D> l_constraints_uo_;   // Polytope (Linear) constraints
+  std::vector<LinearConstraint3D> l_constraints_uo2_;  // Polytope (Linear) constraints
 
   int markerID_ = 0;
   int markerID_last_ = 0;
@@ -398,6 +412,8 @@ private:
   std::mutex mtx_planner_status_;
   std::mutex mtx_initial_cond;
   std::mutex mtx_state;
+  std::mutex mtx_offsets;
+  // std::mutex mtx_factors;
 
   std::mutex mtx_term_goal;
   std::mutex mtx_term_term_goal;
@@ -427,6 +443,7 @@ private:
 
   SeedDecomp3D seed_decomp_util_;
   EllipsoidDecomp3D ellip_decomp_util_;
+  EllipsoidDecomp3D ellip_decomp_util_uo2_;
 
   vec_Vecf<3> JPS_k_m_1_;
   bool takeoff_done_ = false;

@@ -120,22 +120,18 @@ void SolverGurobi::fillXandU()
 {
   double t = 0;
   int interval = 0;
+  //#pragma omp parallel for
+  //  {
   for (int i = 0; i < U_temp_.rows(); i++)
   {
-    // std::cout << "t=" << t << std::endl;
+    // std::cout << "row=" << i << std::endl;
     t = t + DC;
-    // interval = floor(t / dt_);
+    // std::cout << "t=" << t << std::endl;
     if (t > dt_ * (interval + 1))
     {
       interval = interval + 1;
       // std::cout << "*****Interval=" << interval << std::endl;
     }
-    // std::cout << "interval=" << interval << std::endl;
-    // std::cout << "row=" << i << "out of" << U_temp_.rows() << std::endl;
-
-    // std::cout << "N=" << N_ << "  dt_=" << dt_ << std::endl;
-
-    ///  size = (int)(N_)*dt_ / DC;
 
     // std::cout << "t_rel=" << t - interval * dt_ << std::endl;
     double jerkx = getJerk(interval, t - interval * dt_, 0).getValue();
@@ -163,6 +159,7 @@ void SolverGurobi::fillXandU()
     states << posx, posy, posz, velx, vely, velz, accelx, accely, accelz;
     X_temp_.row(i) = states;
   }
+  // }  // End pragma parallel
 
   /*  int last = X_temp_.rows() - 1;
 
@@ -170,7 +167,7 @@ void SolverGurobi::fillXandU()
     Eigen::Matrix<double, 1, 9> final_cond;
     final_cond << X_temp_(last, 0), X_temp_(last, 1), X_temp_(last, 2), xf_[3], xf_[4], xf_[5], xf_[6], xf_[7], xf_[8];
     X_temp_.row(X_temp_.rows() - 1) = final_cond;
-*/
+  */
 
   // Force the final input to be 0 (I'll keep applying this input if when I arrive to the final state I still
   // haven't planned again).
@@ -427,14 +424,14 @@ void SolverGurobi::setX0(double x0[])
 
 void SolverGurobi::setXf(double xf[])
 {
-  std::cout << "Setting final condition:\n";
+  // printf("Setting final condition:\n");
 
   for (int i = 0; i < 9; i++)
   {
-    std::cout << xf[i] << ",  ";
+    // std::cout << xf[i] << "  ";
     xf_[i] = xf[i];
   }
-  std::cout << "\nFinal Condtion set" << std::endl;
+  // std::cout << "\nFinal Condtion set" << std::endl;
 }
 
 void SolverGurobi::setConstraintsXf()
@@ -553,10 +550,12 @@ void SolverGurobi::set_max(double max_values[3])
   setMaxConstraints();
 }
 
-void SolverGurobi::setFactorInitialAndFinal(int factor_initial, int factor_final)
+void SolverGurobi::setFactorInitialAndFinalAndIncrement(double factor_initial, double factor_final,
+                                                        double factor_increment)
 {
   factor_initial_ = factor_initial;
   factor_final_ = factor_final;
+  factor_increment_ = factor_increment;
 }
 
 bool SolverGurobi::genNewTraj()
@@ -575,7 +574,8 @@ bool SolverGurobi::genNewTraj()
 
   // if (mode_ == WHOLE_TRAJ)
   //{
-  for (int i = factor_initial_; i <= factor_final_ && solved == false; i++)
+  runtime_ms_ = 0;
+  for (double i = factor_initial_; i <= factor_final_ && solved == false; i = i + factor_increment_)
   {
     trials_ = trials_ + 1;
     findDT(i);
@@ -589,6 +589,7 @@ bool SolverGurobi::genNewTraj()
     solved = callOptimizer();
     if (solved == true)
     {
+      factor_that_worked_ = i;
       // std::cout << "Factor= " << i << "(dt_= " << dt_ << ")---> worked" << std::endl;
     }
     else
@@ -637,16 +638,21 @@ bool SolverGurobi::genNewTraj()
   return solved;
 }
 
-void SolverGurobi::findDT(int factor)
+void SolverGurobi::setThreads(int threads)
+{
+  m.set("Threads", std::to_string(threads));
+}
+
+void SolverGurobi::setVerbose(int verbose)
+{
+  m.set("OutputFlag", std::to_string(verbose));  // 1 if you want verbose, 0 if not
+}
+
+void SolverGurobi::findDT(double factor)
 {
   // double dt = 2 * getDTInitial();
   dt_ = factor * getDTInitial();
-
-  // And now, round dt_ such that it's a multiple of DC:
-  /*  int mini_intervals = ceil(dt_ / (1.0 * DC));
-    dt_ = mini_intervals * DC;
-  */
-  // std::cout << "dt rounded=" << dt_ << std::endl;
+  // std::cout << "Trying dt=" << dt_ << std::endl;
   // dt_ = 1;
 }
 
@@ -679,28 +685,31 @@ void SolverGurobi::setDynamicConstraints()
 
 bool SolverGurobi::callOptimizer()
 {
+  // int threads = m.get(GRB_IntParam_Threads);
+
+  // std::cout << "Running Gurobi with " << threads << " cthreads" << std::endl;
+
   bool solved = true;
   // std::cout << "CALLING OPTIMIZER OF GUROBI" << std::endl;
 
   // Select these parameteres with the tuning Tool of Gurobi
 
-  if (mode_ == RESCUE_PATH)
-  {
-    m.set("NumericFocus", "3");
-    m.set("Presolve", "0");
-  }
+  /*  if (mode_ == RESCUE_PATH)
+    {
+      m.set("NumericFocus", "3");
+      m.set("Presolve", "0");
+    }
 
-  if (mode_ == WHOLE_TRAJ)
-  {
-    m.set("NumericFocus", "3");
-    m.set("Presolve", "0");
-  }
+    if (mode_ == WHOLE_TRAJ)
+    {
+      m.set("NumericFocus", "3");
+      m.set("Presolve", "0");
+    }*/
 
   m.update();
   temporal_ = temporal_ + 1;
   // printf("Writing into model.lp number=%d\n", temporal_);
   // m.write(ros::package::getPath("cvx") + "/models/model_" + std::to_string(temporal_) + ".lp");
-  m.set("OutputFlag", "0");  // 1 if you want verbose
 
   // std::cout << "*************************Starting Optimization" << std::endl;
   auto start = std::chrono::steady_clock::now();
@@ -711,7 +720,7 @@ bool SolverGurobi::callOptimizer()
   // std::cout << "*************************Gurobi RUNTIME: " << m.get(GRB_DoubleAttr_Runtime) * 1000 << " ms"
   //          << std::endl;
 
-  runtime_ms_ = m.get(GRB_DoubleAttr_Runtime) * 1000;
+  runtime_ms_ = runtime_ms_ + m.get(GRB_DoubleAttr_Runtime) * 1000;
 
   /*  times_log.open("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/times_log.txt", std::ios_base::app);
     times_log << elapsed << "\n";
@@ -772,8 +781,8 @@ bool SolverGurobi::callOptimizer()
     // No solution
     if (mode_ == RESCUE_PATH)
     {
-      m.write("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/model_rp" + std::to_string(temporal_) +
-              "dt=" + std::to_string(dt_) + ".lp");
+      // m.write("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/model_rp" + std::to_string(temporal_) +
+      //         "dt=" + std::to_string(dt_) + ".lp");
     }
     solved = false;
     if (optimstatus == GRB_INF_OR_UNBD)
@@ -913,7 +922,6 @@ double SolverGurobi::getDTInitial()
     dt_initial = 0;
   }
   // printf("dt_initial=%f", dt_initial);
-
   return dt_initial;
 }
 
