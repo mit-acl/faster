@@ -829,19 +829,19 @@ void CVX::replanCB(const ros::TimerEvent& e)
   MyTimer replanCB_t(true);
 
   MyTimer otherStuff_t(true);
-  log_.cvx_jerk_total_ms = 0;
-  log_.cvx_vel_total_ms = 0;
+  /*  log_.cvx_jerk_total_ms = 0;
+    log_.cvx_vel_total_ms = 0;
 
-  log_.loops_jerk = 0;
-  log_.loops_vel = 0;
+    log_.loops_jerk = 0;
+    log_.loops_vel = 0;
 
-  log_.coll_total_ms = 0;
-  log_.loops_col = 0;
+    log_.coll_total_ms = 0;
+    log_.loops_col = 0;
 
-  log_.computed_both = 0;
+    log_.computed_both = 0;*/
 
   // MyTimer time_init(true);
-  std::cout << "In replanCB0" << std::endl;
+  // std::cout << "In replanCB0" << std::endl;
   double t0replanCB = ros::Time::now().toSec();
   // printf("replanCB: Before mtx_state!!!\n");
   mtx_state.lock();
@@ -850,7 +850,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   mtx_state.unlock();
 
-  printf("replanCB: Before mtx_term_goal!!!\n");
+  // printf("replanCB: Before mtx_term_goal!!!\n");
   mtx_term_goal.lock();
   term_goal_ = projectClickedGoal(state_pos);
   // std::cout << "Projected Goal" << term_goal_.transpose() << std::endl;
@@ -872,7 +872,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
     Eigen::Vector3d P2 = term_term_goal_;
     mtx_term_term_goal.unlock();*/
 
-  printf("In replanCB0.3\n");
+  // printf("In replanCB0.3\n");
   mtx_term_goal.lock();
   Eigen::Vector3d term_goal = term_goal_;  // Local copy of the terminal goal
   mtx_term_goal.unlock();
@@ -908,17 +908,17 @@ void CVX::replanCB(const ros::TimerEvent& e)
     return;
   }
 
-  std::cout << "replanCB3\n" << std::endl;
+  // std::cout << "replanCB3\n" << std::endl;
 
   // printf("ReplanCB: Init takes %f ms\n", (double)time_init.Elapsed().count());
 
   // MyTimer time_med(true);
   ///////////////////////////////////////////////////////////////////////////////
 
-  bool have_seen_the_goal1 = false, have_seen_the_goal2 = false;
-  bool found_one_1 = false, found_one_2 = false;  // found at least one free trajectory
-  bool need_to_decide = true;
-  bool solvedjps1 = false, solvedjps2 = false;
+  // bool have_seen_the_goal1 = false, have_seen_the_goal2 = false;
+  // bool found_one_1 = false, found_one_2 = false;  // found at least one free trajectory
+  // bool need_to_decide = true;
+  // bool solvedjps1 = false, solvedjps2 = false;
 
   int li1;    // last index inside the sphere of JPSk
   int li2;    // last index inside the sphere of JPS2
@@ -935,12 +935,12 @@ void CVX::replanCB(const ros::TimerEvent& e)
   Eigen::MatrixXd U_temp1, U_temp2, X_temp1, X_temp2;
 
   Eigen::Vector3d B1, B2, C1, C2, B_old;
-  vec_Vecf<3> WP1, WP2;
+  // vec_Vecf<3> WP1, WP2;
 
   // vec_Vecf<3> JPSk;
   vec_Vecf<3> JPS2;
 
-  std::cout << "replanCB4\n" << std::endl;
+  // std::cout << "replanCB4\n" << std::endl;
   // printf("init2\n");
   // std::cout << "Running JPS3d from=" << state_pos.transpose() << std::endl;
   // std::cout << "Running JPS3d to terminal goal=" << term_goal.transpose() << std::endl;
@@ -1094,13 +1094,17 @@ void CVX::replanCB(const ros::TimerEvent& e)
     first_time = false;
     // std::cout << "Running JPS first time" << std::endl;
     JPSa = solveJPS3D(InitPos, term_goal, &solvedjpsa, 1);
-
+    log_.computed_both = 0;
     JPSk = JPSa;
   }
   else
   {
     // std::cout << "Running JPS other times" << std::endl;
     JPSa = solveJPS3D(InitPos, term_goal, &solvedjpsa, 1);
+
+    log_.JPSk_solved = solvedjpsa;
+    log_.JPSk_ms = timer_jps.ElapsedMs();
+
     if (solvedjpsa == false)
     {
       std::cout << bold << red << "JPSa didn't find a solution" << reset << std::endl;
@@ -1113,25 +1117,32 @@ void CVX::replanCB(const ros::TimerEvent& e)
     Eigen::Vector3d v1 = C - JPSa[0];            // point i expressed with origin=origin sphere
     Eigen::Vector3d v2 = C_old - JPS_k_m_1_[0];  // point i minus 1
     double alpha = angleBetVectors(v1, v2);
+    log_.angle_deg = alpha * 180 / 3.14;
 
     if (alpha <= par_.alpha_0_deg * 3.14 / 180)
-    {
+    {  // No need to decide
       clearJPSPathVisualization(2);
       JPSk = JPSa;
+      log_.decision = 1;
+      log_.computed_both = 0;
     }
     else
     {
       // Going to decide
-      std::cout << "Esto es lo que voy a arreglar:" << std::endl;
-      printElementsOfJPS(JPS_k_m_1_);
+      // std::cout << "Esto es lo que voy a arreglar:" << std::endl;
+      // printElementsOfJPS(JPS_k_m_1_);
+      log_.computed_both = 1;
 
       bool solvedjpsb;
 
+      MyTimer timer_jps_fix(true);
       JPSb = fix(JPS_k_m_1_, InitPos, term_goal, &solvedjpsb);
+      log_.JPS_fix_ms = timer_jps_fix.ElapsedMs();
+      log_.JPS_fix_solved = solvedjpsb;
       if (solvedjpsb == true)
       {
-        std::cout << "Esto es JPSb (lo arreglado):" << std::endl;
-        printElementsOfJPS(JPSb);
+        // std::cout << "Esto es JPSb (lo arreglado):" << std::endl;
+        // printElementsOfJPS(JPSb);
         Eigen::Vector3d D = getFirstIntersectionWithSphere(JPSb, ra, state_pos, &lib);
         dist_a = normJPS(JPSa, lia + 1);
         dist_b = normJPS(JPSb, lib + 1);
@@ -1141,6 +1152,9 @@ void CVX::replanCB(const ros::TimerEvent& e)
         sg_whole_.findDT(1);
         double dta = sg_whole_.dt_;
         Ja = dta + dist_a / par_.v_max;
+        log_.Ja_inside = dta;
+        log_.Ja_outside = dist_a / par_.v_max;
+        log_.Ja = Ja;
 
         double D_vector[9] = { D(0), D(1), D(2), 0, 0, 0, 0, 0, 0 };
         sg_whole_.setXf(D_vector);
@@ -1148,12 +1162,18 @@ void CVX::replanCB(const ros::TimerEvent& e)
         double dtb = sg_whole_.dt_;
         Jb = dtb + dist_b / par_.v_max;
 
+        log_.Jb_inside = dtb;
+        log_.Jb_outside = dist_b / par_.v_max;
+        log_.Jb = Jb;
+
+        log_.decision = (Ja < Jb) ? 1 : 2;
         // Decision:
         JPSk = (Ja < Jb) ? JPSa : JPSb;
         std::cout << green << "Ja=  " << std::fixed << Ja << ", Jb=  " << std::fixed << Jb << reset << std::endl;
       }
       else
       {
+        log_.decision = 1;
         std::cout << bold << red << "JPSb didn't find a solution" << reset << std::endl;
         JPSk = JPSa;
       }
@@ -1170,7 +1190,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
     std::cout << "Esto es JPSk:" << std::endl;
     printElementsOfJPS(JPSk);*/
   JPS_k_m_1_ = JPSk;  // saved for the next iteration
-  solvedjps1 = true;
+  // solvedjps1 = true;
 
   std::cout << bold << blue << "JPS (all):  " << std::fixed << timer_jps << "ms\n" << reset;
 
@@ -1178,7 +1198,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   ra = std::min((dist_to_goal - 0.001), par_.Ra_max);  // radius of the sphere Sa
 
-  if (solvedjps1 == true)
+  if (1)
   {
     JPSk_solved_ = true;
     if (par_.visual == true)
@@ -1218,7 +1238,6 @@ void CVX::replanCB(const ros::TimerEvent& e)
   // printf("Running CVXDecomp!!!\n");
   double before = ros::Time::now().toSec();
 
-  MyTimer cvx_ellip_decomp_t(true);
   if (JPSk_inside_sphere.size() > par_.max_poly + 1)  // If I have more than (par_.max_poly + 1) vertexes
   {
     // std::cout << "ANTES" << std::endl;
@@ -1232,7 +1251,9 @@ void CVX::replanCB(const ros::TimerEvent& e)
   }
   double xf[9] = { B1(0), B1(1), B1(2), 0, 0, 0, 0, 0, 0 };
 
+  MyTimer cvx_ellip_decomp_t(true);
   cvxEllipsoidDecompOcc(JPSk_inside_sphere);  // result saved in l_constraints_
+  log_.cvx_decomp_whole_ms = cvx_ellip_decomp_t.ElapsedMs();
   std::cout << bold << blue << "CVXDecompWhole:  " << std::fixed << cvx_ellip_decomp_t << "ms" << reset << std::endl;
 
   if (par_.visual)
@@ -1244,7 +1265,6 @@ void CVX::replanCB(const ros::TimerEvent& e)
     pub_point_B1_.publish(B1_);
   }
 
-  MyTimer whole_gurobi_t(true);
   sg_whole_.setXf(xf);
   sg_whole_.setX0(x0);
   sg_whole_.setPolytopes(l_constraints_o_);
@@ -1255,7 +1275,14 @@ void CVX::replanCB(const ros::TimerEvent& e)
     std::cout << red << "First point of whole traj is outside" << reset << std::endl;
   }
 
+  MyTimer whole_gurobi_t(true);
   solved_whole = sg_whole_.genNewTraj();
+  log_.gurobi_whole_ms = sg_whole_.runtime_ms_;
+  log_.gurobi_whole_ms_mine = whole_gurobi_t.ElapsedMs();
+  log_.gurobi_whole_trials = sg_whole_.trials_;
+  log_.gurobi_whole_dt = sg_whole_.dt_;
+  log_.gurobi_whole_factor = sg_whole_.factor_that_worked_;
+
   std::cout << bold << blue << "WholeGurobi:  " << std::fixed << whole_gurobi_t << "ms, (" << std::fixed
             << sg_whole_.runtime_ms_ << " ms), " << reset << sg_whole_.trials_ << " trials (dt=" << sg_whole_.dt_
             << "), f_worked=" << std::setprecision(2) << sg_whole_.factor_that_worked_ << std::endl;
@@ -1326,6 +1353,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   MyTimer cvx_ellip_decomp2_t(true);
   cvxEllipsoidDecompUnkOcc2(JPSk_inside_sphere_tmp);  // result saved in l_constraints_
+
+  log_.cvx_decomp_rescue_ms = cvx_ellip_decomp2_t.ElapsedMs();
   std::cout << bold << blue << "CVXDecompRescue:  " << std::fixed << cvx_ellip_decomp2_t << "ms" << reset << std::endl;
 
   mtx_X_U_temp.unlock();
@@ -1371,7 +1400,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   /*  std::cout << "Punto inicial: " << x0_rescue[0] << ", " << x0_rescue[1] << ", " << x0_rescue[2] << std::endl;
     std::cout << "Punto final: " << xf_rescue[0] << ", " << xf_rescue[1] << ", " << xf_rescue[2] << std::endl;*/
-  MyTimer rescue_gurobi_t(true);
+
   sg_rescue_.setXf(xf_rescue);
   sg_rescue_.setX0(x0_rescue);
   sg_rescue_.setPolytopes(l_constraints_uo2_);
@@ -1388,8 +1417,15 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   // sg_rescue_.findDT(2);
   // std::cout << "l_constraints_uo_.size()=" << l_constraints_uo_.size() << std::endl;
-
+  MyTimer rescue_gurobi_t(true);
   bool solved_rescue = sg_rescue_.genNewTraj();
+
+  log_.gurobi_rescue_ms = sg_rescue_.runtime_ms_;
+  log_.gurobi_rescue_ms_mine = rescue_gurobi_t.ElapsedMs();
+  log_.gurobi_rescue_trials = sg_rescue_.trials_;
+  log_.gurobi_rescue_dt = sg_rescue_.dt_;
+  log_.gurobi_rescue_factor = sg_rescue_.factor_that_worked_;
+
   std::cout << bold << blue << "RescueGurobi:  " << std::fixed << rescue_gurobi_t << "ms, (" << std::fixed
             << sg_rescue_.runtime_ms_ << " ms), " << reset << sg_rescue_.trials_ << " trials (dt=" << sg_rescue_.dt_
             << "), f_worked=" << std::setprecision(2) << sg_rescue_.factor_that_worked_ << std::endl;
@@ -1482,6 +1518,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
   }
 
   std::cout << bold << blue << "OtherStuff 2:  " << std::fixed << otherStuff2_t << "ms" << reset << std::endl;
+
+  log_.total_replanning_ms = replanCB_t.ElapsedMs();
   std::cout << bold << blue << "TOTAL REPLANNING CB:  " << std::fixed << replanCB_t << "ms" << reset << std::endl;
 
   mtx_offsets.lock();
@@ -1506,6 +1544,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
             << " R: " << new_init_rescue << "-->" << new_final_rescue << reset << std::endl;
   sg_rescue_.setFactorInitialAndFinalAndIncrement(new_init_rescue, new_final_rescue, new_increment_rescue);
 
+  log_.header.stamp = ros::Time::now();
+  pub_log_.publish(log_);
   return;
 }
 
