@@ -637,6 +637,7 @@ void CVX::vectorOfVectors2MarkerArray(vec_Vecf<3> traj, visualization_msgs::Mark
 void CVX::goalCB(const acl_msgs::TermGoal& msg)
 {
   printf("NEW GOAL************************************************\n");
+  log_.total_dist = 0;
   mtx_term_term_goal.lock();
   term_term_goal_ = Eigen::Vector3d(msg.pos.x, msg.pos.y, msg.pos.z);
   mtx_term_term_goal.unlock();
@@ -1545,7 +1546,11 @@ void CVX::replanCB(const ros::TimerEvent& e)
   sg_rescue_.setFactorInitialAndFinalAndIncrement(new_init_rescue, new_final_rescue, new_increment_rescue);
 
   log_.header.stamp = ros::Time::now();
-  pub_log_.publish(log_);
+
+  if (status_ != GOAL_REACHED)
+  {
+    pub_log_.publish(log_);
+  }
   return;
 }
 
@@ -1957,7 +1962,7 @@ void CVX::stateCB(const acl_msgs::State& msg)
     pubActualTraj();
   }
 
-  if (i % 10 == 0)
+  if (i % 10 == 0 && status_ != GOAL_REACHED)
   {
     Eigen::Vector3d actual_pos(msg.pos.x, msg.pos.y, msg.pos.z);
     log_.total_dist = log_.total_dist + (actual_pos - pos_old_).norm();

@@ -76,7 +76,7 @@ public:
     std::cout << "En elapsed" << std::endl;
     std::cout << "ros::Time::now().toSec()" << ros::Time::now().toSec() << std::endl;
     std::cout << "_start" << _start << std::endl;
-    return 1000 * (ros::Time::now().toSec() - _start);
+    return 1000 * (ros::WallTime::now().toSec() - _start);
   }
   template <typename T, typename Traits>
   friend std::basic_ostream<T, Traits>& operator<<(std::basic_ostream<T, Traits>& out, const ROSWallTimer& timer)
