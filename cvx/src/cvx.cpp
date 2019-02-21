@@ -1086,11 +1086,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   double dist_a, dist_b, Ja, Jb;
   bool solvedjpsa = false, solvedjpsb = false;
 
-  std::cout << bold << blue << "OtherStuff:  " << std::fixed << otherStuff_t.ElapsedMs() << "ms\n" << reset;
-
   std::cout << bold << blue << "OtherStuff:  " << std::fixed << otherStuff_t << "ms\n" << reset;
-
-  std::cout << "Adios" << std::endl;
 
   MyTimer timer_jps(true);
   if (first_time == true)
@@ -1105,14 +1101,13 @@ void CVX::replanCB(const ros::TimerEvent& e)
   {
     // std::cout << "Running JPS other times" << std::endl;
     JPSa = solveJPS3D(InitPos, term_goal, &solvedjpsa, 1);
+    if (solvedjpsa == false)
+    {
+      std::cout << bold << red << "JPSa didn't find a solution" << reset << std::endl;
+      return;
+    }
 
-    /*    if (solvedjpsa == false)
-        {
-          std::cout << bold << red << "JPSa didn't find a solution" << reset << std::endl;
-          return;
-        }
-
-        Eigen::Vector3d C = getFirstIntersectionWithSphere(JPSa, ra, JPSa[0], &lia);
+    /*   Eigen::Vector3d C = getFirstIntersectionWithSphere(JPSa, ra, JPSa[0], &lia);
         Eigen::Vector3d C_old = getFirstIntersectionWithSphere(JPS_k_m_1_, ra, JPS_k_m_1_[0], &lik_m_1);
 
         Eigen::Vector3d v1 = C - JPSa[0];            // point i expressed with origin=origin sphere
@@ -1484,7 +1479,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   int states_last_replan = ceil(replanCB_t.ElapsedMs() / (par_.dc * 1000));  // Number of states that
                                                                              // would have been needed for
                                                                              // the last replan
-  par_.offset_rp = 1.5 * states_last_replan;                                 // Next offset: the
+  par_.offset_rp = 3 * states_last_replan;                                   // Next offset: the
   std::cout << "Next offset:  " << std::fixed << par_.offset_rp << " states" << std::endl;
   par_.offset = states_last_replan;
   mtx_offsets.unlock();
