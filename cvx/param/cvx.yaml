@@ -71,7 +71,7 @@
 
 
 use_ff: true # use feedforward
-visual: false #publish visualization stuff
+visual: true #publish visualization stuff
 use_vel: false # use velocity. If false, r2=r1;
 
 wdx: 20.0  #[m] world dimension in x
@@ -91,7 +91,7 @@ offset: 10  # Replanning offset (the initial conditions are taken OFFSET states 
 offset_rp: 50 #The rescue path starts X states ahead of the beginning of the whole trajectory
 
 Ra: 0.5            # [m] Minimum radius of the first sphere
-Ra_max: 4            # [m] Maximum radius of the first sphere
+Ra_max: 6            # [m] Maximum radius of the first sphere
 Rb: 9.0             # [m] Radius of the second sphere
 w_max: 1            # [rd/s] Maximum angular velocity
 alpha_0_deg: 15         #[deg] threshold to ignore current JPS solution, and consider the old one. 0--> always decide
@@ -101,9 +101,9 @@ inflation_jps: 0.47  #[m] The obstacles are inflated (to run JPS) by this amount
 factor_jps: 1  #[m] JPS is run with resolution=factor_jps*(resolution of the map)
 
 
-v_max: 5.0   #[m/s]  5
-a_max: 5.0   #[m/s2] 5
-j_max: 8.0  #[m/s3]  8
+v_max: 10.0   #[m/s]  5
+a_max: 10.0   #[m/s2] 5
+j_max: 40.0  #[m/s3]  8
 
 q: 100  #[-] weight to the 2nd term of the cost function. If it's very big (>1000), Gurobi fails!! (numerical issues)
 
@@ -117,7 +117,7 @@ factor_initial_rescue: 1
 factor_final_rescue: 2
 factor_increment_rescue: 1
 
-max_poly: 4 #Should be less than N_whole and N_rescue
+max_poly: 3 #Should be less than N_whole and N_rescue
 dist_max_vertexes: 1.5 #[m] Maximum distance between two vertexes before doing the cvx decomp (more vertexes are added to force this)
 gurobi_threads: 1 #[threads] Number of threads that Gurobi will use. If computer is maxed out, threads=1 works faster!
 gurobi_verbose: 0 #Verbosity of Gurobi. 0 or 1

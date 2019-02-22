@@ -61,6 +61,8 @@
 #include <math.h>
 #include <algorithm>
 #include <vector>
+#include <assert.h>
+#include <stdlib.h>
 
 #include <sensor_msgs/point_cloud_conversion.h>
 #include <nav_msgs/Path.h>
@@ -128,6 +130,19 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
 
   ros::param::param<int>("~gurobi_threads", par_.gurobi_threads, 1);
   ros::param::param<int>("~gurobi_verbose", par_.gurobi_verbose, 0);
+
+  if (par_.N_rescue <= par_.max_poly + 2)
+  {
+    std::cout << bold << red << "Needed: N_rescue>=max_poly+ 2 at least" << reset
+              << std::endl;  // To decrease the probability of not finding a solution
+    abort();
+  }
+  if (par_.N_whole <= par_.max_poly + 2)
+  {
+    std::cout << bold << red << "Needed: N_whole>=max_poly + 2 at least" << reset
+              << std::endl;  // To decrease the probability of not finding a solution
+    abort();
+  }
 
   optimized_ = false;
   flight_mode_.mode = flight_mode_.NOT_FLYING;
@@ -294,6 +309,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   sg_rescue_.set_max(max_values);
   sg_rescue_.setQ(par_.q);
   sg_rescue_.setMode(WHOLE_TRAJ);  // RESCUE_PATH
+  sg_rescue_.setForceFinalConstraint(false);
   sg_rescue_.setFactorInitialAndFinalAndIncrement(par_.factor_initial_rescue, par_.factor_final_rescue,
                                                   par_.factor_increment_whole);
   sg_rescue_.setVerbose(par_.gurobi_verbose);
@@ -476,9 +492,9 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f& start_sent, Vec3f& goal_sent, bool* solved, i
 {
   Eigen::Vector3d start(start_sent(0), start_sent(1), std::max(start_sent(2), 0.0));
   Eigen::Vector3d goal(goal_sent(0), goal_sent(1), std::max(goal_sent(2), 0.0));
-  /*  std::cout << "IN JPS3d" << std::endl;
-    std::cout << "start=" << start.transpose() << std::endl;
-    std::cout << "goal=" << goal.transpose() << std::endl;*/
+  std::cout << "IN JPS3d" << std::endl;
+  std::cout << "start=" << start.transpose() << std::endl;
+  std::cout << "goal=" << goal.transpose() << std::endl;
 
   Vec3f originalStart = start;
 
@@ -541,8 +557,18 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f& start_sent, Vec3f& goal_sent, bool* solved, i
     // printf("after cleaning:\n");
     // printElementsOfJPS(path);
     path = planner_ptr_->getPath();  // getpar_.RawPath() if you want the path with more corners (not "cleaned")
-    path[0] = start;
-    path[path.size() - 1] = goal;  // force to start and end in the start and goal (and not somewhere in the voxel)
+    if (path.size() > 1)
+    {
+      path[0] = start;
+      path[path.size() - 1] = goal;  // force to start and end in the start and goal (and not somewhere in the voxel)
+    }
+    else
+    {  // happens when start and goal are very near (--> same cell)
+      vec_Vecf<3> tmp;
+      tmp.push_back(start);
+      tmp.push_back(goal);
+      path = tmp;
+    }
     // path.insert(path.begin(), originalStart);
     /*    printf("First point in path_jps_vector_:\n");
         std::cout << path_jps_vector_[0].transpose() << std::endl;*/
@@ -898,14 +924,14 @@ void CVX::replanCB(const ros::TimerEvent& e)
   {
     status_ = GOAL_REACHED;
 
-    // printf("STATUS=GOAL_REACHED\n");
+    printf("STATUS=GOAL_REACHED\n");
   }
   // printf("Entering in replanCB, planner_status_=%d\n", planner_status_);
   // printf("In replanCB0.4s\n");
   if (status_ == GOAL_SEEN || status_ == GOAL_REACHED || planner_status_ == REPLANNED || status_ == YAWING)
   {
-    // printf("No replanning needed because planner_status_=%d\n", planner_status_);
-    // printf("or because status_=%d\n", status_);
+    printf("No replanning needed because planner_status_=%d\n", planner_status_);
+    printf("or because status_=%d\n", status_);
     return;
   }
 
@@ -1111,6 +1137,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
       std::cout << bold << red << "JPSa didn't find a solution" << reset << std::endl;
       return;
     }
+    std::cout << "This is JPSa" << std::endl;
+    printElementsOfJPS(JPSa);
 
     Eigen::Vector3d C = getFirstIntersectionWithSphere(JPSa, ra, JPSa[0], &lia);
     Eigen::Vector3d C_old = getFirstIntersectionWithSphere(JPS_k_m_1_, ra, JPS_k_m_1_[0], &lik_m_1);
@@ -1130,8 +1158,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
     else
     {
       // Going to decide
-      // std::cout << "Esto es lo que voy a arreglar:" << std::endl;
-      // printElementsOfJPS(JPS_k_m_1_);
+      std::cout << "Esto es lo que voy a arreglar:" << std::endl;
+      printElementsOfJPS(JPS_k_m_1_);
       log_.computed_both = 1;
 
       bool solvedjpsb;
@@ -1142,24 +1170,30 @@ void CVX::replanCB(const ros::TimerEvent& e)
       log_.JPS_fix_solved = solvedjpsb;
       if (solvedjpsb == true)
       {
-        // std::cout << "Esto es JPSb (lo arreglado):" << std::endl;
-        // printElementsOfJPS(JPSb);
-        Eigen::Vector3d D = getFirstIntersectionWithSphere(JPSb, ra, state_pos, &lib);
+        std::cout << "Esto es JPSb (lo arreglado):" << std::endl;
+        printElementsOfJPS(JPSb);
+        Eigen::Vector3d D = getFirstIntersectionWithSphere(JPSb, ra, JPSb[0], &lib);
+        std::cout << "Going to compute norm, la=" << lia << ", lib=" << lib << std::endl;
         dist_a = normJPS(JPSa, lia + 1);
         dist_b = normJPS(JPSb, lib + 1);
+        std::cout << "Norm computed" << std::endl;
 
         double C_vector[9] = { C(0), C(1), C(2), 0, 0, 0, 0, 0, 0 };
+        std::cout << "C=" << C.transpose() << " D=" << D.transpose() << std::endl;
         sg_whole_.setXf(C_vector);
         sg_whole_.findDT(1);
+        std::cout << "Norm computed2" << std::endl;
         double dta = sg_whole_.dt_;
         Ja = dta + dist_a / par_.v_max;
         log_.Ja_inside = dta;
         log_.Ja_outside = dist_a / par_.v_max;
         log_.Ja = Ja;
+        std::cout << "Norm computed3" << std::endl;
 
         double D_vector[9] = { D(0), D(1), D(2), 0, 0, 0, 0, 0, 0 };
         sg_whole_.setXf(D_vector);
         sg_whole_.findDT(1);
+        std::cout << "Norm computed4" << std::endl;
         double dtb = sg_whole_.dt_;
         Jb = dtb + dist_b / par_.v_max;
 
@@ -1405,8 +1439,19 @@ void CVX::replanCB(const ros::TimerEvent& e)
   sg_rescue_.setXf(xf_rescue);
   sg_rescue_.setX0(x0_rescue);
   sg_rescue_.setPolytopes(l_constraints_uo2_);
-  sg_rescue_.setForceFinalConstraint(0);  // !thereIsIntersection If no intersection --> goal is inside
-                                          // polytope --> force final constraint
+
+  bool isMinside = l_constraints_uo2_[l_constraints_uo2_.size() - 1].inside(M);
+
+  // std::cout << "IsMInside=" << isMinside << std::endl;
+  if (isMinside && takeoff_done_ == true)
+  {
+    sg_rescue_.setForceFinalConstraint(1);  // !thereIsIntersection2 If no intersection --> goal is inside
+                                            // polytope --> force final constraint
+  }
+  else
+  {
+    sg_rescue_.setForceFinalConstraint(0);
+  }
 
   if (l_constraints_uo2_[0].inside(posR) == false)
   {
@@ -1511,8 +1556,11 @@ void CVX::replanCB(const ros::TimerEvent& e)
   planner_status_ = REPLANNED;
   mtx_planner_status_.unlock();
   // printf("ReplanCB: planner_status_ = REPLANNED\n");
-
+  Eigen::Vector3d F =
+      sg_rescue_.X_temp_.block(sg_rescue_.X_temp_.rows() - 1, 0, 1, 3);  // Final point of the rescue path
+  std::cout << "*Final Point Rescue Path=" << F.transpose() << std::endl;
   double dist = (term_goal - M).norm();
+  std::cout << "******Distance=" << dist << std::endl;
   if (dist < par_.goal_radius)
   {
     status_ = GOAL_SEEN;
@@ -1853,7 +1901,7 @@ void CVX::pubCB(const ros::TimerEvent& e)
     if (status_ == GOAL_REACHED)
     {
       quadGoal_.dyaw = 0;
-      quadGoal_.yaw = 0;
+      quadGoal_.yaw = quadGoal_.yaw;
     }
 
     mtx_k.lock();

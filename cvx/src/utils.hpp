@@ -625,8 +625,8 @@ inline Eigen::Vector3d getFirstIntersectionWithSphere(vec_Vecf<3>& path, double 
                                                       int* last_index_inside_sphere = NULL,
                                                       bool* noPointsOutsideSphere = NULL)
 {
-  /*  printf("In getFirstIntersectionWithSphere\n");
-    printElementsOfJPS(path);*/
+  // printf("In getFirstIntersectionWithSphere\n");
+  // printElementsOfJPS(path);
   // std::cout << "center=" << center.transpose() << std::endl;
   // printf("here\n");
   if (noPointsOutsideSphere != NULL)
@@ -653,10 +653,11 @@ inline Eigen::Vector3d getFirstIntersectionWithSphere(vec_Vecf<3>& path, double 
   Eigen::Vector3d B;
 
   Eigen::Vector3d intersection;
-
+  // std::cout << "index=" << index << std::endl;
   switch (index)
   {
-    case -1:  // no points are outside the sphere --> find projection center-lastPoint into the sphere
+    case -1:  // no points are outside the sphere --> return last element
+              // std::cout << "no points are outside the sphere" << std::endl;
       A = center;
       B = path[path.size() - 1];
       if (last_index_inside_sphere != NULL)
@@ -669,12 +670,22 @@ inline Eigen::Vector3d getFirstIntersectionWithSphere(vec_Vecf<3>& path, double 
       }
       // std::cout << "Calling intersecion1 with A=" << A.transpose() << "  and B=" << B.transpose() << std::endl;
       intersection = getIntersectionWithSphere(A, B, r, center);
+      // std::cout << "Returning intersection=" << intersection.transpose() << std::endl;
+      // intersection = path[path.size() - 1];
+      if (last_index_inside_sphere != NULL)
+      {
+        *last_index_inside_sphere = 1;
+      }
       break;
     case 0:  // First element is outside the sphere
       printf("First element is still oustide the sphere, there is sth wrong, returning the first element\n");
       intersection = path[0];
       // std::cout << "radius=" << r << std::endl;
       // std::cout << "dist=" << (path[0] - center).norm() << std::endl;
+      if (last_index_inside_sphere != NULL)
+      {
+        *last_index_inside_sphere = 1;
+      }
       break;
     default:
       A = path[index - 1];
@@ -688,7 +699,7 @@ inline Eigen::Vector3d getFirstIntersectionWithSphere(vec_Vecf<3>& path, double 
       }
   }
 
-  bool thereIsIntersec;
+  // bool thereIsIntersec;
 
   return intersection;
 }
