@@ -82,10 +82,10 @@ res: 0.15  #[m] cell dimension = resolution of the map
 
 dc: 0.01            #(seconds) Duration for the interpolation=Value of the timer pubGoal
 goal_radius: 0.2    #(m) Drone has arrived to the goal when distance_to_goal<GOAL_RADIUS
-drone_radius: 0.42  #(m) Used for collision checking
+drone_radius: 0.2  #(m) Used for collision checking
 
-N_whole: 6  #[-] Number of discretization points in the whole trajectory
-N_rescue: 6  #[-] Number of discretization points in the rescue path
+N_whole: 10  #[-] Number of discretization points in the whole trajectory
+N_rescue: 10  #[-] Number of discretization points in the rescue path
 
 offset: 10  # Replanning offset (the initial conditions are taken OFFSET states farther from the last published goal)
 offset_rp: 50 #The rescue path starts X states ahead of the beginning of the whole trajectory
@@ -95,29 +95,29 @@ Ra_max: 6            # [m] Maximum radius of the first sphere
 Rb: 9.0             # [m] Radius of the second sphere
 w_max: 1            # [rd/s] Maximum angular velocity
 alpha_0_deg: 15         #[deg] threshold to ignore current JPS solution, and consider the old one. 0--> always decide
-z_ground: 0.2         #[m] points below this are considered ground
+z_ground: 0.35         #[m] points below this are considered ground
 z_max: 2         #[m] JPS is not allowed to give a solution that goes higher than this height
-inflation_jps: 0.47  #[m] The obstacles are inflated (to run JPS) by this amount
+inflation_jps: 0.4  #[m] The obstacles are inflated (to run JPS) by this amount
 factor_jps: 1  #[m] JPS is run with resolution=factor_jps*(resolution of the map)
 
 
-v_max: 10.0   #[m/s]  5
-a_max: 10.0   #[m/s2] 5
-j_max: 40.0  #[m/s3]  8
+v_max: 5   #[m/s]  5
+a_max: 5   #[m/s2] 5
+j_max: 7  #[m/s3]  8
 
 q: 100  #[-] weight to the 2nd term of the cost function. If it's very big (>1000), Gurobi fails!! (numerical issues)
 
 z_land: 0.02 #[m] z goal for landing
 
 factor_initial_whole: 1
-factor_final_whole: 3
+factor_final_whole: 10 #High final factor is usually not a problem. If it's infeasible, it is usually because dt_ is very small (factor very small)
 factor_increment_whole: 1
 
 factor_initial_rescue: 1
-factor_final_rescue: 2
+factor_final_rescue: 10
 factor_increment_rescue: 1
 
-max_poly: 3 #Should be less than N_whole and N_rescue
-dist_max_vertexes: 1.5 #[m] Maximum distance between two vertexes before doing the cvx decomp (more vertexes are added to force this)
+max_poly: 2 #Should be less than N_whole and N_rescue
+dist_max_vertexes: 1 #[m] Maximum distance between two vertexes before doing the cvx decomp (more vertexes are added to force this)
 gurobi_threads: 1 #[threads] Number of threads that Gurobi will use. If computer is maxed out, threads=1 works faster!
 gurobi_verbose: 0 #Verbosity of Gurobi. 0 or 1

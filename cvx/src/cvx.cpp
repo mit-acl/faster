@@ -144,6 +144,13 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
     abort();
   }
 
+  if (par_.res > par_.inflation_jps)
+  {
+    std::cout << bold << red << "Needed: res <= inflation_jps" << reset
+              << std::endl;  // To decrease the probability of not finding a solution
+    abort();
+  }
+
   optimized_ = false;
   flight_mode_.mode = flight_mode_.NOT_FLYING;
 
@@ -187,7 +194,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
 
   occup_grid_sub_.subscribe(nh_, "occup_grid", 1);
   unknown_grid_sub_.subscribe(nh_, "unknown_grid", 1);
-  sync_.reset(new Sync(MySyncPolicy(10), occup_grid_sub_, unknown_grid_sub_));
+  sync_.reset(new Sync(MySyncPolicy(1), occup_grid_sub_, unknown_grid_sub_));
   sync_->registerCallback(boost::bind(&CVX::mapCB, this, _1, _2));
 
   sub_goal_ = nh_.subscribe("term_goal", 1, &CVX::goalCB, this);
@@ -221,36 +228,36 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   R_.header.frame_id = "world";
   R_.id = 0;
   R_.type = visualization_msgs::Marker::SPHERE;
-  R_.scale.x = 0.35;
-  R_.scale.y = 0.35;
-  R_.scale.z = 0.35;
+  R_.scale.x = 0.10;
+  R_.scale.y = 0.10;
+  R_.scale.z = 0.10;
   R_.color = color(ORANGE_TRANS);
 
   // Initialize I marker
   I_.header.frame_id = "world";
   I_.id = 0;
   I_.type = visualization_msgs::Marker::SPHERE;
-  I_.scale.x = 0.35;
-  I_.scale.y = 0.35;
-  I_.scale.z = 0.35;
-  I_.color = color(ORANGE_TRANS);
+  I_.scale.x = 0.10;
+  I_.scale.y = 0.10;
+  I_.scale.z = 0.10;
+  I_.color = color(GREEN);
 
   // Initialize T marker
   B1_.header.frame_id = "world";
   B1_.id = 0;
   B1_.type = visualization_msgs::Marker::SPHERE;
-  B1_.scale.x = 0.35;
-  B1_.scale.y = 0.35;
-  B1_.scale.z = 0.35;
+  B1_.scale.x = 0.10;
+  B1_.scale.y = 0.10;
+  B1_.scale.z = 0.10;
   B1_.color = color(RED);
 
   // Initialize M marker
   M_.header.frame_id = "world";
   M_.id = 0;
   M_.type = visualization_msgs::Marker::SPHERE;
-  M_.scale.x = 0.35;
-  M_.scale.y = 0.35;
-  M_.scale.z = 0.35;
+  M_.scale.x = 0.10;
+  M_.scale.y = 0.10;
+  M_.scale.z = 0.10;
   M_.color = color(BLUE);
 
   // mtx_term_goal.lock();
@@ -725,8 +732,8 @@ vec_Vecf<3> CVX::fix(vec_Vecf<3>& JPS_old, Eigen::Vector3d& start, Eigen::Vector
   int el_eliminated;  // not used
 
   // std::cout << "*********In fix0.7" << std::endl;
-  Eigen::Vector3d inters1 =
-      getFirstCollisionJPS(JPS_old, &thereIsIntersection, el_eliminated);  // intersection starting from start
+  Eigen::Vector3d inters1 = getFirstCollisionJPS(JPS_old, &thereIsIntersection, el_eliminated, MAP,
+                                                 RETURN_INTERSECTION);  // intersection starting from start
   // std::cout << "Here thereIsIntersection=" << thereIsIntersection << std::endl;
   // std::cout << "*********In fix2" << std::endl;
 
@@ -738,8 +745,8 @@ vec_Vecf<3> CVX::fix(vec_Vecf<3>& JPS_old, Eigen::Vector3d& start, Eigen::Vector
     // std::cout << "*****tmp is:" << std::endl;
     // printElementsOfJPS(tmp);
     std::reverse(tmp.begin(), tmp.end());  // flip all the vector
-    Eigen::Vector3d inters2 =
-        getFirstCollisionJPS(tmp, &thereIsIntersection, el_eliminated);  // intersection starting from the goal
+    Eigen::Vector3d inters2 = getFirstCollisionJPS(tmp, &thereIsIntersection, el_eliminated, MAP,
+                                                   RETURN_INTERSECTION);  // intersection starting from the goal
 
     // std::reverse(path_fix2goal.begin(), path_fix2goal.end());
     bool solvedFix, solvedStart2Fix, solvedFix2Goal;
@@ -747,13 +754,39 @@ vec_Vecf<3> CVX::fix(vec_Vecf<3>& JPS_old, Eigen::Vector3d& start, Eigen::Vector
 
     // printf("Calling to fix from\n");
     // std::cout << inters1.transpose() << std::endl << "to" << inters2.transpose() << std::endl;
-    fix = solveJPS3D(inters1, inters2, &solvedFix, 2);
-    // printf("AQUI2\n");
 
-    path_start2fix = solveJPS3D(start, inters1, &solvedStart2Fix, 2);
+    if ((inters1 - inters2).lpNorm<1>() > 0.01)  // Hack to delete corner cases TODO
+    // if (inters1.isApprox(inters2, 0.01))
+    {
+      fix = solveJPS3D(inters1, inters2, &solvedFix, 2);
+    }
+    else
+    {
+      fix.push_back(inters1);
+    }
+    printf("AQUI2\n");
 
-    // printf("AQUI3\n");
-    path_fix2goal = solveJPS3D(inters2, goal, &solvedFix2Goal, 2);
+    if ((start - inters1).lpNorm<1>() > 0.01)  // Hack to delete corner cases TODO
+    // if (start.isApprox(inters1, 0.01))
+    {
+      path_start2fix = solveJPS3D(start, inters1, &solvedStart2Fix, 2);
+    }
+    else
+    {
+      path_start2fix.push_back(start);
+    }
+
+    printf("AQUI3\n");
+
+    if ((inters2 - goal).lpNorm<1>() > 0.01)  // Hack to delete corner cases TODO
+    // if (inters2.isApprox(goal, 0.01))
+    {
+      path_fix2goal = solveJPS3D(inters2, goal, &solvedFix2Goal, 2);
+    }
+    else
+    {
+      path_fix2goal.push_back(inters2);
+    }
 
     // printf("AQUI4\n");
 
@@ -1096,7 +1129,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   Eigen::Vector3d InitPos;
   InitPos << x0[0], x0[1], x0[2];
 
-  // std::cout << "here6" << std::endl;
+  std::cout << "InitPos" << InitPos << std::endl;
 
   static bool first_time = true;  // how many times I've solved JPSk
 
@@ -1252,7 +1285,9 @@ void CVX::replanCB(const ros::TimerEvent& e)
   bool noPointsOutsideSphere1;
   // std::cout << "here, ra=" << ra << std::endl;
   // std::cout << "here, state_pos=" << state_pos.transpose() << std::endl;
-  // printElementsOfJPS(JPSk);
+
+  std::cout << "JPSk is" << std::endl;
+  printElementsOfJPS(JPSk);
 
   B1 = getFirstIntersectionWithSphere(JPSk, ra, JPSk[0], &li1, &noPointsOutsideSphere1);
 
@@ -1273,6 +1308,9 @@ void CVX::replanCB(const ros::TimerEvent& e)
   // printf("Running CVXDecomp!!!\n");
   double before = ros::Time::now().toSec();
 
+  std::cout << "JPSk_inside_sphere before=" << std::endl;
+  printElementsOfJPS(JPSk_inside_sphere);
+
   if (JPSk_inside_sphere.size() > par_.max_poly + 1)  // If I have more than (par_.max_poly + 1) vertexes
   {
     // std::cout << "ANTES" << std::endl;
@@ -1284,8 +1322,12 @@ void CVX::replanCB(const ros::TimerEvent& e)
     // std::cout << "DESPUES" << std::endl;
     // printElementsOfJPS(JPSk_inside_sphere);
   }
+  std::cout << "Final condition for the whole trajectory" << B1.transpose() << std::endl;
+
   double xf[9] = { B1(0), B1(1), B1(2), 0, 0, 0, 0, 0, 0 };
 
+  std::cout << "JPSk_inside_sphere=" << std::endl;
+  printElementsOfJPS(JPSk_inside_sphere);
   MyTimer cvx_ellip_decomp_t(true);
   cvxEllipsoidDecompOcc(JPSk_inside_sphere);  // result saved in l_constraints_
   log_.cvx_decomp_whole_ms = cvx_ellip_decomp_t.ElapsedMs();
@@ -1445,11 +1487,13 @@ void CVX::replanCB(const ros::TimerEvent& e)
   // std::cout << "IsMInside=" << isMinside << std::endl;
   if (isMinside && takeoff_done_ == true)
   {
+    std::cout << "Forcing final constraint M=" << M.transpose() << std::endl;
     sg_rescue_.setForceFinalConstraint(1);  // !thereIsIntersection2 If no intersection --> goal is inside
                                             // polytope --> force final constraint
   }
   else
   {
+    std::cout << "Not Forcing final constraint" << std::endl;
     sg_rescue_.setForceFinalConstraint(0);
   }
 
@@ -1466,6 +1510,11 @@ void CVX::replanCB(const ros::TimerEvent& e)
   MyTimer rescue_gurobi_t(true);
   bool solved_rescue = sg_rescue_.genNewTraj();
 
+  if (solved_rescue == false)
+  {
+    std::cout << red << "No solution found for the rescue path" << reset << std::endl;
+    return;
+  }
   log_.gurobi_rescue_ms = sg_rescue_.runtime_ms_;
   log_.gurobi_rescue_ms_mine = rescue_gurobi_t.ElapsedMs();
   log_.gurobi_rescue_trials = sg_rescue_.trials_;
@@ -1475,12 +1524,6 @@ void CVX::replanCB(const ros::TimerEvent& e)
   std::cout << bold << blue << "RescueGurobi:  " << std::fixed << rescue_gurobi_t << "ms, (" << std::fixed
             << sg_rescue_.runtime_ms_ << " ms), " << reset << sg_rescue_.trials_ << " trials (dt=" << sg_rescue_.dt_
             << "), f_worked=" << std::setprecision(2) << sg_rescue_.factor_that_worked_ << std::endl;
-
-  if (solved_rescue == false)
-  {
-    std::cout << red << "No solution found for the rescue path" << reset << std::endl;
-    return;
-  }
   ///////////////////////////////////////////////////////////
   ///////////////       MERGE RESULTS    ////////////////////
   ///////////////////////////////////////////////////////////
@@ -1581,12 +1624,12 @@ void CVX::replanCB(const ros::TimerEvent& e)
   mtx_offsets.unlock();
 
   double new_init_whole = sg_whole_.factor_that_worked_ - 0.25;
-  double new_final_whole = sg_whole_.factor_that_worked_ + 0.25;
+  double new_final_whole = sg_whole_.factor_that_worked_ + 10.25;  // high end factor is not a problem
   double new_increment_whole = 0.5;
   sg_whole_.setFactorInitialAndFinalAndIncrement(new_init_whole, new_final_whole, new_increment_whole);
 
   double new_init_rescue = sg_rescue_.factor_that_worked_ - 0.25;
-  double new_final_rescue = sg_rescue_.factor_that_worked_ + 0.25;
+  double new_final_rescue = sg_rescue_.factor_that_worked_ + 10.25;  // high end factor is not a problem
   double new_increment_rescue = 0.5;
 
   std::cout << "Next factors: W: " << std::fixed << std::setprecision(2) << new_init_whole << "-->" << new_final_whole
@@ -2156,8 +2199,16 @@ void CVX::cvxEllipsoidDecompUnkOcc2(vec_Vecf<3>& path)
   {
     return;
   }
-  // Using ellipsoid decomposition
-  ellip_decomp_util_uo2_.set_obs(vec_uo_);
+
+  if (takeoff_done_ == false)
+  {
+    vec_Vec3f empty_obs;
+    ellip_decomp_util_uo2_.set_obs(empty_obs);  // No unkown space when taking off
+  }
+  else
+  {
+    ellip_decomp_util_uo2_.set_obs(vec_uo_);
+  }
   ellip_decomp_util_uo2_.set_local_bbox(
       Vec3f(2, 2, 1));  // Only try to find cvx decomp in the Mikowsski sum of JPS and this box (I think)
                         // par_.drone_radius
@@ -2618,7 +2669,11 @@ Eigen::Vector3d CVX::getFirstCollisionJPS(vec_Vecf<3>& path, bool* thereIsInters
             original.erase(original.begin() + last_id + 1,
                            original.end());  // Now original contains all the elements eliminated
             original.push_back(path[0]);
-            result = path[0];
+
+            // This is to force the intersection point to be at least par_.drone_radius away from the obstacles
+            reduceJPSbyDistance(original, par_.drone_radius);
+
+            result = original[original.size() - 1];
 
             path = original;  // Copy the resulting path to the reference
                               /*     std::reverse(original.begin(), original.end());  // flip all the vector

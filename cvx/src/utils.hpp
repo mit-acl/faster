@@ -549,6 +549,24 @@ inline double normJPS(vec_Vecf<3>& path, int index_start)
   return distance;
 }
 
+// Crop the end of a JPS path by a given distance
+inline void reduceJPSbyDistance(vec_Vecf<3>& path, double d)
+{
+  double dist_so_far = 0;
+  for (int ii = path.size() - 1; ii > 0; ii--)
+  {
+    Eigen::Vector3d v = path[ii] - path[ii - 1];
+    double dist_bet_segments = v.norm();
+    double dist_so_far = dist_so_far + dist_bet_segments;
+    if (dist_so_far > d)
+    {
+      double dist_wanted = dist_so_far - d;
+      path.erase(path.begin() + ii, path.end());
+      path.push_back(path[path.size() - 1] + v.normalized() * dist_wanted);
+      break;
+    }
+  }
+}
 // given 2 points (A inside and B outside the sphere) it computes the intersection of the lines between
 // that 2 points and the sphere
 inline Eigen::Vector3d getIntersectionWithSphere(Eigen::Vector3d& A, Eigen::Vector3d& B, double r,
