@@ -499,9 +499,9 @@ vec_Vecf<3> CVX::solveJPS3D(Vec3f& start_sent, Vec3f& goal_sent, bool* solved, i
 {
   Eigen::Vector3d start(start_sent(0), start_sent(1), std::max(start_sent(2), 0.0));
   Eigen::Vector3d goal(goal_sent(0), goal_sent(1), std::max(goal_sent(2), 0.0));
-  std::cout << "IN JPS3d" << std::endl;
-  std::cout << "start=" << start.transpose() << std::endl;
-  std::cout << "goal=" << goal.transpose() << std::endl;
+  /*  std::cout << "IN JPS3d" << std::endl;
+    std::cout << "start=" << start.transpose() << std::endl;
+    std::cout << "goal=" << goal.transpose() << std::endl;*/
 
   Vec3f originalStart = start;
 
@@ -884,7 +884,7 @@ void CVX::createMoreVertexes(vec_Vecf<3>& path, double d)
 
 void CVX::replanCB(const ros::TimerEvent& e)
 {
-  std::cout << bold << on_red << "************IN REPLAN CB*********" << reset << std::endl;
+  // std::cout << bold << on_red << "************IN REPLAN CB*********" << reset << std::endl;
 
   MyTimer replanCB_t(true);
 
@@ -963,8 +963,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
   // printf("In replanCB0.4s\n");
   if (status_ == GOAL_SEEN || status_ == GOAL_REACHED || planner_status_ == REPLANNED || status_ == YAWING)
   {
-    printf("No replanning needed because planner_status_=%d\n", planner_status_);
-    printf("or because status_=%d\n", status_);
+    // printf("No replanning needed because planner_status_=%d\n", planner_status_);
+    // printf("or because status_=%d\n", status_);
     return;
   }
 
@@ -1125,11 +1125,11 @@ void CVX::replanCB(const ros::TimerEvent& e)
     mtx_initial_cond.unlock();
   }
 
-  std::cout << "replanCB5\n" << std::endl;
+  // std::cout << "replanCB5\n" << std::endl;
   Eigen::Vector3d InitPos;
   InitPos << x0[0], x0[1], x0[2];
 
-  std::cout << "InitPos" << InitPos << std::endl;
+  // std::cout << "InitPos" << InitPos.transpose() << std::endl;
 
   static bool first_time = true;  // how many times I've solved JPSk
 
@@ -1170,8 +1170,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
       std::cout << bold << red << "JPSa didn't find a solution" << reset << std::endl;
       return;
     }
-    std::cout << "This is JPSa" << std::endl;
-    printElementsOfJPS(JPSa);
+    /*    std::cout << "This is JPSa" << std::endl;
+        printElementsOfJPS(JPSa);*/
 
     Eigen::Vector3d C = getFirstIntersectionWithSphere(JPSa, ra, JPSa[0], &lia);
     Eigen::Vector3d C_old = getFirstIntersectionWithSphere(JPS_k_m_1_, ra, JPS_k_m_1_[0], &lik_m_1);
@@ -1308,8 +1308,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
   // printf("Running CVXDecomp!!!\n");
   double before = ros::Time::now().toSec();
 
-  std::cout << "JPSk_inside_sphere before=" << std::endl;
-  printElementsOfJPS(JPSk_inside_sphere);
+  /*  std::cout << "JPSk_inside_sphere before=" << std::endl;
+    printElementsOfJPS(JPSk_inside_sphere);*/
 
   if (JPSk_inside_sphere.size() > par_.max_poly + 1)  // If I have more than (par_.max_poly + 1) vertexes
   {
@@ -1322,12 +1322,12 @@ void CVX::replanCB(const ros::TimerEvent& e)
     // std::cout << "DESPUES" << std::endl;
     // printElementsOfJPS(JPSk_inside_sphere);
   }
-  std::cout << "Final condition for the whole trajectory" << B1.transpose() << std::endl;
+  // std::cout << "Final condition for the whole trajectory" << B1.transpose() << std::endl;
 
   double xf[9] = { B1(0), B1(1), B1(2), 0, 0, 0, 0, 0, 0 };
 
-  std::cout << "JPSk_inside_sphere=" << std::endl;
-  printElementsOfJPS(JPSk_inside_sphere);
+  /*  std::cout << "JPSk_inside_sphere=" << std::endl;
+    printElementsOfJPS(JPSk_inside_sphere);*/
   MyTimer cvx_ellip_decomp_t(true);
   cvxEllipsoidDecompOcc(JPSk_inside_sphere);  // result saved in l_constraints_
   log_.cvx_decomp_whole_ms = cvx_ellip_decomp_t.ElapsedMs();
@@ -1487,13 +1487,13 @@ void CVX::replanCB(const ros::TimerEvent& e)
   // std::cout << "IsMInside=" << isMinside << std::endl;
   if (isMinside && takeoff_done_ == true)
   {
-    std::cout << "Forcing final constraint M=" << M.transpose() << std::endl;
+    // std::cout << "Forcing final constraint M=" << M.transpose() << std::endl;
     sg_rescue_.setForceFinalConstraint(1);  // !thereIsIntersection2 If no intersection --> goal is inside
                                             // polytope --> force final constraint
   }
   else
   {
-    std::cout << "Not Forcing final constraint" << std::endl;
+    // std::cout << "Not Forcing final constraint" << std::endl;
     sg_rescue_.setForceFinalConstraint(0);
   }
 
@@ -1944,7 +1944,7 @@ void CVX::pubCB(const ros::TimerEvent& e)
     if (status_ == GOAL_REACHED)
     {
       quadGoal_.dyaw = 0;
-      quadGoal_.yaw = quadGoal_.yaw;
+      // quadGoal_.yaw = quadGoal_.yaw;
     }
 
     mtx_k.lock();
@@ -1985,8 +1985,8 @@ void CVX::pubCB(const ros::TimerEvent& e)
 
 void CVX::modeCB(const acl_msgs::QuadFlightMode& msg)
 {
-  // printf("In modeCB\n");
-  if (msg.mode == msg.LAND && flight_mode_.mode != flight_mode_.LAND)
+  printf("*****In modeCB\n");
+  if (msg.mode == msg.LAND)  //&& flight_mode_.mode != flight_mode_.LAND
   {
     printf("LANDING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
     // Solver Vel
@@ -2000,27 +2000,46 @@ void CVX::modeCB(const acl_msgs::QuadFlightMode& msg)
         solver_accel_.set_max(max_values);  // TODO: To land, I use u_min_
         solver_accel_.set_xf(xf);
         solver_accel_.genNewTraj();*/
+    mtx_goals.lock();
     mtx_state.lock();
     double x0[9] = { state_.pos.x, state_.pos.y, state_.pos.z, state_.vel.x, state_.vel.y, state_.vel.z, 0, 0, 0 };
 
     double xf[9] = { state_.pos.x, state_.pos.y, par_.z_land, 0, 0, 0, 0, 0, 0 };
     mtx_state.unlock();
     mtx_goals.unlock();
+
+    sg_whole_.setXf(xf);
+    sg_whole_.setX0(x0);
+    std::vector<LinearConstraint3D> l_constraints_empty;
+    sg_whole_.setPolytopes(l_constraints_empty);
+    bool solved_landing = false;
+    solved_landing = sg_whole_.genNewTraj();
+
+    if (solved_landing == false)
+    {
+      std::cout << bold << red << "No solution for landing" << reset << std ::endl;
+    }
+    else
+    {
+      std::cout << "solution found" << std::endl;
+      sg_whole_.fillXandU();
+      to_land_ = true;
+      mtx_X_U_temp.lock();
+      U_temp_ = sg_whole_.U_temp_;
+      X_temp_ = sg_whole_.X_temp_;
+      mtx_X_U_temp.unlock();
+      mtx_planner_status_.lock();
+      planner_status_ = REPLANNED;
+      mtx_planner_status_.unlock();
+    }
+
     // printf("Hola6.7\n");
-    /*    solver_jerk_.set_xf(xf);
-        solver_jerk_.set_x0(x0);
-        k_initial_cond_ = std::min(k_ + par_.offset, (int)(X_.rows() - 1));
-        solver_jerk_.set_x0(x0);
-        solver_jerk_.set_xf(xf);
-        solver_jerk_.genNewTraj();
-        to_land_ = true;
-    mtx_X_U_temp.lock();
-    U_temp_ = solver_jerk_.getU();
-    X_temp_ = solver_jerk_.getX();
-    mtx_X_U_temp.unlock();*/
-    mtx_planner_status_.lock();
-    planner_status_ = REPLANNED;
-    mtx_planner_status_.unlock();
+    /*        solver_jerk_.set_xf(xf);
+            solver_jerk_.set_x0(x0);
+            k_initial_cond_ = std::min(k_ + par_.offset, (int)(X_.rows() - 1));
+            solver_jerk_.set_x0(x0);
+            solver_jerk_.set_xf(xf);
+            solver_jerk_.genNewTraj();*/
   }
   flight_mode_.mode = msg.mode;
 }

@@ -579,6 +579,7 @@ bool SolverGurobi::genNewTraj()
   {
     trials_ = trials_ + 1;
     findDT(i);
+    // std::cout << "Going to try with dt_= " << dt_ << std::endl;
     setPolytopesConstraints();
     setConstraintsX0();
     setConstraintsXf();
@@ -860,14 +861,19 @@ double SolverGurobi::getDTInitial()
   float t_jy = 0;
   float t_jz = 0;
 
-  t_vx = (xf_[0] - x0_[0]) / v_max_;
-  t_vy = (xf_[1] - x0_[1]) / v_max_;
-  t_vz = (xf_[2] - x0_[2]) / v_max_;
+  /*  std::cout << "get DT, x0_=" << x0_[0] << " " << x0_[1] << " " << x0_[2] << "--> xf_=" << xf_[0] << " " << xf_[1]
+              << " " << xf_[2] << std::endl;*/
+
+  t_vx = fabs(xf_[0] - x0_[0]) / v_max_;
+  t_vy = fabs(xf_[1] - x0_[1]) / v_max_;
+  t_vz = fabs(xf_[2] - x0_[2]) / v_max_;
   // printf("%f\n", t_vx);
   // printf("%f\n", t_vy);
   // printf("%f\n", t_vz);
 
-  // std::cout << "get DT, x0_=" << x0_[0] << x0_[1] << x0_[2] << "xf_=" << xf_[0] << xf_[1] << xf_[2] << std::endl;
+  /*  printf("times vel: t_ax, t_ay, t_az:\n");
+    std::cout << t_vx << "  " << t_vy << "  " << t_vz << std::endl;*/
+
   float jerkx = copysign(1, xf_[0] - x0_[0]) * j_max_;
   float jerky = copysign(1, xf_[1] - x0_[1]) * j_max_;
   float jerkz = copysign(1, xf_[2] - x0_[2]) * j_max_;
@@ -878,50 +884,91 @@ double SolverGurobi::getDTInitial()
   float v0y = x0_[4];
   float v0z = x0_[5];
 
+  // Solve For JERK
   // polynomial ax3+bx2+cx+d=0 --> coeff=[d c b a]
-  Eigen::Vector4d coeffx(x0_[0] - xf_[0], v0x, a0x / 2, jerkx / 6);
-  Eigen::Vector4d coeffy(x0_[1] - xf_[1], v0y, a0y / 2, jerky / 6);
-  Eigen::Vector4d coeffz(x0_[2] - xf_[2], v0z, a0z / 2, jerkz / 6);
+  Eigen::Vector4d coeff_jx(x0_[0] - xf_[0], v0x, a0x / 2.0, jerkx / 6.0);
+  Eigen::Vector4d coeff_jy(x0_[1] - xf_[1], v0y, a0y / 2.0, jerky / 6.0);
+  Eigen::Vector4d coeff_jz(x0_[2] - xf_[2], v0z, a0z / 2.0, jerkz / 6.0);
 
-  // std::cout << "Coefficients" << coeffx.transpose() << coeffy.transpose() << coeffz.transpose() << std::endl;
+  /*  std::cout << "Coefficients for jerk" << std::endl;
+    std::cout << "Coeffx=" << coeff_jx.transpose() << std::endl;
+    std::cout << "Coeffy=" << coeff_jy.transpose() << std::endl;
+    std::cout << "Coeffz=" << coeff_jz.transpose() << std::endl;*/
 
-  Eigen::PolynomialSolver<double, Eigen::Dynamic> psolvex(coeffx);
-  Eigen::PolynomialSolver<double, Eigen::Dynamic> psolvey(coeffy);
-  Eigen::PolynomialSolver<double, Eigen::Dynamic> psolvez(coeffz);
+  Eigen::PolynomialSolver<double, Eigen::Dynamic> psolve_jx(coeff_jx);
+  Eigen::PolynomialSolver<double, Eigen::Dynamic> psolve_jy(coeff_jy);
+  Eigen::PolynomialSolver<double, Eigen::Dynamic> psolve_jz(coeff_jz);
 
-  std::vector<double> realRootsx;
-  std::vector<double> realRootsy;
-  std::vector<double> realRootsz;
-  psolvex.realRoots(realRootsx);
-  psolvey.realRoots(realRootsy);
-  psolvez.realRoots(realRootsz);
+  std::vector<double> realRoots_jx;
+  std::vector<double> realRoots_jy;
+  std::vector<double> realRoots_jz;
+  psolve_jx.realRoots(realRoots_jx);
+  psolve_jy.realRoots(realRoots_jy);
+  psolve_jz.realRoots(realRoots_jz);
 
-  t_jx = *std::min_element(realRootsx.begin(), realRootsx.end());
-  t_jy = *std::min_element(realRootsy.begin(), realRootsy.end());
-  t_jz = *std::min_element(realRootsz.begin(), realRootsz.end());
+  t_jx = MinPositiveElement(realRoots_jx);
+  t_jy = MinPositiveElement(realRoots_jy);
+  t_jz = MinPositiveElement(realRoots_jz);
 
-  // printf("after: t_jx, t_jy, t_jz:\n");
-  // std::cout << t_jx << "  " << t_jy << "  " << t_jz << std::endl;
+  /*  printf("times jerk: t_jx, t_jy, t_jz:\n");
+    std::cout << t_jx << "  " << t_jy << "  " << t_jz << std::endl;*/
 
   float accelx = copysign(1, xf_[0] - x0_[0]) * a_max_;
   float accely = copysign(1, xf_[1] - x0_[1]) * a_max_;
   float accelz = copysign(1, xf_[2] - x0_[2]) * a_max_;
-  // Solve equation xf=x0+v0t+0.5*a*t^2
-  Eigen::Vector3f coeff3x(0.5 * accelx, v0x, x0_[0] - xf_[0]);
-  Eigen::Vector3f coeff3y(0.5 * accely, v0y, x0_[1] - xf_[1]);
-  Eigen::Vector3f coeff3z(0.5 * accelz, v0z, x0_[2] - xf_[2]);
 
-  t_ax = solvePolynomialOrder2(coeff3x);
-  t_ay = solvePolynomialOrder2(coeff3y);
-  t_az = solvePolynomialOrder2(coeff3z);
+  // Solve For ACCELERATION
+  // polynomial ax2+bx+c=0 --> coeff=[c b a]
+  Eigen::Vector3d coeff_ax(x0_[0] - xf_[0], v0x, 0.5 * accelx);
+  Eigen::Vector3d coeff_ay(x0_[1] - xf_[1], v0y, 0.5 * accely);
+  Eigen::Vector3d coeff_az(x0_[2] - xf_[2], v0z, 0.5 * accelz);
 
+  /*  std::cout << "Coefficients for accel" << std::endl;
+    std::cout << "coeff_ax=" << coeff_ax.transpose() << std::endl;
+    std::cout << "coeff_ay=" << coeff_ay.transpose() << std::endl;
+    std::cout << "coeff_az=" << coeff_az.transpose() << std::endl;*/
+
+  Eigen::PolynomialSolver<double, Eigen::Dynamic> psolve_ax(coeff_ax);
+  Eigen::PolynomialSolver<double, Eigen::Dynamic> psolve_ay(coeff_ay);
+  Eigen::PolynomialSolver<double, Eigen::Dynamic> psolve_az(coeff_az);
+
+  std::vector<double> realRoots_ax;
+  std::vector<double> realRoots_ay;
+  std::vector<double> realRoots_az;
+  psolve_ax.realRoots(realRoots_ax);
+  psolve_ay.realRoots(realRoots_ay);
+  psolve_az.realRoots(realRoots_az);
+
+  t_ax = MinPositiveElement(realRoots_ax);
+  t_ay = MinPositiveElement(realRoots_ay);
+  t_az = MinPositiveElement(realRoots_az);
+
+  /*  // Solve equation xf=x0+v0t+0.5*a*t^2
+    Eigen::Vector3f coeff3x(0.5 * accelx, v0x, x0_[0] - xf_[0]);
+    Eigen::Vector3f coeff3y(0.5 * accely, v0y, x0_[1] - xf_[1]);
+    Eigen::Vector3f coeff3z(0.5 * accelz, v0z, x0_[2] - xf_[2]);
+
+
+
+    std::cout << "Coefficients for accel" << std::endl;
+    std::cout << "Coeff3x=" << coeff3x.transpose() << std::endl;
+    std::cout << "Coeff3y=" << coeff3y.transpose() << std::endl;
+    std::cout << "Coeff3z=" << coeff3z.transpose() << std::endl;
+
+    t_ax = solvePolynomialOrder2(coeff3x);
+    t_ay = solvePolynomialOrder2(coeff3y);
+    t_az = solvePolynomialOrder2(coeff3z);*/
+
+  /*  printf("times accel: t_ax, t_ay, t_az:\n");
+    std::cout << t_ax << "  " << t_ay << "  " << t_az << std::endl;
+  */
   dt_initial = std::max({ t_vx, t_vy, t_vz, t_ax, t_ay, t_az, t_jx, t_jy, t_jz }) / N_;
   if (dt_initial > 10000)  // happens when there is no solution to the previous eq.
   {
-    printf("there is not a solution to the previous equations");
+    printf("there is not a solution to the previous equations\n");
     dt_initial = 0;
   }
-  // printf("dt_initial=%f", dt_initial);
+  // printf("returning dt_initial=%f\n", dt_initial);
   return dt_initial;
 }
 

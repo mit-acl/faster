@@ -16,6 +16,21 @@
 #include <type_traits>
 // using namespace std;
 
+inline double MinPositiveElement(std::vector<double> v)
+{
+  std::sort(v.begin(), v.end());  // sorted in ascending order
+  double min_value = 0;
+  for (int i = 0; i < v.size(); i++)
+  {
+    if (v[i] > 0)
+    {
+      min_value = v[i];
+      break;
+    }
+  }
+  return min_value;
+}
+
 template <typename T>
 GRBQuadExpr GetNorm2(const std::vector<T>& x)  // Return the squared norm of a vector
 {

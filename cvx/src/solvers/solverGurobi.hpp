@@ -18,17 +18,17 @@
 using namespace termcolor;
 
 // TODO: This function is the same as solvePolyOrder2 but with other name (weird conflicts...)
-inline float solvePolynomialOrder2(Eigen::Vector3f& coeff)
+inline double solvePolynomialOrder2(Eigen::Vector3f& coeff)
 {
   // std::cout << "solving\n" << coeff.transpose() << std::endl;
-  float a = coeff[0];
-  float b = coeff[1];
-  float c = coeff[2];
-  float dis = b * b - 4 * a * c;
+  double a = coeff(0);
+  double b = coeff(1);
+  double c = coeff(2);
+  double dis = b * b - 4 * a * c;
   if (dis >= 0)
   {
-    float x1 = (-b - sqrt(dis)) / (2 * a);  // x1 will always be smaller than x2
-    float x2 = (-b + sqrt(dis)) / (2 * a);
+    double x1 = (-b - sqrt(dis)) / (2 * a);  // x1 will always be smaller than x2
+    double x2 = (-b + sqrt(dis)) / (2 * a);
 
     if (x1 >= 0)
     {
