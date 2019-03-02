@@ -884,7 +884,7 @@ void CVX::createMoreVertexes(vec_Vecf<3>& path, double d)
 
 void CVX::replanCB(const ros::TimerEvent& e)
 {
-  // std::cout << bold << on_red << "************IN REPLAN CB*********" << reset << std::endl;
+  std::cout << bold << on_red << "************IN REPLAN CB*********" << reset << std::endl;
 
   MyTimer replanCB_t(true);
 
@@ -900,6 +900,14 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
     log_.computed_both = 0;*/
 
+  if (!state_initialized_ || !kdtree_map_initialized_ || !kdtree_unk_initialized_ || !goal_click_initialized_)
+  {
+      ROS_WARN("Waiting to initialize kdTree_map and/or kdTree_unk and/or goal_click and/or state_");
+    return;
+  }
+  
+  std::cout<<"state_initialized_="<<state_initialized_<<std::endl;
+
   // MyTimer time_init(true);
   // std::cout << "In replanCB0" << std::endl;
   double t0replanCB = ros::Time::now().toSec();
@@ -907,7 +915,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
   mtx_state.lock();
   Eigen::Vector3d state_pos(state_.pos.x, state_.pos.y, state_.pos.z);  // Local copy of state
   Eigen::Vector3d state_vel(state_.vel.x, state_.vel.y, state_.vel.z);  // Local copy of state
-
+  
+  std::cout<<"state_pos="<<state_pos.transpose()<<std::endl;
   mtx_state.unlock();
 
   // printf("replanCB: Before mtx_term_goal!!!\n");
@@ -922,11 +931,6 @@ void CVX::replanCB(const ros::TimerEvent& e)
     pubintersecPoint(Eigen::Vector3d::Zero(), false);  // Clear the intersection points markers
   }
 
-  if (!kdtree_map_initialized_ || !kdtree_unk_initialized_ || !goal_click_initialized_)
-  {
-    ROS_WARN("Waiting to initialize kdTree_map and/or kdTree_unk and/or goal_click");
-    return;
-  }
 
   /*  mtx_term_term_goal.lock();
     Eigen::Vector3d P2 = term_term_goal_;
@@ -945,10 +949,14 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   double dist_to_goal_commanded = (term_term_goal - state_pos).norm();
 
+  std::cout<<"term_term_goal"<<term_term_goal.transpose()<<std::endl;
+  std::cout<<"state_pos"<<state_pos.transpose()<<std::endl;
+  std::cout<<"dist_to_goal_commanded="<<dist_to_goal_commanded<<std::endl;
   if (dist_to_goal_commanded < par_.goal_radius)
   {
     if (takeoff_done_ == false)
     {
+      std::cout<<bold<<green<<"Takeoff_done_!"<<std::endl;
       takeoff_done_ = true;
     }
   }
@@ -1112,15 +1120,15 @@ void CVX::replanCB(const ros::TimerEvent& e)
   {
     mtx_initial_cond.lock();
 
-    x0[0] = initialCond_.pos.x;
-    x0[1] = initialCond_.pos.y;
-    x0[2] = initialCond_.pos.z;
-    x0[3] = initialCond_.vel.x;
-    x0[4] = initialCond_.vel.y;
-    x0[5] = initialCond_.vel.z;
-    x0[6] = initialCond_.accel.x;
-    x0[7] = initialCond_.accel.y;
-    x0[8] = initialCond_.accel.z;
+    x0[0] = state_pos(0);
+    x0[1] = state_pos(1);
+    x0[2] = state_pos(2);
+    x0[3] = state_vel(0);
+    x0[4] = state_vel(1);
+    x0[5] = state_vel(2);
+    x0[6] = 0;
+    x0[7] = 0;
+    x0[8] = 0;
 
     mtx_initial_cond.unlock();
   }
@@ -1129,12 +1137,12 @@ void CVX::replanCB(const ros::TimerEvent& e)
   Eigen::Vector3d InitPos;
   InitPos << x0[0], x0[1], x0[2];
 
-  // std::cout << "InitPos" << InitPos.transpose() << std::endl;
+  std::cout << "InitPos" << InitPos.transpose() << std::endl;
 
   static bool first_time = true;  // how many times I've solved JPSk
 
-  // std::cout << "Term Goal: *******************************" << std::endl;
-  // std::cout << term_goal << std::endl;
+  std::cout << "Term Goal: *******************************" << std::endl;
+  std::cout << term_goal.transpose() << std::endl;
 
   double ra = std::min((dist_to_goal - 0.001), par_.Ra);
 
@@ -1294,11 +1302,11 @@ void CVX::replanCB(const ros::TimerEvent& e)
   vec_Vecf<3> JPSk_inside_sphere(JPSk.begin(), JPSk.begin() + li1 + 1);  // Elements of JPS that are inside the sphere
   JPSk_inside_sphere.push_back(B1);
 
-  // std::cout << "Before creating more vertexes:" << std::endl;
-  // printElementsOfJPS(JPSk_inside_sphere);
+  std::cout << "Before creating more vertexes:" << std::endl;
+  printElementsOfJPS(JPSk_inside_sphere);
   createMoreVertexes(JPSk_inside_sphere, par_.dist_max_vertexes);
-  // std::cout << "After creating more vertexes:" << std::endl;
-  // printElementsOfJPS(JPSk_inside_sphere);
+  std::cout << "After creating more vertexes:" << std::endl;
+  printElementsOfJPS(JPSk_inside_sphere);
   //////////////////////////////////////////////////////////////////////////
   //////////// Solve with GUROBI Whole trajectory //////////////////////////
   /////////////////////////////////////////////////////////////////////////
@@ -1313,14 +1321,14 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   if (JPSk_inside_sphere.size() > par_.max_poly + 1)  // If I have more than (par_.max_poly + 1) vertexes
   {
-    // std::cout << "ANTES" << std::endl;
-    // printElementsOfJPS(JPSk_inside_sphere);
+    std::cout << "ANTES JPSk_inside_sphere" << std::endl;
+    printElementsOfJPS(JPSk_inside_sphere);
     JPSk_inside_sphere.erase(JPSk_inside_sphere.begin() + par_.max_poly + 1,
                              JPSk_inside_sphere.end());  // Force JPS to have less than par_.max_poly elements
     B1 = JPSk_inside_sphere[JPSk_inside_sphere.size() - 1];
     // std::cout << "JPSk_inside_sphere tiene " << JPSk_inside_sphere.size() << "polytopes" << std::endl;
-    // std::cout << "DESPUES" << std::endl;
-    // printElementsOfJPS(JPSk_inside_sphere);
+    std::cout << "DESPUES JPSk_inside_sphere" << std::endl;
+    printElementsOfJPS(JPSk_inside_sphere);
   }
   // std::cout << "Final condition for the whole trajectory" << B1.transpose() << std::endl;
 
@@ -1392,9 +1400,9 @@ void CVX::replanCB(const ros::TimerEvent& e)
   mtx_offsets.unlock();
   // std::cout << "index=" << index << std::endl;
 
-  /*  std::cout << "******************Actual state:" << std::endl;
+    std::cout << "******************Actual state:" << std::endl;
     std::cout << "Pos=" << state_pos.transpose() << std::endl;
-    std::cout << "Vel=" << state_vel.transpose() << std::endl;*/
+    std::cout << "Vel=" << state_vel.transpose() << std::endl;
 
   Eigen::Vector3d posR(sg_whole_.X_temp_(index, 0), sg_whole_.X_temp_(index, 1), sg_whole_.X_temp_(index, 2));
   Eigen::Vector3d velR(sg_whole_.X_temp_(index, 3), sg_whole_.X_temp_(index, 4), sg_whole_.X_temp_(index, 5));
@@ -1407,11 +1415,12 @@ void CVX::replanCB(const ros::TimerEvent& e)
   vec_Vecf<3> JPSk_inside_sphere_tmp = JPSk_inside_sphere;
   bool thereIsIntersection2;
   int el_eliminated2;
-  // std::cout << "JPSk_inside_sphere_tmp ANTES:" << std::endl;
-  // printElementsOfJPS(JPSk_inside_sphere_tmp);
+  std::cout << "JPSk_inside_sphere_tmp ANTES:" << std::endl;
+  printElementsOfJPS(JPSk_inside_sphere_tmp);
   Eigen::Vector3d M = getFirstCollisionJPS(JPSk_inside_sphere_tmp, &thereIsIntersection2, el_eliminated2, UNKNOWN_MAP,
                                            RETURN_INTERSECTION);  // results saved in JPSk_inside_sphere_tmp
 
+   std::cout << "Point M is:"<<M.transpose() << std::endl;
   if (par_.visual)
   {
     M_.header.stamp = ros::Time::now();
@@ -1421,10 +1430,13 @@ void CVX::replanCB(const ros::TimerEvent& e)
     pub_pointM_.publish(M_);
   }
 
-  // std::cout << "Elements Eliminated=" << el_eliminated2 << std::endl;
-  // std::cout << "JPSk_inside_sphere_tmp DESPUES:" << std::endl;
+  std::cout << "Elements Eliminated=" << el_eliminated2 << std::endl;
+  std::cout << "JPSk_inside_sphere_tmp DESPUES:" << std::endl;
+
+  printElementsOfJPS(JPSk_inside_sphere_tmp);
+
   JPSk_inside_sphere_tmp[0] = posR;
-  // printElementsOfJPS(JPSk_inside_sphere_tmp);
+
 
   std::cout << bold << blue << "OtherStuff 3:  " << std::fixed << otherStuff3_t << "ms" << reset << std::endl;
 
@@ -1931,7 +1943,7 @@ void CVX::pubCB(const ros::TimerEvent& e)
       double desired_yaw = atan2(B_[1] - quadGoal_.pos.y, B_[0] - quadGoal_.pos.x);
       double diff = desired_yaw - quadGoal_.yaw;
       angle_wrap(diff);
-      if (JPSk_solved_ == true)
+      if (JPSk_solved_ == true and takeoff_done_==true)
       {
         yaw(diff, quadGoal_);
       }
@@ -1944,7 +1956,7 @@ void CVX::pubCB(const ros::TimerEvent& e)
     if (status_ == GOAL_REACHED)
     {
       quadGoal_.dyaw = 0;
-      // quadGoal_.yaw = quadGoal_.yaw;
+      quadGoal_.yaw = quadGoal_.yaw;
     }
 
     mtx_k.lock();
@@ -2051,6 +2063,8 @@ void CVX::stateCB(const acl_msgs::State& msg)
   //       msg.vel.z);
   mtx_state.lock();
   state_ = msg;
+  state_initialized_=true;
+  printf("(State): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", msg.pos.x, msg.pos.y, msg.pos.z, msg.vel.x, msg.vel.y,msg.vel.z);
   mtx_state.unlock();
   // Stop updating when we get GO
   if (flight_mode_.mode == flight_mode_.NOT_FLYING || flight_mode_.mode == flight_mode_.KILL)
@@ -2221,6 +2235,7 @@ void CVX::cvxEllipsoidDecompUnkOcc2(vec_Vecf<3>& path)
 
   if (takeoff_done_ == false)
   {
+    std::cout<<bold<<green<<"No takeoff_done_ done yet"<<std::endl;
     vec_Vec3f empty_obs;
     ellip_decomp_util_uo2_.set_obs(empty_obs);  // No unkown space when taking off
   }
@@ -2622,9 +2637,9 @@ Eigen::Vector3d CVX::getFirstCollisionJPS(vec_Vecf<3>& path, bool* thereIsInters
   vec_Vecf<3> original = path;
 
   // vec_Vecf<3> path_behind;
-  /*  std::cout << "In getFirstCollisionJPS\n" << std::endl;
+    std::cout << "In getFirstCollisionJPS\n" << std::endl;
     std::cout << "*****ORIGINAL******" << std::endl;
-    printElementsOfJPS(original);*/
+    printElementsOfJPS(original);
   Eigen::Vector3d first_element = path[0];
   Eigen::Vector3d last_search_point = path[0];
   Eigen::Vector3d inters = path[0];
@@ -2647,7 +2662,7 @@ Eigen::Vector3d CVX::getFirstCollisionJPS(vec_Vecf<3>& path, bool* thereIsInters
   el_eliminated = 0;  // number of elements eliminated
 
   // Find the next eig_search_point
-  int last_id = 0;  // this is the last index inside the sphere
+  int last_id = -1;  // this is the last index inside the sphere
   while (path.size() > 0)
   {
     pcl_search_point = eigenPoint2pclPoint(path[0]);
@@ -2671,20 +2686,33 @@ Eigen::Vector3d CVX::getFirstCollisionJPS(vec_Vecf<3>& path, bool* thereIsInters
     {
       r = sqrt(dist2_map[0]);
 
-      // std::cout << "r=" << r << std::endl;
+      std::cout << "r=" << r << std::endl;
 
       if (r < par_.inflation_jps)  // collision of the JPS path and an inflated obstacle --> take last search point
       {
-        // std::cout << "Collision detected" << std::endl;  // We will return the search_point
+        std::cout << "Collision detected" << std::endl;  // We will return the search_point
         // pubJPSIntersection(inters);
         // inters = path[0];  // path[0] is the search_point I'm using.
+         if(last_id==-1){
+            std::cout<<red<<bold<<"The first point is in collision --> Hacking"<<reset<<std::endl;
+          }
         switch (type_return)
         {
+
           case RETURN_LAST_VERTEX:
             result = last_search_point;
             break;
           case RETURN_INTERSECTION:
-            // std::cout << "In Return Intersection, last_id=" << last_id << std::endl;
+              if(last_id==-1){ //Hacking (TODO)
+              Eigen::Vector3d tmp;
+              tmp<<original[0](0)+0.01,original[0](1),original[0](2);
+              path.clear();
+              path.push_back(original[0]);
+              path.push_back(tmp);
+              result=original[original.size() - 1];
+              }
+              else{
+            std::cout << "In Return Intersection, last_id=" << last_id << std::endl;
             original.erase(original.begin() + last_id + 1,
                            original.end());  // Now original contains all the elements eliminated
             original.push_back(path[0]);
@@ -2692,9 +2720,14 @@ Eigen::Vector3d CVX::getFirstCollisionJPS(vec_Vecf<3>& path, bool* thereIsInters
             // This is to force the intersection point to be at least par_.drone_radius away from the obstacles
             reduceJPSbyDistance(original, par_.drone_radius);
 
-            result = original[original.size() - 1];
 
-            path = original;  // Copy the resulting path to the reference
+
+            result = original[original.size() - 1];
+            
+
+            path = original;
+            }
+              // Copy the resulting path to the reference
                               /*     std::reverse(original.begin(), original.end());  // flip all the vector
                                  result = getFirstIntersectionWithSphere(original, par_.inflation_jps, original[0]);*/
             break;
@@ -2712,8 +2745,7 @@ Eigen::Vector3d CVX::getFirstCollisionJPS(vec_Vecf<3>& path, bool* thereIsInters
       if (no_points_outside_sphere == true)
       {  // JPS doesn't intersect with any obstacle
         *thereIsIntersection = false;
-        // printf("JPS provided doesn't intersect any obstacles, returning the first element of the path you gave
-        // me\n");
+        std::cout<<"JPS provided doesn't intersect any obstacles, returning the first element of the path you gave me\n"<<std::endl;
         result = first_element;
 
         if (type_return == RETURN_INTERSECTION)

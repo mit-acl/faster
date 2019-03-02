@@ -447,4 +447,6 @@ private:
 
   vec_Vecf<3> JPS_k_m_1_;
   bool takeoff_done_ = false;
+
+  bool state_initialized_=false;
 };

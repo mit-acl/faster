@@ -641,7 +641,7 @@ bool SolverGurobi::genNewTraj()
 
 void SolverGurobi::setThreads(int threads)
 {
-  m.set("Threads", std::to_string(threads));
+  //m.set("Threads", std::to_string(threads));
 }
 
 void SolverGurobi::setVerbose(int verbose)

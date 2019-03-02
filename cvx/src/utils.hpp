@@ -643,10 +643,10 @@ inline Eigen::Vector3d getFirstIntersectionWithSphere(vec_Vecf<3>& path, double 
                                                       int* last_index_inside_sphere = NULL,
                                                       bool* noPointsOutsideSphere = NULL)
 {
-  // printf("In getFirstIntersectionWithSphere\n");
-  // printElementsOfJPS(path);
-  // std::cout << "center=" << center.transpose() << std::endl;
-  // printf("here\n");
+  printf("In getFirstIntersectionWithSphere\n");
+  printElementsOfJPS(path);
+  std::cout << "center=" << center.transpose() << std::endl;
+  printf("here\n");
   if (noPointsOutsideSphere != NULL)
   {  // this argument has been provided
     *noPointsOutsideSphere = false;
