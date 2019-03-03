@@ -52,6 +52,10 @@ public:
   double getCost();
   Eigen::MatrixXd getX();
   Eigen::MatrixXd getU();
+
+  double** getx();
+  double** getu();
+
   void setQ(double q);
   void setN(int N);
   void setX0(double x0[]);

@@ -271,6 +271,10 @@ private:
 
   void createMoreVertexes(vec_Vecf<3>& path, double d);
 
+
+bool ARisInFreeSpace(int index);
+
+
   visualization_msgs::Marker setpoint_;
   visualization_msgs::Marker R_;
   visualization_msgs::Marker I_;

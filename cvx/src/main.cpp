@@ -2,6 +2,7 @@
 
 int main(int argc, char **argv)
 {
+  std::cout<<"Going to initialize CVX node"<<std::endl;
   // Initializes ROS, and sets up a node
   ros::init(argc, argv, "cvx");
   ros::NodeHandle nh("~");
@@ -11,8 +12,12 @@ int main(int argc, char **argv)
   ros::CallbackQueue custom_queue2;
   nh_replan_CB.setCallbackQueue(&custom_queue1);
   nh_pub_CB.setCallbackQueue(&custom_queue2);
+
+  std::cout<<"Creating cvx object"<<std::endl;
   CVX cvx(nh, nh_replan_CB, nh_pub_CB);
 
+  std::cout<<"cvx object created"<<std::endl;
+  
   // NOW THE CALLBACK replanCB is IN A DIFFERENT thread than the other callbacks.
 
   // TODO: I think one thread in the line below will be enough (and will have the same effect, becacuse there is only

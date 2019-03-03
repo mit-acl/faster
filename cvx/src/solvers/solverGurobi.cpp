@@ -9,6 +9,8 @@
 
 SolverGurobi::SolverGurobi()
 {
+  std::cout<<"In the Gurobi Constructor\n";
+
   v_max_ = 5;
   a_max_ = 3;
   j_max_ = 5;
@@ -641,7 +643,7 @@ bool SolverGurobi::genNewTraj()
 
 void SolverGurobi::setThreads(int threads)
 {
-  //m.set("Threads", std::to_string(threads));
+  m.set("Threads", std::to_string(threads));
 }
 
 void SolverGurobi::setVerbose(int verbose)

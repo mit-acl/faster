@@ -74,8 +74,8 @@ use_ff: true # use feedforward
 visual: true #publish visualization stuff
 use_vel: false # use velocity. If false, r2=r1;
 
-wdx: 10.0  #[m] world dimension in x
-wdy: 10.0  #[m] world dimension in y
+wdx: 15.0  #[m] world dimension in x
+wdy: 15.0  #[m] world dimension in y
 wdz: 4.0   #[m] world dimension in z
 res: 0.30  #[m] cell dimension = resolution of the map
 
@@ -117,7 +117,7 @@ factor_initial_rescue: 1
 factor_final_rescue: 10
 factor_increment_rescue: 1
 
-max_poly: 3 #Should be less than N_whole and N_rescue
+max_poly: 2 #Should be less than N_whole and N_rescue
 dist_max_vertexes: 1.6 #[m] Maximum distance between two vertexes before doing the cvx decomp (more vertexes are added to force this)
 gurobi_threads: 1 #[threads] Number of threads that Gurobi will use. If computer is maxed out, threads=1 works faster!
 gurobi_verbose: 0 #Verbosity of Gurobi. 0 or 1

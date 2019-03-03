@@ -95,7 +95,7 @@ inline std::vector<Eigen::Vector3d> samplePointsSphere(Eigen::Vector3d& B, doubl
   return tmp;
 }
 
-inline void printElementsOfJPS(vec_Vecf<3> path)
+inline void printElementsOfJPS(vec_Vecf<3>& path)
 {
   // printf("Elements of the path given:\n");
   for (int i = 0; i < path.size(); i++)
@@ -552,12 +552,14 @@ inline double normJPS(vec_Vecf<3>& path, int index_start)
 // Crop the end of a JPS path by a given distance
 inline void reduceJPSbyDistance(vec_Vecf<3>& path, double d)
 {
+  std::cout<<"In reduceJPSbyDistance, path=\n";
+  printElementsOfJPS(path);
   double dist_so_far = 0;
   for (int ii = path.size() - 1; ii > 0; ii--)
   {
     Eigen::Vector3d v = path[ii] - path[ii - 1];
     double dist_bet_segments = v.norm();
-    double dist_so_far = dist_so_far + dist_bet_segments;
+    dist_so_far = dist_so_far + dist_bet_segments;
     if (dist_so_far > d)
     {
       double dist_wanted = dist_so_far - d;
@@ -566,6 +568,8 @@ inline void reduceJPSbyDistance(vec_Vecf<3>& path, double d)
       break;
     }
   }
+  std::cout<<"Finished reduceJPSbyDistance, path=\n";
+   printElementsOfJPS(path);
 }
 // given 2 points (A inside and B outside the sphere) it computes the intersection of the lines between
 // that 2 points and the sphere
@@ -643,10 +647,10 @@ inline Eigen::Vector3d getFirstIntersectionWithSphere(vec_Vecf<3>& path, double 
                                                       int* last_index_inside_sphere = NULL,
                                                       bool* noPointsOutsideSphere = NULL)
 {
-  printf("In getFirstIntersectionWithSphere\n");
-  printElementsOfJPS(path);
-  std::cout << "center=" << center.transpose() << std::endl;
-  printf("here\n");
+  //printf("Utils: In getFirstIntersectionWithSphere\n");
+  //printElementsOfJPS(path);
+  //std::cout << "Utils: center=" << center.transpose() << std::endl;
+  //printf("here\n");
   if (noPointsOutsideSphere != NULL)
   {  // this argument has been provided
     *noPointsOutsideSphere = false;
@@ -671,11 +675,11 @@ inline Eigen::Vector3d getFirstIntersectionWithSphere(vec_Vecf<3>& path, double 
   Eigen::Vector3d B;
 
   Eigen::Vector3d intersection;
-  // std::cout << "index=" << index << std::endl;
+  //std::cout << "Utils: index=" << index << std::endl;
   switch (index)
   {
     case -1:  // no points are outside the sphere --> return last element
-              // std::cout << "no points are outside the sphere" << std::endl;
+      //std::cout << "Utils: no points are outside the sphere!!!" << std::endl;
       A = center;
       B = path[path.size() - 1];
       if (last_index_inside_sphere != NULL)
@@ -688,7 +692,7 @@ inline Eigen::Vector3d getFirstIntersectionWithSphere(vec_Vecf<3>& path, double 
       }
       // std::cout << "Calling intersecion1 with A=" << A.transpose() << "  and B=" << B.transpose() << std::endl;
       intersection = getIntersectionWithSphere(A, B, r, center);
-      // std::cout << "Returning intersection=" << intersection.transpose() << std::endl;
+      //std::cout << "Utils: Returning intersection=" << intersection.transpose() << std::endl;
       // intersection = path[path.size() - 1];
       if (last_index_inside_sphere != NULL)
       {
@@ -708,7 +712,7 @@ inline Eigen::Vector3d getFirstIntersectionWithSphere(vec_Vecf<3>& path, double 
     default:
       A = path[index - 1];
       B = path[index];
-      // std::cout << "Calling intersecion2 with A=" << A.transpose() << "  and B=" << B.transpose() << std::endl;
+      //std::cout << "Utils: calling intersecion2 with A=" << A.transpose() << "  and B=" << B.transpose() << std::endl;
       intersection = getIntersectionWithSphere(A, B, r, center);
       // printf("index-1=%d\n", index - 1);
       if (last_index_inside_sphere != NULL)
@@ -716,9 +720,9 @@ inline Eigen::Vector3d getFirstIntersectionWithSphere(vec_Vecf<3>& path, double 
         *last_index_inside_sphere = index - 1;
       }
   }
-
+  
   // bool thereIsIntersec;
-
+  //std::cout << "Utils: returning intersection= " <<intersection.transpose()<< std::endl;
   return intersection;
 }
 
