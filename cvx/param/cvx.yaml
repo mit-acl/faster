@@ -1,83 +1,13 @@
 #Params for CVX planner
-#debug: true
-
-#FOR THE REAL HARDWARE
-
-# use_ff: true # use feedforward IT HAS TO BE TRUE!!! (if not the program crashes, this is a ToDo)
-# visual: true #publish visualization stuff
-# use_vel: true # use velocity. If false, r2=r1;
-
-# wdx: 20.0  #[m:] world dimension in x
-# wdy: 20.0  #[m] world dimension in y
-# wdz: 3.0   #[m] world dimension in z
-# res: 0.25  #[m] cell dimension = resolution of the map
-
-
-# dc: 0.01            #(seconds) Duration for the interpolation=Value of the timer pubGoal
-# goal_radius: 0.2    #(m) Drone has arrived to the goal when distance_to_goal<GOAL_RADIUS
-# drone_radius: 0.2  #(m) Used for collision checking
-
-
-# offset: 10  # Replanning offset (the initial conditions are taken OFFSET states farther from the last published goal)
-
-# Ra: 1            # [m] Minimum radius of the first sphere
-# Ra_max: 4            # [m] Maximum radius of the first sphere
-# Rb: 6.0             # [m] Radius of the second sphere
-# w_max: 0.6            # [rd/s] Maximum angular velocity
-# alpha_0: 0.25         #[rd] threshold to ignore current JPS solution, and consider the old one. 0--> always decide
-# z_ground: 0.5         #[m] points below this are considered ground
-# z_max: 1.8         #[m] JPS is not allowed to give a solution that goes higher than this height
-# inflation_jps: 0.5  #[m] The obstacles are inflated (to run JPS) by this amount
-# factor_jps: 1  #[m] JPS is run with resolution=factor_jps*(resolution of the map)
-
-
-# v_max: 2   #[m/s]  #4 6 10 en los experimentos ultimos
-# a_max: 3   #[m/s2]
-# j_max: 5  #[m/s3]
-
-# q: 100000  #[-] weight to the 2nd term of the cost function for cvxgen
-
-# z_land: 0.02 #[m] z goal for landing
-
-#Ways to force the drone to fly faster:
-#increase Ra
-#increase v_max, a_max, j_max
-
-#Ways to make the planner faster:
-# Increase deltaT in each cvxgen iteration
-# Timer of the mapper
-# More downsampling in the frontier point cloud
-# downsample instanteneous point clouds from the camera?
-# compile cvxgen with the option -03 (see makefile of cvxgen) instead of -0s
-# set a different resolution for the JPS solver (change factor_jps)
-# reduce dimensions/increase resolution of the map
-# Run the mapper as a nodelet
-# Reduce alpha_0
-# Max out Jetson TX2 (overclocking, modprob,...)
-
-#Things to try
-#Change radius spheres Sa and Sb
-#verify publish index and offset are working
-
-#Things to do
-#Change -1 in the instantaneous point cloud
-#Run 
-# Omit visualization stuff
-# Selection between J1 and J2 
-# z_max change
-
-
-#FOR THE FOREST SIMULATION
-
 
 use_ff: true # use feedforward
-visual: true #publish visualization stuff
+visual: false #publish visualization stuff
 use_vel: false # use velocity. If false, r2=r1;
 
 wdx: 15.0  #[m] world dimension in x
 wdy: 15.0  #[m] world dimension in y
 wdz: 4.0   #[m] world dimension in z
-res: 0.30  #[m] cell dimension = resolution of the map
+res: 0.15  #[m] cell dimension = resolution of the map
 
 
 dc: 0.01            #(seconds) Duration for the interpolation=Value of the timer pubGoal
@@ -91,19 +21,19 @@ offset: 10  # Replanning offset (the initial conditions are taken OFFSET states 
 offset_rp: 50 #The rescue path starts X states ahead of the beginning of the whole trajectory
 
 Ra: 0.5            # [m] Minimum radius of the first sphere
-Ra_max: 6            # [m] Maximum radius of the first sphere
+Ra_max: 4            # [m] Maximum radius of the first sphere
 Rb: 9.0             # [m] Radius of the second sphere
 w_max: 0.5            # [rd/s] Maximum angular velocity
-alpha_0_deg: 15         #[deg] threshold to ignore current JPS solution, and consider the old one. 0--> always decide
-z_ground: 0.1         #[m] points below this are considered ground
+alpha_0_deg: 1500         #[deg] threshold to ignore current JPS solution, and consider the old one. 0--> always decide
+z_ground: 0.05         #[m] points below this are considered ground
 z_max: 2         #[m] JPS is not allowed to give a solution that goes higher than this height
-inflation_jps: 0.37  #[m] The obstacles are inflated (to run JPS) by this amount
+inflation_jps: 0.39  #[m] The obstacles are inflated (to run JPS) by this amount
 factor_jps: 1  #[m] JPS is run with resolution=factor_jps*(resolution of the map)
 
 
-v_max: 4.5   #[m/s]  5
-a_max: 6   #[m/s2] 5
-j_max: 5  #[m/s3]  8
+v_max: 13   #[m/s]  5
+a_max: 19   #[m/s2] 5
+j_max: 17  #[m/s3]  8
 
 q: 100  #[-] weight to the 2nd term of the cost function. If it's very big (>1000), Gurobi fails!! (numerical issues)
 
@@ -118,6 +48,6 @@ factor_final_rescue: 10
 factor_increment_rescue: 1
 
 max_poly: 2 #Should be less than N_whole and N_rescue
-dist_max_vertexes: 1.6 #[m] Maximum distance between two vertexes before doing the cvx decomp (more vertexes are added to force this)
+dist_max_vertexes: 2.5 #[m] Maximum distance between two vertexes before doing the cvx decomp (more vertexes are added to force this)
 gurobi_threads: 1 #[threads] Number of threads that Gurobi will use. If computer is maxed out, threads=1 works faster!
 gurobi_verbose: 0 #Verbosity of Gurobi. 0 or 1

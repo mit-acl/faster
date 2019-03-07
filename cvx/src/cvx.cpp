@@ -1710,7 +1710,7 @@ for (int i=0; i<index; i=i+10){ //Sample points along the trajectory
 
   if ( kdtree_unk_.nearestKSearch (searchPoint, n, pointIdxNKNSearch, pointNKNSquaredDistance) > 0 )
   {
-    if (sqrt(pointNKNSquaredDistance[0])<par_.drone_radius){
+    if (sqrt(pointNKNSquaredDistance[0])<0.2){ //TODO: 0.2 is the radius of the drone. 
       std::cout<<"A->R collides, with d="<<sqrt(pointNKNSquaredDistance[0])<<", radius_drone="<<par_.drone_radius<<std::endl;
       isFree=false;
       break;
