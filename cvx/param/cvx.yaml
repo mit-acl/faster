@@ -1,11 +1,11 @@
 #Params for CVX planner
 
 use_ff: true # use feedforward
-visual: false #publish visualization stuff
+visual: true #publish visualization stuff
 use_vel: false # use velocity. If false, r2=r1;
 
-wdx: 15.0  #[m] world dimension in x
-wdy: 15.0  #[m] world dimension in y
+wdx: 20.0  #[m] world dimension in x
+wdy: 20.0  #[m] world dimension in y
 wdz: 4.0   #[m] world dimension in z
 res: 0.15  #[m] cell dimension = resolution of the map
 
