@@ -4,10 +4,10 @@ use_ff: true # use feedforward
 visual: true #publish visualization stuff
 use_vel: false # use velocity. If false, r2=r1;
 
-wdx: 10.0  #[m] world dimension in x
-wdy: 10.0  #[m] world dimension in y
+wdx: 20.0  #[m] world dimension in x
+wdy: 20.0  #[m] world dimension in y
 wdz: 4.0   #[m] world dimension in z
-res: 0.15  #[m] cell dimension = resolution of the map
+res: 0.25  #[m] cell dimension = resolution of the map
 
 
 dc: 0.01            #(seconds) Duration for the interpolation=Value of the timer pubGoal
@@ -19,7 +19,10 @@ N_rescue: 7  #[-] Number of discretization points in the rescue path
 
 offset: 10  # Replanning offset (the initial conditions are taken OFFSET states farther from the last published goal)
 offset_rp: 50 #The rescue path starts X states ahead of the beginning of the whole trajectory
-factor_offset_rp: 1.5
+factor_deltaTp: 3
+factor_deltaTp: 3
+min_states_deltaTp: 20
+min_states_deltaT: 15
 
 Ra: 0.5            # [m] Minimum radius of the first sphere
 Ra_max: 4            # [m] Maximum radius of the first sphere
@@ -40,15 +43,15 @@ q: 100  #[-] weight to the 2nd term of the cost function. If it's very big (>100
 
 z_land: 0.02 #[m] z goal for landing
 
-factor_initial_whole: 1
+factor_initial_whole: 1.5
 factor_final_whole: 10 #High final factor is usually not a problem. If it's infeasible, it is usually because dt_ is very small (factor very small)
-factor_increment_whole: 1
+factor_increment_whole: 3
 
-factor_initial_rescue: 1
+factor_initial_rescue: 1.5
 factor_final_rescue: 10
 factor_increment_rescue: 1
 
 max_poly: 2 #Should be less than N_whole and N_rescue
-dist_max_vertexes: 2.5 #[m] Maximum distance between two vertexes before doing the cvx decomp (more vertexes are added to force this)
+dist_max_vertexes: 1.8 #[m] Maximum distance between two vertexes in the JPS before doing the cvx decomp (more vertexes are added to force this)
 gurobi_threads: 1 #[threads] Number of threads that Gurobi will use. If computer is maxed out, threads=1 works faster!
 gurobi_verbose: 0 #Verbosity of Gurobi. 0 or 1

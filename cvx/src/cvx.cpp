@@ -98,7 +98,10 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   ros::param::param<int>("~offset", par_.offset, 5);
 
   ros::param::param<int>("~offset_rp", par_.offset_rp, 4);
-  ros::param::param<double>("~factor_offset_rp", par_.factor_offset_rp, 1.5);
+  ros::param::param<double>("~factor_deltaTp", par_.factor_deltaTp, 3);
+  ros::param::param<double>("~factor_deltaT", par_.factor_deltaT, 3);
+  ros::param::param<int>("~min_states_deltaTp", par_.min_states_deltaTp, 50);
+  ros::param::param<int>("~min_states_deltaT", par_.min_states_deltaT, 50);
 
   ros::param::param<double>("~Ra", par_.Ra, 2.0);
   ros::param::param<double>("~Ra_max", par_.Ra_max, 2.5);
@@ -1662,17 +1665,18 @@ mtx_X_U_temp.unlock();
   int states_last_replan = ceil(replanCB_t.ElapsedMs() / (par_.dc * 1000));  // Number of states that
                                                                              // would have been needed for
                                                                              // the last replan
-  par_.offset_rp = par_.factor_offset_rp * states_last_replan;                                   // Next offset: the
+  par_.offset_rp = std::max(par_.factor_deltaTp * states_last_replan, (double)par_.min_states_deltaTp);      //This is Delta_t' in the paper           
   std::cout << "Next offset:  " << std::fixed << par_.offset_rp << " states" << std::endl;
-  par_.offset = states_last_replan;
+  par_.offset = std::max(par_.factor_deltaT*states_last_replan, (double)par_.min_states_deltaT);  //This is Delta_t in the paper
   mtx_offsets.unlock();
 
-  double new_init_whole = sg_whole_.factor_that_worked_ - 0.25;
+  //Time allocation
+  double new_init_whole = 1;//sg_whole_.factor_that_worked_ - 0.25;
   double new_final_whole = sg_whole_.factor_that_worked_ + 10.25;  // high end factor is not a problem
   double new_increment_whole = 0.5;
   sg_whole_.setFactorInitialAndFinalAndIncrement(new_init_whole, new_final_whole, new_increment_whole);
 
-  double new_init_rescue = sg_rescue_.factor_that_worked_ - 0.25;
+  double new_init_rescue = 1; //sg_rescue_.factor_that_worked_ - 0.25;
   double new_final_rescue = sg_rescue_.factor_that_worked_ + 10.25;  // high end factor is not a problem
   double new_increment_rescue = 0.5;
 

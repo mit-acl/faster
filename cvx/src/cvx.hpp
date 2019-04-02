@@ -105,7 +105,11 @@ struct parameteres
   int offset;
   int offset_rp;
 
-  double factor_offset_rp;
+  double factor_deltaTp;
+  double factor_deltaT;
+  int min_states_deltaTp;
+  int min_states_deltaT;
+  
 
   double Ra;
   double Ra_max;
