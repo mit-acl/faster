@@ -104,6 +104,9 @@ struct parameteres
 
   int offset;
   int offset_rp;
+
+  double factor_offset_rp;
+
   double Ra;
   double Ra_max;
   double Rb;

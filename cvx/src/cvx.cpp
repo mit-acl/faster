@@ -98,6 +98,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   ros::param::param<int>("~offset", par_.offset, 5);
 
   ros::param::param<int>("~offset_rp", par_.offset_rp, 4);
+  ros::param::param<double>("~factor_offset_rp", par_.factor_offset_rp, 1.5);
 
   ros::param::param<double>("~Ra", par_.Ra, 2.0);
   ros::param::param<double>("~Ra_max", par_.Ra_max, 2.5);
@@ -1661,7 +1662,7 @@ mtx_X_U_temp.unlock();
   int states_last_replan = ceil(replanCB_t.ElapsedMs() / (par_.dc * 1000));  // Number of states that
                                                                              // would have been needed for
                                                                              // the last replan
-  par_.offset_rp = 3 * states_last_replan;                                   // Next offset: the
+  par_.offset_rp = par_.factor_offset_rp * states_last_replan;                                   // Next offset: the
   std::cout << "Next offset:  " << std::fixed << par_.offset_rp << " states" << std::endl;
   par_.offset = states_last_replan;
   mtx_offsets.unlock();
