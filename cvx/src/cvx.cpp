@@ -164,6 +164,21 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
     abort();
   }
 
+  if (par_.drone_radius <= 2*par_.res)
+  {
+    std::cout << bold << red << "Needed: par_.drone_radius > 2*par_.res" << reset
+              << std::endl;  // If not the convex decomposition finds polytopes between the voxels of the obstacles
+    abort();
+  }
+
+/*  if (par_.inflation_jps <= par_.res/2.0 + par_.drone_radius)
+  {
+    std::cout << bold << red << "Needed: par_.inflation_jps > par_.res/2.0 + par_.drone_radius" << reset
+              << std::endl; //JPS should be run with at least drone_radius + half of the size of a voxel
+    abort();
+  }
+*/
+
 
   
    std::cout << "Checks of parameters satisfied\n";
@@ -1710,8 +1725,12 @@ std::cout<<"Before mtx_unk"<<std::endl;
   mtx_X_U_temp.lock();
   std::cout<<"After mtx_unk. index="<<index<<std::endl;
 for (int i=0; i<index; i=i+10){ //Sample points along the trajectory
-
+  std::cout<<"i="<<i<<std::endl;
   pcl::PointXYZ searchPoint(sg_whole_.X_temp_(i, 0), sg_whole_.X_temp_(i, 1), sg_whole_.X_temp_(i, 2));
+  
+  Eigen::Vector3d novale;
+  novale<<sg_whole_.X_temp_(i, 0), sg_whole_.X_temp_(i, 1), sg_whole_.X_temp_(i, 2);
+  std::cout<<"Point ="<<novale.transpose()<<std::endl;
 
   if ( kdtree_unk_.nearestKSearch (searchPoint, n, pointIdxNKNSearch, pointNKNSquaredDistance) > 0 )
   {
@@ -2756,7 +2775,7 @@ Eigen::Vector3d CVX::getFirstCollisionJPS(vec_Vecf<3>& path, bool* thereIsInters
   while (path.size() > 0)
   {
     //std::cout<<red<<"New Iteration, iteration="<<iteration<<reset<<std::endl;
-    //std::cout<<red<<"Searching from point="<<path[0].transpose()<<reset<<std::endl;
+    std::cout<<red<<"Searching from point="<<path[0].transpose()<<reset<<std::endl;
     pcl_search_point = eigenPoint2pclPoint(path[0]);
 
     int number_of_neigh;
@@ -2777,8 +2796,9 @@ Eigen::Vector3d CVX::getFirstCollisionJPS(vec_Vecf<3>& path, bool* thereIsInters
       r = sqrt(dist2_map[0]);
 
       std::cout << "r=" << r << std::endl;
+      //std::cout << "Point=" << r << std::endl;
 
-      if (r < par_.inflation_jps)  // collision of the JPS path and an inflated obstacle --> take last search point
+      if (r < par_.drone_radius)  // collision of the JPS path and an inflated obstacle --> take last search point
       {
         //std::cout << "Collision detected" << std::endl;  // We will return the search_point
         // pubJPSIntersection(inters);
@@ -2799,7 +2819,8 @@ Eigen::Vector3d CVX::getFirstCollisionJPS(vec_Vecf<3>& path, bool* thereIsInters
               path.clear();
               path.push_back(original[0]);
               path.push_back(tmp);
-              result=original[original.size() - 1];
+              result=path[path.size() - 1];
+              //result=original[original.size() - 1];
               }
               else{
             //std::cout << "In Return Intersection, last_id=" << last_id<<el_eliminated<< std::endl;

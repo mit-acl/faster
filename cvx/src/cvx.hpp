@@ -449,8 +449,8 @@ bool ARisInFreeSpace(int index);
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_map_;
 
-  vec_Vec3f vec_o_;   // Vector that containts the occupied points
-  vec_Vec3f vec_uo_;  // Vector that containts the unkown and occupied points
+  vec_Vec3f vec_o_;   // Vector that contains the occupied points
+  vec_Vec3f vec_uo_;  // Vector that contains the unkown and occupied points
 
   SeedDecomp3D seed_decomp_util_;
   EllipsoidDecomp3D ellip_decomp_util_;
