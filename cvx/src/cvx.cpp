@@ -1060,6 +1060,13 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
     mtx_k.lock();
     // std::cout << "here2" << std::endl;
+    
+    log_.entered_rescue_path=0;
+    if (k_ > par_.offset_rp && status_ == TRAVELING)
+    {
+      //ROS_WARN("Switched to the RESCUE PATH!!");
+      log_.entered_rescue_path=1;
+    }
 
     mtx_offsets.lock();
     k_initial_cond_1_ = std::min(k_ + par_.offset, (int)(X_.rows() - 1));

@@ -63,11 +63,11 @@ public:
     int dim2_down = dim(2) / 2.0;
     int dim2_up = dim(2) / 2.0;
 
-    // printf("reading_map1\n");
-    if (center_map[2] - res * dim(2) / 2.0 < 0)
+    //// printf("reading_map1\n");
+    if ((center_map[2] - res * dim(2) / 2.0) < z_ground)
     {
       // printf("modyfing");
-      dim2_down = (int)((center_map(2) - z_ground) / res) + 1;  //+1 to avoid problems when taking off
+      dim2_down = std::max((int)((center_map(2) - z_ground) / res) + 1,2);  //+1 to avoid problems when taking off
       // dim2_up = (int)(dim[2] / 2.0);
     }
 
