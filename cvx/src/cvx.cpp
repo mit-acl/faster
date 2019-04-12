@@ -106,7 +106,8 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   ros::param::param<double>("~Ra", par_.Ra, 2.0);
   ros::param::param<double>("~Ra_max", par_.Ra_max, 2.5);
   ros::param::param<double>("~Rb", par_.Rb, 6.0);
-  ros::param::param<double>("~w_max", par_.w_max, 1.0);
+  ros::param::param<double>("~w_max", par_.w_max, 0.5);
+  ros::param::param<double>("~alpha_filter_dyaw", par_.alpha_filter_dyaw, 0.8);
   ros::param::param<double>("~alpha_0_deg", par_.alpha_0_deg, 15);
   ros::param::param<double>("~z_ground", par_.z_ground, 0.0);
   ros::param::param<double>("~z_max", par_.z_max, 5.0);
@@ -117,6 +118,9 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   ros::param::param<double>("~a_max", par_.a_max, 2.0);
   ros::param::param<double>("~j_max", par_.j_max, 10.0);
   ros::param::param<double>("~q", par_.q, 100000.0);
+
+  
+  
 
   ros::param::param<double>("~z_land", par_.z_land, 0.02);
 
@@ -737,12 +741,45 @@ void CVX::goalCB(const acl_msgs::TermGoal& msg)
 
 void CVX::yaw(double diff, acl_msgs::QuadGoal& quad_goal)
 {
+
   saturate(diff, -par_.dc * par_.w_max, par_.dc * par_.w_max);
-  if (diff > 0)
-    quad_goal.dyaw = par_.w_max;
+  double dyaw_not_filtered;
+
+/*  if (diff > 0)
+    dyaw_not_filtered = par_.w_max;
   else
-    quad_goal.dyaw = -par_.w_max;
-  quad_goal.yaw += diff;
+    dyaw_not_filtered = -par_.w_max;*/
+
+  dyaw_not_filtered=copysign(1,diff)*par_.w_max;
+
+  dyaw_filtered_=(1-par_.alpha_filter_dyaw)*dyaw_not_filtered  +par_.alpha_filter_dyaw*dyaw_filtered_;
+  quad_goal.dyaw=dyaw_filtered_;
+
+  quad_goal.yaw += dyaw_filtered_*par_.dc;
+
+/*  if(diff<0.1){//don't yaw if difference (in) is very small (Hysteresis)
+    quad_goal.yaw=quad_goal.yaw;
+    quad_goal.dyaw=0; 
+    return;
+  }*/
+
+/*  std::cout<<bold<<green<<std::setprecision(10)<<"diff antes="<<diff<<reset<<std::endl;
+    std::cout<<bold<<green<<std::setprecision(10)<<"par_.dc  "<<par_.dc<<reset<<std::endl;
+  std::cout<<bold<<green<<std::setprecision(10)<<"par_.w_max= "<<par_.w_max<<reset<<std::endl;
+  std::cout<<bold<<green<<std::setprecision(10)<<"-par_.dc * par_.w_max= "<<-par_.dc * par_.w_max<<reset<<std::endl;
+  std::cout<<bold<<green<<std::setprecision(10)<<"par_.dc * par_.w_max= "<<par_.dc * par_.w_max<<reset<<std::endl;
+  saturate(diff, -par_.dc * par_.w_max, par_.dc * par_.w_max);
+  std::cout<<bold<<green<<std::setprecision(10)<<"diff despues="<<diff<<reset<<std::endl;
+  
+  double dyaw_not_filtered=copysign(1,diff)*par_.w_max;
+  std::cout<<bold<<green<<"dyaw_not_filtered="<<dyaw_not_filtered<<reset<<std::endl;
+
+  //Low pass filter for dyaw
+  quad_goal.dyaw=(1-par_.alpha_filter_dyaw)*dyaw_not_filtered  +par_.alpha_filter_dyaw*quad_goal.dyaw;
+  std::cout<<"quad_goal.dyaw="<<quad_goal.dyaw<<std::endl;
+
+  quad_goal.yaw += quad_goal.dyaw*par_.dc;*/
+
 }
 
 vec_Vecf<3> CVX::fix(vec_Vecf<3>& JPS_old, Eigen::Vector3d& start, Eigen::Vector3d& goal, bool* solved)
@@ -1915,8 +1952,27 @@ Eigen::Vector3d CVX::getIntersectionJPSwithPolytope(vec_Vecf<3>& path, std::vect
   // std::cout << "Going to return" << inters.transpose() << std::endl;
   return inters;
 }
+
+void CVX::print_status(){
+
+switch(status_) {
+    case YAWING : std::cout <<bold<< "status_=YAWING"<<reset<<std::endl; break;
+    case TRAVELING : std::cout <<bold<< "status_=TRAVELING"<<reset<<std::endl; break;
+    case GOAL_SEEN : std::cout <<bold<< "status_=GOAL_SEEN"<<reset<<std::endl; break;
+    case GOAL_REACHED : std::cout <<bold<< "status_=GOAL_REACHED"<<reset<<std::endl; break;
+}
+
+switch(planner_status_) {
+    case FIRST_PLAN : std::cout <<bold<< "planner_status_=FIRST_PLAN"<<reset<<std::endl; break;
+    case START_REPLANNING : std::cout <<bold<< "planner_status_=START_REPLANNING"<<reset<<std::endl; break;
+    case REPLANNED : std::cout <<bold<< "planner_status_=REPLANNED"<<reset<<std::endl; break;
+}
+
+}
+
 void CVX::pubCB(const ros::TimerEvent& e)
 {
+  print_status();
   mtx_goals.lock();
   // printf("GOing to publish\n");
 
@@ -1932,6 +1988,9 @@ void CVX::pubCB(const ros::TimerEvent& e)
 
   quadGoal_.header.stamp = ros::Time::now();
   quadGoal_.header.frame_id = "world";
+
+  //Save previous dyaw:
+  dyaw_filtered_=quadGoal_.dyaw;
 
   quadGoal_.vel = vectorNull();
   quadGoal_.accel = vectorNull();
@@ -2029,8 +2088,16 @@ void CVX::pubCB(const ros::TimerEvent& e)
       // mtx_term_goal.lock();
       double desired_yaw = atan2(term_goal_[1] - quadGoal_.pos.y, term_goal_[0] - quadGoal_.pos.x);
       // mtx_term_goal.unlock();
+      std::cout<<red<<bold<<std::setprecision(6) <<"desired_yaw="<<desired_yaw<<reset<<std::endl;
+      std::cout<<red<<bold<<std::setprecision(6)<<"quadGoal_.yaw="<<quadGoal_.yaw<<reset<<std::endl;
+
       double diff = desired_yaw - quadGoal_.yaw;
+      std::cout<<red<<bold<<std::setprecision(6)<<"diff before wrappping="<<diff<<reset<<std::endl;
+
       angle_wrap(diff);
+      
+      std::cout<<red<<bold<<"diff after wrappping="<<diff<<reset<<std::endl;
+
       yaw(diff, quadGoal_);
       /*      printf("Inside, desired_yaw=%0.2f,quadGoal_.yaw=%0.2f, diff=%f , abs(diff)=%f\n", desired_yaw,
          quadGoal_.yaw, diff, fabs(diff));*/
@@ -2049,9 +2116,15 @@ void CVX::pubCB(const ros::TimerEvent& e)
     {
       // double desired_yaw = atan2(quadGoal_.vel.y, quadGoal_.vel.x);
       double desired_yaw = atan2(B_[1] - quadGoal_.pos.y, B_[0] - quadGoal_.pos.x);
+
+      std::cout<<red<<bold<<std::setprecision(6)<<"desired_yaw="<<desired_yaw<<reset<<std::endl;
+      std::cout<<red<<bold<<std::setprecision(6)<<"quadGoal_.yaw="<<quadGoal_.yaw<<reset<<std::endl;
+
       double diff = desired_yaw - quadGoal_.yaw;
+      std::cout<<red<<bold<<std::setprecision(6)<<"diff before wrappping="<<diff<<reset<<std::endl;
       angle_wrap(diff);
-      if (JPSk_solved_ == true and takeoff_done_==true)
+      std::cout<<red<<bold<<std::setprecision(6)<<"diff after wrappping="<<diff<<reset<<std::endl;
+      if (JPSk_solved_ == true and takeoff_done_==true and fabs(diff)>0.04) //only yaw if diff is big enough
       {
         yaw(diff, quadGoal_);
       }

@@ -34,14 +34,18 @@
 
 inline void saturate(double& var, double min, double max)
 {
+  std::cout<<"min="<<min<<" max="<<max<<std::endl;
   if (var < min)
   {
+    std::cout<<"Saturating to min"<<var<<std::endl;
     var = min;
   }
   else if (var > max)
   {
+    std::cout<<"Saturating to max"<<var<<std::endl;
     var = max;
   }
+  std::cout<<"Value saturated"<<var<<std::endl;
 }
 
 inline double angleBetVectors(const Eigen::Vector3d& a, const Eigen::Vector3d& b)

@@ -115,6 +115,7 @@ struct parameteres
   double Ra_max;
   double Rb;
   double w_max;
+  double alpha_filter_dyaw;
   double alpha_0_deg;
   double z_ground;
   double z_max;
@@ -198,6 +199,8 @@ private:
   void modeCB(const acl_msgs::QuadFlightMode& msg);
   void pubCB(const ros::TimerEvent& e);
   void replanCB(const ros::TimerEvent& e);
+
+  void print_status();
 
   /*  void interpInput(double dt, double xf[], double u0[], double x0[], double** u, double** x, Eigen::MatrixXd& U,
                      Eigen::MatrixXd& X);*/
@@ -406,6 +409,8 @@ bool ARisInFreeSpace(int index);
   int k_initial_cond_2_ = 0;
 
   vec_Vecf<3> JPS_old_;
+
+  double dyaw_filtered_=0;
 
   // pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_map_;
   pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_unk_;
