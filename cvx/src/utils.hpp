@@ -6,6 +6,7 @@
 #include <geometry_msgs/Vector3.h>
 #include <geometry_msgs/Point.h>
 #include "termcolor.hpp"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.h"
 
 #define RED 1
 #define RED_TRANS 2
@@ -31,6 +32,25 @@
 
 // inline is needed to avoid the "multiple definitions" error. Other option is to create the utils.cpp file, and put
 // there the function (and here only the prototype)
+
+//## From Wikipedia - http://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles
+inline void quaternion2Euler(tf2::Quaternion q, double &roll, double &pitch, double &yaw)
+{
+  tf2::Matrix3x3(q).getRPY(roll, pitch, yaw);
+}
+
+inline void quaternion2Euler(Eigen::Quaterniond q, double &roll, double &pitch, double &yaw)
+{
+  tf2::Quaternion tf_q(q.x(),q.y(),q.z(),q.w());
+  quaternion2Euler(tf_q,roll,pitch,yaw);
+}
+
+inline void quaternion2Euler(geometry_msgs::Quaternion q, double &roll, double &pitch, double &yaw)
+{
+  tf2::Quaternion tf_q(q.x,q.y,q.z,q.w);
+  quaternion2Euler(tf_q,roll,pitch,yaw);
+}
+
 
 inline void saturate(double& var, double min, double max)
 {

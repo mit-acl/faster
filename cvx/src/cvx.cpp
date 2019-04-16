@@ -1968,6 +1968,16 @@ switch(planner_status_) {
     case REPLANNED : std::cout <<bold<< "planner_status_=REPLANNED"<<reset<<std::endl; break;
 }
 
+switch(flight_mode_.mode) {
+    case flight_mode_.NOT_FLYING : std::cout <<bold<< "flight_mode_=NOT_FLYING"<<reset<<std::endl; break;
+    case flight_mode_.TAKEOFF : std::cout <<bold<< "flight_mode_=TAKEOFF"<<reset<<std::endl; break;
+    case flight_mode_.LAND : std::cout <<bold<< "flight_mode_=LAND"<<reset<<std::endl; break;
+    case flight_mode_.INIT : std::cout <<bold<< "flight_mode_=INIT"<<reset<<std::endl; break;
+    case flight_mode_.GO : std::cout <<bold<< "flight_mode_=GO"<<reset<<std::endl; break;
+    case flight_mode_.ESTOP : std::cout <<bold<< "flight_mode_=ESTOP"<<reset<<std::endl; break;
+    case flight_mode_.KILL : std::cout <<bold<< "flight_mode_=KILL"<<reset<<std::endl; break;
+}
+
 }
 
 void CVX::pubCB(const ros::TimerEvent& e)
@@ -2134,7 +2144,7 @@ void CVX::pubCB(const ros::TimerEvent& e)
         quadGoal_.dyaw = 0;
       }
     }
-    if (status_ == GOAL_REACHED)
+    if (status_ == GOAL_REACHED || takeoff_done_==false)
     {
       quadGoal_.dyaw = 0;
       quadGoal_.yaw = quadGoal_.yaw;
@@ -2161,6 +2171,9 @@ void CVX::pubCB(const ros::TimerEvent& e)
              quadGoal_.pos.z, quadGoal_.vel.x, quadGoal_.vel.y, quadGoal_.vel.z);*/
   // printf("(initialCond_): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", initialCond_.pos.x, initialCond_.pos.y,
   //       initialCond_.pos.z, initialCond_.vel.x, initialCond_.vel.y, initialCond_.vel.z);
+  
+  std::cout<<green<<bold<<std::setprecision(6)<<"quadGoal_.yaw sent="<<quadGoal_.yaw<<reset<<std::endl;
+  std::cout<<green<<bold<<std::setprecision(6)<<"quadGoal_.dyaw sent="<<quadGoal_.dyaw<<reset<<std::endl;
 
   pub_goal_.publish(quadGoal_);
 
@@ -2252,6 +2265,10 @@ void CVX::stateCB(const acl_msgs::State& msg)
   {
     quadGoal_.pos = msg.pos;
     quadGoal_.vel = msg.vel;
+    
+    double roll,pitch,yaw;
+    quaternion2Euler(msg.quat,roll,pitch,yaw);
+    quadGoal_.yaw=yaw;
     z_start_ = msg.pos.z;
     z_start_ = std::max(0.0, z_start_);
     mtx_initial_cond.lock();
