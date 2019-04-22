@@ -45,15 +45,28 @@ q: 100  #[-] weight to the 2nd term of the cost function. If it's very big (>100
 
 z_land: 0.02 #[m] z goal for landing
 
-factor_initial_whole: 1.5
-factor_final_whole: 10 #High final factor is usually not a problem. If it's infeasible, it is usually because dt_ is very small (factor very small)
-factor_increment_whole: 3
 
-factor_initial_rescue: 1.5
-factor_final_rescue: 10
-factor_increment_rescue: 1
+#Factors for time allocation
+gamma_whole: 4       #[-]
+gammap_whole: 10  #[-]
+increment_whole: 0.5 #[-]
+
+gamma_rescue: 4         #[-]
+gammap_rescue: 10    #[-]
+increment_rescue: 0.5   #[-]
 
 max_poly: 3 #Should be less than N_whole and N_rescue
 dist_max_vertexes: 1.8 #[m] Maximum distance between two vertexes in the JPS before doing the cvx decomp (more vertexes are added to force this)
 gurobi_threads: 1 #[threads] Number of threads that Gurobi will use. If computer is maxed out, threads=1 works faster!
 gurobi_verbose: 0 #Verbosity of Gurobi. 0 or 1
+
+
+
+
+# factor_initial_whole: 1.5
+# factor_final_whole: 10 #High final factor is usually not a problem. If it's infeasible, it is usually because dt_ is very small (factor very small)
+# factor_increment_whole: 3
+
+# factor_initial_rescue: 1.5
+# factor_final_rescue: 10
+# factor_increment_rescue: 1

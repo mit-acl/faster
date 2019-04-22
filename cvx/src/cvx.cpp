@@ -92,7 +92,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   ros::param::param<double>("~goal_radius", par_.goal_radius, 0.2);
   ros::param::param<double>("~drone_radius", par_.drone_radius, 0.15);
 
-  ros::param::param<int>("~N_rescue", par_.N_rescue, 10);
+  ros::param::param<int>("~N_safe", par_.N_safe, 10);
   ros::param::param<int>("~N_whole", par_.N_whole, 10);
 
   ros::param::param<int>("~offset", par_.offset, 5);
@@ -123,12 +123,19 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
 
   ros::param::param<double>("cntrl/spinup_time", spinup_time_, 0.5);
 
-  ros::param::param<double>("~factor_initial_whole", par_.factor_initial_whole, 2.0);
-  ros::param::param<double>("~factor_final_whole", par_.factor_final_whole, 2.0);
-  ros::param::param<double>("~factor_increment_whole", par_.factor_increment_whole, 1.0);
-  ros::param::param<double>("~factor_initial_rescue", par_.factor_initial_rescue, 2.0);
-  ros::param::param<double>("~factor_final_rescue", par_.factor_final_rescue, 2.0);
-  ros::param::param<double>("~factor_increment_rescue", par_.factor_increment_rescue, 1.0);
+  ros::param::param<double>("~gamma_whole", par_.gamma_whole, 4.0);
+  ros::param::param<double>("~gammap_whole", par_.gammap_whole, 4.0);
+  ros::param::param<double>("~increment_whole", par_.increment_whole, 1.0);
+  ros::param::param<double>("~gamma_safe", par_.gamma_safe, 4.0);
+  ros::param::param<double>("~gammap_safe", par_.gammap_safe, 4.0);
+  ros::param::param<double>("~increment_safe", par_.increment_safe, 1.0);
+
+  /*  ros::param::param<double>("~factor_initial_whole", par_.factor_initial_whole, 2.0);
+    ros::param::param<double>("~factor_final_whole", par_.factor_final_whole, 2.0);
+    ros::param::param<double>("~factor_increment_whole", par_.factor_increment_whole, 1.0);
+    ros::param::param<double>("~factor_initial_safe", par_.factor_initial_safe, 2.0);
+    ros::param::param<double>("~factor_final_safe", par_.factor_final_safe, 2.0);
+    ros::param::param<double>("~factor_increment_safe", par_.factor_increment_safe, 1.0);*/
 
   ros::param::param<int>("~max_poly", par_.max_poly, 4);
   ros::param::param<double>("~dist_max_vertexes", par_.dist_max_vertexes, 1.5);
@@ -138,9 +145,9 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
 
   std::cout << "Parameters obtained" << std::endl;
 
-  if (par_.N_rescue <= par_.max_poly + 2)
+  if (par_.N_safe <= par_.max_poly + 2)
   {
-    std::cout << bold << red << "Needed: N_rescue>=max_poly+ 2 at least" << reset
+    std::cout << bold << red << "Needed: N_safe>=max_poly+ 2 at least" << reset
               << std::endl;  // To decrease the probability of not finding a solution
     abort();
   }
@@ -186,32 +193,35 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   flight_mode_.mode = flight_mode_.NOT_FLYING;
 
   pub_goal_ = nh_.advertise<acl_msgs::QuadGoal>("goal", 1);
-  pub_term_goal_ = nh_.advertise<geometry_msgs::PointStamped>("term_goal_projected", 1);
-  pub_traj_ = nh_.advertise<nav_msgs::Path>("traj", 1);
-  pub_traj_rescue_ = nh_.advertise<nav_msgs::Path>("traj_rescue", 1);
+  pub_point_G_ = nh_.advertise<geometry_msgs::PointStamped>("point_G", 1);
+  pub_traj_whole_ = nh_.advertise<nav_msgs::Path>("traj_whole", 1);
+  pub_traj_safe_ = nh_.advertise<nav_msgs::Path>("traj_safe", 1);
 
   pub_setpoint_ = nh_.advertise<visualization_msgs::Marker>("setpoint", 1);
   pub_intersectionI_ = nh_.advertise<visualization_msgs::Marker>("intersection_I", 1);
-  pub_point_B1_ = nh_.advertise<visualization_msgs::Marker>("point_B1", 1);
-  pub_start_rescue_path_ = nh_.advertise<visualization_msgs::Marker>("start_rescue_path", 1);
-  pub_pointM_ = nh_.advertise<visualization_msgs::Marker>("point_M", 1);
-  pub_trajs_sphere_ = nh_.advertise<visualization_msgs::MarkerArray>("trajs_sphere", 1);
-  pub_forces_ = nh_.advertise<visualization_msgs::MarkerArray>("forces", 1);
+  pub_point_E_ = nh_.advertise<visualization_msgs::Marker>("point_E", 1);
+  pub_point_R_ = nh_.advertise<visualization_msgs::Marker>("point_R", 1);
+  pub_point_M_ = nh_.advertise<visualization_msgs::Marker>("point_M", 1);
+
   pub_actual_traj_ = nh_.advertise<visualization_msgs::Marker>("actual_traj", 1);
   pub_path_jps1_ = nh_.advertise<visualization_msgs::MarkerArray>("path_jps1", 1);
   pub_path_jps2_ = nh_.advertise<visualization_msgs::MarkerArray>("path_jps2", 1);
   pub_path_jps_whole_traj_ = nh_.advertise<visualization_msgs::MarkerArray>("path_jps_whole_traj", 1);
-  pub_path_jps_rescue_ = nh_.advertise<visualization_msgs::MarkerArray>("path_jps_rescue", 1);
+  pub_path_jps_safe_ = nh_.advertise<visualization_msgs::MarkerArray>("path_jps_safe", 1);
+
+  // pub_trajs_sphere_ = nh_.advertise<visualization_msgs::MarkerArray>("trajs_sphere", 1);
+  // pub_forces_ = nh_.advertise<visualization_msgs::MarkerArray>("forces", 1);
+
   // pub_point_I_ = nh_.advertise<visualization_msgs::Marker>("IntersectionJPS_", 1);
 
-  cvx_decomp_el_o_pub__ = nh.advertise<decomp_ros_msgs::EllipsoidArray>("ellipsoid_array_occupied", 1, true);
-  cvx_decomp_poly_o_pub_ = nh.advertise<decomp_ros_msgs::PolyhedronArray>("polyhedron_array_occupied", 1, true);
+  // cvx_decomp_el_o_pub__ = nh.advertise<decomp_ros_msgs::EllipsoidArray>("ellipsoid_array_occupied", 1, true);
+  cvx_whole_pub_ = nh.advertise<decomp_ros_msgs::PolyhedronArray>("cvx_whole", 1, true);
 
-  cvx_decomp_poly_uo_pub_ =
-      nh.advertise<decomp_ros_msgs::PolyhedronArray>("polyhedron_array_unk_and_occupied", 1, true);
+  // cvx_decomp_poly_uo_pub_ =
+  //    nh.advertise<decomp_ros_msgs::PolyhedronArray>("polyhedron_array_unk_and_occupied", 1, true);
 
-  cvx_decomp_el_uo2_pub__ = nh.advertise<decomp_ros_msgs::EllipsoidArray>("ellipsoid_array_occupied2", 1, true);
-  cvx_decomp_poly_uo2_pub_ = nh.advertise<decomp_ros_msgs::PolyhedronArray>("polyhedron_array_occupied2", 1, true);
+  // cvx_decomp_el_uo2_pub__ = nh.advertise<decomp_ros_msgs::EllipsoidArray>("ellipsoid_array_occupied2", 1, true);
+  cvx_safe_pub_ = nh.advertise<decomp_ros_msgs::PolyhedronArray>("cvx_safe", 1, true);
 
   pub_jps_inters_ = nh_.advertise<geometry_msgs::PointStamped>("jps_intersection", 1);
 
@@ -219,7 +229,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
 
   pub_planning_vis_ = nh_.advertise<visualization_msgs::MarkerArray>("planning_vis", 1);
 
-  pub_samples_rescue_path_ = nh_.advertise<visualization_msgs::MarkerArray>("samples_rescue_path", 1);
+  pub_samples_safe_path_ = nh_.advertise<visualization_msgs::MarkerArray>("samples_safe_path", 1);
 
   pub_log_ = nh_.advertise<acl_msgs::Cvx>("log_topic", 1);
 
@@ -274,13 +284,13 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   I_.color = color(GREEN);
 
   // Initialize T marker
-  B1_.header.frame_id = "world";
-  B1_.id = 0;
-  B1_.type = visualization_msgs::Marker::SPHERE;
-  B1_.scale.x = 0.10;
-  B1_.scale.y = 0.10;
-  B1_.scale.z = 0.10;
-  B1_.color = color(RED);
+  E_.header.frame_id = "world";
+  E_.id = 0;
+  E_.type = visualization_msgs::Marker::SPHERE;
+  E_.scale.x = 0.10;
+  E_.scale.y = 0.10;
+  E_.scale.z = 0.10;
+  E_.color = color(RED);
 
   // Initialize M marker
   M_.header.frame_id = "world";
@@ -291,10 +301,10 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   M_.scale.z = 0.10;
   M_.color = color(BLUE);
 
-  // mtx_term_goal.lock();
-  term_goal_ << 0, 0, 0;
-  // mtx_term_goal.unlock();
-  term_term_goal_ << 0, 0, 0;
+  // mtx_G.lock();
+  G_ << 0, 0, 0;
+  // mtx_G.unlock();
+  G_term_ << 0, 0, 0;
 
   quadGoal_.pos = vectorNull();
   quadGoal_.vel = vectorNull();
@@ -335,23 +345,21 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   sg_whole_.setQ(par_.q);
   sg_whole_.setMode(WHOLE_TRAJ);
   sg_whole_.setForceFinalConstraint(true);
-  sg_whole_.setFactorInitialAndFinalAndIncrement(par_.factor_initial_whole, par_.factor_final_whole,
-                                                 par_.factor_increment_whole);
+  sg_whole_.setFactorInitialAndFinalAndIncrement(1, 10, par_.increment_whole);
   sg_whole_.setVerbose(par_.gurobi_verbose);
   sg_whole_.setThreads(par_.gurobi_threads);
 
-  std::cout << "Going to do setup of sg_rescue_\n";
-  sg_rescue_.setN(par_.N_rescue);
-  sg_rescue_.createVars();
-  sg_rescue_.setDC(par_.dc);
-  sg_rescue_.set_max(max_values);
-  sg_rescue_.setQ(par_.q);
-  sg_rescue_.setMode(WHOLE_TRAJ);  // RESCUE_PATH
-  sg_rescue_.setForceFinalConstraint(false);
-  sg_rescue_.setFactorInitialAndFinalAndIncrement(par_.factor_initial_rescue, par_.factor_final_rescue,
-                                                  par_.factor_increment_whole);
-  sg_rescue_.setVerbose(par_.gurobi_verbose);
-  sg_rescue_.setThreads(par_.gurobi_threads);
+  std::cout << "Going to do setup of sg_safe_\n";
+  sg_safe_.setN(par_.N_safe);
+  sg_safe_.createVars();
+  sg_safe_.setDC(par_.dc);
+  sg_safe_.set_max(max_values);
+  sg_safe_.setQ(par_.q);
+  sg_safe_.setMode(WHOLE_TRAJ);  // SAFE_PATH
+  sg_safe_.setForceFinalConstraint(false);
+  sg_safe_.setFactorInitialAndFinalAndIncrement(1, 10, par_.increment_safe);
+  sg_safe_.setVerbose(par_.gurobi_verbose);
+  sg_safe_.setThreads(par_.gurobi_threads);
 
   std::cout << "Done Setups\n";
 
@@ -410,10 +418,10 @@ void CVX::clearJPSPathVisualization(int i)
       clearMarkerArray(&path_jps2_, &pub_path_jps2_);
       break;
     case JPS_WHOLE_TRAJ:
-      clearMarkerArray(&path_jps_whole_traj_, &pub_path_jps_rescue_);
+      clearMarkerArray(&path_jps_whole_traj_, &pub_path_jps_safe_);
       break;
-    case JPS_RESCUE:
-      clearMarkerArray(&path_jps_rescue_, &pub_path_jps_whole_traj_);
+    case JPS_SAFE:
+      clearMarkerArray(&path_jps_safe_, &pub_path_jps_whole_traj_);
       break;
   }
 }
@@ -459,9 +467,9 @@ void CVX::publishJPSPath(vec_Vecf<3>& path, int i)
       vectorOfVectors2MarkerArray(path, &path_jps_whole_traj_, color(GREEN));
       pub_path_jps_whole_traj_.publish(path_jps_whole_traj_);
       break;
-    case JPS_RESCUE:
-      vectorOfVectors2MarkerArray(path, &path_jps_rescue_, color(YELLOW));
-      pub_path_jps_rescue_.publish(path_jps_rescue_);
+    case JPS_SAFE:
+      vectorOfVectors2MarkerArray(path, &path_jps_safe_, color(YELLOW));
+      pub_path_jps_safe_.publish(path_jps_safe_);
       break;
   }
 }
@@ -669,9 +677,6 @@ void CVX::vectorOfVectors2MarkerArray(vec_Vecf<3> traj, visualization_msgs::Mark
     m.header.frame_id = "world";
     m.header.stamp = ros::Time::now();
     geometry_msgs::Point p = eigen2point(it);
-    /*    p.x = traj[i][0];
-        p.y = X(i, 1);
-        p.z = X(i, 2);*/
     if (type == visualization_msgs::Marker::ARROW)
     {
       m.scale.x = 0.02;
@@ -702,18 +707,18 @@ void CVX::goalCB(const acl_msgs::TermGoal& msg)
 {
   printf("NEW GOAL************************************************\n");
   log_.total_dist = 0;
-  mtx_term_term_goal.lock();
-  term_term_goal_ = Eigen::Vector3d(msg.pos.x, msg.pos.y, msg.pos.z);
-  mtx_term_term_goal.unlock();
-  // std::cout << "term_term_goal_=\n" << term_term_goal_ << std::endl;
-  mtx_term_goal.lock();
+  mtx_G_term.lock();
+  G_term_ = Eigen::Vector3d(msg.pos.x, msg.pos.y, msg.pos.z);
+  mtx_G_term.unlock();
+  // std::cout << "G_term_=\n" << G_term_ << std::endl;
+  mtx_G.lock();
   mtx_state.lock();
   Eigen::Vector3d temp(state_.pos.x, state_.pos.y, state_.pos.z);
-  term_goal_ = projectClickedGoal(temp);
+  G_ = projectClickedGoal(temp);
   pubTerminalGoal();
   mtx_state.unlock();
-  mtx_term_goal.unlock();
-  // std::cout << "term_goal_=\n" << term_goal_ << std::endl;
+  mtx_G.unlock();
+  // std::cout << "G_=\n" << G_ << std::endl;
 
   status_ = (status_ == GOAL_REACHED) ? YAWING : TRAVELING;
   /*  if (status_ == YAWING)
@@ -948,20 +953,10 @@ void CVX::createMoreVertexes(vec_Vecf<3>& path, double d)
 void CVX::replanCB(const ros::TimerEvent& e)
 {
   std::cout << bold << on_red << "************IN REPLAN CB*********" << reset << std::endl;
+  print_status();
 
   MyTimer replanCB_t(true);
-
   MyTimer otherStuff_t(true);
-  /*  log_.cvx_jerk_total_ms = 0;
-    log_.cvx_vel_total_ms = 0;
-
-    log_.loops_jerk = 0;
-    log_.loops_vel = 0;
-
-    log_.coll_total_ms = 0;
-    log_.loops_col = 0;
-
-    log_.computed_both = 0;*/
 
   if (!state_initialized_ || !kdtree_map_initialized_ || !kdtree_unk_initialized_ || !goal_click_initialized_)
   {
@@ -975,25 +970,21 @@ void CVX::replanCB(const ros::TimerEvent& e)
     return;
   }
 
-  // std::cout<<"state_initialized_="<<state_initialized_<<std::endl;
-
-  // MyTimer time_init(true);
-  // std::cout << "In replanCB0" << std::endl;
   double t0replanCB = ros::Time::now().toSec();
   // printf("replanCB: Before mtx_state!!!\n");
   mtx_state.lock();
   Eigen::Vector3d state_pos(state_.pos.x, state_.pos.y, state_.pos.z);  // Local copy of state
   Eigen::Vector3d state_vel(state_.vel.x, state_.vel.y, state_.vel.z);  // Local copy of state
 
-  std::cout << "state_pos=" << state_pos.transpose() << std::endl;
+  // std::cout << "state_pos=" << state_pos.transpose() << std::endl;
   mtx_state.unlock();
 
-  // printf("replanCB: Before mtx_term_goal!!!\n");
-  mtx_term_goal.lock();
-  term_goal_ = projectClickedGoal(state_pos);
+  // printf("replanCB: Before mtx_G!!!\n");
+  mtx_G.lock();
+  G_ = projectClickedGoal(state_pos);
   pubTerminalGoal();
-  // std::cout << "Projected Goal" << term_goal_.transpose() << std::endl;
-  mtx_term_goal.unlock();
+  // std::cout << "Projected Goal" << G_.transpose() << std::endl;
+  mtx_G.unlock();
   // printf("In replanCB0.1\n");
   if (par_.visual == true)
   {
@@ -1001,24 +992,24 @@ void CVX::replanCB(const ros::TimerEvent& e)
     pubintersecPoint(Eigen::Vector3d::Zero(), false);  // Clear the intersection points markers
   }
 
-  /*  mtx_term_term_goal.lock();
-    Eigen::Vector3d P2 = term_term_goal_;
-    mtx_term_term_goal.unlock();*/
+  /*  mtx_G_term.lock();
+    Eigen::Vector3d P2 = G_term_;
+    mtx_G_term.unlock();*/
 
   // printf("In replanCB0.3\n");
-  mtx_term_goal.lock();
-  Eigen::Vector3d term_goal = term_goal_;  // Local copy of the terminal goal
-  mtx_term_goal.unlock();
+  mtx_G.lock();
+  Eigen::Vector3d G = G_;  // Local copy of the terminal goal
+  mtx_G.unlock();
 
-  mtx_term_term_goal.lock();
-  Eigen::Vector3d term_term_goal = term_term_goal_;  // Local copy of the terminal terminal goal
-  mtx_term_term_goal.unlock();
+  mtx_G_term.lock();
+  Eigen::Vector3d G_term = G_term_;  // Local copy of the terminal terminal goal
+  mtx_G_term.unlock();
 
-  double dist_to_goal = (term_term_goal - state_pos).norm();
+  double dist_to_goal = (G_term - state_pos).norm();
 
-  double dist_to_goal_commanded = (term_term_goal - state_pos).norm();
+  double dist_to_goal_commanded = (G_term - state_pos).norm();
 
-  std::cout << "term_term_goal" << term_term_goal.transpose() << std::endl;
+  // std::cout << "G_term" << G_term.transpose() << std::endl;
   // std::cout << "state_pos" << state_pos.transpose() << std::endl;
   // std::cout << "dist_to_goal_commanded=" << dist_to_goal_commanded << std::endl;
   if (dist_to_goal_commanded < par_.goal_radius)
@@ -1052,11 +1043,6 @@ void CVX::replanCB(const ros::TimerEvent& e)
   // MyTimer time_med(true);
   ///////////////////////////////////////////////////////////////////////////////
 
-  // bool have_seen_the_goal1 = false, have_seen_the_goal2 = false;
-  // bool found_one_1 = false, found_one_2 = false;  // found at least one free trajectory
-  // bool need_to_decide = true;
-  // bool solvedjps1 = false, solvedjps2 = false;
-
   int li1;    // last index inside the sphere of JPSk
   int li2;    // last index inside the sphere of JPS2
   int liold;  // last index inside the sphere of JPS2
@@ -1071,114 +1057,30 @@ void CVX::replanCB(const ros::TimerEvent& e)
   J2 = std::numeric_limits<double>::max();
   Eigen::MatrixXd U_temp1, U_temp2, X_temp1, X_temp2;
 
-  Eigen::Vector3d B1, B2, C1, C2, B_old;
-  // vec_Vecf<3> WP1, WP2;
-
-  // vec_Vecf<3> JPSk;
-  vec_Vecf<3> JPS2;
-
   // std::cout << "replanCB4\n" << std::endl;
   // printf("init2\n");
   // std::cout << "Running JPS3d from=" << state_pos.transpose() << std::endl;
-  // std::cout << "Running JPS3d to terminal goal=" << term_goal.transpose() << std::endl;
+  // std::cout << "Running JPS3d to terminal goal=" << G.transpose() << std::endl;
 
   double x0[9];
   if (X_initialized_)  // Needed to skip the first time (X_ still not initialized)
   {
-    // std::cout << "here1" << std::endl;
-
     mtx_k.lock();
-    // std::cout << "here2" << std::endl;
 
-    log_.entered_rescue_path = 0;
+    log_.entered_safe_path = 0;
     if (k_ > par_.offset_rp && status_ == TRAVELING)
     {
-      // ROS_WARN("Switched to the RESCUE PATH!!");
-      log_.entered_rescue_path = 1;
+      // ROS_WARN("Switched to the SAFE PATH!!");
+      log_.entered_safe_path = 1;
     }
 
     mtx_offsets.lock();
     k_initial_cond_1_ = std::min(k_ + par_.offset, (int)(X_.rows() - 1));
     mtx_offsets.unlock();
+    mtx_k.unlock();
     // printf("Ahora mismo, k_initial_cond_1=%d\n", k_initial_cond_1_);
 
     updateInitialCond(k_initial_cond_1_);
-
-    /*    mtx_X_U.lock();
-        int my_length = std::min(par_.offset, (int)(U_.rows() - (k_ + 1)));
-        my_length = (my_length < 1) ? 1 : my_length;
-        Eigen::MatrixXd jerk_simulate = U_.block(k_ + 1, 0, my_length, U_.cols());
-        Eigen::Vector3d vicon_accel = X_.block(k_, 6, 1, 3).transpose();  // TODO: Take this from the IMU in the real HW
-
-        std::vector<Eigen::Vector3d> simulated;
-
-        mtx_X_U.unlock();
-
-        std::cout << "****STARTING FROM:" << std::endl;
-        std::cout << "pos:" << state_pos.transpose() << std::endl;
-        std::cout << "vel:" << state_vel.transpose() << std::endl;
-        std::cout << "accel:" << vicon_accel.transpose() << std::endl;
-
-        std::cout << "Y aplicando el jerk:" << std::endl;
-        std::cout << "jerk:" << jerk_simulate << std::endl;
-
-        simulated = simulateForward(state_pos, state_vel, vicon_accel,
-                                    jerk_simulate);  // produces the simulated state par_.offset + 1*/
-
-    /*
-    mtx_X_U.lock();
-
-    Eigen::Vector3d novale_pos = (X_.block(k_, 0, 1, 3)).transpose();
-    Eigen::Vector3d novale_vel = (X_.block(k_, 3, 1, 3)).transpose();
-    Eigen::Vector3d novale_accel = (X_.block(k_, 6, 1, 3)).transpose();
-  mtx_X_U.unlock();
-
-     std::cout << "STARTING FROM:" << std::endl;
-        std::cout << "pos:" << novale_pos.transpose() << std::endl;
-        std::cout << "vel:" << novale_vel.transpose() << std::endl;
-        std::cout << "accel:" << novale_accel.transpose() << std::endl;
-
-        std::cout << "Y aplicando el jerk:" << std::endl;
-        std::cout << "jerk:" << jerk_simulate << std::endl;
-
-        simulated = simulateForward(novale_pos, novale_vel, novale_accel,
-                                    jerk_simulate);  // produces the simulated state par_.offset + 1
-
-        // simulated = simulateForward(state_pos, state_vel, vicon_accel, jerk_simulate);
-        std::cout << "SIMULATED:" << std::endl;
-        std::cout << simulated[0].transpose() << " " << simulated[1].transpose() << " " << simulated[2].transpose()
-                  << std::endl;
-
-        mtx_X_U.lock();
-        std::cout << "ME DEBERIA DAR:" << std::endl;
-        std::cout << X_.block(k_, 0, par_.offset + 2, X_.cols()) << std::endl;
-        mtx_X_U.unlock();
-
-        mtx_initial_cond.lock();
-        std::cout << "IVE TAKEN AS INITIAL CONDITION:" << std::endl;
-        std::cout << initialCond_.pos.x << ", " << initialCond_.pos.y << ", " << initialCond_.pos.z << ", "
-                  << initialCond_.vel.x << ", " << initialCond_.vel.y << ", " << initialCond_.vel.z << ", "
-                  << initialCond_.accel.x << ", " << initialCond_.accel.y << ", " << initialCond_.accel.z << std::endl;
-        mtx_initial_cond.unlock();*/
-    //     double x0[9] = { (simulated[0])(0), (simulated[0])(1), (simulated[0])(2),  ////////
-    //                  (simulated[1])(0), (simulated[1])(1), (simulated[1])(2),  ////////
-    //                  (simulated[2])(0), (simulated[2])(1), (simulated[2])(2) };
-
-    mtx_k.unlock();
-    /* std::cout << "SIMULATED:" << std::endl;
-    std::cout << simulated[0].transpose() << " " << simulated[1].transpose() << " " << simulated[2].transpose()
-              << std::endl;
-    x0[0] = (simulated[0])(0);  // Pos
-    x0[1] = (simulated[0])(1);  // Pos
-    x0[2] = (simulated[0])(2);  // Pos
-    x0[3] = (simulated[1])(0);  // Vel
-    x0[4] = (simulated[1])(1);  // Vel
-    x0[5] = (simulated[1])(2);  // Vel
-    x0[6] = (simulated[2])(0);  // Accel
-    x0[7] = (simulated[2])(1);  // Accel
-    x0[8] = (simulated[2])(2);  // Accel
-
-    std::cout << "here4" << std::endl;*/
 
     mtx_initial_cond.lock();
     x0[0] = initialCond_.pos.x;
@@ -1209,7 +1111,6 @@ void CVX::replanCB(const ros::TimerEvent& e)
     mtx_initial_cond.unlock();
   }
 
-  // std::cout << "replanCB5\n" << std::endl;
   Eigen::Vector3d InitPos;
   InitPos << x0[0], x0[1], x0[2];
 
@@ -1217,8 +1118,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   static bool first_time = true;  // how many times I've solved JPSk
 
-  std::cout << "Term Goal: *******************************" << std::endl;
-  std::cout << term_goal.transpose() << std::endl;
+  /*  std::cout << "Term Goal: *******************************" << std::endl;
+    std::cout << G.transpose() << std::endl;*/
 
   double ra = std::min((dist_to_goal - 0.001), par_.Ra);
 
@@ -1237,17 +1138,17 @@ void CVX::replanCB(const ros::TimerEvent& e)
   {
     first_time = false;
     // std::cout << "Running JPS first time" << std::endl;
-    JPSa = solveJPS3D(InitPos, term_goal, &solvedjpsa, 1);
+    JPSa = solveJPS3D(InitPos, G, &solvedjpsa, 1);
     log_.computed_both = 0;
     JPSk = JPSa;
   }
   else
   {
     // std::cout << "Running JPS other times" << std::endl;
-    JPSa = solveJPS3D(InitPos, term_goal, &solvedjpsa, 1);
+    JPSa = solveJPS3D(InitPos, G, &solvedjpsa, 1);
 
-    log_.JPSk_solved = solvedjpsa;
-    log_.JPSk_ms = timer_jps.ElapsedMs();
+    log_.JPSa_solved = solvedjpsa;
+    log_.JPSa_ms = timer_jps.ElapsedMs();
 
     if (solvedjpsa == false)
     {
@@ -1282,7 +1183,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
       bool solvedjpsb;
 
       MyTimer timer_jps_fix(true);
-      JPSb = fix(JPS_k_m_1_, InitPos, term_goal, &solvedjpsb);
+      JPSb = fix(JPS_k_m_1_, InitPos, G, &solvedjpsb);
       log_.JPS_fix_ms = timer_jps_fix.ElapsedMs();
       log_.JPS_fix_solved = solvedjpsb;
       if (solvedjpsb == true)
@@ -1290,31 +1191,30 @@ void CVX::replanCB(const ros::TimerEvent& e)
         std::cout << "Esto es JPSb (lo arreglado):" << std::endl;
         printElementsOfJPS(JPSb);
         Eigen::Vector3d D = getFirstIntersectionWithSphere(JPSb, ra, JPSb[0], &lib);
-        std::cout << "Going to compute norm, la=" << lia << ", lib=" << lib << std::endl;
+        // std::cout << "Going to compute norm, la=" << lia << ", lib=" << lib << std::endl;
         dist_a = normJPS(JPSa, lia + 1);
         dist_b = normJPS(JPSb, lib + 1);
-        std::cout << "Norm computed" << std::endl;
 
         double C_vector[9] = { C(0), C(1), C(2), 0, 0, 0, 0, 0, 0 };
         std::cout << "C=" << C.transpose() << " D=" << D.transpose() << std::endl;
         sg_whole_.setXf(C_vector);
         sg_whole_.findDT(1);
-        std::cout << "Norm computed2" << std::endl;
+
         double dta = sg_whole_.dt_;
-        Ja = dta + dist_a / par_.v_max;
-        log_.Ja_inside = dta;
+        Ja = sg_whole_.N_ * dta + dist_a / par_.v_max;
+        log_.Ja_inside = sg_whole_.N_ * dta;
         log_.Ja_outside = dist_a / par_.v_max;
         log_.Ja = Ja;
-        std::cout << "Norm computed3" << std::endl;
+        // std::cout << "Norm computed3" << std::endl;
 
         double D_vector[9] = { D(0), D(1), D(2), 0, 0, 0, 0, 0, 0 };
         sg_whole_.setXf(D_vector);
         sg_whole_.findDT(1);
-        std::cout << "Norm computed4" << std::endl;
+        // std::cout << "Norm computed4" << std::endl;
         double dtb = sg_whole_.dt_;
-        Jb = dtb + dist_b / par_.v_max;
+        Jb = sg_whole_.N_ * dtb + dist_b / par_.v_max;
 
-        log_.Jb_inside = dtb;
+        log_.Jb_inside = sg_whole_.N_ * dtb;
         log_.Jb_outside = dist_b / par_.v_max;
         log_.Jb = Jb;
 
@@ -1332,6 +1232,9 @@ void CVX::replanCB(const ros::TimerEvent& e)
     }
   }
 
+  log_.JPStotal_ms = timer_jps.ElapsedMs();
+  std::cout << bold << blue << "JPS (all):  " << std::fixed << timer_jps << "ms\n" << reset;
+
   // JPSk = JPSa;  // Quitar esto despues
   /*  std::cout << "Esto es JPS_k_m_1_:" << std::endl;
     printElementsOfJPS(JPS_k_m_1_);*/
@@ -1343,8 +1246,6 @@ void CVX::replanCB(const ros::TimerEvent& e)
     printElementsOfJPS(JPSk);*/
   JPS_k_m_1_ = JPSk;  // saved for the next iteration
   // solvedjps1 = true;
-
-  std::cout << bold << blue << "JPS (all):  " << std::fixed << timer_jps << "ms\n" << reset;
 
   ///////////////////////////
 
@@ -1373,23 +1274,18 @@ void CVX::replanCB(const ros::TimerEvent& e)
   std::cout << "JPSk is" << std::endl;
   printElementsOfJPS(JPSk);
 
-  B1 = getFirstIntersectionWithSphere(JPSk, ra, JPSk[0], &li1, &noPointsOutsideSphere1);
+  Eigen::Vector3d E;
+  E = getFirstIntersectionWithSphere(JPSk, ra, JPSk[0], &li1, &noPointsOutsideSphere1);
 
   vec_Vecf<3> JPSk_inside_sphere(JPSk.begin(), JPSk.begin() + li1 + 1);  // Elements of JPS that are inside the sphere
-  JPSk_inside_sphere.push_back(B1);
-
-  /*  std::cout << "Before creating more vertexes:" << std::endl;
-    printElementsOfJPS(JPSk_inside_sphere);*/
+  JPSk_inside_sphere.push_back(E);
   createMoreVertexes(JPSk_inside_sphere, par_.dist_max_vertexes);
-  /*  std::cout << "After creating more vertexes:" << std::endl;
-    printElementsOfJPS(JPSk_inside_sphere);*/
+
   //////////////////////////////////////////////////////////////////////////
   //////////// Solve with GUROBI Whole trajectory //////////////////////////
   /////////////////////////////////////////////////////////////////////////
   std::cout << bold << green << "***********WHOLE TRAJ*********************" << reset << std::endl;
-  // printf("Running Gurobi!!!\n");
 
-  // printf("Running CVXDecomp!!!\n");
   double before = ros::Time::now().toSec();
 
   /*  std::cout << "JPSk_inside_sphere before=" << std::endl;
@@ -1397,21 +1293,11 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   if (JPSk_inside_sphere.size() > par_.max_poly + 1)  // If I have more than (par_.max_poly + 1) vertexes
   {
-    std::cout << "ANTES JPSk_inside_sphere" << std::endl;
-    printElementsOfJPS(JPSk_inside_sphere);
     JPSk_inside_sphere.erase(JPSk_inside_sphere.begin() + par_.max_poly + 1,
                              JPSk_inside_sphere.end());  // Force JPS to have less than par_.max_poly elements
-    B1 = JPSk_inside_sphere[JPSk_inside_sphere.size() - 1];
-    // std::cout << "JPSk_inside_sphere tiene " << JPSk_inside_sphere.size() << "polytopes" << std::endl;
-    std::cout << "DESPUES JPSk_inside_sphere" << std::endl;
-    printElementsOfJPS(JPSk_inside_sphere);
+    E = JPSk_inside_sphere[JPSk_inside_sphere.size() - 1];
   }
-  // std::cout << "Final condition for the whole trajectory" << B1.transpose() << std::endl;
 
-  double xf[9] = { B1(0), B1(1), B1(2), 0, 0, 0, 0, 0, 0 };
-
-  /*  std::cout << "JPSk_inside_sphere=" << std::endl;
-    printElementsOfJPS(JPSk_inside_sphere);*/
   MyTimer cvx_ellip_decomp_t(true);
   cvxEllipsoidDecompOcc(JPSk_inside_sphere);  // result saved in l_constraints_
   log_.cvx_decomp_whole_ms = cvx_ellip_decomp_t.ElapsedMs();
@@ -1419,19 +1305,20 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   if (par_.visual)
   {
-    B1_.header.stamp = ros::Time::now();
-    B1_.pose.position.x = B1(0);
-    B1_.pose.position.y = B1(1);
-    B1_.pose.position.z = B1(2);
-    pub_point_B1_.publish(B1_);
+    E_.header.stamp = ros::Time::now();
+    E_.pose.position.x = E(0);
+    E_.pose.position.y = E(1);
+    E_.pose.position.z = E(2);
+    pub_point_E_.publish(E_);
   }
 
+  double xf[9] = { E(0), E(1), E(2), 0, 0, 0, 0, 0, 0 };
   sg_whole_.setXf(xf);
   sg_whole_.setX0(x0);
-  sg_whole_.setPolytopes(l_constraints_o_);
+  sg_whole_.setPolytopes(l_constraints_whole_);
   bool solved_whole = false;
 
-  if (l_constraints_o_[0].inside(InitPos) == false)
+  if (l_constraints_whole_[0].inside(InitPos) == false)
   {
     std::cout << red << "First point of whole traj is outside" << reset << std::endl;
   }
@@ -1448,27 +1335,21 @@ void CVX::replanCB(const ros::TimerEvent& e)
             << sg_whole_.runtime_ms_ << " ms), " << reset << sg_whole_.trials_ << " trials (dt=" << sg_whole_.dt_
             << "), f_worked=" << std::setprecision(2) << sg_whole_.factor_that_worked_ << std::endl;
 
-  // std::cout << "l_constraints_o_.size()=" << l_constraints_o_.size() << std::endl;
   if (solved_whole == false)
   {
     std::cout << red << "No solution found for the whole trajectory" << reset << std::endl;
     return;
   }
 
-  // std::cout << "Going to fill" << std::endl;
-
-  // printf("Solved Gurobi!!!\n");
   MyTimer fill_whole_t(true);
   sg_whole_.fillXandU();
   std::cout << bold << blue << "Fill Whole:  " << std::fixed << fill_whole_t << "ms" << reset << std::endl;
   mtx_X_U_temp.lock();
-  // U_temp_ = sg_whole_.getU();
-  // X_temp_ = sg_whole_.getX();
 
-  ///////////////////////////////////////////////////////////////
-  ///////////////       RESCUE PATH   //////////////////////
+  ///////////////////////////////////////////////////////////
+  ///////////////       SAFE PATH   //////////////////////
   //////////////////////////////////////////////////////////
-  std::cout << bold << green << "***********RESCUE PATH*********************" << reset << std::endl;
+  std::cout << bold << green << "***********SAFE PATH*********************" << reset << std::endl;
 
   MyTimer otherStuff3_t(true);
   mtx_offsets.lock();
@@ -1476,9 +1357,9 @@ void CVX::replanCB(const ros::TimerEvent& e)
   mtx_offsets.unlock();
   // std::cout << "index=" << index << std::endl;
 
-  std::cout << "******************Actual state:" << std::endl;
-  std::cout << "Pos=" << state_pos.transpose() << std::endl;
-  std::cout << "Vel=" << state_vel.transpose() << std::endl;
+  /*  std::cout << "******************Actual state:" << std::endl;
+    std::cout << "Pos=" << state_pos.transpose() << std::endl;
+    std::cout << "Vel=" << state_vel.transpose() << std::endl;*/
 
   Eigen::Vector3d posR(sg_whole_.X_temp_(index, 0), sg_whole_.X_temp_(index, 1), sg_whole_.X_temp_(index, 2));
   Eigen::Vector3d velR(sg_whole_.X_temp_(index, 3), sg_whole_.X_temp_(index, 4), sg_whole_.X_temp_(index, 5));
@@ -1495,32 +1376,28 @@ void CVX::replanCB(const ros::TimerEvent& e)
   std::cout << bold << blue << "Check collision with AR:  " << std::fixed << check_collision_AR_t << "ms" << reset
             << std::endl;
 
-  // std::cout << "******************SOL whole*********************\n";
-  // std::cout << sg_whole_.X_temp_.block(0, 0, index, sg_whole_.X_temp_.cols()) << std::endl;
-  // std::cout << sg_whole_.U_temp_ << std::endl;
-
   vec_Vecf<3> JPSk_inside_sphere_tmp = JPSk_inside_sphere;
   bool thereIsIntersection2;
   int el_eliminated2;
-  std::cout << "JPSk_inside_sphere_tmp ANTES:" << std::endl;
-  printElementsOfJPS(JPSk_inside_sphere_tmp);
+  // std::cout << "JPSk_inside_sphere_tmp ANTES:" << std::endl;
+  // printElementsOfJPS(JPSk_inside_sphere_tmp);
   Eigen::Vector3d M = getFirstCollisionJPS(JPSk_inside_sphere_tmp, &thereIsIntersection2, el_eliminated2, UNKNOWN_MAP,
                                            RETURN_INTERSECTION);  // results saved in JPSk_inside_sphere_tmp
 
-  std::cout << "Point M is:" << M.transpose() << std::endl;
+  // std::cout << "Point M is:" << M.transpose() << std::endl;
   if (par_.visual)
   {
     M_.header.stamp = ros::Time::now();
     M_.pose.position.x = M(0);
     M_.pose.position.y = M(1);
     M_.pose.position.z = M(2);
-    pub_pointM_.publish(M_);
+    pub_point_M_.publish(M_);
   }
 
-  std::cout << "Elements Eliminated=" << el_eliminated2 << std::endl;
-  std::cout << "JPSk_inside_sphere_tmp DESPUES:" << std::endl;
+  /*  std::cout << "Elements Eliminated=" << el_eliminated2 << std::endl;
+    std::cout << "JPSk_inside_sphere_tmp DESPUES:" << std::endl;
 
-  printElementsOfJPS(JPSk_inside_sphere_tmp);
+    printElementsOfJPS(JPSk_inside_sphere_tmp);*/
 
   JPSk_inside_sphere_tmp[0] = posR;
 
@@ -1529,14 +1406,10 @@ void CVX::replanCB(const ros::TimerEvent& e)
   MyTimer cvx_ellip_decomp2_t(true);
   cvxEllipsoidDecompUnkOcc2(JPSk_inside_sphere_tmp);  // result saved in l_constraints_
 
-  log_.cvx_decomp_rescue_ms = cvx_ellip_decomp2_t.ElapsedMs();
-  std::cout << bold << blue << "CVXDecompRescue:  " << std::fixed << cvx_ellip_decomp2_t << "ms" << reset << std::endl;
+  log_.cvx_decomp_safe_ms = cvx_ellip_decomp2_t.ElapsedMs();
+  std::cout << bold << blue << "CVXDecompSafe:  " << std::fixed << cvx_ellip_decomp2_t << "ms" << reset << std::endl;
 
   mtx_X_U_temp.unlock();
-
-  /*  std::cout << "****posR=" << posR.transpose() << std::endl;
-    std::cout << "****velR=" << velR.transpose() << std::endl;
-    std::cout << "****accelR=" << accelR.transpose() << std::endl;*/
 
   if (par_.visual)
   {
@@ -1544,99 +1417,75 @@ void CVX::replanCB(const ros::TimerEvent& e)
     R_.pose.position.x = posR(0);
     R_.pose.position.y = posR(1);
     R_.pose.position.z = posR(2);
-    pub_start_rescue_path_.publish(R_);
+    pub_point_R_.publish(R_);
   }
 
-  // MyTimer cvx_seed_decomp_t(true);
-  // cvxSeedDecompUnkOcc(posR);
-  // std::cout << bold << blue << "CVXDecompRescue:  " << std::fixed << cvx_seed_decomp_t << "ms" << reset << std::endl;
+  bool isGinside = l_constraints_safe_[l_constraints_safe_.size() - 1].inside(G);
+  if (isGinside)
+  {
+    std::cout << red << bold << "G is inside" << reset << std::endl;
+  }
+  M = (isGinside == true) ? G : M;
 
-  // std::cout << "Before sending A es\n" << A << std::endl;
+  double x0_safe[9] = { posR[0], posR[1], posR[2], velR[0], velR[1], velR[2], accelR[0], accelR[1], accelR[2] };
+  double xf_safe[9] = { M[0], M[1], M[2], 0, 0, 0, 0, 0, 0 };  // Note that the final position of xf_safe is only
+                                                               // used to find dt, not as a final condition
 
-  /*  bool thereIsIntersection = true;
-    JPSk[0] = posR;  // Force the first element to be posR
-    std::cout << "JPSK is:" << std::endl;
-    printElementsOfJPS(JPSk);
-    Eigen::Vector3d I = getIntersectionJPSwithPolytope(JPSk, l_constraints_uo_,
-                                                       thereIsIntersection);  // Intersection of JPS with polytope
-    // If there is no intersection, I will be the last point of JPS (i.e. the intermediate goal)
+  /*  std::cout << "Punto inicial: " << x0_safe[0] << ", " << x0_safe[1] << ", " << x0_safe[2] << std::endl;
+    std::cout << "Punto final: " << xf_safe[0] << ", " << xf_safe[1] << ", " << xf_safe[2] << std::endl;*/
 
-    if (thereIsIntersection == false)
-    {
-      I = JPSk[JPSk.size() - 1];
-    }*/
-  // std::cout << "Intersection Found=" << I.transpose() << std::endl;
-  // std::cout << "thereIsIntersection= " << thereIsIntersection << std::endl;
+  sg_safe_.setXf(xf_safe);
+  sg_safe_.setX0(x0_safe);
+  sg_safe_.setPolytopes(l_constraints_safe_);
 
-  double x0_rescue[9] = { posR[0], posR[1], posR[2], velR[0], velR[1], velR[2], accelR[0], accelR[1], accelR[2] };
+  bool isMinside = l_constraints_safe_[l_constraints_safe_.size() - 1].inside(M);
 
-  double xf_rescue[9] = { M[0], M[1], M[2], 0, 0, 0, 0, 0, 0 };  // Note that the final position of xf_rescue is only
-                                                                 // used to find dt, not as a final condition
-
-  /*  std::cout << "Punto inicial: " << x0_rescue[0] << ", " << x0_rescue[1] << ", " << x0_rescue[2] << std::endl;
-    std::cout << "Punto final: " << xf_rescue[0] << ", " << xf_rescue[1] << ", " << xf_rescue[2] << std::endl;*/
-
-  sg_rescue_.setXf(xf_rescue);
-  sg_rescue_.setX0(x0_rescue);
-  sg_rescue_.setPolytopes(l_constraints_uo2_);
-
-  bool isMinside = l_constraints_uo2_[l_constraints_uo2_.size() - 1].inside(M);
-
-  // std::cout << "IsMInside=" << isMinside << std::endl;
   if (isMinside && takeoff_done_ == true)
   {
-    // std::cout << "Forcing final constraint M=" << M.transpose() << std::endl;
-    sg_rescue_.setForceFinalConstraint(1);  // !thereIsIntersection2 If no intersection --> goal is inside
-                                            // polytope --> force final constraint
+    std::cout << bold << "Forcing final constraint M=" << M.transpose() << reset << std::endl;
+    sg_safe_.setForceFinalConstraint(1);  // !thereIsIntersection2 If no intersection --> goal is inside
+                                          // polytope --> force final constraint
   }
   else
   {
-    // std::cout << "Not Forcing final constraint" << std::endl;
-    sg_rescue_.setForceFinalConstraint(0);
+    sg_safe_.setForceFinalConstraint(0);
   }
 
-  if (l_constraints_uo2_[0].inside(posR) == false)
+  if (l_constraints_safe_[0].inside(posR) == false)
   {
-    std::cout << red << "First point of rescue traj is outside" << reset << std::endl;
+    std::cout << red << "First point of safe traj is outside" << reset << std::endl;
   }
-  // std::cout<<"Constraints "
-  // MatDNf<3> A = cs.A();
-  // std::cout << "Incluso antes A es\n" << A << std::endl;
 
-  // sg_rescue_.findDT(2);
   // std::cout << "l_constraints_uo_.size()=" << l_constraints_uo_.size() << std::endl;
-  MyTimer rescue_gurobi_t(true);
-  bool solved_rescue = sg_rescue_.genNewTraj();
+  MyTimer safe_gurobi_t(true);
+  bool solved_safe = sg_safe_.genNewTraj();
 
-  if (solved_rescue == false)
+  if (solved_safe == false)
   {
-    std::cout << red << "No solution found for the rescue path" << reset << std::endl;
+    std::cout << red << "No solution found for the safe path" << reset << std::endl;
     return;
   }
-  log_.gurobi_rescue_ms = sg_rescue_.runtime_ms_;
-  log_.gurobi_rescue_ms_mine = rescue_gurobi_t.ElapsedMs();
-  log_.gurobi_rescue_trials = sg_rescue_.trials_;
-  log_.gurobi_rescue_dt = sg_rescue_.dt_;
-  log_.gurobi_rescue_factor = sg_rescue_.factor_that_worked_;
+  log_.gurobi_safe_ms = sg_safe_.runtime_ms_;
+  log_.gurobi_safe_ms_mine = safe_gurobi_t.ElapsedMs();
+  log_.gurobi_safe_trials = sg_safe_.trials_;
+  log_.gurobi_safe_dt = sg_safe_.dt_;
+  log_.gurobi_safe_factor = sg_safe_.factor_that_worked_;
 
-  std::cout << bold << blue << "RescueGurobi:  " << std::fixed << rescue_gurobi_t << "ms, (" << std::fixed
-            << sg_rescue_.runtime_ms_ << " ms), " << reset << sg_rescue_.trials_ << " trials (dt=" << sg_rescue_.dt_
-            << "), f_worked=" << std::setprecision(2) << sg_rescue_.factor_that_worked_ << std::endl;
+  std::cout << bold << blue << "SafeGurobi:  " << std::fixed << safe_gurobi_t << "ms, (" << std::fixed
+            << sg_safe_.runtime_ms_ << " ms), " << reset << sg_safe_.trials_ << " trials (dt=" << sg_safe_.dt_
+            << "), f_worked=" << std::setprecision(2) << sg_safe_.factor_that_worked_ << std::endl;
   ///////////////////////////////////////////////////////////
   ///////////////       MERGE RESULTS    ////////////////////
   ///////////////////////////////////////////////////////////
 
-  MyTimer fill_rescue_t(true);
+  MyTimer fill_safe_t(true);
   // Both have solution
-  sg_rescue_.fillXandU();
-  std::cout << bold << blue << "Fill Rescue:  " << std::fixed << fill_rescue_t << "ms" << reset << std::endl;
+  sg_safe_.fillXandU();
+  std::cout << bold << blue << "Fill Safe:  " << std::fixed << fill_safe_t << "ms" << reset << std::endl;
 
   MyTimer otherStuff2_t(true);
-  // std::cout << "******************SOL RESCUE*********************\n";
-  // std::cout << sg_rescue_.X_temp_ << std::endl;
-  // std::cout << sg_rescue_.U_temp_ << std::endl;
 
-  // And now X_temp_ will be 1st part of whole + rescue path
+  // X_temp_ will be 1st part of whole + safe path
 
   mtx_X_U_temp.lock();
 
@@ -1644,27 +1493,27 @@ void CVX::replanCB(const ros::TimerEvent& e)
   int colsU = sg_whole_.U_temp_.cols();
   int colsX = sg_whole_.X_temp_.cols();
 
-  int rows_X_resc = sg_rescue_.X_temp_.rows();
-  int rows_U_resc = sg_rescue_.U_temp_.rows();
+  int rows_X_safe = sg_safe_.X_temp_.rows();
+  int rows_U_safe = sg_safe_.U_temp_.rows();
   int rows_X_whole = sg_whole_.X_temp_.rows();
   int rows_U_whole = sg_whole_.U_temp_.rows();
   // printf("Going to resize\n");
-  U_temp_.conservativeResize(index + rows_U_resc + 1, colsU);  // Set the number of rows of U_temp_
-  X_temp_.conservativeResize(index + rows_X_resc + 1, colsX);  // Set the number of rows of X_temp_
+  U_temp_.conservativeResize(index + rows_X_safe + 1, colsU);  // Set the number of rows of U_temp_
+  X_temp_.conservativeResize(index + rows_U_safe + 1, colsX);  // Set the number of rows of X_temp_
 
   /*  std::cout << "U_temp_ has (rows,cols)=" << U_temp_.rows() << ", " << U_temp_.cols() << std::endl;
     std::cout << "X_temp_ has (rows,cols)=" << X_temp_.rows() << ", " << X_temp_.cols() << std::endl;
 
     std::cout << "index is" << index << std::endl;
-    std::cout << "rows_U_resc is" << rows_U_resc << std::endl;*/
+    std::cout << "rows_U_safe is" << rows_U_safe << std::endl;*/
 
-  // copy the 1st part of the whole traj and the part of the rescue path
+  // copy the 1st part of the whole traj and the part of the safe path
   // std::cout << "Last row of X_temp_copied is" << X_temp_.row(index + 1).transpose() << std::endl;
   U_temp_.block(0, 0, index + 1, colsU) = sg_whole_.U_temp_.block(0, 0, index + 1, colsU);
   X_temp_.block(0, 0, index + 1, colsX) = sg_whole_.X_temp_.block(0, 0, index + 1, colsX);
 
-  U_temp_.block(index + 1, 0, rows_U_resc, colsU) = sg_rescue_.U_temp_;
-  X_temp_.block(index + 1, 0, rows_X_resc, colsX) = sg_rescue_.X_temp_;
+  U_temp_.block(index + 1, 0, rows_U_safe, colsU) = sg_safe_.U_temp_;
+  X_temp_.block(index + 1, 0, rows_X_safe, colsX) = sg_safe_.X_temp_;
 
   // std::cout << "******************SOL CONJUNTA*********************\n";
   // std::cout << X_temp_ << std::endl;
@@ -1679,7 +1528,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   {
     clearJPSPathVisualization(JPS_WHOLE_TRAJ);
     publishJPSPath(JPSk_inside_sphere, JPS_WHOLE_TRAJ);
-    pubTraj(sg_rescue_.X_temp_, RESCUE);
+    pubTraj(sg_safe_.X_temp_, SAFE);
     pubTraj(sg_whole_.X_temp_, WHOLE);
   }
 
@@ -1691,16 +1540,19 @@ void CVX::replanCB(const ros::TimerEvent& e)
   k_initial_cond_ = k_initial_cond_1_;
   // printf("Ahora mismo, k_initial_cond_=%d and k_=%d\n", k_initial_cond_, k_);
   mtx_k.unlock();
-  B_ = B1;
+  B_ = E;
   optimized_ = true;
   mtx_planner_status_.lock();
   planner_status_ = REPLANNED;
   mtx_planner_status_.unlock();
   // printf("ReplanCB: planner_status_ = REPLANNED\n");
-  Eigen::Vector3d F =
-      sg_rescue_.X_temp_.block(sg_rescue_.X_temp_.rows() - 1, 0, 1, 3);  // Final point of the rescue path
-  std::cout << "*Final Point Rescue Path=" << F.transpose() << std::endl;
-  double dist = (term_term_goal_ - F).norm();
+  std::cout << "Rescue Path:\n" << sg_safe_.X_temp_ << std::endl;
+  Eigen::Vector3d F;
+  F << sg_safe_.X_temp_(rows_X_safe - 1, 0), sg_safe_.X_temp_(rows_X_safe - 1, 1),
+      sg_safe_.X_temp_(rows_X_safe - 1, 2);  // Final point of the safe path
+  //  = sg_safe_.X_temp_.block(sg_safe_.X_temp_.rows() - 1, 0, 1, 3);  // Final point of the safe path
+  std::cout << "*Final Point Safe Path=" << F.transpose() << std::endl;
+  double dist = (G_term_ - F).norm();
   std::cout << "******Distance=" << dist << std::endl;
   if (dist < par_.goal_radius)
   {
@@ -1717,26 +1569,28 @@ void CVX::replanCB(const ros::TimerEvent& e)
   int states_last_replan = ceil(replanCB_t.ElapsedMs() / (par_.dc * 1000));  // Number of states that
                                                                              // would have been needed for
                                                                              // the last replan
-  par_.offset_rp = std::max(par_.factor_deltaTp * states_last_replan,
-                            (double)par_.min_states_deltaTp);  // This is Delta_t' in the paper
+  double delta_tp = std::max(par_.factor_deltaTp * states_last_replan,
+                             (double)par_.min_states_deltaTp);  // Delta_t_prime
   std::cout << "Next offset:  " << std::fixed << par_.offset_rp << " states" << std::endl;
-  par_.offset = std::max(par_.factor_deltaT * states_last_replan,
-                         (double)par_.min_states_deltaT);  // This is Delta_t in the paper
+  double delta_t = std::max(par_.factor_deltaT * states_last_replan,
+                            (double)par_.min_states_deltaT);  // Delta_t
+
+  par_.offset_rp = delta_tp;
+  par_.offset = delta_t;
   mtx_offsets.unlock();
 
   // Time allocation
-  double new_init_whole = 1;                                       // sg_whole_.factor_that_worked_ - 0.25;
-  double new_final_whole = sg_whole_.factor_that_worked_ + 10.25;  // high end factor is not a problem
-  double new_increment_whole = 0.5;
-  sg_whole_.setFactorInitialAndFinalAndIncrement(new_init_whole, new_final_whole, new_increment_whole);
+  double new_init_whole =
+      std::max(sg_whole_.factor_that_worked_ - par_.gamma_whole, 1.0);         // sg_whole_.factor_that_worked_ - 0.25;
+  double new_final_whole = sg_whole_.factor_that_worked_ + par_.gammap_whole;  // high end factor is not a problem
+  sg_whole_.setFactorInitialAndFinalAndIncrement(new_init_whole, new_final_whole, par_.increment_whole);
 
-  double new_init_rescue = 1;                                        // sg_rescue_.factor_that_worked_ - 0.25;
-  double new_final_rescue = sg_rescue_.factor_that_worked_ + 10.25;  // high end factor is not a problem
-  double new_increment_rescue = 0.5;
+  double new_init_safe = std::max(sg_safe_.factor_that_worked_ - par_.gamma_safe, 1.0);
+  double new_final_safe = sg_safe_.factor_that_worked_ + par_.gammap_safe;  // high end factor is not a problem
+  sg_safe_.setFactorInitialAndFinalAndIncrement(new_init_safe, new_final_safe, par_.increment_safe);
 
   std::cout << "Next factors: W: " << std::fixed << std::setprecision(2) << new_init_whole << "-->" << new_final_whole
-            << " R: " << new_init_rescue << "-->" << new_final_rescue << reset << std::endl;
-  sg_rescue_.setFactorInitialAndFinalAndIncrement(new_init_rescue, new_final_rescue, new_increment_rescue);
+            << " R: " << new_init_safe << "-->" << new_final_safe << reset << std::endl;
 
   log_.header.stamp = ros::Time::now();
 
@@ -1750,7 +1604,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
 bool CVX::ARisInFreeSpace(int index)
 {  // We have to check only against the unkown space (A-R won't intersect the obstacles for sure)
 
-  std::cout << "In ARisInFreeSpace, radius_drone= " << par_.drone_radius << std::endl;
+  // std::cout << "In ARisInFreeSpace, radius_drone= " << par_.drone_radius << std::endl;
   int n = 1;  // find one neighbour
 
   std::vector<int> pointIdxNKNSearch(n);
@@ -1758,22 +1612,22 @@ bool CVX::ARisInFreeSpace(int index)
 
   bool isFree = true;
 
-  std::cout << "Before mtx_unk" << std::endl;
+  // std::cout << "Before mtx_unk" << std::endl;
   mtx_unk.lock();
   mtx_X_U_temp.lock();
-  std::cout << "After mtx_unk. index=" << index << std::endl;
+  // std::cout << "After mtx_unk. index=" << index << std::endl;
   for (int i = 0; i < index; i = i + 10)
   {  // Sample points along the trajectory
-    std::cout << "i=" << i << std::endl;
+     // std::cout << "i=" << i << std::endl;
     pcl::PointXYZ searchPoint(sg_whole_.X_temp_(i, 0), sg_whole_.X_temp_(i, 1), sg_whole_.X_temp_(i, 2));
 
     Eigen::Vector3d novale;
     novale << sg_whole_.X_temp_(i, 0), sg_whole_.X_temp_(i, 1), sg_whole_.X_temp_(i, 2);
-    std::cout << "Point =" << novale.transpose() << std::endl;
+    // std::cout << "Point =" << novale.transpose() << std::endl;
 
     if (kdtree_unk_.nearestKSearch(searchPoint, n, pointIdxNKNSearch, pointNKNSquaredDistance) > 0)
     {
-      if (sqrt(pointNKNSquaredDistance[0]) < 0.2)
+      if (sqrt(pointNKNSquaredDistance[0]) < 0.25)
       {  // TODO: 0.2 is the radius of the drone.
         std::cout << "A->R collides, with d=" << sqrt(pointNKNSquaredDistance[0])
                   << ", radius_drone=" << par_.drone_radius << std::endl;
@@ -2001,7 +1855,7 @@ void CVX::print_status()
 
 void CVX::pubCB(const ros::TimerEvent& e)
 {
-  print_status();
+  // print_status();
   mtx_goals.lock();
   // printf("GOing to publish\n");
 
@@ -2051,6 +1905,7 @@ void CVX::pubCB(const ros::TimerEvent& e)
     quadGoal_.cut_power = false;
 
     mtx_k.lock();
+
     k_ = std::min(k_, (int)(X_.rows() - 1));
     // printf("planner_status_= %d\n", planner_status_);
     // printf("to_land_= %d\n", to_land_);
@@ -2113,18 +1968,18 @@ void CVX::pubCB(const ros::TimerEvent& e)
 
     if (status_ == YAWING)
     {
-      // mtx_term_goal.lock();
-      double desired_yaw = atan2(term_goal_[1] - quadGoal_.pos.y, term_goal_[0] - quadGoal_.pos.x);
-      // mtx_term_goal.unlock();
-      std::cout << red << bold << std::setprecision(6) << "desired_yaw=" << desired_yaw << reset << std::endl;
-      std::cout << red << bold << std::setprecision(6) << "quadGoal_.yaw=" << quadGoal_.yaw << reset << std::endl;
+      // mtx_G.lock();
+      double desired_yaw = atan2(G_[1] - quadGoal_.pos.y, G_[0] - quadGoal_.pos.x);
+      // mtx_G.unlock();
+      // std::cout << red << bold << std::setprecision(6) << "desired_yaw=" << desired_yaw << reset << std::endl;
+      // std::cout << red << bold << std::setprecision(6) << "quadGoal_.yaw=" << quadGoal_.yaw << reset << std::endl;
 
       double diff = desired_yaw - quadGoal_.yaw;
-      std::cout << red << bold << std::setprecision(6) << "diff before wrappping=" << diff << reset << std::endl;
+      // std::cout << red << bold << std::setprecision(6) << "diff before wrappping=" << diff << reset << std::endl;
 
       angle_wrap(diff);
 
-      std::cout << red << bold << "diff after wrappping=" << diff << reset << std::endl;
+      //      std::cout << red << bold << "diff after wrappping=" << diff << reset << std::endl;
 
       yaw(diff, quadGoal_);
       /*      printf("Inside, desired_yaw=%0.2f,quadGoal_.yaw=%0.2f, diff=%f , abs(diff)=%f\n", desired_yaw,
@@ -2145,13 +2000,13 @@ void CVX::pubCB(const ros::TimerEvent& e)
       // double desired_yaw = atan2(quadGoal_.vel.y, quadGoal_.vel.x);
       double desired_yaw = atan2(B_[1] - quadGoal_.pos.y, B_[0] - quadGoal_.pos.x);
 
-      std::cout << red << bold << std::setprecision(6) << "desired_yaw=" << desired_yaw << reset << std::endl;
-      std::cout << red << bold << std::setprecision(6) << "quadGoal_.yaw=" << quadGoal_.yaw << reset << std::endl;
+      // std::cout << red << bold << std::setprecision(6) << "desired_yaw=" << desired_yaw << reset << std::endl;
+      // std::cout << red << bold << std::setprecision(6) << "quadGoal_.yaw=" << quadGoal_.yaw << reset << std::endl;
 
       double diff = desired_yaw - quadGoal_.yaw;
-      std::cout << red << bold << std::setprecision(6) << "diff before wrappping=" << diff << reset << std::endl;
+      // std::cout << red << bold << std::setprecision(6) << "diff before wrappping=" << diff << reset << std::endl;
       angle_wrap(diff);
-      std::cout << red << bold << std::setprecision(6) << "diff after wrappping=" << diff << reset << std::endl;
+      // std::cout << red << bold << std::setprecision(6) << "diff after wrappping=" << diff << reset << std::endl;
       if (JPSk_solved_ == true and takeoff_done_ == true and fabs(diff) > 0.04)  // only yaw if diff is big enough
       {
         yaw(diff, quadGoal_);
@@ -2174,7 +2029,7 @@ void CVX::pubCB(const ros::TimerEvent& e)
     mtx_offsets.lock();
     if (k_ > par_.offset_rp && status_ == TRAVELING)
     {
-      ROS_WARN("Switched to the RESCUE PATH!!");
+      ROS_WARN("Switched to the SAFE PATH!!");
     }
     mtx_offsets.unlock();
 
@@ -2190,8 +2045,9 @@ void CVX::pubCB(const ros::TimerEvent& e)
   // printf("(initialCond_): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", initialCond_.pos.x, initialCond_.pos.y,
   //       initialCond_.pos.z, initialCond_.vel.x, initialCond_.vel.y, initialCond_.vel.z);
 
-  std::cout << green << bold << std::setprecision(6) << "quadGoal_.yaw sent=" << quadGoal_.yaw << reset << std::endl;
-  std::cout << green << bold << std::setprecision(6) << "quadGoal_.dyaw sent=" << quadGoal_.dyaw << reset << std::endl;
+  // std::cout << green << bold << std::setprecision(6) << "quadGoal_.yaw sent=" << quadGoal_.yaw << reset << std::endl;
+  // std::cout << green << bold << std::setprecision(6) << "quadGoal_.dyaw sent=" << quadGoal_.dyaw << reset <<
+  // std::endl;
 
   pub_goal_.publish(quadGoal_);
 
@@ -2478,81 +2334,27 @@ void CVX::cvxEllipsoidDecompUnkOcc2(vec_Vecf<3>& path)
     poly_msg.header.frame_id = "world";
 
     // Publish visualization msgs
-    cvx_decomp_el_uo2_pub__.publish(es_msg);
-    cvx_decomp_poly_uo2_pub_.publish(poly_msg);
+    // cvx_decomp_el_uo2_pub__.publish(es_msg);
+    cvx_safe_pub_.publish(poly_msg);
   }
   // Convert to inequality constraints Ax < b
   // std::vector<polytope> polytopes;
   auto polys = ellip_decomp_util_uo2_.get_polyhedrons();
 
-  l_constraints_uo2_.clear();
+  l_constraints_safe_.clear();
 
   for (size_t i = 0; i < path.size() - 1; i++)
   {
     // std::cout << "Inserting constraint" << std::endl;
     const auto pt_inside = (path[i] + path[i + 1]) / 2;
     LinearConstraint3D cs(pt_inside, polys[i].hyperplanes());
-    l_constraints_uo2_.push_back(cs);
+    l_constraints_safe_.push_back(cs);
   }
 
-  if (l_constraints_uo2_[0].inside(path[0]) == false)
+  if (l_constraints_safe_[0].inside(path[0]) == false)
   {
-    std::cout << red << "In cvxEllip: First point of rescue traj is outside" << reset << std::endl;
+    std::cout << red << "In cvxEllip: First point of safe traj is outside" << reset << std::endl;
   }
-}
-
-void CVX::cvxSeedDecompUnkOcc(Vecf<3>& seed)
-{
-  double before = ros::Time::now().toSec();
-
-  // std::cout << "In cvxDecomp 0!" << std::endl;
-  if (kdtree_map_initialized_ == false)
-  {
-    return;
-  }
-  // std::cout << "In cvxDecomp 1!" << std::endl;
-
-  // vec_Vec3f obs;
-
-  // std::cout << "Type Obstacles==UNKOWN_AND_OCCUPIED_SPACE**************" << std::endl;
-
-  // pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr_cloud_map = kdtree_map_.getInputCloud();
-  // pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr_cloud_unkown = kdtree_unk_.getInputCloud();
-
-  // std::cout << "Number of elements in unkCloud" < < < < std::endl;
-
-  /*  obs = pclptr_to_vec(pclptr_map_, pclptr_unk_);
-    std::cout << "Points in mapCloud=" << (*pclptr_map_).points.size() << std::endl;
-    std::cout << "Points in unkCloud=" << (*pclptr_unk_).points.size() << std::endl;*/
-
-  // Initialize SeedDecomp3D
-
-  seed_decomp_util_.set_seed(seed);
-  seed_decomp_util_.set_obs(vec_uo_);
-  seed_decomp_util_.set_local_bbox(Vec3f(4, 4, 1));
-  // std::cout << "In cvxDecomp before dilate!" << std::endl;
-  seed_decomp_util_.dilate(0.1);
-  // std::cout << "In cvxDecomp after dilate!" << std::endl;
-  seed_decomp_util_.shrink_polyhedron(par_.drone_radius);
-  // std::cout << "In cvxDecomp after shrink!" << std::endl;
-
-  vec_E<Polyhedron<3>> polyhedron_as_array;  // This vector will contain only one element
-  polyhedron_as_array.push_back(seed_decomp_util_.get_polyhedron());
-  decomp_ros_msgs::PolyhedronArray poly_msg = DecompROS::polyhedron_array_to_ros(polyhedron_as_array);
-  poly_msg.header.frame_id = "world";
-
-  // Publish visualization msgs
-  cvx_decomp_poly_uo_pub_.publish(poly_msg);
-  auto poly = seed_decomp_util_.get_polyhedron();
-  // std::cout << "Incluso antes A es\n" << poly.hyperplanes()[0].n_.transpose() << std::endl;
-  l_constraints_uo_.clear();
-  LinearConstraint3D cs(seed, poly.hyperplanes());
-
-  MatDNf<3> A = cs.A();
-  // std::cout << "Incluso antes A es\n" << A << std::endl;
-
-  l_constraints_uo_.push_back(cs);
-  // ROS_WARN("SeedDecomp takes: %0.2f ms", 1000 * (ros::Time::now().toSec() - before));
 }
 
 void CVX::cvxEllipsoidDecompOcc(vec_Vecf<3>& path)
@@ -2588,21 +2390,21 @@ void CVX::cvxEllipsoidDecompOcc(vec_Vecf<3>& path)
     poly_msg.header.frame_id = "world";
 
     // Publish visualization msgs
-    cvx_decomp_el_o_pub__.publish(es_msg);
-    cvx_decomp_poly_o_pub_.publish(poly_msg);
+    // cvx_decomp_el_o_pub__.publish(es_msg);
+    cvx_whole_pub_.publish(poly_msg);
   }
   // Convert to inequality constraints Ax < b
   // std::vector<polytope> polytopes;
   auto polys = ellip_decomp_util_.get_polyhedrons();
 
-  l_constraints_o_.clear();
+  l_constraints_whole_.clear();
 
   for (size_t i = 0; i < path.size() - 1; i++)
   {
     // std::cout << "Inserting constraint" << std::endl;
     const auto pt_inside = (path[i] + path[i + 1]) / 2;
     LinearConstraint3D cs(pt_inside, polys[i].hyperplanes());
-    l_constraints_o_.push_back(cs);
+    l_constraints_whole_.push_back(cs);
   }
 }
 
@@ -2630,12 +2432,12 @@ void CVX::pubTraj(Eigen::MatrixXd& X, int type)
 
   if (type == WHOLE)
   {
-    pub_traj_.publish(traj);
+    pub_traj_whole_.publish(traj);
   }
 
-  if (type == RESCUE)
+  if (type == SAFE)
   {
-    pub_traj_rescue_.publish(traj);
+    pub_traj_safe_.publish(traj);
   }
 }
 
@@ -2722,66 +2524,6 @@ void CVX::clearMarkerSetOfArrows()
   trajs_sphere_.markers.clear();  // trajs_sphere_ is ready to insert in it the "add" markers
   markerID_ = 0;
 }
-
-/*void CVX::frontierCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
-{
-  // printf("****In FrontierCB\n");
-  if (pcl2ptr_msg->width == 0 || pcl2ptr_msg->height == 0)  // Point Cloud is empty (this happens at the beginning)
-  {
-    return;
-  }
-
-  pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_frontier(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::fromROSMsg(*pcl2ptr_msg, *pclptr_frontier);
-
-  mtx_frontier.lock();
-  kdtree_frontier_.setInputCloud(pclptr_frontier);
-  mtx_frontier.unlock();
-  kdtree_frontier_initialized_ = 1;
-}*/
-
-/*void CVX::pclCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
-{
-  // printf("In pclCB\n");
-
-  if (pcl2ptr_msg->width == 0 || pcl2ptr_msg->height == 0)  // Point Cloud is empty
-  {
-    return;
-  }
-  geometry_msgs::TransformStamped transformStamped;
-  sensor_msgs::PointCloud2Ptr pcl2ptr_msg_transformed(new sensor_msgs::PointCloud2());
-  try
-  {
-    transformStamped = tf_buffer_.lookupTransform("world", name_drone_ + "/camera", ros::Time(0));
-    tf2::doTransform(*pcl2ptr_msg, *pcl2ptr_msg_transformed, transformStamped);
-
-    pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr(new pcl::PointCloud<pcl::PointXYZ>);
-    pcl::fromROSMsg(*pcl2ptr_msg_transformed, *pclptr);
-
-    std::vector<int> index;
-    // TODO: there must be a better way to check this. It's here because (in the simulation) sometimes all the points
-    // are NaN (when the drone is on the ground and stuck moving randomly). If this is not done, the program breaks. I
-    // think it won't be needed in the real drone
-    pcl::removeNaNFromPointCloud(*pclptr, *pclptr, index);
-    if (pclptr->size() == 0)
-    {
-      return;
-    }
-
-    kdTreeStamped my_kdTreeStamped;
-    my_kdTreeStamped.kdTree.setInputCloud(pclptr);
-    my_kdTreeStamped.time = pcl2ptr_msg->header.stamp;
-    mtx_inst.lock();
-    // printf("pclCB: MTX is locked\n");
-    v_kdtree_new_pcls_.push_back(my_kdTreeStamped);
-    // printf("pclCB: MTX is unlocked\n");
-    mtx_inst.unlock();
-  }
-  catch (tf2::TransformException& ex)
-  {
-    ROS_WARN("%s", ex.what());
-  }
-}*/
 
 // Occupied CB
 void CVX::mapCB(const sensor_msgs::PointCloud2::ConstPtr& pcl2ptr_map_ros,
@@ -2892,7 +2634,7 @@ Eigen::Vector3d CVX::getFirstCollisionJPS(vec_Vecf<3>& path, bool* thereIsInters
   while (path.size() > 0)
   {
     // std::cout<<red<<"New Iteration, iteration="<<iteration<<reset<<std::endl;
-    std::cout << red << "Searching from point=" << path[0].transpose() << reset << std::endl;
+    // std::cout << red << "Searching from point=" << path[0].transpose() << reset << std::endl;
     pcl_search_point = eigenPoint2pclPoint(path[0]);
 
     int number_of_neigh;
@@ -2912,7 +2654,7 @@ Eigen::Vector3d CVX::getFirstCollisionJPS(vec_Vecf<3>& path, bool* thereIsInters
     {
       r = sqrt(dist2_map[0]);
 
-      std::cout << "r=" << r << std::endl;
+      // std::cout << "r=" << r << std::endl;
       // std::cout << "Point=" << r << std::endl;
 
       if (r < par_.drone_radius)  // collision of the JPS path and an inflated obstacle --> take last search point
@@ -3043,9 +2785,9 @@ void CVX::pubActualTraj()
   mtx_state.lock();
   Eigen::Vector3d act_pos(state_.pos.x, state_.pos.y, state_.pos.z);
   mtx_state.unlock();
-  // mtx_term_goal.lock();
-  Eigen::Vector3d t_goal = term_goal_;
-  // mtx_term_goal.unlock();
+  // mtx_G.lock();
+  Eigen::Vector3d t_goal = G_;
+  // mtx_G.unlock();
   float dist_to_goal = (t_goal - act_pos).norm();
 
   if (dist_to_goal < 2 * par_.goal_radius)
@@ -3077,55 +2819,11 @@ void CVX::pubTerminalGoal()
 {
   geometry_msgs::PointStamped p;
   p.header.frame_id = "world";
-  // mtx_term_goal.lock();
-  p.point = eigen2point(term_goal_);
-  // mtx_term_goal.unlock();
+  // mtx_G.lock();
+  p.point = eigen2point(G_);
+  // mtx_G.unlock();
 
-  pub_term_goal_.publish(p);
-}
-
-void CVX::pubPlanningVisual(Eigen::Vector3d center, double ra, double rb, Eigen::Vector3d B1, Eigen::Vector3d C1)
-{
-  visualization_msgs::MarkerArray tmp;
-
-  int start = 2200;  // Large enough to prevent conflict with other markers
-  visualization_msgs::Marker sphere_Sa;
-  sphere_Sa.header.frame_id = "world";
-  sphere_Sa.id = start;
-  sphere_Sa.type = visualization_msgs::Marker::SPHERE;
-  sphere_Sa.scale = vectorUniform(2 * ra);
-  sphere_Sa.color = color(BLUE_TRANS);
-  sphere_Sa.pose.position = eigen2point(center);
-  tmp.markers.push_back(sphere_Sa);
-
-  visualization_msgs::Marker sphere_Sb;
-  sphere_Sb.header.frame_id = "world";
-  sphere_Sb.id = start + 1;
-  sphere_Sb.type = visualization_msgs::Marker::SPHERE;
-  sphere_Sb.scale = vectorUniform(2 * rb);
-  sphere_Sb.color = color(RED_TRANS_TRANS);
-  sphere_Sb.pose.position = eigen2point(center);
-  tmp.markers.push_back(sphere_Sb);
-
-  visualization_msgs::Marker B1_marker;
-  B1_marker.header.frame_id = "world";
-  B1_marker.id = start + 2;
-  B1_marker.type = visualization_msgs::Marker::SPHERE;
-  B1_marker.scale = vectorUniform(0.1);
-  B1_marker.color = color(BLUE_LIGHT);
-  B1_marker.pose.position = eigen2point(B1);
-  tmp.markers.push_back(B1_marker);
-
-  visualization_msgs::Marker C1_marker;
-  C1_marker.header.frame_id = "world";
-  C1_marker.id = start + 3;
-  C1_marker.type = visualization_msgs::Marker::SPHERE;
-  C1_marker.scale = vectorUniform(0.1);
-  C1_marker.color = color(BLUE_LIGHT);
-  C1_marker.pose.position = eigen2point(C1);
-  tmp.markers.push_back(C1_marker);
-
-  pub_planning_vis_.publish(tmp);
+  pub_point_G_.publish(p);
 }
 
 void CVX::pubintersecPoint(Eigen::Vector3d p, bool add)
@@ -3174,9 +2872,9 @@ Eigen::Vector3d CVX::projectClickedGoal(Eigen::Vector3d& P1)
 {
   //[px1, py1, pz1] is inside the map (it's the center of the map, where the drone is)
   //[px2, py2, pz2] is outside the map
-  mtx_term_term_goal.lock();
-  Eigen::Vector3d P2 = term_term_goal_;
-  mtx_term_term_goal.unlock();
+  mtx_G_term.lock();
+  Eigen::Vector3d P2 = G_term_;
+  mtx_G_term.unlock();
   // return P2;  // TODO: Comment this line after the HW experiments!
   double x_max = P1(0) + par_.wdx / 2;
   double x_min = P1(0) - par_.wdx / 2;
@@ -3269,3 +2967,237 @@ Eigen::Vector3d CVX::projectClickedGoal(Eigen::Vector3d& P1)
   // std::cout << "*****Projecting: returned" << inters.transpose() << std::endl;
   return inters;
 }
+
+/*    mtx_X_U.lock();
+    int my_length = std::min(par_.offset, (int)(U_.rows() - (k_ + 1)));
+    my_length = (my_length < 1) ? 1 : my_length;
+    Eigen::MatrixXd jerk_simulate = U_.block(k_ + 1, 0, my_length, U_.cols());
+    Eigen::Vector3d vicon_accel = X_.block(k_, 6, 1, 3).transpose();  // TODO: Take this from the IMU in the real HW
+
+    std::vector<Eigen::Vector3d> simulated;
+
+    mtx_X_U.unlock();
+
+    std::cout << "****STARTING FROM:" << std::endl;
+    std::cout << "pos:" << state_pos.transpose() << std::endl;
+    std::cout << "vel:" << state_vel.transpose() << std::endl;
+    std::cout << "accel:" << vicon_accel.transpose() << std::endl;
+
+    std::cout << "Y aplicando el jerk:" << std::endl;
+    std::cout << "jerk:" << jerk_simulate << std::endl;
+
+    simulated = simulateForward(state_pos, state_vel, vicon_accel,
+                                jerk_simulate);  // produces the simulated state par_.offset + 1*/
+
+/*
+mtx_X_U.lock();
+
+Eigen::Vector3d novale_pos = (X_.block(k_, 0, 1, 3)).transpose();
+Eigen::Vector3d novale_vel = (X_.block(k_, 3, 1, 3)).transpose();
+Eigen::Vector3d novale_accel = (X_.block(k_, 6, 1, 3)).transpose();
+mtx_X_U.unlock();
+
+ std::cout << "STARTING FROM:" << std::endl;
+    std::cout << "pos:" << novale_pos.transpose() << std::endl;
+    std::cout << "vel:" << novale_vel.transpose() << std::endl;
+    std::cout << "accel:" << novale_accel.transpose() << std::endl;
+
+    std::cout << "Y aplicando el jerk:" << std::endl;
+    std::cout << "jerk:" << jerk_simulate << std::endl;
+
+    simulated = simulateForward(novale_pos, novale_vel, novale_accel,
+                                jerk_simulate);  // produces the simulated state par_.offset + 1
+
+    // simulated = simulateForward(state_pos, state_vel, vicon_accel, jerk_simulate);
+    std::cout << "SIMULATED:" << std::endl;
+    std::cout << simulated[0].transpose() << " " << simulated[1].transpose() << " " << simulated[2].transpose()
+              << std::endl;
+
+    mtx_X_U.lock();
+    std::cout << "ME DEBERIA DAR:" << std::endl;
+    std::cout << X_.block(k_, 0, par_.offset + 2, X_.cols()) << std::endl;
+    mtx_X_U.unlock();
+
+    mtx_initial_cond.lock();
+    std::cout << "IVE TAKEN AS INITIAL CONDITION:" << std::endl;
+    std::cout << initialCond_.pos.x << ", " << initialCond_.pos.y << ", " << initialCond_.pos.z << ", "
+              << initialCond_.vel.x << ", " << initialCond_.vel.y << ", " << initialCond_.vel.z << ", "
+              << initialCond_.accel.x << ", " << initialCond_.accel.y << ", " << initialCond_.accel.z << std::endl;
+    mtx_initial_cond.unlock();*/
+//     double x0[9] = { (simulated[0])(0), (simulated[0])(1), (simulated[0])(2),  ////////
+//                  (simulated[1])(0), (simulated[1])(1), (simulated[1])(2),  ////////
+//                  (simulated[2])(0), (simulated[2])(1), (simulated[2])(2) };
+
+// mtx_k.unlock();
+/* std::cout << "SIMULATED:" << std::endl;
+std::cout << simulated[0].transpose() << " " << simulated[1].transpose() << " " << simulated[2].transpose()
+          << std::endl;
+x0[0] = (simulated[0])(0);  // Pos
+x0[1] = (simulated[0])(1);  // Pos
+x0[2] = (simulated[0])(2);  // Pos
+x0[3] = (simulated[1])(0);  // Vel
+x0[4] = (simulated[1])(1);  // Vel
+x0[5] = (simulated[1])(2);  // Vel
+x0[6] = (simulated[2])(0);  // Accel
+x0[7] = (simulated[2])(1);  // Accel
+x0[8] = (simulated[2])(2);  // Accel
+
+std::cout << "here4" << std::endl;*/
+
+/*void CVX::pubPlanningVisual(Eigen::Vector3d center, double ra, double rb, Eigen::Vector3d B1, Eigen::Vector3d C1)
+{
+  visualization_msgs::MarkerArray tmp;
+
+  int start = 2200;  // Large enough to prevent conflict with other markers
+  visualization_msgs::Marker sphere_Sa;
+  sphere_Sa.header.frame_id = "world";
+  sphere_Sa.id = start;
+  sphere_Sa.type = visualization_msgs::Marker::SPHERE;
+  sphere_Sa.scale = vectorUniform(2 * ra);
+  sphere_Sa.color = color(BLUE_TRANS);
+  sphere_Sa.pose.position = eigen2point(center);
+  tmp.markers.push_back(sphere_Sa);
+
+  visualization_msgs::Marker sphere_Sb;
+  sphere_Sb.header.frame_id = "world";
+  sphere_Sb.id = start + 1;
+  sphere_Sb.type = visualization_msgs::Marker::SPHERE;
+  sphere_Sb.scale = vectorUniform(2 * rb);
+  sphere_Sb.color = color(RED_TRANS_TRANS);
+  sphere_Sb.pose.position = eigen2point(center);
+  tmp.markers.push_back(sphere_Sb);
+
+  visualization_msgs::Marker B1_marker;
+  B1_marker.header.frame_id = "world";
+  B1_marker.id = start + 2;
+  B1_marker.type = visualization_msgs::Marker::SPHERE;
+  B1_marker.scale = vectorUniform(0.1);
+  B1_marker.color = color(BLUE_LIGHT);
+  B1_marker.pose.position = eigen2point(B1);
+  tmp.markers.push_back(B1_marker);
+
+  visualization_msgs::Marker C1_marker;
+  C1_marker.header.frame_id = "world";
+  C1_marker.id = start + 3;
+  C1_marker.type = visualization_msgs::Marker::SPHERE;
+  C1_marker.scale = vectorUniform(0.1);
+  C1_marker.color = color(BLUE_LIGHT);
+  C1_marker.pose.position = eigen2point(C1);
+  tmp.markers.push_back(C1_marker);
+
+  pub_planning_vis_.publish(tmp);
+}*/
+
+/*void CVX::frontierCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
+{
+  // printf("****In FrontierCB\n");
+  if (pcl2ptr_msg->width == 0 || pcl2ptr_msg->height == 0)  // Point Cloud is empty (this happens at the beginning)
+  {
+    return;
+  }
+
+  pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_frontier(new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::fromROSMsg(*pcl2ptr_msg, *pclptr_frontier);
+
+  mtx_frontier.lock();
+  kdtree_frontier_.setInputCloud(pclptr_frontier);
+  mtx_frontier.unlock();
+  kdtree_frontier_initialized_ = 1;
+}*/
+
+/*void CVX::pclCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg)
+{
+  // printf("In pclCB\n");
+
+  if (pcl2ptr_msg->width == 0 || pcl2ptr_msg->height == 0)  // Point Cloud is empty
+  {
+    return;
+  }
+  geometry_msgs::TransformStamped transformStamped;
+  sensor_msgs::PointCloud2Ptr pcl2ptr_msg_transformed(new sensor_msgs::PointCloud2());
+  try
+  {
+    transformStamped = tf_buffer_.lookupTransform("world", name_drone_ + "/camera", ros::Time(0));
+    tf2::doTransform(*pcl2ptr_msg, *pcl2ptr_msg_transformed, transformStamped);
+
+    pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::fromROSMsg(*pcl2ptr_msg_transformed, *pclptr);
+
+    std::vector<int> index;
+    // TODO: there must be a better way to check this. It's here because (in the simulation) sometimes all the points
+    // are NaN (when the drone is on the ground and stuck moving randomly). If this is not done, the program breaks. I
+    // think it won't be needed in the real drone
+    pcl::removeNaNFromPointCloud(*pclptr, *pclptr, index);
+    if (pclptr->size() == 0)
+    {
+      return;
+    }
+
+    kdTreeStamped my_kdTreeStamped;
+    my_kdTreeStamped.kdTree.setInputCloud(pclptr);
+    my_kdTreeStamped.time = pcl2ptr_msg->header.stamp;
+    mtx_inst.lock();
+    // printf("pclCB: MTX is locked\n");
+    v_kdtree_new_pcls_.push_back(my_kdTreeStamped);
+    // printf("pclCB: MTX is unlocked\n");
+    mtx_inst.unlock();
+  }
+  catch (tf2::TransformException& ex)
+  {
+    ROS_WARN("%s", ex.what());
+  }
+}*/
+
+/*void CVX::cvxSeedDecompUnkOcc(Vecf<3>& seed)
+{
+  double before = ros::Time::now().toSec();
+
+  // std::cout << "In cvxDecomp 0!" << std::endl;
+  if (kdtree_map_initialized_ == false)
+  {
+    return;
+  }
+  // std::cout << "In cvxDecomp 1!" << std::endl;
+
+  // vec_Vec3f obs;
+
+  // std::cout << "Type Obstacles==UNKOWN_AND_OCCUPIED_SPACE**************" << std::endl;
+
+  // pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr_cloud_map = kdtree_map_.getInputCloud();
+  // pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr_cloud_unkown = kdtree_unk_.getInputCloud();
+
+  // std::cout << "Number of elements in unkCloud" < < < < std::endl;
+
+ // obs = pclptr_to_vec(pclptr_map_, pclptr_unk_);
+ //   std::cout << "Points in mapCloud=" << (*pclptr_map_).points.size() << std::endl;
+ //   std::cout << "Points in unkCloud=" << (*pclptr_unk_).points.size() << std::endl;
+
+  // Initialize SeedDecomp3D
+
+  seed_decomp_util_.set_seed(seed);
+  seed_decomp_util_.set_obs(vec_uo_);
+  seed_decomp_util_.set_local_bbox(Vec3f(4, 4, 1));
+  // std::cout << "In cvxDecomp before dilate!" << std::endl;
+  seed_decomp_util_.dilate(0.1);
+  // std::cout << "In cvxDecomp after dilate!" << std::endl;
+  seed_decomp_util_.shrink_polyhedron(par_.drone_radius);
+  // std::cout << "In cvxDecomp after shrink!" << std::endl;
+
+  vec_E<Polyhedron<3>> polyhedron_as_array;  // This vector will contain only one element
+  polyhedron_as_array.push_back(seed_decomp_util_.get_polyhedron());
+  decomp_ros_msgs::PolyhedronArray poly_msg = DecompROS::polyhedron_array_to_ros(polyhedron_as_array);
+  poly_msg.header.frame_id = "world";
+
+  // Publish visualization msgs
+  cvx_decomp_poly_uo_pub_.publish(poly_msg);
+  auto poly = seed_decomp_util_.get_polyhedron();
+  // std::cout << "Incluso antes A es\n" << poly.hyperplanes()[0].n_.transpose() << std::endl;
+  l_constraints_uo_.clear();
+  LinearConstraint3D cs(seed, poly.hyperplanes());
+
+  MatDNf<3> A = cs.A();
+  // std::cout << "Incluso antes A es\n" << A << std::endl;
+
+  l_constraints_uo_.push_back(cs);
+  // ROS_WARN("SeedDecomp takes: %0.2f ms", 1000 * (ros::Time::now().toSec() - before));
+}*/

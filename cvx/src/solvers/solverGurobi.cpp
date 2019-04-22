@@ -9,7 +9,7 @@
 
 SolverGurobi::SolverGurobi()
 {
-  std::cout<<"In the Gurobi Constructor\n";
+  std::cout << "In the Gurobi Constructor\n";
 
   v_max_ = 5;
   a_max_ = 3;
@@ -460,8 +460,8 @@ void SolverGurobi::setConstraintsXf()
         final_cons.push_back(m.addConstr(getAccel(N_ - 1, dt_, i) - xf_[i + 6] >= -0.05));  // Final acceleration*/
     if (forceFinalConstraint_ == true)
     {
-      // std::cout << "*********FORCING FINAL CONSTRAINT******" << std::endl;
-      // std::cout << xf_[i] << std::endl;
+      std::cout << "*********FORCING FINAL CONSTRAINT******" << std::endl;
+      std::cout << xf_[i] << std::endl;
       final_cons.push_back(m.addConstr(getPos(N_ - 1, dt_, i) - xf_[i] == 0,
                                        "FinalPosAxis_" + std::to_string(i)));  // Final position
     }

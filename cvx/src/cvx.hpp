@@ -58,8 +58,8 @@
 #define MAP 1          // MAP refers to the occupancy grid
 #define UNKNOWN_MAP 2  // UNKNOWN_MAP refers to the unkown grid
 
-#define WHOLE 1   // Whole trajectory (part of which is planned on unkonwn space)
-#define RESCUE 2  // Rescue path
+#define WHOLE 1  // Whole trajectory (part of which is planned on unkonwn space)
+#define SAFE 2   // Safe path
 
 #define OCCUPIED_SPACE 1
 #define UNKOWN_AND_OCCUPIED_SPACE 2
@@ -67,7 +67,7 @@
 #define JPSk_NORMAL 1
 #define JPS2_NORMAL 2
 #define JPS_WHOLE_TRAJ 3
-#define JPS_RESCUE 4
+#define JPS_SAFE 4
 
 #define RETURN_LAST_VERTEX 0
 #define RETURN_INTERSECTION 1
@@ -100,7 +100,7 @@ struct parameteres
   double drone_radius;
 
   int N_whole;
-  int N_rescue;
+  int N_safe;
 
   int offset;
   int offset_rp;
@@ -109,7 +109,6 @@ struct parameteres
   double factor_deltaT;
   int min_states_deltaTp;
   int min_states_deltaT;
-  
 
   double Ra;
   double Ra_max;
@@ -129,14 +128,22 @@ struct parameteres
 
   double z_land;
 
-  double factor_initial_whole;
-  double factor_final_whole;
+  double gamma_whole;
+  double gammap_whole;
+  double increment_whole;
 
-  double factor_initial_rescue;
-  double factor_final_rescue;
+  double gamma_safe;
+  double gammap_safe;
+  double increment_safe;
+  /*
+    double factor_initial_whole;
+    double factor_final_whole;
 
-  double factor_increment_rescue;
-  double factor_increment_whole;
+    double factor_initial_safe;
+    double factor_final_safe;
+
+    double factor_increment_safe;
+    double factor_increment_whole;*/
 
   int max_poly;
   double dist_max_vertexes;
@@ -144,38 +151,6 @@ struct parameteres
   int gurobi_threads;
   int gurobi_verbose;
 };
-
-/*struct log_values
-{
-  double JPS1_time;
-  double JPS2_time;
-
-  double Cvxgen_jerk_time;
-  double Cvxgen_vel_time;
-
-  double JPS1_cost;
-  double JPrimj1_cost;
-  double JPrimv1_cost;
-  double JDist1_cost;
-
-  double JPS2_cost;
-  double JPrimj2_cost;
-  double JPrimv2_cost;
-  double JDist2_cost;
-
-  double coll_check1;
-  double coll_check2;
-
-  double vmax_reached;
-
-  double total_dist;
-
-  double angle;
-
-  double total_time_replanCB;
-
-  int decision;
-};*/
 
 //####Class CVX
 class CVX
@@ -189,8 +164,8 @@ private:
   // Solver<ACCEL> solver_accel_;
   // Solver<JERK> solver_jerk_;
 
-  SolverGurobi sg_whole_;   // solver gurobi whole trajectory
-  SolverGurobi sg_rescue_;  // solver gurobi whole trajectory
+  SolverGurobi sg_whole_;  // solver gurobi whole trajectory
+  SolverGurobi sg_safe_;   // solver gurobi whole trajectory
   // class methods
   // void pubTraj(double** x);
   void pubTraj(Eigen::MatrixXd& X, int type);
@@ -240,7 +215,7 @@ private:
 
   // double solveVelAndGetCost(vec_Vecf<3> path);
   void updateInitialCond(int i);
-  void pubPlanningVisual(Eigen::Vector3d center, double ra, double rb, Eigen::Vector3d B1, Eigen::Vector3d C1);
+  // void pubPlanningVisual(Eigen::Vector3d center, double ra, double rb, Eigen::Vector3d B1, Eigen::Vector3d C1);
   void pubintersecPoint(Eigen::Vector3d p, bool add);
   void yaw(double diff, acl_msgs::QuadGoal& quad_goal);
 
@@ -281,56 +256,54 @@ private:
 
   void createMoreVertexes(vec_Vecf<3>& path, double d);
 
-
-bool ARisInFreeSpace(int index);
-
+  bool ARisInFreeSpace(int index);
 
   visualization_msgs::Marker setpoint_;
   visualization_msgs::Marker R_;
   visualization_msgs::Marker I_;
-  visualization_msgs::Marker B1_;
+  visualization_msgs::Marker E_;
   visualization_msgs::Marker M_;
   acl_msgs::QuadGoal quadGoal_;
   acl_msgs::QuadGoal initialCond_;  // It's the initial condition for the solver
   acl_msgs::QuadFlightMode flight_mode_;
   acl_msgs::State state_;
-  Eigen::Vector3d term_goal_;       // This goal is always inside of the map
-  Eigen::Vector3d term_term_goal_;  // This goal is the clicked goal
+  Eigen::Vector3d G_;       // This goal is always inside of the map
+  Eigen::Vector3d G_term_;  // This goal is the clicked goal
 
   ros::NodeHandle nh_;
   ros::NodeHandle nh_replan_CB_;
   ros::NodeHandle nh_pub_CB_;
 
-  ros::Publisher pub_term_goal_;
+  ros::Publisher pub_point_G_;
   ros::Publisher pub_goal_;
-  ros::Publisher pub_traj_;
-  ros::Publisher pub_traj_rescue_;
+  ros::Publisher pub_traj_whole_;
+  ros::Publisher pub_traj_safe_;
   ros::Publisher pub_setpoint_;
   ros::Publisher pub_trajs_sphere_;
   ros::Publisher pub_forces_;
   ros::Publisher pub_actual_traj_;
   ros::Publisher pub_path_jps1_;
   ros::Publisher pub_path_jps2_;
-  ros::Publisher pub_path_jps_rescue_;
+  ros::Publisher pub_path_jps_safe_;
   ros::Publisher pub_path_jps_whole_traj_;
   ros::Publisher pub_intersectionI_;
-  ros::Publisher pub_start_rescue_path_;
-  ros::Publisher pub_pointM_;
-  ros::Publisher pub_point_B1_;
+  ros::Publisher pub_point_R_;
+  ros::Publisher pub_point_M_;
+  ros::Publisher pub_point_E_;
 
   ros::Publisher pub_planning_vis_;
   ros::Publisher pub_intersec_points_;
   ros::Publisher pub_jps_inters_;
-  ros::Publisher pub_samples_rescue_path_;
+  ros::Publisher pub_samples_safe_path_;
   ros::Publisher pub_log_;
 
-  ros::Publisher cvx_decomp_el_o_pub__;
-  ros::Publisher cvx_decomp_poly_o_pub_;
+  // ros::Publisher cvx_decomp_el_o_pub__;
+  ros::Publisher cvx_whole_pub_;
 
-  ros::Publisher cvx_decomp_el_uo2_pub__;
-  ros::Publisher cvx_decomp_poly_uo2_pub_;
+  // ros::Publisher cvx_decomp_el_uo2_pub__;
+  ros::Publisher cvx_safe_pub_;
 
-  ros::Publisher cvx_decomp_poly_uo_pub_;
+  // ros::Publisher cvx_decomp_poly_uo_pub_;
   ros::Subscriber sub_goal_;
   ros::Subscriber sub_state_;
   ros::Subscriber sub_mode_;
@@ -355,16 +328,15 @@ bool ARisInFreeSpace(int index);
   visualization_msgs::MarkerArray path_jps1_;
   visualization_msgs::MarkerArray path_jps2_;
   visualization_msgs::MarkerArray path_jps2_fix_;
-  visualization_msgs::MarkerArray path_jps_rescue_;
+  visualization_msgs::MarkerArray path_jps_safe_;
   visualization_msgs::MarkerArray path_jps_whole_traj_;
 
   visualization_msgs::MarkerArray intersec_points_;
-  visualization_msgs::MarkerArray samples_rescue_path_;
+  visualization_msgs::MarkerArray samples_safe_path_;
 
   vec_E<Polyhedron<3>> polyhedra_;
-  std::vector<LinearConstraint3D> l_constraints_o_;    // Polytope (Linear) constraints
-  std::vector<LinearConstraint3D> l_constraints_uo_;   // Polytope (Linear) constraints
-  std::vector<LinearConstraint3D> l_constraints_uo2_;  // Polytope (Linear) constraints
+  std::vector<LinearConstraint3D> l_constraints_whole_;  // Polytope (Linear) constraints
+  std::vector<LinearConstraint3D> l_constraints_safe_;   // Polytope (Linear) constraints
 
   int markerID_ = 0;
   int markerID_last_ = 0;
@@ -373,7 +345,7 @@ bool ARisInFreeSpace(int index);
   Eigen::MatrixXd U_temp_,
       X_temp_;  // Contains the intepolated input/states of a traj. If the traj. is free, it will be copied to U_, X_
 
-  Eigen::MatrixXd U_rescue_, X_rescue_;
+  Eigen::MatrixXd U_safe_, X_safe_;
   bool optimized_;
   double spinup_time_;
   double z_start_;
@@ -410,7 +382,7 @@ bool ARisInFreeSpace(int index);
 
   vec_Vecf<3> JPS_old_;
 
-  double dyaw_filtered_=0;
+  double dyaw_filtered_ = 0;
 
   // pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_map_;
   pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_unk_;
@@ -423,7 +395,7 @@ bool ARisInFreeSpace(int index);
   std::mutex mtx_jps_map_util;  // mutex for map_util_ and planner_ptr_
   std::mutex mtx_k;
   std::mutex mtx_X_U_temp;
-  std::mutex mtx_X_U_rescue;
+  std::mutex mtx_X_U_safe;
   std::mutex mtx_X_U;
   std::mutex mtx_planner_status_;
   std::mutex mtx_initial_cond;
@@ -431,8 +403,8 @@ bool ARisInFreeSpace(int index);
   std::mutex mtx_offsets;
   // std::mutex mtx_factors;
 
-  std::mutex mtx_term_goal;
-  std::mutex mtx_term_term_goal;
+  std::mutex mtx_G;
+  std::mutex mtx_G_term;
 
   std::shared_ptr<JPS::VoxelMapUtil> map_util_;
   std::unique_ptr<JPSPlanner3D> planner_ptr_;
@@ -464,5 +436,5 @@ bool ARisInFreeSpace(int index);
   vec_Vecf<3> JPS_k_m_1_;
   bool takeoff_done_ = false;
 
-  bool state_initialized_=false;
+  bool state_initialized_ = false;
 };

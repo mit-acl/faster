@@ -120,11 +120,11 @@ public:
   int temporal_ = 0;
   double runtime_ms_ = 0;
   double factor_that_worked_ = 0;
+  int N_ = 10;
 
 protected:
   double cost_;
 
-  int N_ = 10;
   double xf_[3 * 3];
   double x0_[3 * 3];
   double v_max_;
