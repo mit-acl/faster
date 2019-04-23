@@ -126,7 +126,7 @@ void SolverGurobi::fillXandU()
   //  {
   for (int i = 0; i < U_temp_.rows(); i++)
   {
-    // std::cout << "row=" << i << std::endl;
+    std::cout << "row=" << i << std::endl;
     t = t + DC;
     // std::cout << "t=" << t << std::endl;
     if (t > dt_ * (interval + 1))
@@ -264,7 +264,7 @@ void SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> polytopes)
 
 void SolverGurobi::setPolytopesConstraints()
 {
-  // std::cout << "Setting POLYTOPES=" << std::endl;
+  std::cout << "Setting POLYTOPES=" << std::endl;
 
   // Remove previous polytopes constraints
   for (int i = 0; i < polytopes_cons.size(); i++)
@@ -317,8 +317,8 @@ void SolverGurobi::setPolytopesConstraints()
       }
     }
 
-    // std::cout << "NUMBER OF POLYTOPES=" << polytopes_.size() << std::endl;
-    // std::cout << "NUMBER OF FACES of the first polytope=" << polytopes_[0].A().rows() << std::endl;
+    std::cout << "NUMBER OF POLYTOPES=" << polytopes_.size() << std::endl;
+    std::cout << "NUMBER OF FACES of the first polytope=" << polytopes_[0].A().rows() << std::endl;
 
     // Polytope constraints (if binary_varible==1 --> In that polytope) and at_least_1_pol_cons (at least one polytope)
     // constraints
@@ -581,10 +581,12 @@ bool SolverGurobi::genNewTraj()
   {
     trials_ = trials_ + 1;
     findDT(i);
-    // std::cout << "Going to try with dt_= " << dt_ << std::endl;
+    std::cout << "Going to try with dt_= " << dt_ << std::endl;
     setPolytopesConstraints();
+    std::cout << "Setting x0" << std::endl;
     setConstraintsX0();
     setConstraintsXf();
+    std::cout << "Setting dynamic constraints" << std::endl;
     setDynamicConstraints();
     // setDistanceConstraints();
     setObjective();

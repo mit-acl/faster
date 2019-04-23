@@ -1276,6 +1276,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
   Eigen::Vector3d E;
   E = getFirstIntersectionWithSphere(JPSk, ra, JPSk[0], &li1, &noPointsOutsideSphere1);
 
+  B_ = E;
+
   vec_Vecf<3> JPSk_inside_sphere(JPSk.begin(), JPSk.begin() + li1 + 1);  // Elements of JPS that are inside the sphere
   JPSk_inside_sphere.push_back(E);
   createMoreVertexes(JPSk_inside_sphere, par_.dist_max_vertexes);
@@ -1436,7 +1438,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   sg_safe_.setX0(x0_safe);
   std::cout << "Setting polytopes for safe" << std::endl;
   sg_safe_.setPolytopes(l_constraints_safe_);
-  std::cout << "Polytopes set" << std::endl;
+  std::cout << "Polytopes set=" << l_constraints_safe_.size() << std::endl;
 
   bool isMinside = l_constraints_safe_[l_constraints_safe_.size() - 1].inside(M);
 
@@ -1460,6 +1462,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   MyTimer safe_gurobi_t(true);
   std::cout << "Generating new trajectory" << std::endl;
   bool solved_safe = sg_safe_.genNewTraj();
+  std::cout << "Generated" << std::endl;
 
   if (solved_safe == false)
   {
@@ -1481,6 +1484,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   MyTimer fill_safe_t(true);
   // Both have solution
+  std::cout << "Going to fill" << std::endl;
   sg_safe_.fillXandU();
   std::cout << bold << blue << "Fill Safe:  " << std::fixed << fill_safe_t << "ms" << reset << std::endl;
 
@@ -1541,7 +1545,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   k_initial_cond_ = k_initial_cond_1_;
   // printf("Ahora mismo, k_initial_cond_=%d and k_=%d\n", k_initial_cond_, k_);
   mtx_k.unlock();
-  B_ = E;
+
   optimized_ = true;
   mtx_planner_status_.lock();
   planner_status_ = REPLANNED;
@@ -2575,13 +2579,13 @@ void CVX::mapCB(const sensor_msgs::PointCloud2::ConstPtr& pcl2ptr_map_ros,
   pcl::fromROSMsg(*pcl2ptr_unk_ros, *pclptr_unk_);
   if (pcl2ptr_unk_ros->width != 0 && pcl2ptr_unk_ros->height != 0)
   {
-    /*    std::vector<int> index;
-        pcl::removeNaNFromPointCloud(*pclptr_unk_, *pclptr_unk_, index);
-        if (pclptr_unk_->points.size() == 0)
-        {
-          printf("Unkown cloud has 0 points\n");
-          return;
-        }*/
+    std::vector<int> index;
+    pcl::removeNaNFromPointCloud(*pclptr_unk_, *pclptr_unk_, index);
+    if (pclptr_unk_->points.size() == 0)
+    {
+      printf("Unkown cloud has 0 points\n");
+      return;
+    }
 
     kdtree_unk_.setInputCloud(pclptr_unk_);  // Commented this to improve speed
     kdtree_unk_initialized_ = 1;
