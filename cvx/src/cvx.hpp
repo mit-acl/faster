@@ -102,9 +102,6 @@ struct parameteres
   int N_whole;
   int N_safe;
 
-  int offset;
-  int offset_rp;
-
   double factor_deltaTp;
   double factor_deltaT;
   int min_states_deltaTp;
@@ -124,7 +121,6 @@ struct parameteres
   double v_max;
   double a_max;
   double j_max;
-  double q;
 
   double z_land;
 
@@ -229,7 +225,7 @@ private:
   void pubTerminalGoal();
 
   void pubJPSIntersection(Eigen::Vector3d inters);
-  Eigen::Vector3d getFirstCollisionJPS(vec_Vecf<3>& path, bool* thereIsIntersection, int& el_eliminated, int map = MAP,
+  Eigen::Vector3d getFirstCollisionJPS(vec_Vecf<3>& path, bool* thereIsIntersection, int map = MAP,
                                        int type_return = RETURN_LAST_VERTEX);
   Eigen::Vector3d projectClickedGoal(Eigen::Vector3d& P1);
 
@@ -337,6 +333,9 @@ private:
   vec_E<Polyhedron<3>> polyhedra_;
   std::vector<LinearConstraint3D> l_constraints_whole_;  // Polytope (Linear) constraints
   std::vector<LinearConstraint3D> l_constraints_safe_;   // Polytope (Linear) constraints
+
+  int deltaTp_ = 10;
+  int deltaT_ = 10;
 
   int markerID_ = 0;
   int markerID_last_ = 0;

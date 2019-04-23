@@ -4,44 +4,36 @@ use_ff: true # use feedforward
 visual: true #publish visualization stuff
 use_vel: false # use velocity. If false, r2=r1;
 
-wdx: 16.0  #[m] world dimension in x
-wdy: 16.0  #[m] world dimension in y
-wdz: 4.0   #[m] world dimension in z
-res: 0.15  #[m] cell dimension = resolution of the map
-
-
 dc: 0.01            #(seconds) Duration for the interpolation=Value of the timer pubGoal
 goal_radius: 0.35    #(m) Drone has arrived to the goal when distance_to_goal<GOAL_RADIUS
-drone_radius: 0.55  #(m) Used for collision checking
+drone_radius: 0.2  #(m) Used for collision checking
 
 N_whole: 10  #[-] Number of discretization points in the whole trajectory
 N_rescue: 7  #[-] Number of discretization points in the rescue path
 
-offset: 10  # Replanning offset (the initial conditions are taken OFFSET states farther from the last published goal)
-offset_rp: 50 #The rescue path starts X states ahead of the beginning of the whole trajectory
-factor_deltaTp: 1.5
-factor_deltaTp: 1.5
-min_states_deltaTp: 20
-min_states_deltaT: 15
+factor_deltaT: 1.5
+factor_deltaTp: 2
+#If the drone switches too often to the safe path, decrease factor_deltaTp and increase factor_deltaTp
+
+min_states_deltaTp: 0 #20
+min_states_deltaT: 0  #15
 
 Ra: 0.5            # [m] Minimum radius of the first sphere
-Ra_max: 2.5            # [m] Maximum radius of the first sphere
+Ra_max: 6            # [m] Maximum radius of the first sphere
 Rb: 9.0             # [m] Radius of the second sphere
-w_max: 0.4            # [rd/s] Maximum angular velocity
+w_max: 1            # [rd/s] Maximum angular velocity. 0.4 for Hardware
 alpha_filter_dyaw: 0.92  #[] Filter parameter for dyaw, \in [0,1]. Higher--> More aggressive filtering
 
-alpha_0_deg: 1500         #[deg] threshold to ignore current JPS solution, and consider the old one. 0--> always decide
-z_ground: 0.75         #[m] points below this are considered ground
+alpha_0_deg: 15         #[deg] threshold to ignore current JPS solution, and consider the old one. 0--> always decide
+z_ground: 0.35         #[m] points below this are considered ground
 z_max: 2         #[m] JPS is not allowed to give a solution that goes higher than this height
-inflation_jps: 0.55  #[m] The obstacles are inflated (to run JPS) by this amount
+inflation_jps: 0.25  #[m] The obstacles are inflated (to run JPS) by this amount
 factor_jps: 1  #[m] JPS is run with resolution=factor_jps*(resolution of the map)
 
 
-v_max: 2   #[m/s]  5
-a_max: 3   #[m/s2] 5
-j_max: 3  #[m/s3]  8
-
-q: 100  #[-] weight to the 2nd term of the cost function. If it's very big (>1000), Gurobi fails!! (numerical issues)
+v_max: 3   #[m/s]  5
+a_max: 6   #[m/s2] 5
+j_max: 35  #[m/s3]  8
 
 z_land: 0.02 #[m] z goal for landing
 
@@ -49,17 +41,27 @@ z_land: 0.02 #[m] z goal for landing
 #Factors for time allocation
 gamma_whole: 4       #[-]
 gammap_whole: 10  #[-]
-increment_whole: 0.5 #[-]
+increment_whole: 1 #[-]
 
 gamma_rescue: 4         #[-]
 gammap_rescue: 10    #[-]
-increment_rescue: 0.5   #[-]
+increment_rescue: 1   #[-]
 
-max_poly: 3 #Should be less than N_whole and N_rescue
-dist_max_vertexes: 1.8 #[m] Maximum distance between two vertexes in the JPS before doing the cvx decomp (more vertexes are added to force this)
+max_poly: 2 #Should be less than N_whole and N_rescue
+dist_max_vertexes: 1 #[m] Maximum distance between two vertexes in the JPS before doing the cvx decomp (more vertexes are added to force this)
 gurobi_threads: 1 #[threads] Number of threads that Gurobi will use. If computer is maxed out, threads=1 works faster!
 gurobi_verbose: 0 #Verbosity of Gurobi. 0 or 1
 
+
+
+#q: 100  #[-] weight to the 2nd term of the cost function. If it's very big (>1000), Gurobi fails!! (numerical issues)
+
+
+# The following values are taken from the global_mapper.yaml
+# wdx: 20.0  #[m] world dimension in x
+# wdy: 20.0  #[m] world dimension in y
+# wdz: 4.0   #[m] world dimension in z
+# res: 0.15  #[m] cell dimension = resolution of the map
 
 
 

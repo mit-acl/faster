@@ -5,6 +5,7 @@
 	<node ns="$(arg quad)" name="cvx" pkg="cvx" type="cvx_node" output="screen" clear_params="true">
 
     <rosparam file="$(find cvx)/param/cvx.yaml" command="load"/>
+    <rosparam file="$(find global_mapper_ros)/cfg/global_mapper.yaml" command="load" ns="mapper"/>
 
 
 <!--         <param name="~u_max" value="2.0" type="double"/>

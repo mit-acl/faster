@@ -56,7 +56,7 @@ public:
   double** getx();
   double** getu();
 
-  void setQ(double q);
+  // void setQ(double q);
   void setN(int N);
   void setX0(double x0[]);
   // void set_u0(double u0[]);
@@ -131,7 +131,7 @@ protected:
   double a_max_;
   double j_max_;
   double DC;
-  double q_;  // weight to the 2nd term in the cost function
+  // double q_;  // weight to the 2nd term in the cost function
   double** x_;
   double** u_;
 
