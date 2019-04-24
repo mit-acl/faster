@@ -66,7 +66,7 @@
 
 #define JPSk_NORMAL 1
 #define JPS2_NORMAL 2
-#define JPS_WHOLE_TRAJ 3
+#define JPS_WHOLE 3
 #define JPS_SAFE 4
 
 #define RETURN_LAST_VERTEX 0
@@ -281,7 +281,7 @@ private:
   ros::Publisher pub_path_jps1_;
   ros::Publisher pub_path_jps2_;
   ros::Publisher pub_path_jps_safe_;
-  ros::Publisher pub_path_jps_whole_traj_;
+  ros::Publisher pub_path_jps_whole_;
   ros::Publisher pub_intersectionI_;
   ros::Publisher pub_point_R_;
   ros::Publisher pub_point_M_;
@@ -325,7 +325,7 @@ private:
   visualization_msgs::MarkerArray path_jps2_;
   visualization_msgs::MarkerArray path_jps2_fix_;
   visualization_msgs::MarkerArray path_jps_safe_;
-  visualization_msgs::MarkerArray path_jps_whole_traj_;
+  visualization_msgs::MarkerArray path_jps_whole_;
 
   visualization_msgs::MarkerArray intersec_points_;
   visualization_msgs::MarkerArray samples_safe_path_;

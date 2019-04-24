@@ -715,11 +715,14 @@ inline Eigen::Vector3d getFirstIntersectionWithSphere(vec_Vecf<3>& path, double 
       }
       // std::cout << "Calling intersecion1 with A=" << A.transpose() << "  and B=" << B.transpose() << std::endl;
       intersection = getIntersectionWithSphere(A, B, r, center);
+
+      // intersection = path[path.size() - 1];
+
       // std::cout << "Utils: Returning intersection=" << intersection.transpose() << std::endl;
       // intersection = path[path.size() - 1];
       if (last_index_inside_sphere != NULL)
       {
-        *last_index_inside_sphere = 1;
+        *last_index_inside_sphere = path.size() - 1;
       }
       break;
     case 0:  // First element is outside the sphere

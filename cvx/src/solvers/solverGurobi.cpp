@@ -120,19 +120,23 @@ void SolverGurobi::setObjective()  // I need to set it every time, because the o
 
 void SolverGurobi::fillXandU()
 {
+  std::cout << "in fillXandU" << std::endl;
   double t = 0;
   int interval = 0;
   //#pragma omp parallel for
   //  {
+  std::cout << "voy a fill" << std::endl;
+  std::cout << "U_temp_.rows()=" << U_temp_.rows() << std::endl;
   for (int i = 0; i < U_temp_.rows(); i++)
   {
     std::cout << "row=" << i << std::endl;
     t = t + DC;
-    // std::cout << "t=" << t << std::endl;
+    std::cout << "t=" << t << std::endl;
     if (t > dt_ * (interval + 1))
     {
-      interval = interval + 1;
-      // std::cout << "*****Interval=" << interval << std::endl;
+      interval = std::min(interval + 1, N_ - 1);
+
+      std::cout << "*****Interval=" << interval << std::endl;
     }
 
     // std::cout << "t_rel=" << t - interval * dt_ << std::endl;
@@ -161,6 +165,7 @@ void SolverGurobi::fillXandU()
     states << posx, posy, posz, velx, vely, velz, accelx, accely, accelz;
     X_temp_.row(i) = states;
   }
+  std::cout << "After the loop" << std::endl;
   // }  // End pragma parallel
 
   /*  int last = X_temp_.rows() - 1;
@@ -174,6 +179,8 @@ void SolverGurobi::fillXandU()
   // Force the final input to be 0 (I'll keep applying this input if when I arrive to the final state I still
   // haven't planned again).
   U_temp_.row(U_temp_.rows() - 1) = Eigen::Vector3d::Zero().transpose();
+
+  std::cout << "end of fillXandU" << std::endl;
   /*  std::cout << "***********The final states are***********" << std::endl;
     std::cout << X_temp_.row(X_temp_.rows() - 1).transpose() << std::endl;
 
@@ -484,10 +491,14 @@ void SolverGurobi::setConstraintsX0()
   // Constraint x0==x_initial
   for (int i = 0; i < 3; i++)
   {
+    std::cout << "x0_[i]= " << x0_[i] << std::endl;
+    std::cout << "Position" << std::endl;
     init_cons.push_back(m.addConstr(getPos(0, 0, i) == x0_[i],
                                     "InitialPosAxis_" + std::to_string(i)));  // Initial position
+    std::cout << "Velocity" << std::endl;
     init_cons.push_back(m.addConstr(getVel(0, 0, i) == x0_[i + 3],
                                     "InitialVelAxis_" + std::to_string(i)));  // Initial velocity
+    std::cout << "Accel" << std::endl;
     init_cons.push_back(m.addConstr(getAccel(0, 0, i) == x0_[i + 6],
                                     "InitialAccelAxis_" + std::to_string(i)));  // Initial acceleration}
   }
@@ -496,7 +507,7 @@ void SolverGurobi::setConstraintsX0()
 void SolverGurobi::resetXandU()
 {
   int size = (int)(N_)*dt_ / DC;
-  // size = (size < 2) ? 2 : size;  // force size to be at least 2
+  size = (size < 2) ? 2 : size;  // force size to be at least 2
   U_temp_ = Eigen::MatrixXd::Zero(size, 3);
   X_temp_ = Eigen::MatrixXd::Zero(size, 9);
 }
@@ -564,8 +575,8 @@ bool SolverGurobi::genNewTraj()
 {
   bool solved = false;
 
-  // std::cout << "Factor_initial= " << factor_initial_ << std::endl;
-  // std::cout << "Factor_final= " << factor_final_ << std::endl;
+  std::cout << "Factor_initial= " << factor_initial_ << std::endl;
+  std::cout << "Factor_final= " << factor_final_ << std::endl;
   trials_ = 0;
 
   /*  std::cout << "A es esto:\n";
@@ -573,6 +584,11 @@ bool SolverGurobi::genNewTraj()
     std::cout << polytopes_[0].A() << std::endl;
     std::cout << "B es esto:\n";
     std::cout << polytopes_[0].b().transpose() << std::endl;*/
+
+  if (factor_initial_ < 1)
+  {
+    std::cout << "factor_initial_ is less than one, it doesn't make sense" << std::endl;
+  }
 
   // if (mode_ == WHOLE_TRAJ)
   //{
@@ -656,7 +672,7 @@ void SolverGurobi::setVerbose(int verbose)
 void SolverGurobi::findDT(double factor)
 {
   // double dt = 2 * getDTInitial();
-  dt_ = factor * getDTInitial();
+  dt_ = factor * std::max(getDTInitial(), 2 * DC);
   // std::cout << "Trying dt=" << dt_ << std::endl;
   // dt_ = 1;
 }

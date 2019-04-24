@@ -210,7 +210,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   pub_actual_traj_ = nh_.advertise<visualization_msgs::Marker>("actual_traj", 1);
   pub_path_jps1_ = nh_.advertise<visualization_msgs::MarkerArray>("path_jps1", 1);
   pub_path_jps2_ = nh_.advertise<visualization_msgs::MarkerArray>("path_jps2", 1);
-  pub_path_jps_whole_traj_ = nh_.advertise<visualization_msgs::MarkerArray>("path_jps_whole_traj", 1);
+  pub_path_jps_whole_ = nh_.advertise<visualization_msgs::MarkerArray>("path_jps_whole", 1);
   pub_path_jps_safe_ = nh_.advertise<visualization_msgs::MarkerArray>("path_jps_safe", 1);
 
   cvx_whole_pub_ = nh.advertise<decomp_ros_msgs::PolyhedronArray>("cvx_whole", 1, true);
@@ -380,6 +380,54 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
 
   JPS_old_.clear();
 
+  // My stuff goes here
+
+  /*  Eigen::Vector3d E;
+    vec_Vecf<3> JPSk;
+    JPSk.push_back(Eigen::Vector3d(34.21, 35.74, 1.02));
+    JPSk.push_back(Eigen::Vector3d(34.16, 36.30, 0.95));
+    JPSk.push_back(Eigen::Vector3d(34.16, 38.10, 0.95));
+    JPSk.push_back(Eigen::Vector3d(34.76, 38.70, 0.95));
+    JPSk.push_back(Eigen::Vector3d(34.91, 38.70, 0.95));
+    JPSk.push_back(Eigen::Vector3d(35.36, 39.00, 0.95));
+    JPSk.push_back(Eigen::Vector3d(36.00, 40.50, 1.00));
+
+    int li1;
+    double ra = 5.56;
+    bool noPointsOutsideSphere1;
+    E = getFirstIntersectionWithSphere(JPSk, ra, JPSk[0], &li1, &noPointsOutsideSphere1);
+
+    std::cout << "li=" << li1 << std::endl;
+    std::cout << "noPointsOutsideSphere1=" << noPointsOutsideSphere1 << std::endl;
+    vec_Vecf<3> JPSk_inside_sphere(JPSk.begin(), JPSk.begin() + li1 + 1);  // Elements of JPS that are inside the sphere
+
+    if (noPointsOutsideSphere1 == false)
+    {
+      JPSk_inside_sphere.push_back(E);
+    }
+
+    std::cout << green << bold << "before creating more vertexes" << reset << std::endl;
+    printElementsOfJPS(JPSk_inside_sphere);
+
+    std::cout << green << bold << "E is " << reset << E.transpose() << std::endl;
+
+    createMoreVertexes(JPSk_inside_sphere, par_.dist_max_vertexes);
+
+    std::cout << "After creating more vertexes=" << std::endl;
+    printElementsOfJPS(JPSk_inside_sphere);
+
+    if (JPSk_inside_sphere.size() > par_.max_poly + 1)  // If I have more than (par_.max_poly + 1) vertexes
+    {
+      JPSk_inside_sphere.erase(JPSk_inside_sphere.begin() + par_.max_poly + 1,
+                               JPSk_inside_sphere.end());  // Force JPS to have less than par_.max_poly elements
+      E = JPSk_inside_sphere[JPSk_inside_sphere.size() - 1];
+    }
+
+    std::cout << "JPS used for whole is" << std::endl;
+    printElementsOfJPS(JPSk_inside_sphere);*/
+
+  // End of my stuff
+
   tfListener = new tf2_ros::TransformListener(tf_buffer_);
   // wait for body transform to be published before initializing
   ROS_INFO("Waiting for world to camera transform...");
@@ -419,11 +467,11 @@ void CVX::clearJPSPathVisualization(int i)
     case JPS2_NORMAL:
       clearMarkerArray(&path_jps2_, &pub_path_jps2_);
       break;
-    case JPS_WHOLE_TRAJ:
-      clearMarkerArray(&path_jps_whole_traj_, &pub_path_jps_safe_);
+    case JPS_WHOLE:
+      clearMarkerArray(&path_jps_whole_, &pub_path_jps_whole_);
       break;
     case JPS_SAFE:
-      clearMarkerArray(&path_jps_safe_, &pub_path_jps_whole_traj_);
+      clearMarkerArray(&path_jps_safe_, &pub_path_jps_safe_);
       break;
   }
 }
@@ -465,9 +513,9 @@ void CVX::publishJPSPath(vec_Vecf<3>& path, int i)
       vectorOfVectors2MarkerArray(path, &path_jps2_, color(RED));
       pub_path_jps2_.publish(path_jps2_);
       break;
-    case JPS_WHOLE_TRAJ:
-      vectorOfVectors2MarkerArray(path, &path_jps_whole_traj_, color(GREEN));
-      pub_path_jps_whole_traj_.publish(path_jps_whole_traj_);
+    case JPS_WHOLE:
+      vectorOfVectors2MarkerArray(path, &path_jps_whole_, color(GREEN));
+      pub_path_jps_whole_.publish(path_jps_whole_);
       break;
     case JPS_SAFE:
       vectorOfVectors2MarkerArray(path, &path_jps_safe_, color(YELLOW));
@@ -1267,7 +1315,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   }
 
   bool noPointsOutsideSphere1;
-  // std::cout << "here, ra=" << ra << std::endl;
+  std::cout << "here, ra=" << ra << std::endl;
   // std::cout << "here, state_pos=" << state_pos.transpose() << std::endl;
 
   std::cout << "JPSk is" << std::endl;
@@ -1279,8 +1327,18 @@ void CVX::replanCB(const ros::TimerEvent& e)
   B_ = E;
 
   vec_Vecf<3> JPSk_inside_sphere(JPSk.begin(), JPSk.begin() + li1 + 1);  // Elements of JPS that are inside the sphere
-  JPSk_inside_sphere.push_back(E);
+
+  if (noPointsOutsideSphere1 == false)
+  {
+    JPSk_inside_sphere.push_back(E);
+  }
+  std::cout << "JPS used for whole before creating more vertexes=" << std::endl;
+  printElementsOfJPS(JPSk_inside_sphere);
+
   createMoreVertexes(JPSk_inside_sphere, par_.dist_max_vertexes);
+
+  std::cout << "JPS used for whole after creating extra vertexes=" << std::endl;
+  printElementsOfJPS(JPSk_inside_sphere);
 
   //////////////////////////////////////////////////////////////////////////
   //////////// Solve with GUROBI Whole trajectory //////////////////////////
@@ -1289,14 +1347,20 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   double before = ros::Time::now().toSec();
 
-  /*  std::cout << "JPSk_inside_sphere before=" << std::endl;
-    printElementsOfJPS(JPSk_inside_sphere);*/
-
   if (JPSk_inside_sphere.size() > par_.max_poly + 1)  // If I have more than (par_.max_poly + 1) vertexes
   {
     JPSk_inside_sphere.erase(JPSk_inside_sphere.begin() + par_.max_poly + 1,
                              JPSk_inside_sphere.end());  // Force JPS to have less than par_.max_poly elements
     E = JPSk_inside_sphere[JPSk_inside_sphere.size() - 1];
+  }
+
+  std::cout << "JPS used for whole is" << std::endl;
+  printElementsOfJPS(JPSk_inside_sphere);
+
+  if (par_.visual == true)
+  {
+    clearJPSPathVisualization(JPS_WHOLE);
+    publishJPSPath(JPSk_inside_sphere, JPS_WHOLE);
   }
 
   MyTimer cvx_ellip_decomp_t(true);
@@ -1354,9 +1418,15 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   MyTimer otherStuff3_t(true);
   mtx_offsets.lock();
-  int index = deltaTp_;  // R is the point of the trajectory offset_rp ms after the start of the  whole trajectory
+  deltaTp_ = std::min((int)deltaTp_,
+                      (int)(sg_whole_.X_temp_.rows() - 1));  // R is the point of the trajectory offset_rp ms after the
+                                                             // start of the  whole trajectory
+  int index = deltaTp_;
   mtx_offsets.unlock();
-  // std::cout << "index=" << index << std::endl;
+
+  std::cout << "index=" << index << std::endl;
+
+  std::cout << "Rows of X_temp_" << sg_whole_.X_temp_.rows() << std::endl;
 
   /*  std::cout << "******************Actual state:" << std::endl;
     std::cout << "Pos=" << state_pos.transpose() << std::endl;
@@ -1365,6 +1435,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
   Eigen::Vector3d posR(sg_whole_.X_temp_(index, 0), sg_whole_.X_temp_(index, 1), sg_whole_.X_temp_(index, 2));
   Eigen::Vector3d velR(sg_whole_.X_temp_(index, 3), sg_whole_.X_temp_(index, 4), sg_whole_.X_temp_(index, 5));
   Eigen::Vector3d accelR(sg_whole_.X_temp_(index, 6), sg_whole_.X_temp_(index, 7), sg_whole_.X_temp_(index, 8));
+
+  std::cout << "posR=" << posR.transpose() << std::endl;
   mtx_X_U_temp.unlock();
 
   MyTimer check_collision_AR_t(true);
@@ -1531,8 +1603,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   if (par_.visual == true)
   {
-    clearJPSPathVisualization(JPS_WHOLE_TRAJ);
-    publishJPSPath(JPSk_inside_sphere, JPS_WHOLE_TRAJ);
+    // clearJPSPathVisualization(JPS_WHOLE);
+    // publishJPSPath(JPSk_inside_sphere, JPS_WHOLE);
     pubTraj(sg_safe_.X_temp_, SAFE);
     pubTraj(sg_whole_.X_temp_, WHOLE);
   }
@@ -1630,7 +1702,7 @@ bool CVX::ARisInFreeSpace(int index)
 
     if (kdtree_unk_.nearestKSearch(searchPoint, n, pointIdxNKNSearch, pointNKNSquaredDistance) > 0)
     {
-      if (sqrt(pointNKNSquaredDistance[0]) < 0.25)
+      if (sqrt(pointNKNSquaredDistance[0]) < 0.2)
       {  // TODO: 0.2 is the radius of the drone.
         std::cout << "A->R collides, with d=" << sqrt(pointNKNSquaredDistance[0])
                   << ", radius_drone=" << par_.drone_radius << std::endl;
