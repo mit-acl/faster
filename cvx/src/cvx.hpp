@@ -141,7 +141,8 @@ struct parameteres
     double factor_increment_safe;
     double factor_increment_whole;*/
 
-  int max_poly;
+  int max_poly_whole;
+  int max_poly_safe;
   double dist_max_vertexes;
 
   int gurobi_threads;

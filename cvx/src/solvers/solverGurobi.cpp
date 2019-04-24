@@ -271,7 +271,7 @@ void SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> polytopes)
 
 void SolverGurobi::setPolytopesConstraints()
 {
-  std::cout << "Setting POLYTOPES=" << std::endl;
+  std::cout << "Setting POLYTOPES=" << polytopes_cons.size() << std::endl;
 
   // Remove previous polytopes constraints
   for (int i = 0; i < polytopes_cons.size(); i++)

@@ -90,10 +90,10 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   ros::param::param<int>("~N_safe", par_.N_safe, 10);
   ros::param::param<int>("~N_whole", par_.N_whole, 10);
 
-  ros::param::param<double>("~factor_deltaTp_", par_.factor_deltaTp, 3);
-  ros::param::param<double>("~factor_deltaT", par_.factor_deltaT, 3);
-  ros::param::param<int>("~min_states_deltaTp", par_.min_states_deltaTp, 50);
-  ros::param::param<int>("~min_states_deltaT", par_.min_states_deltaT, 50);
+  ros::param::param<double>("~factor_deltaTp", par_.factor_deltaTp, 1.5);
+  ros::param::param<double>("~factor_deltaT", par_.factor_deltaT, 1.5);
+  ros::param::param<int>("~min_states_deltaTp", par_.min_states_deltaTp, 0);
+  ros::param::param<int>("~min_states_deltaT", par_.min_states_deltaT, 0);
 
   ros::param::param<double>("~Ra", par_.Ra, 2.0);
   ros::param::param<double>("~Ra_max", par_.Ra_max, 2.5);
@@ -128,7 +128,8 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
     ros::param::param<double>("~factor_final_safe", par_.factor_final_safe, 2.0);
     ros::param::param<double>("~factor_increment_safe", par_.factor_increment_safe, 1.0);*/
 
-  ros::param::param<int>("~max_poly", par_.max_poly, 4);
+  ros::param::param<int>("~max_poly_whole", par_.max_poly_whole, 4);
+  ros::param::param<int>("~max_poly_safe", par_.max_poly_safe, 4);
   ros::param::param<double>("~dist_max_vertexes", par_.dist_max_vertexes, 1.5);
 
   ros::param::param<int>("~gurobi_threads", par_.gurobi_threads, 1);
@@ -149,13 +150,13 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
 
   std::cout << "Parameters obtained" << std::endl;
 
-  if (par_.N_safe <= par_.max_poly + 2)
+  if (par_.N_safe <= par_.max_poly_safe + 2)
   {
     std::cout << bold << red << "Needed: N_safe>=max_poly+ 2 at least" << reset
               << std::endl;  // To decrease the probability of not finding a solution
     abort();
   }
-  if (par_.N_whole <= par_.max_poly + 2)
+  if (par_.N_whole <= par_.max_poly_whole + 2)
   {
     std::cout << bold << red << "Needed: N_whole>=max_poly + 2 at least" << reset
               << std::endl;  // To decrease the probability of not finding a solution
@@ -1347,29 +1348,30 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   //////////////////////////////////////////////////////////////////////////
   //////////// Solve with GUROBI Whole trajectory //////////////////////////
-  /////////////////////////////////////////////////////////////////////////
+  //////////////////////////////////////////////////////////////////////////
   std::cout << bold << green << "***********WHOLE TRAJ*********************" << reset << std::endl;
 
   double before = ros::Time::now().toSec();
 
-  if (JPSk_inside_sphere.size() > par_.max_poly + 1)  // If I have more than (par_.max_poly + 1) vertexes
+  vec_Vecf<3> JPS_whole = JPSk_inside_sphere;
+  if (JPS_whole.size() > par_.max_poly_whole + 1)  // If I have more than (par_.max_poly + 1) vertexes
   {
-    JPSk_inside_sphere.erase(JPSk_inside_sphere.begin() + par_.max_poly + 1,
-                             JPSk_inside_sphere.end());  // Force JPS to have less than par_.max_poly elements
-    E = JPSk_inside_sphere[JPSk_inside_sphere.size() - 1];
+    JPS_whole.erase(JPS_whole.begin() + par_.max_poly_whole + 1,
+                    JPS_whole.end());  // Force JPS to have less than par_.max_poly elements
+    E = JPS_whole[JPS_whole.size() - 1];
   }
 
   // std::cout << "JPS used for whole is" << std::endl;
-  // printElementsOfJPS(JPSk_inside_sphere);
+  // printElementsOfJPS(JPS_whole);
 
   if (par_.visual == true)
   {
     clearJPSPathVisualization(JPS_WHOLE);
-    publishJPSPath(JPSk_inside_sphere, JPS_WHOLE);
+    publishJPSPath(JPS_whole, JPS_WHOLE);
   }
 
   MyTimer cvx_ellip_decomp_t(true);
-  cvxEllipsoidDecompOcc(JPSk_inside_sphere);  // result saved in l_constraints_
+  cvxEllipsoidDecompOcc(JPS_whole);  // result saved in l_constraints_
   log_.cvx_decomp_whole_ms = cvx_ellip_decomp_t.ElapsedMs();
   std::cout << bold << blue << "CVXDecompWhole:  " << std::fixed << cvx_ellip_decomp_t << "ms" << reset << std::endl;
 
@@ -1479,11 +1481,19 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   JPSk_inside_sphere_tmp[0] = posR;
 
+  vec_Vecf<3> JPS_safe = JPSk_inside_sphere_tmp;
+  if (JPS_safe.size() > par_.max_poly_safe + 1)  // If I have more than (par_.max_poly + 1) vertexes
+  {
+    JPS_safe.erase(JPS_safe.begin() + par_.max_poly_safe + 1,
+                   JPS_safe.end());  // Force JPS to have less than par_.max_poly elements
+    M = JPS_safe[JPS_safe.size() - 1];
+  }
+
   std::cout << bold << blue << "OtherStuff 3:  " << std::fixed << otherStuff3_t << "ms" << reset << std::endl;
 
   MyTimer cvx_ellip_decomp2_t(true);
-  cvxEllipsoidDecompUnkOcc2(JPSk_inside_sphere_tmp);  // result saved in l_constraints_
-  publishJPSPath(JPSk_inside_sphere_tmp, JPS_SAFE);
+  cvxEllipsoidDecompUnkOcc2(JPS_safe);  // result saved in l_constraints_
+  publishJPSPath(JPS_safe, JPS_SAFE);
 
   log_.cvx_decomp_safe_ms = cvx_ellip_decomp2_t.ElapsedMs();
   std::cout << bold << blue << "CVXDecompSafe:  " << std::fixed << cvx_ellip_decomp2_t << "ms" << reset << std::endl;
@@ -1630,7 +1640,6 @@ void CVX::replanCB(const ros::TimerEvent& e)
   planner_status_ = REPLANNED;
   mtx_planner_status_.unlock();
   // printf("ReplanCB: planner_status_ = REPLANNED\n");
-  // std::cout << "Rescue Path:\n" << sg_safe_.X_temp_ << std::endl;
   Eigen::Vector3d F;
   F << sg_safe_.X_temp_(rows_X_safe - 1, 0), sg_safe_.X_temp_(rows_X_safe - 1, 1),
       sg_safe_.X_temp_(rows_X_safe - 1, 2);  // Final point of the safe path
@@ -1656,6 +1665,9 @@ void CVX::replanCB(const ros::TimerEvent& e)
   int states_last_replan = ceil(replanCB_t.ElapsedMs() / (par_.dc * 1000));  // Number of states that
                                                                              // would have been needed for
                                                                              // the last replan
+
+  std::cout << "states_last_replan:  " << std::fixed << states_last_replan << " states" << std::endl;
+  std::cout << "min_states_deltaTp:  " << std::fixed << par_.min_states_deltaTp << " states" << std::endl;
   deltaTp_ = std::max(par_.factor_deltaTp * states_last_replan,
                       (double)par_.min_states_deltaTp);  // deltaTp
   std::cout << "Next deltaTp_:  " << std::fixed << deltaTp_ << " states" << std::endl;
@@ -2457,8 +2469,16 @@ void CVX::cvxEllipsoidDecompOcc(vec_Vecf<3>& path)
   // pcl::KdTreeFLANN<pcl::PointXYZ>::PointCloudConstPtr ptr_cloud_map = kdtree_map_.getInputCloud();
   // obs = pclptr_to_vec(ptr_cloud_map);
 
-  // Using ellipsoid decomposition
-  ellip_decomp_util_.set_obs(vec_o_);
+  if (takeoff_done_ == false)
+  {
+    vec_Vec3f empty_obs;
+    ellip_decomp_util_.set_obs(empty_obs);  // No unkown space when taking off
+  }
+  else
+  {
+    // Using ellipsoid decomposition
+    ellip_decomp_util_.set_obs(vec_o_);  // Original was vec_o_
+  }
   ellip_decomp_util_.set_local_bbox(
       Vec3f(2, 2, 1));  // Only try to find cvx decomp in the Mikowsski sum of JPS and this box (I think)
                         // par_.drone_radius
