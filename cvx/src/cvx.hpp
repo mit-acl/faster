@@ -334,6 +334,7 @@ private:
   std::vector<LinearConstraint3D> l_constraints_whole_;  // Polytope (Linear) constraints
   std::vector<LinearConstraint3D> l_constraints_safe_;   // Polytope (Linear) constraints
 
+  int deltaTp_old_ = 1000;
   int deltaTp_ = 10;
   int deltaT_ = 10;
 

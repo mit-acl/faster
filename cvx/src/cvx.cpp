@@ -1114,15 +1114,20 @@ void CVX::replanCB(const ros::TimerEvent& e)
   {
     mtx_k.lock();
 
+    mtx_offsets.lock();
+    k_initial_cond_1_ = std::min(k_ + deltaT_, (int)(X_.rows() - 1));
+
     log_.entered_safe_path = 0;
-    if (k_ > deltaTp_ && status_ == TRAVELING)
+    if (k_initial_cond_1_ >= deltaTp_old_ && status_ == TRAVELING)
     {
       ROS_WARN("Switched to the SAFE PATH!!");
       log_.entered_safe_path = 1;
     }
 
-    mtx_offsets.lock();
-    k_initial_cond_1_ = std::min(k_ + deltaT_, (int)(X_.rows() - 1));
+    log_.deltaT = deltaT_;
+    log_.deltaP2Rold = deltaTp_old_ - k_;
+    log_.k = k_;
+    log_.deltaTp_old = deltaTp_old_;
     mtx_offsets.unlock();
     mtx_k.unlock();
     // printf("Ahora mismo, k_initial_cond_1=%d\n", k_initial_cond_1_);
@@ -1223,8 +1228,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
     else
     {
       // Going to decide
-      std::cout << "Esto es lo que voy a arreglar:" << std::endl;
-      printElementsOfJPS(JPS_k_m_1_);
+      // std::cout << "Esto es lo que voy a arreglar:" << std::endl;
+      // printElementsOfJPS(JPS_k_m_1_);
       log_.computed_both = 1;
 
       bool solvedjpsb;
@@ -1235,8 +1240,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
       log_.JPS_fix_solved = solvedjpsb;
       if (solvedjpsb == true)
       {
-        std::cout << "Esto es JPSb (lo arreglado):" << std::endl;
-        printElementsOfJPS(JPSb);
+        // std::cout << "Esto es JPSb (lo arreglado):" << std::endl;
+        // printElementsOfJPS(JPSb);
         Eigen::Vector3d D = getFirstIntersectionWithSphere(JPSb, ra, JPSb[0], &lib);
         // std::cout << "Going to compute norm, la=" << lia << ", lib=" << lib << std::endl;
         dist_a = normJPS(JPSa, lia + 1);
@@ -1315,11 +1320,11 @@ void CVX::replanCB(const ros::TimerEvent& e)
   }
 
   bool noPointsOutsideSphere1;
-  std::cout << "here, ra=" << ra << std::endl;
+  // std::cout << "here, ra=" << ra << std::endl;
   // std::cout << "here, state_pos=" << state_pos.transpose() << std::endl;
 
-  std::cout << "JPSk is" << std::endl;
-  printElementsOfJPS(JPSk);
+  // std::cout << "JPSk is" << std::endl;
+  // printElementsOfJPS(JPSk);
 
   Eigen::Vector3d E;
   E = getFirstIntersectionWithSphere(JPSk, ra, JPSk[0], &li1, &noPointsOutsideSphere1);
@@ -1332,13 +1337,13 @@ void CVX::replanCB(const ros::TimerEvent& e)
   {
     JPSk_inside_sphere.push_back(E);
   }
-  std::cout << "JPS used for whole before creating more vertexes=" << std::endl;
-  printElementsOfJPS(JPSk_inside_sphere);
+  // std::cout << "JPS used for whole before creating more vertexes=" << std::endl;
+  // printElementsOfJPS(JPSk_inside_sphere);
 
   createMoreVertexes(JPSk_inside_sphere, par_.dist_max_vertexes);
 
-  std::cout << "JPS used for whole after creating extra vertexes=" << std::endl;
-  printElementsOfJPS(JPSk_inside_sphere);
+  // std::cout << "JPS used for whole after creating extra vertexes=" << std::endl;
+  // printElementsOfJPS(JPSk_inside_sphere);
 
   //////////////////////////////////////////////////////////////////////////
   //////////// Solve with GUROBI Whole trajectory //////////////////////////
@@ -1354,8 +1359,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
     E = JPSk_inside_sphere[JPSk_inside_sphere.size() - 1];
   }
 
-  std::cout << "JPS used for whole is" << std::endl;
-  printElementsOfJPS(JPSk_inside_sphere);
+  // std::cout << "JPS used for whole is" << std::endl;
+  // printElementsOfJPS(JPSk_inside_sphere);
 
   if (par_.visual == true)
   {
@@ -1421,12 +1426,15 @@ void CVX::replanCB(const ros::TimerEvent& e)
   deltaTp_ = std::min((int)deltaTp_,
                       (int)(sg_whole_.X_temp_.rows() - 1));  // R is the point of the trajectory offset_rp ms after the
                                                              // start of the  whole trajectory
+
+  log_.deltaTp = deltaTp_;
+
   int index = deltaTp_;
   mtx_offsets.unlock();
 
-  std::cout << "index=" << index << std::endl;
+  // std::cout << "index=" << index << std::endl;
 
-  std::cout << "Rows of X_temp_" << sg_whole_.X_temp_.rows() << std::endl;
+  // std::cout << "Rows of X_temp_" << sg_whole_.X_temp_.rows() << std::endl;
 
   /*  std::cout << "******************Actual state:" << std::endl;
     std::cout << "Pos=" << state_pos.transpose() << std::endl;
@@ -1436,7 +1444,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   Eigen::Vector3d velR(sg_whole_.X_temp_(index, 3), sg_whole_.X_temp_(index, 4), sg_whole_.X_temp_(index, 5));
   Eigen::Vector3d accelR(sg_whole_.X_temp_(index, 6), sg_whole_.X_temp_(index, 7), sg_whole_.X_temp_(index, 8));
 
-  std::cout << "posR=" << posR.transpose() << std::endl;
+  // std::cout << "posR=" << posR.transpose() << std::endl;
   mtx_X_U_temp.unlock();
 
   MyTimer check_collision_AR_t(true);
@@ -1451,12 +1459,12 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   vec_Vecf<3> JPSk_inside_sphere_tmp = JPSk_inside_sphere;
   bool thereIsIntersection2;
-  std::cout << "JPSk_inside_sphere_tmp ANTES:" << std::endl;
-  printElementsOfJPS(JPSk_inside_sphere_tmp);
+  // std::cout << "JPSk_inside_sphere_tmp ANTES:" << std::endl;
+  // printElementsOfJPS(JPSk_inside_sphere_tmp);
   Eigen::Vector3d M = getFirstCollisionJPS(JPSk_inside_sphere_tmp, &thereIsIntersection2, UNKNOWN_MAP,
                                            RETURN_INTERSECTION);  // results saved in JPSk_inside_sphere_tmp
 
-  std::cout << "Point M is:" << M.transpose() << std::endl;
+  // std::cout << "Point M is:" << M.transpose() << std::endl;
   if (par_.visual)
   {
     M_.header.stamp = ros::Time::now();
@@ -1466,9 +1474,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
     pub_point_M_.publish(M_);
   }
 
-  std::cout << "JPSk_inside_sphere_tmp DESPUES:" << std::endl;
-
-  printElementsOfJPS(JPSk_inside_sphere_tmp);
+  // std::cout << "JPSk_inside_sphere_tmp DESPUES:" << std::endl;
+  // printElementsOfJPS(JPSk_inside_sphere_tmp);
 
   JPSk_inside_sphere_tmp[0] = posR;
 
@@ -1508,9 +1515,9 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   sg_safe_.setXf(xf_safe);
   sg_safe_.setX0(x0_safe);
-  std::cout << "Setting polytopes for safe" << std::endl;
+  // std::cout << "Setting polytopes for safe" << std::endl;
   sg_safe_.setPolytopes(l_constraints_safe_);
-  std::cout << "Polytopes set=" << l_constraints_safe_.size() << std::endl;
+  // std::cout << "Polytopes set=" << l_constraints_safe_.size() << std::endl;
 
   bool isMinside = l_constraints_safe_[l_constraints_safe_.size() - 1].inside(M);
 
@@ -1532,9 +1539,9 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   // std::cout << "l_constraints_uo_.size()=" << l_constraints_uo_.size() << std::endl;
   MyTimer safe_gurobi_t(true);
-  std::cout << "Generating new trajectory" << std::endl;
+  // std::cout << "Generating new trajectory" << std::endl;
   bool solved_safe = sg_safe_.genNewTraj();
-  std::cout << "Generated" << std::endl;
+  // std::cout << "Generated" << std::endl;
 
   if (solved_safe == false)
   {
@@ -1556,7 +1563,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   MyTimer fill_safe_t(true);
   // Both have solution
-  std::cout << "Going to fill" << std::endl;
+  // std::cout << "Going to fill" << std::endl;
   sg_safe_.fillXandU();
   std::cout << bold << blue << "Fill Safe:  " << std::fixed << fill_safe_t << "ms" << reset << std::endl;
 
@@ -1643,6 +1650,9 @@ void CVX::replanCB(const ros::TimerEvent& e)
   std::cout << bold << blue << "TOTAL REPLANNING CB:  " << std::fixed << replanCB_t << "ms" << reset << std::endl;
 
   mtx_offsets.lock();
+
+  deltaTp_old_ = deltaTp_;
+
   int states_last_replan = ceil(replanCB_t.ElapsedMs() / (par_.dc * 1000));  // Number of states that
                                                                              // would have been needed for
                                                                              // the last replan
@@ -2235,11 +2245,12 @@ void CVX::stateCB(const acl_msgs::State& msg)
     pubActualTraj();
   }
 
-  if (i % 6 == 0 && status_ != GOAL_REACHED && i != 0)
+  if (i % 10 == 0 && status_ != GOAL_REACHED && i != 0)
   {
     Eigen::Vector3d actual_pos(msg.pos.x, msg.pos.y, msg.pos.z);
-    log_.total_dist = log_.total_dist + (actual_pos - pos_old_).norm();
-    pos_old_ = actual_pos;
+    // Don't use the state to compute the total distance (it's very noisy)
+    // log_.total_dist = log_.total_dist + (actual_pos - pos_old_).norm();
+    // pos_old_ = actual_pos;
   }
   Eigen::Vector3d vel(msg.vel.x, msg.vel.y, msg.vel.z);
   log_.veloc_norm = vel.norm();

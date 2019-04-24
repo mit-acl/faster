@@ -120,23 +120,23 @@ void SolverGurobi::setObjective()  // I need to set it every time, because the o
 
 void SolverGurobi::fillXandU()
 {
-  std::cout << "in fillXandU" << std::endl;
+  // std::cout << "in fillXandU" << std::endl;
   double t = 0;
   int interval = 0;
   //#pragma omp parallel for
   //  {
-  std::cout << "voy a fill" << std::endl;
-  std::cout << "U_temp_.rows()=" << U_temp_.rows() << std::endl;
+  // std::cout << "voy a fill" << std::endl;
+  // std::cout << "U_temp_.rows()=" << U_temp_.rows() << std::endl;
   for (int i = 0; i < U_temp_.rows(); i++)
   {
-    std::cout << "row=" << i << std::endl;
+    // std::cout << "row=" << i << std::endl;
     t = t + DC;
-    std::cout << "t=" << t << std::endl;
+    // std::cout << "t=" << t << std::endl;
     if (t > dt_ * (interval + 1))
     {
       interval = std::min(interval + 1, N_ - 1);
 
-      std::cout << "*****Interval=" << interval << std::endl;
+      // std::cout << "*****Interval=" << interval << std::endl;
     }
 
     // std::cout << "t_rel=" << t - interval * dt_ << std::endl;
@@ -165,7 +165,7 @@ void SolverGurobi::fillXandU()
     states << posx, posy, posz, velx, vely, velz, accelx, accely, accelz;
     X_temp_.row(i) = states;
   }
-  std::cout << "After the loop" << std::endl;
+  // std::cout << "After the loop" << std::endl;
   // }  // End pragma parallel
 
   /*  int last = X_temp_.rows() - 1;
@@ -180,7 +180,7 @@ void SolverGurobi::fillXandU()
   // haven't planned again).
   U_temp_.row(U_temp_.rows() - 1) = Eigen::Vector3d::Zero().transpose();
 
-  std::cout << "end of fillXandU" << std::endl;
+  // std::cout << "end of fillXandU" << std::endl;
   /*  std::cout << "***********The final states are***********" << std::endl;
     std::cout << X_temp_.row(X_temp_.rows() - 1).transpose() << std::endl;
 
@@ -324,8 +324,8 @@ void SolverGurobi::setPolytopesConstraints()
       }
     }
 
-    std::cout << "NUMBER OF POLYTOPES=" << polytopes_.size() << std::endl;
-    std::cout << "NUMBER OF FACES of the first polytope=" << polytopes_[0].A().rows() << std::endl;
+    // std::cout << "NUMBER OF POLYTOPES=" << polytopes_.size() << std::endl;
+    // std::cout << "NUMBER OF FACES of the first polytope=" << polytopes_[0].A().rows() << std::endl;
 
     // Polytope constraints (if binary_varible==1 --> In that polytope) and at_least_1_pol_cons (at least one polytope)
     // constraints
@@ -491,14 +491,14 @@ void SolverGurobi::setConstraintsX0()
   // Constraint x0==x_initial
   for (int i = 0; i < 3; i++)
   {
-    std::cout << "x0_[i]= " << x0_[i] << std::endl;
-    std::cout << "Position" << std::endl;
+    // std::cout << "x0_[i]= " << x0_[i] << std::endl;
+    // std::cout << "Position" << std::endl;
     init_cons.push_back(m.addConstr(getPos(0, 0, i) == x0_[i],
                                     "InitialPosAxis_" + std::to_string(i)));  // Initial position
-    std::cout << "Velocity" << std::endl;
+                                                                              // std::cout << "Velocity" << std::endl;
     init_cons.push_back(m.addConstr(getVel(0, 0, i) == x0_[i + 3],
                                     "InitialVelAxis_" + std::to_string(i)));  // Initial velocity
-    std::cout << "Accel" << std::endl;
+    // std::cout << "Accel" << std::endl;
     init_cons.push_back(m.addConstr(getAccel(0, 0, i) == x0_[i + 6],
                                     "InitialAccelAxis_" + std::to_string(i)));  // Initial acceleration}
   }
@@ -575,8 +575,8 @@ bool SolverGurobi::genNewTraj()
 {
   bool solved = false;
 
-  std::cout << "Factor_initial= " << factor_initial_ << std::endl;
-  std::cout << "Factor_final= " << factor_final_ << std::endl;
+  // std::cout << "Factor_initial= " << factor_initial_ << std::endl;
+  // std::cout << "Factor_final= " << factor_final_ << std::endl;
   trials_ = 0;
 
   /*  std::cout << "A es esto:\n";
@@ -597,12 +597,12 @@ bool SolverGurobi::genNewTraj()
   {
     trials_ = trials_ + 1;
     findDT(i);
-    std::cout << "Going to try with dt_= " << dt_ << std::endl;
+    // std::cout << "Going to try with dt_= " << dt_ << std::endl;
     setPolytopesConstraints();
-    std::cout << "Setting x0" << std::endl;
+    // std::cout << "Setting x0" << std::endl;
     setConstraintsX0();
     setConstraintsXf();
-    std::cout << "Setting dynamic constraints" << std::endl;
+    // std::cout << "Setting dynamic constraints" << std::endl;
     setDynamicConstraints();
     // setDistanceConstraints();
     setObjective();
