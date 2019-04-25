@@ -1330,8 +1330,6 @@ void CVX::replanCB(const ros::TimerEvent& e)
   Eigen::Vector3d E;
   E = getFirstIntersectionWithSphere(JPSk, ra, JPSk[0], &li1, &noPointsOutsideSphere1);
 
-  B_ = E;
-
   vec_Vecf<3> JPSk_inside_sphere(JPSk.begin(), JPSk.begin() + li1 + 1);  // Elements of JPS that are inside the sphere
 
   if (noPointsOutsideSphere1 == false)
@@ -1466,6 +1464,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   Eigen::Vector3d M = getFirstCollisionJPS(JPSk_inside_sphere_tmp, &thereIsIntersection2, UNKNOWN_MAP,
                                            RETURN_INTERSECTION);  // results saved in JPSk_inside_sphere_tmp
 
+  B_ = M;
   // std::cout << "Point M is:" << M.transpose() << std::endl;
   if (par_.visual)
   {
@@ -2098,8 +2097,13 @@ void CVX::pubCB(const ros::TimerEvent& e)
       // double desired_yaw = atan2(quadGoal_.vel.y, quadGoal_.vel.x);
       double desired_yaw = atan2(B_[1] - quadGoal_.pos.y, B_[0] - quadGoal_.pos.x);
 
-      // std::cout << red << bold << std::setprecision(6) << "desired_yaw=" << desired_yaw << reset << std::endl;
-      // std::cout << red << bold << std::setprecision(6) << "quadGoal_.yaw=" << quadGoal_.yaw << reset << std::endl;
+      /*      std::cout << red << bold << std::setprecision(6) << "B_=" << B_.transpose() << reset << std::endl;
+            std::cout << red << bold << std::setprecision(6) << "quadGoal_=" << quadGoal_.pos.x << "  " <<
+         quadGoal_.pos.y
+                      << reset << std::endl;
+            std::cout << red << bold << std::setprecision(6) << "desired_yaw=" << desired_yaw << reset << std::endl;
+            std::cout << red << bold << std::setprecision(6) << "quadGoal_.yaw=" << quadGoal_.yaw << reset <<
+         std::endl;*/
 
       double diff = desired_yaw - quadGoal_.yaw;
       // std::cout << red << bold << std::setprecision(6) << "diff before wrappping=" << diff << reset << std::endl;
