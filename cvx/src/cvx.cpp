@@ -90,9 +90,9 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   ros::param::param<int>("~N_safe", par_.N_safe, 10);
   ros::param::param<int>("~N_whole", par_.N_whole, 10);
 
-  ros::param::param<double>("~factor_deltaTp", par_.factor_deltaTp, 1.5);
+  // ros::param::param<double>("~factor_deltaTp", par_.factor_deltaTp, 1.5);
   ros::param::param<double>("~factor_deltaT", par_.factor_deltaT, 1.5);
-  ros::param::param<int>("~min_states_deltaTp", par_.min_states_deltaTp, 0);
+  // ros::param::param<int>("~min_states_deltaTp", par_.min_states_deltaTp, 0);
   ros::param::param<int>("~min_states_deltaT", par_.min_states_deltaT, 0);
 
   ros::param::param<double>("~Ra", par_.Ra, 2.0);
@@ -1119,16 +1119,18 @@ void CVX::replanCB(const ros::TimerEvent& e)
     k_initial_cond_1_ = std::min(k_ + deltaT_, (int)(X_.rows() - 1));
 
     log_.entered_safe_path = 0;
-    if (k_initial_cond_1_ >= deltaTp_old_ && status_ == TRAVELING)
+    if (k_initial_cond_1_ >= indexR_ &&
+        status_ == TRAVELING)  // Here index_R_ has the value of the previous replanning step
     {
       ROS_WARN("Switched to the SAFE PATH!!");
       log_.entered_safe_path = 1;
     }
 
+    log_.deltaT_percentage = (k_initial_cond_1_ - k_) / (1.0 * (indexR_ - k_));
     log_.deltaT = deltaT_;
-    log_.deltaP2Rold = deltaTp_old_ - k_;
+    // log_.deltaP2Rold = deltaTp_old_ - k_;
     log_.k = k_;
-    log_.deltaTp_old = deltaTp_old_;
+    // log_.deltaTp_old = deltaTp_old_;
     mtx_offsets.unlock();
     mtx_k.unlock();
     // printf("Ahora mismo, k_initial_cond_1=%d\n", k_initial_cond_1_);
@@ -1382,6 +1384,13 @@ void CVX::replanCB(const ros::TimerEvent& e)
     pub_point_E_.publish(E_);
   }
 
+  bool isGinside_whole = l_constraints_whole_[l_constraints_whole_.size() - 1].inside(G);
+  if (isGinside_whole)
+  {
+    std::cout << red << bold << "G is inside" << reset << std::endl;
+  }
+  E = (isGinside_whole == true) ? G : E;
+
   double xf[9] = { E(0), E(1), E(2), 0, 0, 0, 0, 0, 0 };
   sg_whole_.setXf(xf);
   sg_whole_.setX0(x0);
@@ -1414,53 +1423,14 @@ void CVX::replanCB(const ros::TimerEvent& e)
   MyTimer fill_whole_t(true);
   sg_whole_.fillXandU();
   std::cout << bold << blue << "Fill Whole:  " << std::fixed << fill_whole_t << "ms" << reset << std::endl;
-  mtx_X_U_temp.lock();
 
   ///////////////////////////////////////////////////////////
   ///////////////       SAFE PATH   //////////////////////
   //////////////////////////////////////////////////////////
   std::cout << bold << green << "***********SAFE PATH*********************" << reset << std::endl;
 
-  MyTimer otherStuff3_t(true);
-  mtx_offsets.lock();
-  deltaTp_ = std::min((int)deltaTp_,
-                      (int)(sg_whole_.X_temp_.rows() - 1));  // R is the point of the trajectory offset_rp ms after the
-                                                             // start of the  whole trajectory
-
-  log_.deltaTp = deltaTp_;
-
-  int index = deltaTp_;
-  mtx_offsets.unlock();
-
-  // std::cout << "index=" << index << std::endl;
-
-  // std::cout << "Rows of X_temp_" << sg_whole_.X_temp_.rows() << std::endl;
-
-  /*  std::cout << "******************Actual state:" << std::endl;
-    std::cout << "Pos=" << state_pos.transpose() << std::endl;
-    std::cout << "Vel=" << state_vel.transpose() << std::endl;*/
-
-  Eigen::Vector3d posR(sg_whole_.X_temp_(index, 0), sg_whole_.X_temp_(index, 1), sg_whole_.X_temp_(index, 2));
-  Eigen::Vector3d velR(sg_whole_.X_temp_(index, 3), sg_whole_.X_temp_(index, 4), sg_whole_.X_temp_(index, 5));
-  Eigen::Vector3d accelR(sg_whole_.X_temp_(index, 6), sg_whole_.X_temp_(index, 7), sg_whole_.X_temp_(index, 8));
-
-  // std::cout << "posR=" << posR.transpose() << std::endl;
-  mtx_X_U_temp.unlock();
-
-  MyTimer check_collision_AR_t(true);
-  if (ARisInFreeSpace(index) == false and takeoff_done_ == true)
-  {
-    std::cout << red << bold << "The piece A-->R is not in Free Space" << std::endl;
-    return;
-  }
-
-  std::cout << bold << blue << "Check collision with AR:  " << std::fixed << check_collision_AR_t << "ms" << reset
-            << std::endl;
-
   vec_Vecf<3> JPSk_inside_sphere_tmp = JPSk_inside_sphere;
   bool thereIsIntersection2;
-  // std::cout << "JPSk_inside_sphere_tmp ANTES:" << std::endl;
-  // printElementsOfJPS(JPSk_inside_sphere_tmp);
   Eigen::Vector3d M = getFirstCollisionJPS(JPSk_inside_sphere_tmp, &thereIsIntersection2, UNKNOWN_MAP,
                                            RETURN_INTERSECTION);  // results saved in JPSk_inside_sphere_tmp
 
@@ -1475,106 +1445,150 @@ void CVX::replanCB(const ros::TimerEvent& e)
     pub_point_M_.publish(M_);
   }
 
-  // std::cout << "JPSk_inside_sphere_tmp DESPUES:" << std::endl;
-  // printElementsOfJPS(JPSk_inside_sphere_tmp);
+  ////////////////
+  bool needToComputeSafePath;
 
-  JPSk_inside_sphere_tmp[0] = posR;
+  // std::cout << "Going to find index of H" << std::endl;
+  int indexH = findIndexH(needToComputeSafePath);
+  log_.needToComputeSafePath = (int)needToComputeSafePath;
 
-  vec_Vecf<3> JPS_safe = JPSk_inside_sphere_tmp;
-  if (JPS_safe.size() > par_.max_poly_safe + 1)  // If I have more than (par_.max_poly + 1) vertexes
+  if (needToComputeSafePath == false and takeoff_done_ == true)
   {
-    JPS_safe.erase(JPS_safe.begin() + par_.max_poly_safe + 1,
-                   JPS_safe.end());  // Force JPS to have less than par_.max_poly elements
-    M = JPS_safe[JPS_safe.size() - 1];
-  }
-
-  std::cout << bold << blue << "OtherStuff 3:  " << std::fixed << otherStuff3_t << "ms" << reset << std::endl;
-
-  MyTimer cvx_ellip_decomp2_t(true);
-  cvxEllipsoidDecompUnkOcc2(JPS_safe);  // result saved in l_constraints_
-  publishJPSPath(JPS_safe, JPS_SAFE);
-
-  log_.cvx_decomp_safe_ms = cvx_ellip_decomp2_t.ElapsedMs();
-  std::cout << bold << blue << "CVXDecompSafe:  " << std::fixed << cvx_ellip_decomp2_t << "ms" << reset << std::endl;
-
-  mtx_X_U_temp.unlock();
-
-  if (par_.visual)
-  {
-    R_.header.stamp = ros::Time::now();
-    R_.pose.position.x = posR(0);
-    R_.pose.position.y = posR(1);
-    R_.pose.position.z = posR(2);
-    pub_point_R_.publish(R_);
-  }
-
-  bool isGinside = l_constraints_safe_[l_constraints_safe_.size() - 1].inside(G);
-  if (isGinside)
-  {
-    std::cout << red << bold << "G is inside" << reset << std::endl;
-  }
-  M = (isGinside == true) ? G : M;
-
-  double x0_safe[9] = { posR[0], posR[1], posR[2], velR[0], velR[1], velR[2], accelR[0], accelR[1], accelR[2] };
-  double xf_safe[9] = { M[0], M[1], M[2], 0, 0, 0, 0, 0, 0 };  // Note that the final position of xf_safe is only
-                                                               // used to find dt, not as a final condition
-
-  /*  std::cout << "Punto inicial: " << x0_safe[0] << ", " << x0_safe[1] << ", " << x0_safe[2] << std::endl;
-    std::cout << "Punto final: " << xf_safe[0] << ", " << xf_safe[1] << ", " << xf_safe[2] << std::endl;*/
-
-  sg_safe_.setXf(xf_safe);
-  sg_safe_.setX0(x0_safe);
-  // std::cout << "Setting polytopes for safe" << std::endl;
-  sg_safe_.setPolytopes(l_constraints_safe_);
-  // std::cout << "Polytopes set=" << l_constraints_safe_.size() << std::endl;
-
-  bool isMinside = l_constraints_safe_[l_constraints_safe_.size() - 1].inside(M);
-
-  if (isMinside && takeoff_done_ == true)
-  {
-    // std::cout << bold << "Forcing final constraint M=" << M.transpose() << reset << std::endl;
-    sg_safe_.setForceFinalConstraint(1);  // !thereIsIntersection2 If no intersection --> goal is inside
-                                          // polytope --> force final constraint
+    std::cout << red << bold << "No Rescue path" << reset << std::endl;
+    indexR_ = indexH;
+    // No need of a rescue path
   }
   else
   {
-    sg_safe_.setForceFinalConstraint(0);
-  }
+    indexR_ = findIndexR(indexH);
+    // Continue to compute the rescue path
 
-  if (l_constraints_safe_[0].inside(posR) == false)
-  {
-    std::cout << red << "First point of safe traj is outside" << reset << std::endl;
-  }
+    ///////////
 
-  // std::cout << "l_constraints_uo_.size()=" << l_constraints_uo_.size() << std::endl;
-  MyTimer safe_gurobi_t(true);
-  // std::cout << "Generating new trajectory" << std::endl;
-  bool solved_safe = sg_safe_.genNewTraj();
-  // std::cout << "Generated" << std::endl;
+    MyTimer otherStuff3_t(true);
+    mtx_X_U_temp.lock();
+    mtx_offsets.lock();
+    // deltaTp_ =std::min((int)deltaTp_,(int)(sg_whole_.X_temp_.rows() - 1));  // R is the point of the trajectory
+    // offset_rp ms after the
+    // start of the  whole trajectory
 
-  if (solved_safe == false)
-  {
-    std::cout << red << "No solution found for the safe path" << reset << std::endl;
-    return;
-  }
-  log_.gurobi_safe_ms = sg_safe_.runtime_ms_;
-  log_.gurobi_safe_ms_mine = safe_gurobi_t.ElapsedMs();
-  log_.gurobi_safe_trials = sg_safe_.trials_;
-  log_.gurobi_safe_dt = sg_safe_.dt_;
-  log_.gurobi_safe_factor = sg_safe_.factor_that_worked_;
+    //  log_.deltaTp = deltaTp_;
 
-  std::cout << bold << blue << "SafeGurobi:  " << std::fixed << safe_gurobi_t << "ms, (" << std::fixed
-            << sg_safe_.runtime_ms_ << " ms), " << reset << sg_safe_.trials_ << " trials (dt=" << sg_safe_.dt_
-            << "), f_worked=" << std::setprecision(2) << sg_safe_.factor_that_worked_ << std::endl;
+    // int index = deltaTp_;
+    mtx_offsets.unlock();
+
+    Eigen::Vector3d posR(sg_whole_.X_temp_(indexR_, 0), sg_whole_.X_temp_(indexR_, 1), sg_whole_.X_temp_(indexR_, 2));
+    Eigen::Vector3d velR(sg_whole_.X_temp_(indexR_, 3), sg_whole_.X_temp_(indexR_, 4), sg_whole_.X_temp_(indexR_, 5));
+    Eigen::Vector3d accelR(sg_whole_.X_temp_(indexR_, 6), sg_whole_.X_temp_(indexR_, 7), sg_whole_.X_temp_(indexR_, 8));
+
+    // std::cout << "posR=" << posR.transpose() << std::endl;
+    mtx_X_U_temp.unlock();
+
+    /*    MyTimer check_collision_AR_t(true);
+        if (ARisInFreeSpace(indexR_) == false and takeoff_done_ == true)
+        {
+          std::cout << red << bold << "The piece A-->R is not in Free Space" << std::endl;
+          return;
+        }
+
+        std::cout << bold << blue << "Check collision with AR:  " << std::fixed << check_collision_AR_t << "ms" << reset
+                  << std::endl;*/
+
+    JPSk_inside_sphere_tmp[0] = posR;
+
+    vec_Vecf<3> JPS_safe = JPSk_inside_sphere_tmp;
+    if (JPS_safe.size() > par_.max_poly_safe + 1)  // If I have more than (par_.max_poly + 1) vertexes
+    {
+      JPS_safe.erase(JPS_safe.begin() + par_.max_poly_safe + 1,
+                     JPS_safe.end());  // Force JPS to have less than par_.max_poly elements
+      M = JPS_safe[JPS_safe.size() - 1];
+    }
+
+    std::cout << bold << blue << "OtherStuff 3:  " << std::fixed << otherStuff3_t << "ms" << reset << std::endl;
+
+    MyTimer cvx_ellip_decomp2_t(true);
+    cvxEllipsoidDecompUnkOcc2(JPS_safe);  // result saved in l_constraints_
+    publishJPSPath(JPS_safe, JPS_SAFE);
+
+    log_.cvx_decomp_safe_ms = cvx_ellip_decomp2_t.ElapsedMs();
+    std::cout << bold << blue << "CVXDecompSafe:  " << std::fixed << cvx_ellip_decomp2_t << "ms" << reset << std::endl;
+
+    // mtx_X_U_temp.unlock();
+
+    if (par_.visual)
+    {
+      R_.header.stamp = ros::Time::now();
+      R_.pose.position.x = posR(0);
+      R_.pose.position.y = posR(1);
+      R_.pose.position.z = posR(2);
+      pub_point_R_.publish(R_);
+    }
+
+    bool isGinside = l_constraints_safe_[l_constraints_safe_.size() - 1].inside(G);
+    if (isGinside)
+    {
+      std::cout << red << bold << "G is inside" << reset << std::endl;
+    }
+    M = (isGinside == true) ? G : M;
+
+    double x0_safe[9] = { posR[0], posR[1], posR[2], velR[0], velR[1], velR[2], accelR[0], accelR[1], accelR[2] };
+    double xf_safe[9] = { M[0], M[1], M[2], 0, 0, 0, 0, 0, 0 };  // Note that the final position of xf_safe is only
+                                                                 // used to find dt, not as a final condition
+
+    sg_safe_.setXf(xf_safe);
+    sg_safe_.setX0(x0_safe);
+    // std::cout << "Setting polytopes for safe" << std::endl;
+    sg_safe_.setPolytopes(l_constraints_safe_);
+    // std::cout << "Polytopes set=" << l_constraints_safe_.size() << std::endl;
+
+    bool isMinside = l_constraints_safe_[l_constraints_safe_.size() - 1].inside(M);
+
+    if (isMinside && takeoff_done_ == true)
+    {
+      // std::cout << bold << "Forcing final constraint M=" << M.transpose() << reset << std::endl;
+      sg_safe_.setForceFinalConstraint(1);  // !thereIsIntersection2 If no intersection --> goal is inside
+                                            // polytope --> force final constraint
+    }
+    else
+    {
+      sg_safe_.setForceFinalConstraint(0);
+    }
+
+    if (l_constraints_safe_[0].inside(posR) == false)
+    {
+      std::cout << red << "First point of safe traj is outside" << reset << std::endl;
+    }
+
+    // std::cout << "l_constraints_uo_.size()=" << l_constraints_uo_.size() << std::endl;
+    MyTimer safe_gurobi_t(true);
+    // std::cout << "Generating new trajectory" << std::endl;
+    bool solved_safe = sg_safe_.genNewTraj();
+    // std::cout << "Generated" << std::endl;
+
+    if (solved_safe == false)
+    {
+      std::cout << red << "No solution found for the safe path" << reset << std::endl;
+      return;
+    }
+    log_.gurobi_safe_ms = sg_safe_.runtime_ms_;
+    log_.gurobi_safe_ms_mine = safe_gurobi_t.ElapsedMs();
+    log_.gurobi_safe_trials = sg_safe_.trials_;
+    log_.gurobi_safe_dt = sg_safe_.dt_;
+    log_.gurobi_safe_factor = sg_safe_.factor_that_worked_;
+
+    std::cout << bold << blue << "SafeGurobi:  " << std::fixed << safe_gurobi_t << "ms, (" << std::fixed
+              << sg_safe_.runtime_ms_ << " ms), " << reset << sg_safe_.trials_ << " trials (dt=" << sg_safe_.dt_
+              << "), f_worked=" << std::setprecision(2) << sg_safe_.factor_that_worked_ << std::endl;
+    MyTimer fill_safe_t(true);
+    // Both have solution
+    // std::cout << "Going to fill" << std::endl;
+    sg_safe_.fillXandU();
+    std::cout << bold << blue << "Fill Safe:  " << std::fixed << fill_safe_t << "ms" << reset << std::endl;
+  }  // End of need to compute the rescue path
+
   ///////////////////////////////////////////////////////////
   ///////////////       MERGE RESULTS    ////////////////////
   ///////////////////////////////////////////////////////////
-
-  MyTimer fill_safe_t(true);
-  // Both have solution
-  // std::cout << "Going to fill" << std::endl;
-  sg_safe_.fillXandU();
-  std::cout << bold << blue << "Fill Safe:  " << std::fixed << fill_safe_t << "ms" << reset << std::endl;
 
   MyTimer otherStuff2_t(true);
 
@@ -1586,13 +1600,16 @@ void CVX::replanCB(const ros::TimerEvent& e)
   int colsU = sg_whole_.U_temp_.cols();
   int colsX = sg_whole_.X_temp_.cols();
 
-  int rows_X_safe = sg_safe_.X_temp_.rows();
-  int rows_U_safe = sg_safe_.U_temp_.rows();
+  int rows_X_safe = (needToComputeSafePath == true) ? sg_safe_.X_temp_.rows() : 0;
+  int rows_U_safe = (needToComputeSafePath == true) ? sg_safe_.U_temp_.rows() : 0;
   int rows_X_whole = sg_whole_.X_temp_.rows();
   int rows_U_whole = sg_whole_.U_temp_.rows();
-  // printf("Going to resize\n");
-  U_temp_.conservativeResize(index + rows_X_safe + 1, colsU);  // Set the number of rows of U_temp_
-  X_temp_.conservativeResize(index + rows_U_safe + 1, colsX);  // Set the number of rows of X_temp_
+
+  // std::cout << "Going to resize, indexR= " << indexR << "rows_X_safe= " << rows_X_safe << "\n";
+  U_temp_.conservativeResize(indexR_ + rows_X_safe + 1, colsU);  // Set the number of rows of U_temp_
+  X_temp_.conservativeResize(indexR_ + rows_U_safe + 1, colsX);  // Set the number of rows of X_temp_
+
+  // std::cout << "Resized\n";
 
   /*  std::cout << "U_temp_ has (rows,cols)=" << U_temp_.rows() << ", " << U_temp_.cols() << std::endl;
     std::cout << "X_temp_ has (rows,cols)=" << X_temp_.rows() << ", " << X_temp_.cols() << std::endl;
@@ -1602,11 +1619,17 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   // copy the 1st part of the whole traj and the part of the safe path
   // std::cout << "Last row of X_temp_copied is" << X_temp_.row(index + 1).transpose() << std::endl;
-  U_temp_.block(0, 0, index + 1, colsU) = sg_whole_.U_temp_.block(0, 0, index + 1, colsU);
-  X_temp_.block(0, 0, index + 1, colsX) = sg_whole_.X_temp_.block(0, 0, index + 1, colsX);
+  // std::cout << "Going to copy to U_temp\n";
+  U_temp_.block(0, 0, indexR_ + 1, colsU) = sg_whole_.U_temp_.block(0, 0, indexR_ + 1, colsU);
+  X_temp_.block(0, 0, indexR_ + 1, colsX) = sg_whole_.X_temp_.block(0, 0, indexR_ + 1, colsX);
 
-  U_temp_.block(index + 1, 0, rows_U_safe, colsU) = sg_safe_.U_temp_;
-  X_temp_.block(index + 1, 0, rows_X_safe, colsX) = sg_safe_.X_temp_;
+  // std::cout << "Copied\n";
+
+  if (needToComputeSafePath == true)  // If the safe path has been computed
+  {
+    U_temp_.block(indexR_ + 1, 0, rows_U_safe, colsU) = sg_safe_.U_temp_;
+    X_temp_.block(indexR_ + 1, 0, rows_X_safe, colsX) = sg_safe_.X_temp_;
+  }
 
   // std::cout << "******************SOL CONJUNTA*********************\n";
   // std::cout << X_temp_ << std::endl;
@@ -1617,11 +1640,25 @@ void CVX::replanCB(const ros::TimerEvent& e)
   // printf("Copied block\n");
   mtx_X_U_temp.unlock();
 
+  log_.indexR_percentage = indexR_ / (1.0 * indexH);
+  log_.indexR = indexR_;
+  log_.indexH = indexH;
+
   if (par_.visual == true)
   {
+    // std::cout << "Visualizing\n";
     // clearJPSPathVisualization(JPS_WHOLE);
     // publishJPSPath(JPSk_inside_sphere, JPS_WHOLE);
-    pubTraj(sg_safe_.X_temp_, SAFE);
+    if (needToComputeSafePath == true)
+    {
+      pubTraj(sg_safe_.X_temp_, SAFE);
+    }
+    else
+    {  // publish only the last point of the whole trajectory as a "dummy" rescue path
+      // std::cout << "..without safe path\n";
+      Eigen::MatrixXd tmp = sg_whole_.X_temp_.block(rows_X_whole - 1, 1, 1, colsX - 1);
+      pubTraj(tmp, SAFE);
+    }
     pubTraj(sg_whole_.X_temp_, WHOLE);
   }
 
@@ -1659,17 +1696,16 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   mtx_offsets.lock();
 
-  deltaTp_old_ = deltaTp_;
+  // deltaTp_old_ = deltaTp_;
 
   int states_last_replan = ceil(replanCB_t.ElapsedMs() / (par_.dc * 1000));  // Number of states that
                                                                              // would have been needed for
                                                                              // the last replan
 
   std::cout << "states_last_replan:  " << std::fixed << states_last_replan << " states" << std::endl;
-  std::cout << "min_states_deltaTp:  " << std::fixed << par_.min_states_deltaTp << " states" << std::endl;
-  deltaTp_ = std::max(par_.factor_deltaTp * states_last_replan,
-                      (double)par_.min_states_deltaTp);  // deltaTp
-  std::cout << "Next deltaTp_:  " << std::fixed << deltaTp_ << " states" << std::endl;
+  // std::cout << "min_states_deltaTp:  " << std::fixed << par_.min_states_deltaTp << " states" << std::endl;
+  // deltaTp_ = std::max(par_.factor_deltaTp * states_last_replan, (double)par_.min_states_deltaTp);  // deltaTp
+  // std::cout << "Next deltaTp_:  " << std::fixed << deltaTp_ << " states" << std::endl;
   deltaT_ = std::max(par_.factor_deltaT * states_last_replan,
                      (double)par_.min_states_deltaT);  // Delta_t
 
@@ -1695,6 +1731,84 @@ void CVX::replanCB(const ros::TimerEvent& e)
     pub_log_.publish(log_);
   }
   return;
+}
+
+int CVX::findIndexR(int indexH)
+{
+  // std::cout << bold << "In findIndexR" << reset << std::endl;
+  // Ignore z to obtain this heuristics (if not it can become VERY conservative)
+  mtx_X_U_temp.lock();
+  Eigen::Vector2d posHk;
+  posHk << sg_whole_.X_temp_(indexH, 0), sg_whole_.X_temp_(indexH, 1);
+  int indexR = indexH;
+  for (int i = 0; i <= indexH; i = i + 1)  // Loop from A to H
+  {
+    Eigen::Vector2d vel;
+    vel << sg_whole_.X_temp_(i, 3), sg_whole_.X_temp_(i, 4);
+    // std::cout << "Vel=" << vel.transpose() << std::endl;
+
+    Eigen::Vector2d pos;
+    pos << sg_whole_.X_temp_(i, 0), sg_whole_.X_temp_(i, 1);
+    // std::cout << "Pos=" << pos.transpose() << std::endl;
+    // std::cout << "Vel2=" << vel.array().square().transpose() << std::endl;
+    // std::cout << "(posHk - pos).array().sign()=" << (posHk - pos).array().sign().transpose() << std::endl;
+
+    Eigen::Vector2d braking_distance = (posHk - pos).array().sign() * vel.array().square() / (2 * par_.a_max);
+
+    // std::cout << "braking_distance=" << braking_distance.transpose() << std::endl;
+    // std::cout << "(posHk - pos).cwiseAbs().array())=" << (posHk - pos).cwiseAbs().array().transpose() << std::endl;
+
+    bool thereWillBeCollision =
+        (braking_distance.array() > (posHk - pos).cwiseAbs().array()).any();  // Any of the braking distances (in x, y,
+                                                                              // z) is bigger than the distance to the
+                                                                              // obstacle in that direction
+    if (thereWillBeCollision)
+    {
+      std::cout << "posHk=" << posHk.transpose() << std::endl;
+      std::cout << "pos=" << pos.transpose() << std::endl;
+      std::cout << "vel=" << vel.transpose() << std::endl;
+      indexR = i;
+      break;
+    }
+  }
+  std::cout << red << bold << "indexR=" << indexR << " /" << sg_whole_.X_temp_.rows() - 1 << reset << std::endl;
+  mtx_X_U_temp.unlock();
+
+  return indexR;
+}
+
+int CVX::findIndexH(bool& needToComputeSafePath)
+{
+  int n = 1;  // find one neighbour
+  std::vector<int> pointIdxNKNSearch(n);
+  std::vector<float> pointNKNSquaredDistance(n);
+
+  needToComputeSafePath = false;
+
+  mtx_unk.lock();
+  mtx_X_U_temp.lock();
+  int indexH = sg_whole_.X_temp_.rows() - 1;
+
+  for (int i = 0; i < sg_whole_.X_temp_.rows(); i = i + 10)
+  {  // Sample points along the trajectory
+
+    pcl::PointXYZ searchPoint(sg_whole_.X_temp_(i, 0), sg_whole_.X_temp_(i, 1), sg_whole_.X_temp_(i, 2));
+
+    if (kdtree_unk_.nearestKSearch(searchPoint, n, pointIdxNKNSearch, pointNKNSquaredDistance) > 0)
+    {
+      if (sqrt(pointNKNSquaredDistance[0]) < par_.drone_radius)
+      {                                // TODO: 0.2 is the radius of the drone.
+        needToComputeSafePath = true;  // There is intersection, so there is need to compute rescue path
+        indexH = i;
+        break;
+      }
+    }
+  }
+  std::cout << red << bold << "indexH=" << indexH << " /" << sg_whole_.X_temp_.rows() - 1 << reset << std::endl;
+  mtx_unk.unlock();
+  mtx_X_U_temp.unlock();
+
+  return indexH;
 }
 
 bool CVX::ARisInFreeSpace(int index)
@@ -2128,14 +2242,7 @@ void CVX::pubCB(const ros::TimerEvent& e)
     mtx_k.lock();
     k_++;
 
-    mtx_offsets.lock();
-    if (k_ > deltaTp_ && status_ == TRAVELING)
-    {
-      // ROS_WARN("Switched to the SAFE PATH!!");
-    }
-    mtx_offsets.unlock();
-
-    mtx_k.unlock();
+    c mtx_k.unlock();
   }
   else
   {

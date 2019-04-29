@@ -84,7 +84,7 @@ struct polytope
   Eigen::MatrixXd b;
 };
 
-struct parameteres
+struct parameters
 {
   bool use_ff;
   bool visual;
@@ -255,6 +255,9 @@ private:
 
   bool ARisInFreeSpace(int index);
 
+  int findIndexR(int indexH);
+  int findIndexH(bool& needToComputeSafePath);
+
   visualization_msgs::Marker setpoint_;
   visualization_msgs::Marker R_;
   visualization_msgs::Marker I_;
@@ -315,7 +318,7 @@ private:
   ros::Timer pubCBTimer_;
   ros::Timer replanCBTimer_;
 
-  parameteres par_;    // where all the parameteres are
+  parameters par_;     // where all the parameters are
   acl_msgs::Cvx log_;  // to log all the data
   tf2_ros::Buffer tf_buffer_;
   tf2_ros::TransformListener* tfListener;
@@ -335,9 +338,10 @@ private:
   std::vector<LinearConstraint3D> l_constraints_whole_;  // Polytope (Linear) constraints
   std::vector<LinearConstraint3D> l_constraints_safe_;   // Polytope (Linear) constraints
 
-  int deltaTp_old_ = 1000;
-  int deltaTp_ = 10;
+  // int deltaTp_old_ = 1000;
+  // int deltaTp_ = 10;
   int deltaT_ = 10;
+  int indexR_ = 0;
 
   int markerID_ = 0;
   int markerID_last_ = 0;

@@ -11,16 +11,16 @@ drone_radius: 0.2  #(m) Used for collision checking
 N_whole: 6  #[-] Number of discretization points in the whole trajectory
 N_safe: 6  #[-] Number of discretization points in the safe path
 
-factor_deltaT: 1.15 #2.5
-factor_deltaTp: 2
+factor_deltaT: 2 #2.5  Smaller --> More replanning frequency, but higher probability of not solving the whole trajectory on time
+#factor_deltaTp: 2
 
-min_states_deltaTp: 0 #20
+#min_states_deltaTp: 0 #20
 min_states_deltaT: 0  #15
 
 Ra: 0.5            # [m] Minimum radius of the first sphere
 Ra_max: 6            # [m] Maximum radius of the first sphere
 Rb: 9.0             # [m] Radius of the second sphere
-w_max: 0.4            # [rd/s] Maximum angular velocity. 0.4 for Hardware
+w_max: 2            # [rd/s] Maximum angular velocity. 0.4 for Hardware
 alpha_filter_dyaw: 0.92  #[] Filter parameter for dyaw, \in [0,1]. Higher--> More aggressive filtering
 
 alpha_0_deg: 15         #[deg] threshold to ignore current JPS solution, and consider the old one. 0--> always decide
