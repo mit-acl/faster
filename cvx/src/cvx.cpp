@@ -2242,7 +2242,7 @@ void CVX::pubCB(const ros::TimerEvent& e)
     mtx_k.lock();
     k_++;
 
-    c mtx_k.unlock();
+    mtx_k.unlock();
   }
   else
   {
