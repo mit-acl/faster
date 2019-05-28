@@ -1,6 +1,7 @@
 <launch>
 
 	<arg name="quad"/>
+	<arg name="goal_topic" default="goal"/> <!--goal for simulation (or HW with NUC and SD connected via wifi), goal_nuc for HW with NUC and SD connected via ethernet -->
 
 	<node ns="$(arg quad)" name="cvx" pkg="cvx" type="cvx_node" output="screen" clear_params="true">
 
@@ -28,7 +29,7 @@
 		<!-- Publications -->
 		<remap from="~traj" to="traj"/>
 		<remap from="~trajs_sphere" to="trajs_sphere"/>
-		<remap from="~goal" to="goal" />
+		<remap from="~goal" to="$(arg goal_topic)" />
 		<remap from="~setpoint" to="setpoint" />
         <remap from="~log_topic" to="log_topic" />
 		

@@ -6,7 +6,7 @@ use_vel: false # use velocity. If false, r2=r1;
 
 dc: 0.01            #(seconds) Duration for the interpolation=Value of the timer pubGoal
 goal_radius: 0.35    #(m) Drone has arrived to the goal when distance_to_goal<GOAL_RADIUS
-drone_radius: 0.2  #(m) Used for collision checking
+drone_radius: 0.35  #(m) Used for collision checking
 
 N_whole: 6  #[-] Number of discretization points in the whole trajectory
 N_safe: 6  #[-] Number of discretization points in the safe path
@@ -18,21 +18,21 @@ factor_deltaT: 2 #2.5  Smaller --> More replanning frequency, but higher probabi
 min_states_deltaT: 0  #15
 
 Ra: 0.5            # [m] Minimum radius of the first sphere
-Ra_max: 6            # [m] Maximum radius of the first sphere
+Ra_max: 5.9            # [m] Maximum radius of the first sphere
 Rb: 9.0             # [m] Radius of the second sphere
-w_max: 2            # [rd/s] Maximum angular velocity. 0.4 for Hardware
+w_max: 0.4            # [rd/s] Maximum angular velocity. 0.4 for Hardware
 alpha_filter_dyaw: 0.92  #[] Filter parameter for dyaw, \in [0,1]. Higher--> More aggressive filtering
 
 alpha_0_deg: 15         #[deg] threshold to ignore current JPS solution, and consider the old one. 0--> always decide
-z_ground: 0.35         #[m] points below this are considered ground
-z_max: 2         #[m] JPS is not allowed to give a solution that goes higher than this height
-inflation_jps: 0.55  #[m] The obstacles are inflated (to run JPS) by this amount
+z_ground: 0.7         #[m] points below this are considered ground
+z_max: 2.6         #[m] JPS is not allowed to give a solution that goes higher than this height
+inflation_jps: 0.31  #[m] The obstacles are inflated (to run JPS) by this amount
 factor_jps: 1  #[m] JPS is run with resolution=factor_jps*(resolution of the map)
 
 
-v_max: 3   #[m/s]  3
-a_max: 6   #[m/s2] 6
-j_max: 35  #[m/s3] 35
+v_max: 15   #[m/s]  3
+a_max: 35   #[m/s2] 6
+j_max: 40  #[m/s3] 35
 
 z_land: 0.02 #[m] z goal for landing
 
@@ -46,7 +46,7 @@ gamma_safe: 4         #[-]
 gammap_safe: 10    #[-]
 increment_safe: 1   #[-]
 
-max_poly_whole: 2 #Should be less than N_whole 
+max_poly_whole: 3 #Should be less than N_whole 
 max_poly_safe: 3 #Should be less than N_safe
 dist_max_vertexes: 2 #4 #[m] Maximum distance between two vertexes in the JPS before doing the cvx decomp (more vertexes are added to force this)
 gurobi_threads: 1 #[threads] Number of threads that Gurobi will use. If computer is maxed out, threads=1 works faster!

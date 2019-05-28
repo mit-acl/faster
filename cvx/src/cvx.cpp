@@ -6,7 +6,7 @@
 // right now the unkown space that cvx receives is only a sphere around the drone, not the whole real unknown
 // space
 // Set dt as a constant in the optimization problem (so that many constraints no se tengan que poner de nuevo) (what in
-// Cvxgen is called parameter)
+// Cvxgen is called parameter  )
 
 // When taking off, something weird happen (started to happen when I added the penalization to JPS in the obj function)
 // Ahroa mismo las pointclouds no las estoy teniendo en cuenta
@@ -2763,7 +2763,18 @@ void CVX::mapCB(const sensor_msgs::PointCloud2::ConstPtr& pcl2ptr_map_ros,
 
   updateJPSMap(pclptr_map_);  // UPDATE EVEN WHEN THERE ARE NO POINTS
 
-  if (pcl2ptr_map_ros->width != 0 && pcl2ptr_map_ros->height != 0)  // Point Cloud is empty
+ if (pcl2ptr_map_ros->width == 0 || pcl2ptr_map_ros->height == 0){ //Add dummy point (TODO, remove this);
+pclptr_map_->width=1;
+pclptr_map_->height=1;
+pclptr_map_->is_dense=false;
+pclptr_map_->points.resize(1*1);
+pclptr_map_->points[0].x=-10000;
+pclptr_map_->points[0].y=0;
+pclptr_map_->points[0].z=0;
+
+}
+
+  if (pclptr_map_->width != 0 && pclptr_map_->height != 0)  // Point Cloud is empty
   {
     // std::cout << "Updating kdtree_map_, size=" << pclptr_map_->size() << std::endl;
     kdtree_map_.setInputCloud(pclptr_map_);
