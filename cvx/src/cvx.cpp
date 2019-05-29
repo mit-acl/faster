@@ -46,6 +46,7 @@
 
 #include "cvx.hpp"
 #include "geometry_msgs/PointStamped.h"
+#include "geometry_msgs/Twist.h"
 #include "nav_msgs/Path.h"
 #include "visualization_msgs/MarkerArray.h"
 #include <pcl_conversions/pcl_conversions.h>
@@ -197,6 +198,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   optimized_ = false;
   flight_mode_.mode = flight_mode_.NOT_FLYING;
 
+  pub_goal_jackal_ = nh_.advertise<geometry_msgs::Twist>("/cmd_vel", 1);
   pub_goal_ = nh_.advertise<acl_msgs::QuadGoal>("goal", 1);
   pub_point_G_ = nh_.advertise<geometry_msgs::PointStamped>("point_G", 1);
   pub_traj_whole_ = nh_.advertise<nav_msgs::Path>("traj_whole", 1);
@@ -1119,8 +1121,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
     k_initial_cond_1_ = std::min(k_ + deltaT_, (int)(X_.rows() - 1));
 
     log_.entered_safe_path = 0;
-    if (k_initial_cond_1_ >= indexR_ &&
-        status_ == TRAVELING)  // Here index_R_ has the value of the previous replanning step
+    if (k_initial_cond_1_ >= indexR_ && status_ == TRAVELING)  // Here index_R_ has the value of the previous replanning
+                                                               // step
     {
       ROS_WARN("Switched to the SAFE PATH!!");
       log_.entered_safe_path = 1;
@@ -2258,6 +2260,32 @@ void CVX::pubCB(const ros::TimerEvent& e)
   // std::cout << green << bold << std::setprecision(6) << "quadGoal_.dyaw sent=" << quadGoal_.dyaw << reset <<
   // std::endl;
 
+  ////////////////////////////////
+  // NOW generate all the things needed for the jackal
+
+  geometry_msgs::Twist cmd_jackal;
+  cmd_jackal.linear = quadGoal_.vel;
+  double xd = quadGoal_.vel.x;
+  double yd = quadGoal_.vel.y;
+
+  double xd2 = quadGoal_.accel.x;
+  double yd2 = quadGoal_.accel.y;
+
+  double xd3 = quadGoal_.jerk.x;
+  double yd3 = quadGoal_.jerk.y;
+
+  double l = 1;
+  double numerator = (xd * yd3 + xd3 * yd) * (xd * xd + yd * yd) - 3 * (xd * yd2 - yd2 * xd) * (xd * xd2 + yd * yd2);
+  double denominator = pow((xd * xd + yd * yd), 3) + l * l * pow(xd * yd2 - xd2 * yd, 2);
+  double u2 = l * sqrt(xd * xd + yd * yd) * numerator / denominator;
+
+  cmd_jackal.angular.x = 0;
+  cmd_jackal.angular.y = 0;
+  cmd_jackal.angular.z = u2;
+
+  pub_goal_jackal_.publish(cmd_jackal);
+  ///////////////////////////////////////////////
+
   pub_goal_.publish(quadGoal_);
 
   // Pub setpoint maker.  setpoint_ is the last quadGoal sent to the drone
@@ -2526,9 +2554,8 @@ void CVX::cvxEllipsoidDecompUnkOcc2(vec_Vecf<3>& path)
   {
     ellip_decomp_util_uo2_.set_obs(vec_uo_);
   }
-  ellip_decomp_util_uo2_.set_local_bbox(
-      Vec3f(2, 2, 1));  // Only try to find cvx decomp in the Mikowsski sum of JPS and this box (I think)
-                        // par_.drone_radius
+  ellip_decomp_util_uo2_.set_local_bbox(Vec3f(2, 2, 1));  // Only try to find cvx decomp in the Mikowsski sum of JPS and
+                                                          // this box (I think) par_.drone_radius
   ellip_decomp_util_uo2_.set_inflate_distance(par_.drone_radius);  // The obstacles are inflated by this distance
   ellip_decomp_util_uo2_.dilate(path);                             // Find convex polyhedra
   // decomp_util.shrink_polyhedrons(par_.drone_radius);  // Shrink polyhedra by the drone radius. NOT RECOMMENDED (leads
@@ -2590,9 +2617,8 @@ void CVX::cvxEllipsoidDecompOcc(vec_Vecf<3>& path)
     // Using ellipsoid decomposition
     ellip_decomp_util_.set_obs(vec_o_);  // Original was vec_o_
   }
-  ellip_decomp_util_.set_local_bbox(
-      Vec3f(2, 2, 1));  // Only try to find cvx decomp in the Mikowsski sum of JPS and this box (I think)
-                        // par_.drone_radius
+  ellip_decomp_util_.set_local_bbox(Vec3f(2, 2, 1));  // Only try to find cvx decomp in the Mikowsski sum of JPS and
+                                                      // this box (I think) par_.drone_radius
   ellip_decomp_util_.set_inflate_distance(par_.drone_radius);  // The obstacles are inflated by this distance
   ellip_decomp_util_.dilate(path);                             // Find convex polyhedra
   // decomp_util.shrink_polyhedrons(par_.drone_radius);  // Shrink polyhedra by the drone radius. NOT RECOMMENDED (leads
@@ -2763,16 +2789,16 @@ void CVX::mapCB(const sensor_msgs::PointCloud2::ConstPtr& pcl2ptr_map_ros,
 
   updateJPSMap(pclptr_map_);  // UPDATE EVEN WHEN THERE ARE NO POINTS
 
- if (pcl2ptr_map_ros->width == 0 || pcl2ptr_map_ros->height == 0){ //Add dummy point (TODO, remove this);
-pclptr_map_->width=1;
-pclptr_map_->height=1;
-pclptr_map_->is_dense=false;
-pclptr_map_->points.resize(1*1);
-pclptr_map_->points[0].x=-10000;
-pclptr_map_->points[0].y=0;
-pclptr_map_->points[0].z=0;
-
-}
+  if (pcl2ptr_map_ros->width == 0 || pcl2ptr_map_ros->height == 0)
+  {  // Add dummy point (TODO, remove this);
+    pclptr_map_->width = 1;
+    pclptr_map_->height = 1;
+    pclptr_map_->is_dense = false;
+    pclptr_map_->points.resize(1 * 1);
+    pclptr_map_->points[0].x = -10000;
+    pclptr_map_->points[0].y = 0;
+    pclptr_map_->points[0].z = 0;
+  }
 
   if (pclptr_map_->width != 0 && pclptr_map_->height != 0)  // Point Cloud is empty
   {

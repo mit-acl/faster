@@ -274,6 +274,7 @@ private:
   ros::NodeHandle nh_replan_CB_;
   ros::NodeHandle nh_pub_CB_;
 
+  ros::Publisher pub_goal_jackal_;
   ros::Publisher pub_point_G_;
   ros::Publisher pub_goal_;
   ros::Publisher pub_traj_whole_;
