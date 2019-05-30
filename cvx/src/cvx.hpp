@@ -149,6 +149,12 @@ struct parameters
 
   int gurobi_threads;
   int gurobi_verbose;
+
+  double kw;
+  double kyaw;
+  double kv;
+  double kdist;
+  double kalpha;
 };
 
 //####Class CVX
@@ -449,4 +455,6 @@ private:
   bool state_initialized_ = false;
 
   double current_yaw_ = 0;
+
+  double desired_yaw_old_ = 0;
 };

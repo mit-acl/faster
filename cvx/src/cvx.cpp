@@ -122,6 +122,12 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   ros::param::param<double>("~gammap_safe", par_.gammap_safe, 4.0);
   ros::param::param<double>("~increment_safe", par_.increment_safe, 1.0);
 
+  ros::param::param<double>("~kw", par_.kw, 2.0);
+  ros::param::param<double>("~kyaw", par_.kyaw, 2.0);
+  ros::param::param<double>("~kv", par_.kv, 2.0);
+  ros::param::param<double>("~kdist", par_.kdist, 2.0);
+  ros::param::param<double>("~kalpha", par_.kalpha, 2.0);
+
   /*  ros::param::param<double>("~factor_initial_whole", par_.factor_initial_whole, 2.0);
     ros::param::param<double>("~factor_final_whole", par_.factor_final_whole, 2.0);
     ros::param::param<double>("~factor_increment_whole", par_.factor_increment_whole, 1.0);
@@ -1087,13 +1093,13 @@ void CVX::replanCB(const ros::TimerEvent& e)
   // printf("In replanCB0.4s\n");
   if (status_ == GOAL_SEEN || status_ == GOAL_REACHED || planner_status_ == REPLANNED || status_ == YAWING)
   {
-    printf("No replanning needed because planner_status_=%d and/or status_=%d \n", planner_status_, status_);
-    printf("or because status_=%d\n", status_);
+    /*    printf("No replanning needed because planner_status_=%d and/or status_=%d \n", planner_status_, status_);
+        printf("or because status_=%d\n", status_);*/
     return;
   }
 
   std::cout << bold << on_red << "************IN REPLAN CB*********" << reset << std::endl;
-  print_status();
+  // print_status();
 
   // std::cout << "replanCB3\n" << std::endl;
 
@@ -1465,14 +1471,14 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
   if (needToComputeSafePath == false and takeoff_done_ == true)
   {
-    std::cout << red << bold << "No Rescue path" << reset << std::endl;
+    // std::cout << red << bold << "No Rescue path" << reset << std::endl;
     indexR_ = indexH;
     // No need of a rescue path
   }
   else
   {
     indexR_ = findIndexR(indexH);
-    std::cout << red << bold << "Below1" << reset << std::endl;
+    // std::cout << red << bold << "Below1" << reset << std::endl;
     // Continue to compute the rescue path
 
     ///////////
@@ -2110,9 +2116,9 @@ void CVX::print_status()
 
 void CVX::pubCB(const ros::TimerEvent& e)
 {
-  print_status();
+  // print_status();
   mtx_goals.lock();
-  printf("In PUBCB: GOing to publish\n");
+  // printf("In PUBCB: GOing to publish\n");
 
   if (flight_mode_.mode == flight_mode_.LAND)
   {
@@ -2308,52 +2314,67 @@ void CVX::pubCB(const ros::TimerEvent& e)
 
   geometry_msgs::Twist cmd_jackal;
 
-  double x_error = state_.pos.x - quadGoal_.pos.x;
-  double y_error = state_.pos.y - quadGoal_.pos.y;
+  /*  double x_error = sqrt(pow(xd, 2) + pow(yd, 2));
+    double y_error = state_.pos.y - quadGoal_.pos.y;
 
-  double vx_input = quadGoal_.vel.x - 2 * x_error;
-  double vy_input = quadGoal_.vel.y - 2 * y_error;
+    double vx_input = quadGoal_.vel.x - 2 * x_error;
+    double vy_input = quadGoal_.vel.y - 2 * y_error;*/
 
-  cmd_jackal.linear.x = sqrt(pow(vx_input, 2) + pow(vy_input, 2));
-  cmd_jackal.linear.y = 0;
-  cmd_jackal.linear.z = 0;
-
+  double x = quadGoal_.pos.x;
+  double y = quadGoal_.pos.y;
   double xd = quadGoal_.vel.x;
   double yd = quadGoal_.vel.y;
-
   double xd2 = quadGoal_.accel.x;
   double yd2 = quadGoal_.accel.y;
+
+  double v_desired = sqrt(pow(xd, 2) + pow(yd, 2));
+  double alpha = current_yaw_ - atan2(y - state_.pos.y, x - state_.pos.x);
+  angle_wrap(alpha);                                                    // wrap between -pi and pi
+  int forward = (alpha <= 3.14 / 2.0 && alpha > -3.14 / 2.0) ? 1 : -1;  // 1 if forward, -1 if backwards
+  double dist_error = forward * sqrt(pow(x - state_.pos.x, 2) + pow(y - state_.pos.y, 2));
+  alpha = (fabs(dist_error) < 0.03) ? 0 : alpha;
+
+  /*  std::cout << bold << "v_desired= " << v_desired << ", dist_error= " << dist_error << ", forward= " << forward
+              << "alpha= " << alpha << reset << std::endl;*/
 
   // See http://mathworld.wolfram.com/Curvature.html (diff(phi)/diff(t))
   double numerator = xd * yd2 - yd * xd2;
   double denominator = xd * xd + yd * yd;
-
   double w_desired = (denominator > 0.01) ? numerator / denominator : 0;
-  double desired_yaw = atan2(vy_input, vx_input);
-
+  double desired_yaw = (fabs(xd) < 0.001 || fabs(dist_error) < 0.03) ? desired_yaw_old_ : atan2(yd, xd);
+  std::cout << "desired_yaw=" << desired_yaw << std::endl;
+  std::cout << "current_yaw_=" << desired_yaw << std::endl;
+  desired_yaw_old_ = desired_yaw;
   double yaw_error = current_yaw_ - desired_yaw;
+  angle_wrap(yaw_error);  // wrap between -pi and pi
+  /*  std::cout << bold << "current_yaw_= " << current_yaw_ << ", desired_yaw= " << desired_yaw << reset << std::endl;
+    std::cout << bold << "w_desired= " << w_desired << ", yaw_error= " << yaw_error << reset << std::endl;*/
 
-  double u2 = w_desired - 3 * yaw_error;
+  cmd_jackal.linear.x = par_.kv * v_desired + par_.kdist * dist_error;
+  cmd_jackal.angular.z = par_.kw * w_desired - par_.kyaw * yaw_error - par_.kalpha * alpha;
 
-  cmd_jackal.angular.x = 0;
-  cmd_jackal.angular.y = 0;
-  cmd_jackal.angular.z = u2;
-  std::cout << "Publishing Jackal Goal" << std::endl;
+  std::cout << bold << "Linear.x= " << cmd_jackal.linear.x << blue << "-->v_desired=" << v_desired
+            << ", dist_error= " << dist_error << reset << std::endl;
+
+  std::cout << bold << "Angular.z= " << cmd_jackal.angular.z << blue << "-->w_desired=" << w_desired
+            << ", yaw_error= " << yaw_error << ", alpha= " << alpha << reset << std::endl;
+
+  // std::cout << "Publishing Jackal Goal" << std::endl;
   pub_goal_jackal_.publish(cmd_jackal);
   ///////////////////////////////////////////////
 
-  std::cout << "Publishing QUAD Goal" << std::endl;
+  // std::cout << "Publishing QUAD Goal" << std::endl;
   pub_goal_.publish(quadGoal_);
-  std::cout << "QUAD Goal published" << std::endl;
+  // std::cout << "QUAD Goal published" << std::endl;
 
   // Pub setpoint maker.  setpoint_ is the last quadGoal sent to the drone
   setpoint_.header.stamp = ros::Time::now();
   setpoint_.pose.position.x = quadGoal_.pos.x;
   setpoint_.pose.position.y = quadGoal_.pos.y;
   setpoint_.pose.position.z = quadGoal_.pos.z;
-  printf("Publicando Goal=%f, %f, %f\n", quadGoal_.pos.x, quadGoal_.pos.y, quadGoal_.pos.z);
+  // printf("Publicando Goal=%f, %f, %f\n", quadGoal_.pos.x, quadGoal_.pos.y, quadGoal_.pos.z);
   pub_setpoint_.publish(setpoint_);
-  printf("End pubCB\n");
+  // printf("End pubCB\n");
   // printf("#########Time in pubCB %0.2f ms\n", 1000 * (ros::Time::now().toSec() - t0pubCB));
   mtx_goals.unlock();
 }
@@ -2438,6 +2459,13 @@ void CVX::odomCB(const nav_msgs::Odometry& msg)
   state_initialized_ = true;
   /*  printf("(State): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", msg.pos.x, msg.pos.y, msg.pos.z, msg.vel.x,
      msg.vel.y, msg.vel.z);*/
+
+  double roll, pitch, yaw;
+  quaternion2Euler(msg.pose.pose.orientation, roll, pitch, yaw);
+  /*  std::cout << bold << red << "IN ODOM CB:" << msg.pose.pose.orientation << reset << std::endl;
+    std::cout << bold << red << "Yaw=" << yaw * 180 / 3.14 << reset << std::endl;*/
+  current_yaw_ = yaw;
+
   mtx_state.unlock();
   // Stop updating when we get GO
   if (flight_mode_.mode == flight_mode_.NOT_FLYING || flight_mode_.mode == flight_mode_.KILL)

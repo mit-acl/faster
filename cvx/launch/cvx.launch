@@ -18,7 +18,7 @@
 
         <!-- Subscriptions -->
 		<remap from="~state" to="state"/>
-		<remap from="~odom" to="jackal_velocity_controller/odom"/>
+		<remap from="~odom" to="odometry/local_filtered"/>
 		<remap from="~flightmode" to="flightmode" />
 		<remap from="~term_goal" to="term_goal" />
 		<remap from="~occup_grid" to="global_mapper_ros/occupancy_grid"/> <!--PointCloud of the map-->
