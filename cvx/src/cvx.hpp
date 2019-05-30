@@ -16,6 +16,8 @@
 #include <acl_msgs/QuadGoal.h>
 #include <acl_msgs/QuadFlightMode.h>
 #include <acl_msgs/TermGoal.h>
+#include <nav_msgs/Odometry.h>
+
 #include <mutex>
 
 // TimeSynchronizer includes
@@ -168,6 +170,7 @@ private:
   void pubTraj(Eigen::MatrixXd& X, int type);
   void goalCB(const acl_msgs::TermGoal& msg);
   void stateCB(const acl_msgs::State& msg);
+  void odomCB(const nav_msgs::Odometry& odom_ptr);
   void modeCB(const acl_msgs::QuadFlightMode& msg);
   void pubCB(const ros::TimerEvent& e);
   void replanCB(const ros::TimerEvent& e);
@@ -307,6 +310,7 @@ private:
   // ros::Publisher cvx_decomp_poly_uo_pub_;
   ros::Subscriber sub_goal_;
   ros::Subscriber sub_state_;
+  ros::Subscriber sub_odom_;
   ros::Subscriber sub_mode_;
   ros::Subscriber sub_vicon_;
 
@@ -443,4 +447,6 @@ private:
   bool takeoff_done_ = false;
 
   bool state_initialized_ = false;
+
+  double current_yaw_ = 0;
 };

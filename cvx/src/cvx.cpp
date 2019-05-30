@@ -171,12 +171,12 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
     abort();
   }
 
-  if (par_.Ra_max > (par_.wdx / 2.0) || (par_.Ra_max > par_.wdy / 2.0))
-  {
-    std::cout << bold << red << "Needed: par_.Ra_max > par_.wdx/2.0|| par_.Ra_max > par_.wdy/2.0" << reset
-              << std::endl;  // To decrease the probability of not finding a solution
-    abort();
-  }
+  /*  if (par_.Ra_max > (par_.wdx / 2.0) || (par_.Ra_max > par_.wdy / 2.0))
+    {
+      std::cout << bold << red << "Needed: par_.Ra_max > par_.wdx/2.0|| par_.Ra_max > par_.wdy/2.0" << reset
+                << std::endl;  // To decrease the probability of not finding a solution
+      abort();f
+    }*/
 
   /*  if (par_.drone_radius <= 2 * par_.res)
     {
@@ -196,9 +196,10 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   std::cout << "Checks of parameters satisfied\n";
 
   optimized_ = false;
-  flight_mode_.mode = flight_mode_.NOT_FLYING;
+  // flight_mode_.mode = flight_mode_.NOT_FLYING;
+  flight_mode_.mode = flight_mode_.GO;  // TODO (changed for the jackal)
 
-  pub_goal_jackal_ = nh_.advertise<geometry_msgs::Twist>("/cmd_vel", 1);
+  pub_goal_jackal_ = nh_.advertise<geometry_msgs::Twist>("goal_jackal", 1);
   pub_goal_ = nh_.advertise<acl_msgs::QuadGoal>("goal", 1);
   pub_point_G_ = nh_.advertise<geometry_msgs::PointStamped>("point_G", 1);
   pub_traj_whole_ = nh_.advertise<nav_msgs::Path>("traj_whole", 1);
@@ -229,7 +230,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
 
   // pub_samples_safe_path_ = nh_.advertise<visualization_msgs::MarkerArray>("samples_safe_path", 1);
 
-  // pub_trajs_sphere_ = nh_.advertise<visualization_msgs::MarkerArray>("trajs_sphere", 1);
+  pub_trajs_sphere_ = nh_.advertise<visualization_msgs::MarkerArray>("trajs_sphere", 1);
   // pub_forces_ = nh_.advertise<visualization_msgs::MarkerArray>("forces", 1);
 
   // pub_point_I_ = nh_.advertise<visualization_msgs::Marker>("IntersectionJPS_", 1);
@@ -248,6 +249,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   sub_goal_ = nh_.subscribe("term_goal", 1, &CVX::goalCB, this);
   sub_mode_ = nh_.subscribe("flightmode", 1, &CVX::modeCB, this);
   sub_state_ = nh_.subscribe("state", 1, &CVX::stateCB, this);
+  sub_odom_ = nh_.subscribe("odom", 1, &CVX::odomCB, this);
 
   // sub_vicon_ = nh_.subscribe("vicon", 1, &CVX::viconCB, this);
 
@@ -767,7 +769,9 @@ void CVX::goalCB(const acl_msgs::TermGoal& msg)
   mtx_state.lock();
   Eigen::Vector3d temp(state_.pos.x, state_.pos.y, state_.pos.z);
   G_ = projectClickedGoal(temp);
+  std::cout << "GOING TO PUBLISH TERMINAL GOAL\n";
   pubTerminalGoal();
+  std::cout << "TERMINAL GOAL PUBLISHED\n";
   mtx_state.unlock();
   mtx_G.unlock();
   // std::cout << "G_=\n" << G_ << std::endl;
@@ -785,10 +789,10 @@ void CVX::goalCB(const acl_msgs::TermGoal& msg)
   planner_status_ = START_REPLANNING;
   mtx_planner_status_.unlock();
   force_reset_to_0_ = true;
-  printf("GCB: planner_status_ = START_REPLANNING\n");
+  std::cout << "GCB: planner_status_ = START_REPLANNING\n";
   goal_click_initialized_ = true;
   clearMarkerActualTraj();
-  // printf("Exiting from goalCB\n");
+  std::cout << "Exiting from goalCB\n";
 }
 
 void CVX::yaw(double diff, acl_msgs::QuadGoal& quad_goal)
@@ -1029,14 +1033,19 @@ void CVX::replanCB(const ros::TimerEvent& e)
   // printf("replanCB: Before mtx_G!!!\n");
   mtx_G.lock();
   G_ = projectClickedGoal(state_pos);
+  // printf("Publishing terminal Goal!!!\n");
   pubTerminalGoal();
+  // printf("Published terminal Goal!!!\n");
   // std::cout << "Projected Goal" << G_.transpose() << std::endl;
   mtx_G.unlock();
   // printf("In replanCB0.1\n");
   if (par_.visual == true)
   {
+    // printf("Clearning Marker arrows\n");
     clearMarkerSetOfArrows();
+    // printf("Publishing Intersection Point!!!\n");
     pubintersecPoint(Eigen::Vector3d::Zero(), false);  // Clear the intersection points markers
+    // printf("Published Intersection Point!!!\n");
   }
 
   /*  mtx_G_term.lock();
@@ -1078,8 +1087,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
   // printf("In replanCB0.4s\n");
   if (status_ == GOAL_SEEN || status_ == GOAL_REACHED || planner_status_ == REPLANNED || status_ == YAWING)
   {
-    // printf("No replanning needed because planner_status_=%d and/or status_=%d \n", planner_status_, status_);
-    // printf("or because status_=%d\n", status_);
+    printf("No replanning needed because planner_status_=%d and/or status_=%d \n", planner_status_, status_);
+    printf("or because status_=%d\n", status_);
     return;
   }
 
@@ -1463,6 +1472,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   else
   {
     indexR_ = findIndexR(indexH);
+    std::cout << red << bold << "Below1" << reset << std::endl;
     // Continue to compute the rescue path
 
     ///////////
@@ -1479,10 +1489,12 @@ void CVX::replanCB(const ros::TimerEvent& e)
     // int index = deltaTp_;
     mtx_offsets.unlock();
 
+    std::cout << red << bold << "Below2" << reset << std::endl;
     Eigen::Vector3d posR(sg_whole_.X_temp_(indexR_, 0), sg_whole_.X_temp_(indexR_, 1), sg_whole_.X_temp_(indexR_, 2));
     Eigen::Vector3d velR(sg_whole_.X_temp_(indexR_, 3), sg_whole_.X_temp_(indexR_, 4), sg_whole_.X_temp_(indexR_, 5));
     Eigen::Vector3d accelR(sg_whole_.X_temp_(indexR_, 6), sg_whole_.X_temp_(indexR_, 7), sg_whole_.X_temp_(indexR_, 8));
 
+    std::cout << red << bold << "Below3" << reset << std::endl;
     // std::cout << "posR=" << posR.transpose() << std::endl;
     mtx_X_U_temp.unlock();
 
@@ -1495,7 +1507,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
         std::cout << bold << blue << "Check collision with AR:  " << std::fixed << check_collision_AR_t << "ms" << reset
                   << std::endl;*/
-
+    std::cout << red << bold << "Below4" << reset << std::endl;
     JPSk_inside_sphere_tmp[0] = posR;
 
     vec_Vecf<3> JPS_safe = JPSk_inside_sphere_tmp;
@@ -1592,6 +1604,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
   ///////////////       MERGE RESULTS    ////////////////////
   ///////////////////////////////////////////////////////////
 
+  std::cout << red << bold << "Merging Results" << reset << std::endl;
+
   MyTimer otherStuff2_t(true);
 
   // X_temp_ will be 1st part of whole + safe path
@@ -1602,14 +1616,20 @@ void CVX::replanCB(const ros::TimerEvent& e)
   int colsU = sg_whole_.U_temp_.cols();
   int colsX = sg_whole_.X_temp_.cols();
 
+  // std::cout << red << bold << "Above1, indexR_=" << indexR_ << reset << std::endl;
+
   int rows_X_safe = (needToComputeSafePath == true) ? sg_safe_.X_temp_.rows() : 0;
   int rows_U_safe = (needToComputeSafePath == true) ? sg_safe_.U_temp_.rows() : 0;
   int rows_X_whole = sg_whole_.X_temp_.rows();
   int rows_U_whole = sg_whole_.U_temp_.rows();
 
+  // std::cout << red << bold << "Above2, " << rows_X_safe << " " << rows_U_safe << " " << rows_X_whole << " "
+  //          << rows_U_whole << reset << std::endl;
   // std::cout << "Going to resize, indexR= " << indexR << "rows_X_safe= " << rows_X_safe << "\n";
   U_temp_.conservativeResize(indexR_ + rows_X_safe + 1, colsU);  // Set the number of rows of U_temp_
   X_temp_.conservativeResize(indexR_ + rows_U_safe + 1, colsX);  // Set the number of rows of X_temp_
+
+  // std::cout << red << bold << "Above3" << reset << std::endl;
 
   // std::cout << "Resized\n";
 
@@ -1625,6 +1645,8 @@ void CVX::replanCB(const ros::TimerEvent& e)
   U_temp_.block(0, 0, indexR_ + 1, colsU) = sg_whole_.U_temp_.block(0, 0, indexR_ + 1, colsU);
   X_temp_.block(0, 0, indexR_ + 1, colsX) = sg_whole_.X_temp_.block(0, 0, indexR_ + 1, colsX);
 
+  // std::cout << red << bold << "Above4" << reset << std::endl;
+
   // std::cout << "Copied\n";
 
   if (needToComputeSafePath == true)  // If the safe path has been computed
@@ -1632,6 +1654,10 @@ void CVX::replanCB(const ros::TimerEvent& e)
     U_temp_.block(indexR_ + 1, 0, rows_U_safe, colsU) = sg_safe_.U_temp_;
     X_temp_.block(indexR_ + 1, 0, rows_X_safe, colsX) = sg_safe_.X_temp_;
   }
+
+  // computeAngularVelocities();  // For the Jackal, saved in W_temp_;
+
+  // std::cout << red << bold << "Above5" << reset << std::endl;
 
   // std::cout << "******************SOL CONJUNTA*********************\n";
   // std::cout << X_temp_ << std::endl;
@@ -1657,8 +1683,10 @@ void CVX::replanCB(const ros::TimerEvent& e)
     }
     else
     {  // publish only the last point of the whole trajectory as a "dummy" rescue path
-      // std::cout << "..without safe path\n";
+       // std::cout << "..without safe path\n";
+      // std::cout << red << bold << "Above6" << reset << std::endl;
       Eigen::MatrixXd tmp = sg_whole_.X_temp_.block(rows_X_whole - 1, 1, 1, colsX - 1);
+      // std::cout << red << bold << "Above7" << reset << std::endl;
       pubTraj(tmp, SAFE);
     }
     pubTraj(sg_whole_.X_temp_, WHOLE);
@@ -1667,6 +1695,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   ///////////////////////////////////////////////////////////
   ///////////////       OTHER STUFF    //////////////////////
   ///////////////////////////////////////////////////////////
+  // std::cout << red << bold << "Above8" << reset << std::endl;
   JPS_old_ = JPSk;
   mtx_k.lock();
   k_initial_cond_ = k_initial_cond_1_;
@@ -1678,9 +1707,11 @@ void CVX::replanCB(const ros::TimerEvent& e)
   planner_status_ = REPLANNED;
   mtx_planner_status_.unlock();
   // printf("ReplanCB: planner_status_ = REPLANNED\n");
+  // std::cout << red << bold << "Above9" << reset << std::endl;
   Eigen::Vector3d F;
-  F << sg_safe_.X_temp_(rows_X_safe - 1, 0), sg_safe_.X_temp_(rows_X_safe - 1, 1),
-      sg_safe_.X_temp_(rows_X_safe - 1, 2);  // Final point of the safe path
+  F << X_temp_(X_temp_.rows() - 1, 0), X_temp_(X_temp_.rows() - 1, 1),
+      X_temp_(X_temp_.rows() - 1, 2);  // Final point of the safe path (\equiv final point of the comitted path)
+  // std::cout << red << bold << "Above10" << reset << std::endl;
   //  = sg_safe_.X_temp_.block(sg_safe_.X_temp_.rows() - 1, 0, 1, 3);  // Final point of the safe path
   // std::cout << "*Final Point Safe Path=" << F.transpose() << std::endl;
   double dist = (G_term_ - F).norm();
@@ -1734,6 +1765,18 @@ void CVX::replanCB(const ros::TimerEvent& e)
   }
   return;
 }
+
+/*void CVX::computeAngularVelocities()
+{
+  W_temp_.conservativeResize(X_temp_.rows(), 1);
+  // Eigen::VectorXd W_temp_;
+  for (int i = 0; i < X_temp_.rows() - 1; i++)
+  {
+    alpha_1 = atan2(X_temp_[i, 5], X_temp_[i, 4]);
+    alpha_2 = atan2(X_temp_[i + 1, 5], X_temp_[i + 1, 4]);
+    W_temp_[i] = (alpha_2 - alpha_1) / par_.dc;
+  }
+}*/
 
 int CVX::findIndexR(int indexH)
 {
@@ -2067,9 +2110,9 @@ void CVX::print_status()
 
 void CVX::pubCB(const ros::TimerEvent& e)
 {
-  // print_status();
+  print_status();
   mtx_goals.lock();
-  // printf("GOing to publish\n");
+  printf("In PUBCB: GOing to publish\n");
 
   if (flight_mode_.mode == flight_mode_.LAND)
   {
@@ -2264,38 +2307,53 @@ void CVX::pubCB(const ros::TimerEvent& e)
   // NOW generate all the things needed for the jackal
 
   geometry_msgs::Twist cmd_jackal;
-  cmd_jackal.linear = quadGoal_.vel;
+
+  double x_error = state_.pos.x - quadGoal_.pos.x;
+  double y_error = state_.pos.y - quadGoal_.pos.y;
+
+  double vx_input = quadGoal_.vel.x - 2 * x_error;
+  double vy_input = quadGoal_.vel.y - 2 * y_error;
+
+  cmd_jackal.linear.x = sqrt(pow(vx_input, 2) + pow(vy_input, 2));
+  cmd_jackal.linear.y = 0;
+  cmd_jackal.linear.z = 0;
+
   double xd = quadGoal_.vel.x;
   double yd = quadGoal_.vel.y;
 
   double xd2 = quadGoal_.accel.x;
   double yd2 = quadGoal_.accel.y;
 
-  double xd3 = quadGoal_.jerk.x;
-  double yd3 = quadGoal_.jerk.y;
+  // See http://mathworld.wolfram.com/Curvature.html (diff(phi)/diff(t))
+  double numerator = xd * yd2 - yd * xd2;
+  double denominator = xd * xd + yd * yd;
 
-  double l = 1;
-  double numerator = (xd * yd3 + xd3 * yd) * (xd * xd + yd * yd) - 3 * (xd * yd2 - yd2 * xd) * (xd * xd2 + yd * yd2);
-  double denominator = pow((xd * xd + yd * yd), 3) + l * l * pow(xd * yd2 - xd2 * yd, 2);
-  double u2 = l * sqrt(xd * xd + yd * yd) * numerator / denominator;
+  double w_desired = (denominator > 0.01) ? numerator / denominator : 0;
+  double desired_yaw = atan2(vy_input, vx_input);
+
+  double yaw_error = current_yaw_ - desired_yaw;
+
+  double u2 = w_desired - 3 * yaw_error;
 
   cmd_jackal.angular.x = 0;
   cmd_jackal.angular.y = 0;
   cmd_jackal.angular.z = u2;
-
+  std::cout << "Publishing Jackal Goal" << std::endl;
   pub_goal_jackal_.publish(cmd_jackal);
   ///////////////////////////////////////////////
 
+  std::cout << "Publishing QUAD Goal" << std::endl;
   pub_goal_.publish(quadGoal_);
+  std::cout << "QUAD Goal published" << std::endl;
 
   // Pub setpoint maker.  setpoint_ is the last quadGoal sent to the drone
   setpoint_.header.stamp = ros::Time::now();
   setpoint_.pose.position.x = quadGoal_.pos.x;
   setpoint_.pose.position.y = quadGoal_.pos.y;
   setpoint_.pose.position.z = quadGoal_.pos.z;
-  // printf("Publicando Goal=%f, %f, %f\n", quadGoal_.pos.x, quadGoal_.pos.y, quadGoal_.pos.z);
+  printf("Publicando Goal=%f, %f, %f\n", quadGoal_.pos.x, quadGoal_.pos.y, quadGoal_.pos.z);
   pub_setpoint_.publish(setpoint_);
-  // printf("End pubCB\n");
+  printf("End pubCB\n");
   // printf("#########Time in pubCB %0.2f ms\n", 1000 * (ros::Time::now().toSec() - t0pubCB));
   mtx_goals.unlock();
 }
@@ -2359,6 +2417,69 @@ void CVX::modeCB(const acl_msgs::QuadFlightMode& msg)
             solver_jerk_.genNewTraj();*/
   }
   flight_mode_.mode = msg.mode;
+}
+
+// Odometry Callback (for the Jackal)
+void CVX::odomCB(const nav_msgs::Odometry& msg)
+{
+  // ROS_ERROR("In state CB");
+  // printf("(State): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", msg.pos.x, msg.pos.y, msg.pos.z, msg.vel.x, msg.vel.y,
+  //       msg.vel.z);
+
+  mtx_state.lock();
+  state_.pos.x = msg.pose.pose.position.x;
+  state_.pos.y = msg.pose.pose.position.y;
+  state_.pos.z = msg.pose.pose.position.z;
+
+  state_.vel.x = msg.twist.twist.linear.x;
+  state_.vel.y = msg.twist.twist.linear.y;
+  state_.vel.z = msg.twist.twist.linear.z;
+
+  state_initialized_ = true;
+  /*  printf("(State): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", msg.pos.x, msg.pos.y, msg.pos.z, msg.vel.x,
+     msg.vel.y, msg.vel.z);*/
+  mtx_state.unlock();
+  // Stop updating when we get GO
+  if (flight_mode_.mode == flight_mode_.NOT_FLYING || flight_mode_.mode == flight_mode_.KILL)
+  {
+    quadGoal_.pos.x = msg.pose.pose.position.x;
+    quadGoal_.pos.y = msg.pose.pose.position.y;
+    quadGoal_.pos.z = msg.pose.pose.position.z;
+
+    quadGoal_.vel.x = msg.twist.twist.linear.x;
+    quadGoal_.vel.y = msg.twist.twist.linear.y;
+    quadGoal_.vel.z = msg.twist.twist.linear.z;
+
+    double roll, pitch, yaw;
+    quaternion2Euler(msg.pose.pose.orientation, roll, pitch, yaw);
+    current_yaw_ = yaw;
+    quadGoal_.yaw = yaw;
+    z_start_ = msg.pose.pose.position.z;
+    z_start_ = std::max(0.0, z_start_);
+    mtx_initial_cond.lock();
+    initialCond_.pos.x = msg.pose.pose.position.x;
+    initialCond_.pos.y = msg.pose.pose.position.y;
+    initialCond_.pos.z = msg.pose.pose.position.z;
+    mtx_initial_cond.unlock();
+  }
+
+  static int i = 0;
+  i++;
+
+  if (status_ != GOAL_REACHED && par_.visual == true)
+  {
+    pubActualTraj();
+  }
+
+  if (i % 10 == 0 && status_ != GOAL_REACHED && i != 0)
+  {
+    Eigen::Vector3d actual_pos(msg.pose.pose.position.x, msg.pose.pose.position.y, msg.pose.pose.position.z);
+    // Don't use the state to compute the total distance (it's very noisy)
+    // log_.total_dist = log_.total_dist + (actual_pos - pos_old_).norm();
+    // pos_old_ = actual_pos;
+  }
+  Eigen::Vector3d vel(msg.twist.twist.linear.x, msg.twist.twist.linear.y, msg.twist.twist.linear.z);
+  log_.veloc_norm = vel.norm();
 }
 
 void CVX::stateCB(const acl_msgs::State& msg)
