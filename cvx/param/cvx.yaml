@@ -30,8 +30,8 @@ inflation_jps: 0.35  #[m] The obstacles are inflated (to run JPS) by this amount
 factor_jps: 1  #[m] JPS is run with resolution=factor_jps*(resolution of the map)
 
 
-v_max: 1.4   #[m/s]  3
-a_max: 1.4   #[m/s2] 6
+v_max: 10   #[m/s]  1.4
+a_max: 20   #[m/s2] 1.4
 j_max: 5  #[m/s3] 35
 
 z_land: 0.02 #[m] z goal for landing

@@ -2450,7 +2450,7 @@ void CVX::odomCB(const nav_msgs::Odometry& msg)
   mtx_state.lock();
   state_.pos.x = msg.pose.pose.position.x;
   state_.pos.y = msg.pose.pose.position.y;
-  state_.pos.z = msg.pose.pose.position.z;
+  state_.pos.z = msg.pose.pose.position.z + 0.3;  // TODO change this 0.3
 
   state_.vel.x = msg.twist.twist.linear.x;
   state_.vel.y = msg.twist.twist.linear.y;
