@@ -1012,6 +1012,7 @@ void CVX::createMoreVertexes(vec_Vecf<3>& path, double d)
 
 void CVX::replanCB(const ros::TimerEvent& e)
 {
+  print_status();
   MyTimer replanCB_t(true);
   MyTimer otherStuff_t(true);
 
@@ -1089,9 +1090,11 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
     printf("STATUS=GOAL_REACHED\n");
   }
+
   // printf("Entering in replanCB, planner_status_=%d\n", planner_status_);
   // printf("In replanCB0.4s\n");
-  if (status_ == GOAL_SEEN || status_ == GOAL_REACHED || planner_status_ == REPLANNED || status_ == YAWING)
+  if (status_ == GOAL_SEEN || status_ == GOAL_REACHED || planner_status_ == REPLANNED ||
+      (status_ == YAWING && optimized_ == true))  // TODO (changed for the jackal, added optimized_ == true)
   {
     /*    printf("No replanning needed because planner_status_=%d and/or status_=%d \n", planner_status_, status_);
         printf("or because status_=%d\n", status_);*/
@@ -1099,7 +1102,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   }
 
   std::cout << bold << on_red << "************IN REPLAN CB*********" << reset << std::endl;
-  // print_status();
+  print_status();
 
   // std::cout << "replanCB3\n" << std::endl;
 
@@ -1408,6 +1411,10 @@ void CVX::replanCB(const ros::TimerEvent& e)
   }
   E = (isGinside_whole == true) ? G : E;
 
+  // TODO hack for the jackal
+  E = (optimized_ == false) ? state_pos : E;
+  // End of hack
+
   double xf[9] = { E(0), E(1), E(2), 0, 0, 0, 0, 0, 0 };
   sg_whole_.setXf(xf);
   sg_whole_.setX0(x0);
@@ -1550,6 +1557,10 @@ void CVX::replanCB(const ros::TimerEvent& e)
       std::cout << red << bold << "G is inside" << reset << std::endl;
     }
     M = (isGinside == true) ? G : M;
+
+    // TODO hack for the jackal
+    M = (optimized_ == false) ? state_pos : M;
+    // End of hack
 
     double x0_safe[9] = { posR[0], posR[1], posR[2], velR[0], velR[1], velR[2], accelR[0], accelR[1], accelR[2] };
     double xf_safe[9] = { M[0], M[1], M[2], 0, 0, 0, 0, 0, 0 };  // Note that the final position of xf_safe is only
@@ -2112,6 +2123,9 @@ void CVX::print_status()
       std::cout << bold << "flight_mode_=KILL" << reset << std::endl;
       break;
   }
+
+  std::cout << bold << "optimized_=" << optimized_ << reset << std::endl;
+  std::cout << bold << "takeoff_done_=" << takeoff_done_ << reset << std::endl;
 }
 
 void CVX::pubCB(const ros::TimerEvent& e)
@@ -2241,11 +2255,11 @@ void CVX::pubCB(const ros::TimerEvent& e)
 
       angle_wrap(diff);
 
-      //      std::cout << red << bold << "diff after wrappping=" << diff << reset << std::endl;
+      std::cout << red << bold << "diff after wrappping=" << diff << reset << std::endl;
 
       yaw(diff, quadGoal_);
-      /*      printf("Inside, desired_yaw=%0.2f,quadGoal_.yaw=%0.2f, diff=%f , abs(diff)=%f\n", desired_yaw,
-         quadGoal_.yaw, diff, fabs(diff));*/
+      printf("Inside, desired_yaw=%0.2f,quadGoal_.yaw=%0.2f, diff=%f , abs(diff)=%f\n", desired_yaw, quadGoal_.yaw,
+             diff, fabs(diff));
       if (fabs(diff) < 0.2)
       {
         // printf("It's less than 0.2!!\n");
@@ -2320,45 +2334,55 @@ void CVX::pubCB(const ros::TimerEvent& e)
     double vx_input = quadGoal_.vel.x - 2 * x_error;
     double vy_input = quadGoal_.vel.y - 2 * y_error;*/
 
-  double x = quadGoal_.pos.x;
-  double y = quadGoal_.pos.y;
-  double xd = quadGoal_.vel.x;
-  double yd = quadGoal_.vel.y;
-  double xd2 = quadGoal_.accel.x;
-  double yd2 = quadGoal_.accel.y;
+  if (status_ == YAWING)
+  {
+    cmd_jackal.angular.z = quadGoal_.dyaw;
+  }
+  else if (status_ == GOAL_REACHED)
+  {
+    // don't send commands
+  }
+  else
+  {
+    double x = quadGoal_.pos.x;
+    double y = quadGoal_.pos.y;
+    double xd = quadGoal_.vel.x;
+    double yd = quadGoal_.vel.y;
+    double xd2 = quadGoal_.accel.x;
+    double yd2 = quadGoal_.accel.y;
 
-  double v_desired = sqrt(pow(xd, 2) + pow(yd, 2));
-  double alpha = current_yaw_ - atan2(y - state_.pos.y, x - state_.pos.x);
-  angle_wrap(alpha);                                                    // wrap between -pi and pi
-  int forward = (alpha <= 3.14 / 2.0 && alpha > -3.14 / 2.0) ? 1 : -1;  // 1 if forward, -1 if backwards
-  double dist_error = forward * sqrt(pow(x - state_.pos.x, 2) + pow(y - state_.pos.y, 2));
-  alpha = (fabs(dist_error) < 0.03) ? 0 : alpha;
+    double v_desired = sqrt(pow(xd, 2) + pow(yd, 2));
+    double alpha = current_yaw_ - atan2(y - state_.pos.y, x - state_.pos.x);
+    angle_wrap(alpha);                                                    // wrap between -pi and pi
+    int forward = (alpha <= 3.14 / 2.0 && alpha > -3.14 / 2.0) ? 1 : -1;  // 1 if forward, -1 if backwards
+    double dist_error = forward * sqrt(pow(x - state_.pos.x, 2) + pow(y - state_.pos.y, 2));
+    alpha = (fabs(dist_error) < 0.03) ? 0 : alpha;
 
-  /*  std::cout << bold << "v_desired= " << v_desired << ", dist_error= " << dist_error << ", forward= " << forward
-              << "alpha= " << alpha << reset << std::endl;*/
+    /*  std::cout << bold << "v_desired= " << v_desired << ", dist_error= " << dist_error << ", forward= " << forward
+                << "alpha= " << alpha << reset << std::endl;*/
 
-  // See http://mathworld.wolfram.com/Curvature.html (diff(phi)/diff(t))
-  double numerator = xd * yd2 - yd * xd2;
-  double denominator = xd * xd + yd * yd;
-  double w_desired = (denominator > 0.01) ? numerator / denominator : 0;
-  double desired_yaw = (fabs(xd) < 0.001 || fabs(dist_error) < 0.03) ? desired_yaw_old_ : atan2(yd, xd);
-  std::cout << "desired_yaw=" << desired_yaw << std::endl;
-  std::cout << "current_yaw_=" << desired_yaw << std::endl;
-  desired_yaw_old_ = desired_yaw;
-  double yaw_error = current_yaw_ - desired_yaw;
-  angle_wrap(yaw_error);  // wrap between -pi and pi
-  /*  std::cout << bold << "current_yaw_= " << current_yaw_ << ", desired_yaw= " << desired_yaw << reset << std::endl;
-    std::cout << bold << "w_desired= " << w_desired << ", yaw_error= " << yaw_error << reset << std::endl;*/
+    // See http://mathworld.wolfram.com/Curvature.html (diff(phi)/diff(t))
+    double numerator = xd * yd2 - yd * xd2;
+    double denominator = xd * xd + yd * yd;
+    double w_desired = (denominator > 0.01) ? numerator / denominator : 0;
+    double desired_yaw = (fabs(xd) < 0.001 || fabs(dist_error) < 0.03) ? desired_yaw_old_ : atan2(yd, xd);
+    std::cout << "desired_yaw=" << desired_yaw << std::endl;
+    std::cout << "current_yaw_=" << desired_yaw << std::endl;
+    desired_yaw_old_ = desired_yaw;
+    double yaw_error = current_yaw_ - desired_yaw;
+    angle_wrap(yaw_error);  // wrap between -pi and pi
+    /*  std::cout << bold << "current_yaw_= " << current_yaw_ << ", desired_yaw= " << desired_yaw << reset << std::endl;
+      std::cout << bold << "w_desired= " << w_desired << ", yaw_error= " << yaw_error << reset << std::endl;*/
 
-  cmd_jackal.linear.x = par_.kv * v_desired + par_.kdist * dist_error;
-  cmd_jackal.angular.z = par_.kw * w_desired - par_.kyaw * yaw_error - par_.kalpha * alpha;
+    cmd_jackal.linear.x = par_.kv * v_desired + par_.kdist * dist_error;
+    cmd_jackal.angular.z = par_.kw * w_desired - par_.kyaw * yaw_error - par_.kalpha * alpha;
 
-  std::cout << bold << "Linear.x= " << cmd_jackal.linear.x << blue << "-->v_desired=" << v_desired
-            << ", dist_error= " << dist_error << reset << std::endl;
+    std::cout << bold << "Linear.x= " << cmd_jackal.linear.x << blue << "-->v_desired=" << v_desired
+              << ", dist_error= " << dist_error << reset << std::endl;
 
-  std::cout << bold << "Angular.z= " << cmd_jackal.angular.z << blue << "-->w_desired=" << w_desired
-            << ", yaw_error= " << yaw_error << ", alpha= " << alpha << reset << std::endl;
-
+    std::cout << bold << "Angular.z= " << cmd_jackal.angular.z << blue << "-->w_desired=" << w_desired
+              << ", yaw_error= " << yaw_error << ", alpha= " << alpha << reset << std::endl;
+  }
   // std::cout << "Publishing Jackal Goal" << std::endl;
   pub_goal_jackal_.publish(cmd_jackal);
   ///////////////////////////////////////////////
