@@ -66,8 +66,11 @@ public:
     //// printf("reading_map1\n");
     if ((center_map[2] - res * dim(2) / 2.0) < z_ground)
     {
+      std::cout << "center_map(2)=" << center_map(2) << std::endl;
+      std::cout << "z_ground=" << z_ground << std::endl;
+      std::cout << "((center_map(2) - z_ground) / res)=" << (int)((center_map(2) - z_ground) / res) << std::endl;
       // printf("modyfing");
-      dim2_down = std::max((int)((center_map(2) - z_ground) / res) + 1,2);  //+1 to avoid problems when taking off
+      dim2_down = std::max((int)((center_map(2) - z_ground) / res), 0);  //+1 to avoid problems when taking off
       // dim2_up = (int)(dim[2] / 2.0);
     }
 
@@ -80,7 +83,8 @@ public:
       // dim[2] = dim2_down + dim2_up;
     }
     // printf("z_max is %f\n", z_max);
-    // printf("Dim_up is %d\n", dim2_up);
+    printf("Dim_down is %d\n", dim2_down);
+    printf("Dim_up is %d\n", dim2_up);
     dim(2) = dim2_down + dim2_up;
     /*    printf("*******Dim is\n");
         std::cout << dim.transpose() << std::endl;*/
@@ -92,8 +96,8 @@ public:
     origin_d_(1) = center_map(1) - res * dim(1) / 2.0;
     origin_d_(2) = center_map(2) - res * dim2_down;
 
-    /*    printf("*******Corner despues is\n");
-        std::cout << origin_d_.transpose() << std::endl;*/
+    printf("*******Corner despues is\n");
+    std::cout << origin_d_.transpose() << std::endl;
 
     /*        double or2 = origin_(2);*/
 
@@ -577,6 +581,6 @@ protected:
 typedef MapUtil<2> OccMapUtil;
 
 typedef MapUtil<3> VoxelMapUtil;
-}
+}  // namespace JPS
 
 #endif

@@ -2734,6 +2734,13 @@ void CVX::cvxEllipsoidDecompUnkOcc2(vec_Vecf<3>& path)
     // std::cout << "Inserting constraint" << std::endl;
     const auto pt_inside = (path[i] + path[i + 1]) / 2;
     LinearConstraint3D cs(pt_inside, polys[i].hyperplanes());
+
+    // Now add the constraint "Above the ground:"
+    cs.A_.conservativeResize(cs.A_.rows() + 1, cs.A_.cols());
+    cs.A_.row(cs.A_.rows() - 1) = -Eigen::Vector3d::UnitZ();
+    cs.b_.conservativeResize(cs.b_.rows() + 1, cs.b_.cols());
+    cs.b_[cs.b_.rows() - 1] = par_.z_ground;
+
     l_constraints_safe_.push_back(cs);
   }
 
@@ -2797,6 +2804,13 @@ void CVX::cvxEllipsoidDecompOcc(vec_Vecf<3>& path)
     // std::cout << "Inserting constraint" << std::endl;
     const auto pt_inside = (path[i] + path[i + 1]) / 2;
     LinearConstraint3D cs(pt_inside, polys[i].hyperplanes());
+
+    // Now add the constraint "Above the ground:"
+    cs.A_.conservativeResize(cs.A_.rows() + 1, cs.A_.cols());
+    cs.A_.row(cs.A_.rows() - 1) = -Eigen::Vector3d::UnitZ();
+    cs.b_.conservativeResize(cs.b_.rows() + 1, cs.b_.cols());
+    cs.b_[cs.b_.rows() - 1] = par_.z_ground;
+
     l_constraints_whole_.push_back(cs);
   }
 }
