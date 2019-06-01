@@ -77,6 +77,9 @@ public:
   void setConstraintsX0();
   void setDynamicConstraints();
   void setForceFinalConstraint(bool forceFinalConstraint);
+  void setWMax(double w_max);
+
+  bool isWmaxSatisfied();
 
   void setMaxConstraints();
   void createVars();
@@ -168,5 +171,6 @@ protected:
   double factor_increment_ = 2;
 
   int total_not_solved = 0;
+  double w_max_ = 1;
 };
 #endif

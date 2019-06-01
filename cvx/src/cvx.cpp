@@ -124,6 +124,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
 
   ros::param::param<double>("~kw", par_.kw, 2.0);
   ros::param::param<double>("~kyaw", par_.kyaw, 2.0);
+  ros::param::param<double>("~kdalpha", par_.kdalpha, 2.0);
   ros::param::param<double>("~kv", par_.kv, 2.0);
   ros::param::param<double>("~kdist", par_.kdist, 2.0);
   ros::param::param<double>("~kalpha", par_.kalpha, 2.0);
@@ -362,6 +363,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   sg_whole_.setFactorInitialAndFinalAndIncrement(1, 10, par_.increment_whole);
   sg_whole_.setVerbose(par_.gurobi_verbose);
   sg_whole_.setThreads(par_.gurobi_threads);
+  sg_whole_.setWMax(par_.w_max);
 
   std::cout << "Going to do setup of sg_safe_\n";
   sg_safe_.setN(par_.N_safe);
@@ -373,6 +375,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   sg_safe_.setFactorInitialAndFinalAndIncrement(1, 10, par_.increment_safe);
   sg_safe_.setVerbose(par_.gurobi_verbose);
   sg_safe_.setThreads(par_.gurobi_threads);
+  sg_safe_.setWMax(par_.w_max);
 
   std::cout << "Done Setups\n";
 
@@ -2366,22 +2369,25 @@ void CVX::pubCB(const ros::TimerEvent& e)
     double denominator = xd * xd + yd * yd;
     double w_desired = (denominator > 0.01) ? numerator / denominator : 0;
     double desired_yaw = (fabs(xd) < 0.001 || fabs(dist_error) < 0.03) ? desired_yaw_old_ : atan2(yd, xd);
-    std::cout << "desired_yaw=" << desired_yaw << std::endl;
-    std::cout << "current_yaw_=" << desired_yaw << std::endl;
+    // std::cout << "desired_yaw=" << desired_yaw << std::endl;
+    // std::cout << "current_yaw_=" << desired_yaw << std::endl;
     desired_yaw_old_ = desired_yaw;
     double yaw_error = current_yaw_ - desired_yaw;
     angle_wrap(yaw_error);  // wrap between -pi and pi
     /*  std::cout << bold << "current_yaw_= " << current_yaw_ << ", desired_yaw= " << desired_yaw << reset << std::endl;
       std::cout << bold << "w_desired= " << w_desired << ", yaw_error= " << yaw_error << reset << std::endl;*/
 
+    double alpha_dot = (alpha - alpha_before_) / par_.dc;
+    alpha_before_ = alpha;
+
     cmd_jackal.linear.x = par_.kv * v_desired + par_.kdist * dist_error;
-    cmd_jackal.angular.z = par_.kw * w_desired - par_.kyaw * yaw_error - par_.kalpha * alpha;
+    cmd_jackal.angular.z = par_.kw * w_desired - par_.kyaw * yaw_error - par_.kdalpha * alpha_dot - par_.kalpha * alpha;
 
-    std::cout << bold << "Linear.x= " << cmd_jackal.linear.x << blue << "-->v_desired=" << v_desired
-              << ", dist_error= " << dist_error << reset << std::endl;
+    /*    std::cout << bold << "Linear.x= " << cmd_jackal.linear.x << blue << "-->v_desired=" << v_desired
+                  << ", dist_error= " << dist_error << reset << std::endl;
 
-    std::cout << bold << "Angular.z= " << cmd_jackal.angular.z << blue << "-->w_desired=" << w_desired
-              << ", yaw_error= " << yaw_error << ", alpha= " << alpha << reset << std::endl;
+        std::cout << bold << "Angular.z= " << cmd_jackal.angular.z << blue << "-->w_desired=" << w_desired
+                  << ", yaw_error= " << yaw_error << ", alpha= " << alpha << reset << std::endl;*/
   }
   // std::cout << "Publishing Jackal Goal" << std::endl;
   pub_goal_jackal_.publish(cmd_jackal);

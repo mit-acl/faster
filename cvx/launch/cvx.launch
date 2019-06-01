@@ -18,7 +18,8 @@
 
         <!-- Subscriptions -->
 		<remap from="~state" to="state"/>
-		<remap from="~odom" to="odometry/local_filtered"/>
+		<remap from="~odom" to="odometry/filtered"/>
+		<!-- <remap from="~odom" to="odometry/local_filtered"/> -->
 		<remap from="~flightmode" to="flightmode" />
 		<remap from="~term_goal" to="term_goal" />
 		<remap from="~occup_grid" to="global_mapper_ros/occupancy_grid"/> <!--PointCloud of the map-->
@@ -33,7 +34,8 @@
 		<remap from="~traj" to="traj"/>
 		<remap from="~trajs_sphere" to="trajs_sphere"/>
 		<remap from="~goal" to="$(arg goal_topic)" />
-		<remap from="~goal_jackal" to="jackal_velocity_controller/cmd_vel" />
+		<!-- <remap from="~goal_jackal" to="jackal_velocity_controller/cmd_vel" /> -->
+		<remap from="~goal_jackal" to="autonomous_cmd_vel" />
 		<remap from="~setpoint" to="setpoint" />
         <remap from="~log_topic" to="log_topic" />
 		

@@ -340,8 +340,8 @@ void SolverGurobi::setPolytopesConstraints()
         {
           sum = sum + b[t][col];
         }
-        at_least_1_pol_cons.push_back(
-            m.addConstr(sum == 1, "At_least_1_pol_t_" + std::to_string(t)));  // at least in one polytope
+        at_least_1_pol_cons.push_back(m.addConstr(sum == 1, "At_least_1_pol_t_" + std::to_string(t)));  // at least in
+                                                                                                        // one polytope
       }
       std::vector<GRBLinExpr> cp0 = getCP0(t);  // Control Point 0
       std::vector<GRBLinExpr> cp1 = getCP1(t);  // Control Point 1
@@ -610,6 +610,10 @@ bool SolverGurobi::genNewTraj()
     solved = callOptimizer();
     if (solved == true)
     {
+      solved = isWmaxSatisfied();
+    }
+    if (solved == true)  // solved and Wmax is satisfied
+    {
       factor_that_worked_ = i;
       // std::cout << "Factor= " << i << "(dt_= " << dt_ << ")---> worked" << std::endl;
     }
@@ -669,6 +673,11 @@ void SolverGurobi::setVerbose(int verbose)
   m.set("OutputFlag", std::to_string(verbose));  // 1 if you want verbose, 0 if not
 }
 
+void SolverGurobi::setWMax(double w_max)
+{
+  w_max_ = w_max;
+}
+
 void SolverGurobi::findDT(double factor)
 {
   // double dt = 2 * getDTInitial();
@@ -691,17 +700,40 @@ void SolverGurobi::setDynamicConstraints()
   {
     for (int i = 0; i < 3; i++)
     {
-      dyn_cons.push_back(
-          m.addConstr(getPos(t, dt_, i) == getPos(t + 1, 0, i),
-                      "ContPos_t" + std::to_string(t) + "_axis" + std::to_string(i)));  // Continuity in position
-      dyn_cons.push_back(
-          m.addConstr(getVel(t, dt_, i) == getVel(t + 1, 0, i),
-                      "ContVel_t" + std::to_string(t) + "_axis" + std::to_string(i)));  // Continuity in velocity
+      dyn_cons.push_back(m.addConstr(getPos(t, dt_, i) == getPos(t + 1, 0, i),
+                                     "ContPos_t" + std::to_string(t) + "_axis" + std::to_string(i)));  // Continuity in
+                                                                                                       // position
+      dyn_cons.push_back(m.addConstr(getVel(t, dt_, i) == getVel(t + 1, 0, i),
+                                     "ContVel_t" + std::to_string(t) + "_axis" + std::to_string(i)));  // Continuity in
+                                                                                                       // velocity
       dyn_cons.push_back(
           m.addConstr(getAccel(t, dt_, i) == getAccel(t + 1, 0, i),
                       "ContAccel_t" + std::to_string(t) + "_axis" + std::to_string(i)));  // Continuity in acceleration
     }
   }
+}
+
+// For the Jackal:
+bool SolverGurobi::isWmaxSatisfied()
+{
+  for (int n = 0; n < N_; n++)
+  {
+    double xd = getVel(n, 0, 0).getValue();
+    double yd = getVel(n, 0, 1).getValue();
+    double xd2 = getAccel(n, 0, 0).getValue();
+    double yd2 = getAccel(n, 0, 1).getValue();
+
+    double numerator = xd * yd2 - yd * xd2;
+    double denominator = xd * xd + yd * yd;
+    double w_desired = (denominator > 0.001) ? fabs(numerator / denominator) : 0.5 * w_max_;
+
+    if (w_desired > w_max_)
+    {
+      std::cout << "w_desired > than w_max: " << w_desired << " > " << w_max_ << "  , solving again" << std::endl;
+      return false;
+    }
+  }
+  return true;
 }
 
 bool SolverGurobi::callOptimizer()

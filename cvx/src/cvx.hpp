@@ -152,6 +152,7 @@ struct parameters
 
   double kw;
   double kyaw;
+  double kdalpha;
   double kv;
   double kdist;
   double kalpha;
@@ -457,4 +458,6 @@ private:
   double current_yaw_ = 0;
 
   double desired_yaw_old_ = 0;
+
+  double alpha_before_ = 0;
 };
