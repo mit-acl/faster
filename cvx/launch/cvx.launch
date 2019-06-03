@@ -18,7 +18,7 @@
 
         <!-- Subscriptions -->
 		<remap from="~state" to="state"/>
-		<remap from="~odom" to="odometry/filtered"/>
+		<remap from="~odom" to="odometry/filtered_no"/>
 		<!-- <remap from="~odom" to="odometry/local_filtered"/> -->
 		<remap from="~flightmode" to="flightmode" />
 		<remap from="~term_goal" to="term_goal" />

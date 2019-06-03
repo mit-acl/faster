@@ -608,10 +608,10 @@ bool SolverGurobi::genNewTraj()
     setObjective();
     resetXandU();
     solved = callOptimizer();
-    if (solved == true)
-    {
-      solved = isWmaxSatisfied();
-    }
+    /*    if (solved == true)
+        {
+          solved = isWmaxSatisfied();
+        }*/
     if (solved == true)  // solved and Wmax is satisfied
     {
       factor_that_worked_ = i;

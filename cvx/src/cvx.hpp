@@ -156,6 +156,8 @@ struct parameters
   double kv;
   double kdist;
   double kalpha;
+
+  double delta_a;
 };
 
 //####Class CVX

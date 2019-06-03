@@ -129,6 +129,8 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   ros::param::param<double>("~kdist", par_.kdist, 2.0);
   ros::param::param<double>("~kalpha", par_.kalpha, 2.0);
 
+  ros::param::param<double>("~delta_a", par_.delta_a, 0.5);
+
   /*  ros::param::param<double>("~factor_initial_whole", par_.factor_initial_whole, 2.0);
     ros::param::param<double>("~factor_final_whole", par_.factor_final_whole, 2.0);
     ros::param::param<double>("~factor_increment_whole", par_.factor_increment_whole, 1.0);
@@ -1818,7 +1820,8 @@ int CVX::findIndexR(int indexH)
     // std::cout << "Vel2=" << vel.array().square().transpose() << std::endl;
     // std::cout << "(posHk - pos).array().sign()=" << (posHk - pos).array().sign().transpose() << std::endl;
 
-    Eigen::Vector2d braking_distance = (posHk - pos).array().sign() * vel.array().square() / (2 * par_.a_max);
+    Eigen::Vector2d braking_distance =
+        (posHk - pos).array().sign() * vel.array().square() / (2 * par_.delta_a * par_.a_max);
 
     // std::cout << "braking_distance=" << braking_distance.transpose() << std::endl;
     // std::cout << "(posHk - pos).cwiseAbs().array())=" << (posHk - pos).cwiseAbs().array().transpose() << std::endl;
@@ -2263,7 +2266,7 @@ void CVX::pubCB(const ros::TimerEvent& e)
       yaw(diff, quadGoal_);
       printf("Inside, desired_yaw=%0.2f,quadGoal_.yaw=%0.2f, diff=%f , abs(diff)=%f\n", desired_yaw, quadGoal_.yaw,
              diff, fabs(diff));
-      if (fabs(diff) < 0.2)
+      if (fabs(diff) < 0.04)
       {
         // printf("It's less than 0.2!!\n");
         status_ = TRAVELING;
@@ -2359,7 +2362,7 @@ void CVX::pubCB(const ros::TimerEvent& e)
     angle_wrap(alpha);                                                    // wrap between -pi and pi
     int forward = (alpha <= 3.14 / 2.0 && alpha > -3.14 / 2.0) ? 1 : -1;  // 1 if forward, -1 if backwards
     double dist_error = forward * sqrt(pow(x - state_.pos.x, 2) + pow(y - state_.pos.y, 2));
-    alpha = (fabs(dist_error) < 0.03) ? 0 : alpha;
+    alpha = (fabs(dist_error) < 0.1) ? 0 : alpha;
 
     /*  std::cout << bold << "v_desired= " << v_desired << ", dist_error= " << dist_error << ", forward= " << forward
                 << "alpha= " << alpha << reset << std::endl;*/
@@ -2380,8 +2383,16 @@ void CVX::pubCB(const ros::TimerEvent& e)
     double alpha_dot = (alpha - alpha_before_) / par_.dc;
     alpha_before_ = alpha;
 
-    cmd_jackal.linear.x = par_.kv * v_desired + par_.kdist * dist_error;
-    cmd_jackal.angular.z = par_.kw * w_desired - par_.kyaw * yaw_error - par_.kdalpha * alpha_dot - par_.kalpha * alpha;
+    if (fabs(dist_error) > 0.15)
+    {
+      cmd_jackal.linear.x = par_.kdist * dist_error;
+      cmd_jackal.angular.z = -par_.kalpha * alpha;
+    }
+    else
+    {
+      cmd_jackal.linear.x = par_.kv * v_desired;
+      cmd_jackal.angular.z = par_.kw * w_desired - par_.kyaw * yaw_error;
+    }
 
     /*    std::cout << bold << "Linear.x= " << cmd_jackal.linear.x << blue << "-->v_desired=" << v_desired
                   << ", dist_error= " << dist_error << reset << std::endl;
@@ -2485,13 +2496,26 @@ void CVX::odomCB(const nav_msgs::Odometry& msg)
   state_.vel.x = msg.twist.twist.linear.x;
   state_.vel.y = msg.twist.twist.linear.y;
   state_.vel.z = msg.twist.twist.linear.z;
+  double roll, pitch, yaw;
+  quaternion2Euler(msg.pose.pose.orientation, roll, pitch, yaw);
+
+  if (state_initialized_ == false)
+  {
+    quadGoal_.pos.x = msg.pose.pose.position.x;
+    quadGoal_.pos.x = msg.pose.pose.position.y;
+    quadGoal_.pos.x = msg.pose.pose.position.z;
+
+    quadGoal_.vel.x = msg.twist.twist.linear.x;
+    quadGoal_.vel.y = msg.twist.twist.linear.y;
+    quadGoal_.vel.z = msg.twist.twist.linear.z;
+
+    quadGoal_.yaw = yaw;
+  }
 
   state_initialized_ = true;
   /*  printf("(State): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", msg.pos.x, msg.pos.y, msg.pos.z, msg.vel.x,
      msg.vel.y, msg.vel.z);*/
 
-  double roll, pitch, yaw;
-  quaternion2Euler(msg.pose.pose.orientation, roll, pitch, yaw);
   /*  std::cout << bold << red << "IN ODOM CB:" << msg.pose.pose.orientation << reset << std::endl;
     std::cout << bold << red << "Yaw=" << yaw * 180 / 3.14 << reset << std::endl;*/
   current_yaw_ = yaw;
@@ -2545,12 +2569,30 @@ void CVX::stateCB(const acl_msgs::State& msg)
   // ROS_ERROR("In state CB");
   // printf("(State): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", msg.pos.x, msg.pos.y, msg.pos.z, msg.vel.x, msg.vel.y,
   //       msg.vel.z);
+
+  double roll, pitch, yaw;
+  quaternion2Euler(msg.quat, roll, pitch, yaw);
+  /*  std::cout << bold << red << "IN ODOM CB:" << msg.pose.pose.orientation << reset << std::endl;
+    std::cout << bold << red << "Yaw=" << yaw * 180 / 3.14 << reset << std::endl;*/
+  current_yaw_ = yaw;
+
+  std::cout << "Current_yaw= " << current_yaw_ << std::endl;
+
+  if (state_initialized_ == false)
+  {
+    quadGoal_.pos = msg.pos;
+    quadGoal_.vel = msg.vel;
+    quadGoal_.yaw = yaw;
+  }
+
   mtx_state.lock();
   state_ = msg;
   state_initialized_ = true;
   /*  printf("(State): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", msg.pos.x, msg.pos.y, msg.pos.z, msg.vel.x,
      msg.vel.y, msg.vel.z);*/
+
   mtx_state.unlock();
+
   // Stop updating when we get GO
   if (flight_mode_.mode == flight_mode_.NOT_FLYING || flight_mode_.mode == flight_mode_.KILL)
   {
