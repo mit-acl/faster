@@ -462,4 +462,5 @@ private:
   double desired_yaw_old_ = 0;
 
   double alpha_before_ = 0;
+  double desired_yaw_B_ = 0;
 };

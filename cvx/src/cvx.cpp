@@ -787,6 +787,8 @@ void CVX::goalCB(const acl_msgs::TermGoal& msg)
   mtx_G.unlock();
   // std::cout << "G_=\n" << G_ << std::endl;
 
+  quadGoal_.yaw = current_yaw_;
+
   status_ = (status_ == GOAL_REACHED) ? YAWING : TRAVELING;
   /*  if (status_ == YAWING)
     {
@@ -1821,7 +1823,7 @@ int CVX::findIndexR(int indexH)
     // std::cout << "(posHk - pos).array().sign()=" << (posHk - pos).array().sign().transpose() << std::endl;
 
     Eigen::Vector2d braking_distance =
-        (posHk - pos).array().sign() * vel.array().square() / (2 * par_.delta_a * par_.a_max);
+        (vel.array() * (posHk - pos).array()).sign() * vel.array().square() / (2 * par_.delta_a * par_.a_max);
 
     // std::cout << "braking_distance=" << braking_distance.transpose() << std::endl;
     // std::cout << "(posHk - pos).cwiseAbs().array())=" << (posHk - pos).cwiseAbs().array().transpose() << std::endl;
@@ -2280,7 +2282,7 @@ void CVX::pubCB(const ros::TimerEvent& e)
     if ((status_ == TRAVELING || status_ == GOAL_SEEN))
     {
       // double desired_yaw = atan2(quadGoal_.vel.y, quadGoal_.vel.x);
-      double desired_yaw = atan2(B_[1] - quadGoal_.pos.y, B_[0] - quadGoal_.pos.x);
+      desired_yaw_B_ = atan2(B_[1] - quadGoal_.pos.y, B_[0] - quadGoal_.pos.x);
 
       /*      std::cout << red << bold << std::setprecision(6) << "B_=" << B_.transpose() << reset << std::endl;
             std::cout << red << bold << std::setprecision(6) << "quadGoal_=" << quadGoal_.pos.x << "  " <<
@@ -2290,7 +2292,7 @@ void CVX::pubCB(const ros::TimerEvent& e)
             std::cout << red << bold << std::setprecision(6) << "quadGoal_.yaw=" << quadGoal_.yaw << reset <<
          std::endl;*/
 
-      double diff = desired_yaw - quadGoal_.yaw;
+      double diff = desired_yaw_B_ - quadGoal_.yaw;
       // std::cout << red << bold << std::setprecision(6) << "diff before wrappping=" << diff << reset << std::endl;
       angle_wrap(diff);
       // std::cout << red << bold << std::setprecision(6) << "diff after wrappping=" << diff << reset << std::endl;
@@ -2340,13 +2342,31 @@ void CVX::pubCB(const ros::TimerEvent& e)
     double vx_input = quadGoal_.vel.x - 2 * x_error;
     double vy_input = quadGoal_.vel.y - 2 * y_error;*/
 
+  std::cout << "k_=" << k_ << std::endl;
+  std::cout << "(int)(X_.rows() - 1)=" << (int)(X_.rows() - 1) << std::endl;
+
   if (status_ == YAWING)
   {
     cmd_jackal.angular.z = quadGoal_.dyaw;
   }
+
   else if (status_ == GOAL_REACHED)
   {
     // don't send commands
+  }
+  else if (k_ >= (int)(X_.rows() - 1) && status_ != GOAL_SEEN)  // stopped at the end of a trajectory, but GOAL not
+                                                                // REACHED --> yaw
+  {
+    double angle = current_yaw_ - desired_yaw_B_;  // quadGoal_.yaw;
+    std::cout << bold << blue << "Spinning:" << reset << std::endl;
+    std::cout << "current_yaw_=" << current_yaw_ << std::endl;
+    std::cout << "quadGoal_.yaw=" << quadGoal_.yaw << std::endl;
+    std::cout << "angle before=" << angle << std::endl;
+    angle_wrap(angle);
+    std::cout << "angle after=" << angle << std::endl;
+    int direction = (angle > 0) ? -1 : 1;
+    std::cout << "direction=" << direction << std::endl;
+    cmd_jackal.angular.z = direction * par_.w_max;
   }
   else
   {
@@ -2386,12 +2406,32 @@ void CVX::pubCB(const ros::TimerEvent& e)
     if (fabs(dist_error) > 0.15)
     {
       cmd_jackal.linear.x = par_.kdist * dist_error;
+      if (forward < 0)
+      {
+        if (alpha >= 0)
+        {
+          alpha = alpha - 3.14;
+        }
+        else
+        {  // alpha is negative
+          alpha = alpha + 3.14;
+        }
+        angle_wrap(alpha);
+      }
       cmd_jackal.angular.z = -par_.kalpha * alpha;
+
+      std::cout << bold << red << "In Mode outside Trajectory" << reset << std::endl;
+      std::cout << "alpha=" << alpha << std::endl;
+      std::cout << "dist_error" << dist_error << std::endl;
     }
     else
     {
       cmd_jackal.linear.x = par_.kv * v_desired;
       cmd_jackal.angular.z = par_.kw * w_desired - par_.kyaw * yaw_error;
+      std::cout << bold << red << "In Mode inside Trajectory" << reset << std::endl;
+      std::cout << "desired_yaw=" << desired_yaw << std::endl;
+      std::cout << "current_yaw_=" << desired_yaw << std::endl;
+      std::cout << "yaw_error=" << yaw_error << std::endl;
     }
 
     /*    std::cout << bold << "Linear.x= " << cmd_jackal.linear.x << blue << "-->v_desired=" << v_desired
