@@ -2406,18 +2406,18 @@ void CVX::pubCB(const ros::TimerEvent& e)
     if (fabs(dist_error) > 0.15)
     {
       cmd_jackal.linear.x = par_.kdist * dist_error;
-      if (forward < 0)
-      {
-        if (alpha >= 0)
-        {
-          alpha = alpha - 3.14;
-        }
-        else
-        {  // alpha is negative
-          alpha = alpha + 3.14;
-        }
-        angle_wrap(alpha);
-      }
+      /*      if (forward < 0)
+            {
+              if (alpha >= 0)
+              {
+                alpha = alpha - 3.14;
+              }
+              else
+              {  // alpha is negative
+                alpha = alpha + 3.14;
+              }
+              angle_wrap(alpha);
+            }*/
       cmd_jackal.angular.z = -par_.kalpha * alpha;
 
       std::cout << bold << red << "In Mode outside Trajectory" << reset << std::endl;
@@ -3180,12 +3180,12 @@ Eigen::Vector3d CVX::getFirstCollisionJPS(vec_Vecf<3>& path, bool* thereIsInters
     {
       r = sqrt(dist2_map[0]);
 
-      // std::cout << "r=" << r << std::endl;
+      std::cout << "r=" << r << std::endl;
       // std::cout << "Point=" << r << std::endl;
 
       if (r < par_.drone_radius)  // collision of the JPS path and an inflated obstacle --> take last search point
       {
-        // std::cout << "Collision detected" << std::endl;  // We will return the search_point
+        std::cout << "Collision detected" << std::endl;  // We will return the search_point
         // pubJPSIntersection(inters);
         // inters = path[0];  // path[0] is the search_point I'm using.
         if (iteration == 0)

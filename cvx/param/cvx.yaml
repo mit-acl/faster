@@ -6,7 +6,8 @@ use_vel: false # use velocity. If false, r2=r1;
 
 dc: 0.01            #(seconds) Duration for the interpolation=Value of the timer pubGoal
 goal_radius: 0.35    #(m) Drone has arrived to the goal when distance_to_goal<GOAL_RADIUS
-drone_radius: 0.35  #(m) Used for collision checking
+drone_radius: 0.45  #(m) Used for collision checking
+
 
 N_whole: 10  #[-] Number of discretization points in the whole trajectory
 N_safe: 10  #[-] Number of discretization points in the safe path
@@ -20,19 +21,19 @@ min_states_deltaT: 0  #15
 Ra: 0.5            # [m] Minimum radius of the first sphere
 Ra_max: 4            # [m] Maximum radius of the first sphere
 Rb: 9.0             # [m] Radius of the second sphere
-w_max: 2            # [rd/s] Maximum angular velocity. 0.4 for Hardware
+w_max: 4            # [rd/s] Maximum angular velocity. 0.4 for Hardware
 alpha_filter_dyaw: 0 #was 0.92  #[] Filter parameter for dyaw, \in [0,1]. Higher--> More aggressive filtering
 
 alpha_0_deg: 150         #[deg] threshold to ignore current JPS solution, and consider the old one. 0--> always decide
 z_ground: 0         #[m] points below this are considered ground
 z_max: 0.3         #[m] JPS is not allowed to give a solution that goes higher than this height
-inflation_jps: 0.35  #[m] The obstacles are inflated (to run JPS) by this amount
+inflation_jps: 0.45  #[m] The obstacles are inflated (to run JPS) by this amount
 factor_jps: 1  #[m] JPS is run with resolution=factor_jps*(resolution of the map)
 
 
-v_max: 1.3   #[m/s]  1.4
-a_max: 10   #[m/s2] 1.4
-j_max: 30  #[m/s3] 35
+v_max: 1   #[m/s]  1.4
+a_max: 7   #[m/s2] 1.4
+j_max: 13  #[m/s3] 35
 
 z_land: 0.02 #[m] z goal for landing
 
@@ -57,10 +58,10 @@ kyaw: 1.5
 kdalpha: 0.0
 kalpha: 3
 
-kv: 1
-kdist: 1
+kv: 2
+kdist: 2
 
-delta_a: 0.6
+delta_a: 1
 
 q: 100  #[-] weight to the 2nd term of the cost function. If it's very big (>1000), Gurobi fails!! (numerical issues)
 
