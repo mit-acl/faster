@@ -111,7 +111,6 @@ struct parameters
 
   double Ra;
   double Ra_max;
-  double Rb;
   double w_max;
   double alpha_filter_dyaw;
   double alpha_0_deg;
@@ -133,15 +132,6 @@ struct parameters
   double gamma_safe;
   double gammap_safe;
   double increment_safe;
-  /*
-    double factor_initial_whole;
-    double factor_final_whole;
-
-    double factor_initial_safe;
-    double factor_final_safe;
-
-    double factor_increment_safe;
-    double factor_increment_whole;*/
 
   int max_poly_whole;
   int max_poly_safe;
@@ -158,6 +148,9 @@ struct parameters
   double kalpha;
 
   double delta_a;
+  double delta_H;
+
+  bool use_faster;
 };
 
 //####Class CVX
@@ -275,8 +268,9 @@ private:
   visualization_msgs::Marker I_;
   visualization_msgs::Marker E_;
   visualization_msgs::Marker M_;
+  visualization_msgs::Marker H_;
   acl_msgs::QuadGoal quadGoal_;
-  acl_msgs::QuadGoal initialCond_;  // It's the initial condition for the solver
+  acl_msgs::QuadGoal stateA_;  // It's the initial condition for the solver
   acl_msgs::QuadFlightMode flight_mode_;
   acl_msgs::State state_;
   Eigen::Vector3d G_;       // This goal is always inside of the map
@@ -303,6 +297,7 @@ private:
   ros::Publisher pub_point_R_;
   ros::Publisher pub_point_M_;
   ros::Publisher pub_point_E_;
+  ros::Publisher pub_point_H_;
 
   ros::Publisher pub_planning_vis_;
   ros::Publisher pub_intersec_points_;

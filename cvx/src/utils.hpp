@@ -5,6 +5,7 @@
 #include <std_msgs/ColorRGBA.h>
 #include <geometry_msgs/Vector3.h>
 #include <geometry_msgs/Point.h>
+#include <visualization_msgs/Marker.h>
 #include "termcolor.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.h"
 
@@ -32,6 +33,95 @@
 
 // inline is needed to avoid the "multiple definitions" error. Other option is to create the utils.cpp file, and put
 // there the function (and here only the prototype)
+
+inline std_msgs::ColorRGBA color(int id)
+{
+  std_msgs::ColorRGBA red;
+  red.r = 1;
+  red.g = 0;
+  red.b = 0;
+  red.a = 1;
+  std_msgs::ColorRGBA red_trans;
+  red_trans.r = 1;
+  red_trans.g = 0;
+  red_trans.b = 0;
+  red_trans.a = 0.7;
+  std_msgs::ColorRGBA red_trans_trans;
+  red_trans_trans.r = 1;
+  red_trans_trans.g = 0;
+  red_trans_trans.b = 0;
+  red_trans_trans.a = 0.4;
+  std_msgs::ColorRGBA blue;
+  blue.r = 0;
+  blue.g = 0;
+  blue.b = 1;
+  blue.a = 1;
+  std_msgs::ColorRGBA blue_trans;
+  blue_trans.r = 0;
+  blue_trans.g = 0;
+  blue_trans.b = 1;
+  blue_trans.a = 0.7;
+  std_msgs::ColorRGBA blue_trans_trans;
+  blue_trans_trans.r = 0;
+  blue_trans_trans.g = 0;
+  blue_trans_trans.b = 1;
+  blue_trans_trans.a = 0.4;
+  std_msgs::ColorRGBA blue_light;
+  blue_light.r = 0.5;
+  blue_light.g = 0.7;
+  blue_light.b = 1;
+  blue_light.a = 1;
+  std_msgs::ColorRGBA green;
+  green.r = 0;
+  green.g = 1;
+  green.b = 0;
+  green.a = 1;
+  std_msgs::ColorRGBA yellow;
+  yellow.r = 1;
+  yellow.g = 1;
+  yellow.b = 0;
+  yellow.a = 1;
+  std_msgs::ColorRGBA orange_trans;  // orange transparent
+  orange_trans.r = 1;
+  orange_trans.g = 0.5;
+  orange_trans.b = 0;
+  orange_trans.a = 0.7;
+  switch (id)
+  {
+    case RED:
+      return red;
+      break;
+    case RED_TRANS:
+      return red_trans;
+      break;
+    case RED_TRANS_TRANS:
+      return red_trans_trans;
+      break;
+    case BLUE:
+      return blue;
+      break;
+    case BLUE_TRANS:
+      return blue_trans;
+      break;
+    case BLUE_TRANS_TRANS:
+      return blue_trans_trans;
+      break;
+    case BLUE_LIGHT:
+      return blue_light;
+      break;
+    case GREEN:
+      return green;
+      break;
+    case YELLOW:
+      return yellow;
+      break;
+    case ORANGE_TRANS:
+      return orange_trans;
+      break;
+    default:
+      ROS_ERROR("COLOR NOT DEFINED");
+  }
+}
 
 //## From Wikipedia - http://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles
 inline void quaternion2Euler(tf2::Quaternion q, double& roll, double& pitch, double& yaw)
@@ -65,6 +155,21 @@ inline void saturate(double& var, double min, double max)
     var = max;
   }
   // std::cout << "Value saturated" << var << std::endl;
+}
+
+inline visualization_msgs::Marker getMarkerSphere(double scale, int my_color)
+{
+  visualization_msgs::Marker marker;
+
+  marker.header.frame_id = "world";
+  marker.id = 0;
+  marker.type = visualization_msgs::Marker::SPHERE;
+  marker.scale.x = scale;
+  marker.scale.y = scale;
+  marker.scale.z = scale;
+  marker.color = color(my_color);
+
+  return marker;
 }
 
 inline double angleBetVectors(const Eigen::Vector3d& a, const Eigen::Vector3d& b)
@@ -373,95 +478,6 @@ inline float solvePolyOrder2(Eigen::Vector3f coeff)
   }
   printf("No solution found to the equation\n");
   return std::numeric_limits<float>::max();
-}
-
-inline std_msgs::ColorRGBA color(int id)
-{
-  std_msgs::ColorRGBA red;
-  red.r = 1;
-  red.g = 0;
-  red.b = 0;
-  red.a = 1;
-  std_msgs::ColorRGBA red_trans;
-  red_trans.r = 1;
-  red_trans.g = 0;
-  red_trans.b = 0;
-  red_trans.a = 0.7;
-  std_msgs::ColorRGBA red_trans_trans;
-  red_trans_trans.r = 1;
-  red_trans_trans.g = 0;
-  red_trans_trans.b = 0;
-  red_trans_trans.a = 0.4;
-  std_msgs::ColorRGBA blue;
-  blue.r = 0;
-  blue.g = 0;
-  blue.b = 1;
-  blue.a = 1;
-  std_msgs::ColorRGBA blue_trans;
-  blue_trans.r = 0;
-  blue_trans.g = 0;
-  blue_trans.b = 1;
-  blue_trans.a = 0.7;
-  std_msgs::ColorRGBA blue_trans_trans;
-  blue_trans_trans.r = 0;
-  blue_trans_trans.g = 0;
-  blue_trans_trans.b = 1;
-  blue_trans_trans.a = 0.4;
-  std_msgs::ColorRGBA blue_light;
-  blue_light.r = 0.5;
-  blue_light.g = 0.7;
-  blue_light.b = 1;
-  blue_light.a = 1;
-  std_msgs::ColorRGBA green;
-  green.r = 0;
-  green.g = 1;
-  green.b = 0;
-  green.a = 1;
-  std_msgs::ColorRGBA yellow;
-  yellow.r = 1;
-  yellow.g = 1;
-  yellow.b = 0;
-  yellow.a = 1;
-  std_msgs::ColorRGBA orange_trans;  // orange transparent
-  orange_trans.r = 1;
-  orange_trans.g = 0.5;
-  orange_trans.b = 0;
-  orange_trans.a = 0.7;
-  switch (id)
-  {
-    case RED:
-      return red;
-      break;
-    case RED_TRANS:
-      return red_trans;
-      break;
-    case RED_TRANS_TRANS:
-      return red_trans_trans;
-      break;
-    case BLUE:
-      return blue;
-      break;
-    case BLUE_TRANS:
-      return blue_trans;
-      break;
-    case BLUE_TRANS_TRANS:
-      return blue_trans_trans;
-      break;
-    case BLUE_LIGHT:
-      return blue_light;
-      break;
-    case GREEN:
-      return green;
-      break;
-    case YELLOW:
-      return yellow;
-      break;
-    case ORANGE_TRANS:
-      return orange_trans;
-      break;
-    default:
-      ROS_ERROR("COLOR NOT DEFINED");
-  }
 }
 
 // coeff is from highest degree to lowest degree. Returns the smallest positive real solution. Returns -1 if a

@@ -593,6 +593,7 @@ bool SolverGurobi::genNewTraj()
   // if (mode_ == WHOLE_TRAJ)
   //{
   runtime_ms_ = 0;
+
   for (double i = factor_initial_; i <= factor_final_ && solved == false; i = i + factor_increment_)
   {
     trials_ = trials_ + 1;
@@ -622,43 +623,8 @@ bool SolverGurobi::genNewTraj()
       // std::cout << "Factor= " << i << "(dt_= " << dt_ << ")---> didn't worked" << std::endl;
     }
   }
-  //}
 
-  /*  if (mode_ == RESCUE_PATH)
-    {
-      for (float t = 0; t <= 5 && solved == false; t = t + 0.05)
-      {
-        trials_ = trials_ + 1;
-        dt_ = t;
-        setPolytopesConstraints();
-        setConstraintsX0();
-        setConstraintsXf();
-        setDynamicConstraints();
-        // setDistanceConstraints();
-        setObjective();
-        resetXandU();
-        solved = callOptimizer();
-        if (solved == true)
-        {
-          // std::cout << "Factor= " << i << "(dt_= " << dt_ << ")---> worked" << std::endl;
-        }
-        else
-        {
-          // std::cout << "Factor= " << i << "(dt_= " << dt_ << ")---> didn't worked" << std::endl;
-        }
-      }
-    }*/
-
-  // double dt_initial = dt_;
-  // while (solved == false)
-  //{
-
-  // if (solved == false)
-  //{
-  //  dt_ = 1.2 * dt_;
   //}
-  //}
-  // std::cout << "dt_final/dt_initial= " << dt_ / dt_initial << std::endl;
 
   return solved;
 }
@@ -841,6 +807,10 @@ bool SolverGurobi::callOptimizer()
     if (optimstatus == GRB_INF_OR_UNBD)
     {
       // printf("GUROBI SOLUTION: Unbounded or Infeasible. Maybe too small dt?\n");
+
+      /*      m.computeIIS();  // Compute the Irreducible Inconsistent Subsystem and write it on a file
+            m.write("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/model_rp" + std::to_string(temporal_) +
+                    "dt=" + std::to_string(dt_) + ".ilp");*/
     }
 
     if (optimstatus == GRB_NUMERIC)
