@@ -39,7 +39,6 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   std::cout << "Doing the setup\n";
   ros::param::param<bool>("~use_ff", par_.use_ff, 1);
   ros::param::param<bool>("~visual", par_.visual, true);
-  ros::param::param<bool>("~use_vel", par_.use_vel, true);
 
   ros::param::param<double>("~dc", par_.dc, 0.01);
   ros::param::param<double>("~goal_radius", par_.goal_radius, 0.2);
@@ -51,6 +50,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   ros::param::param<double>("~factor_deltaT", par_.factor_deltaT, 1.5);
   // ros::param::param<int>("~min_states_deltaTp", par_.min_states_deltaTp, 0);
   ros::param::param<int>("~min_states_deltaT", par_.min_states_deltaT, 0);
+  ros::param::param<double>("~factor_min_deltaT", par_.factor_min_deltaT, 1.0);
 
   ros::param::param<double>("~Ra", par_.Ra, 2.0);
   ros::param::param<double>("~Ra_max", par_.Ra_max, 2.5);
@@ -95,6 +95,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   ros::param::param<int>("~gurobi_verbose", par_.gurobi_verbose, 0);
 
   ros::param::param<bool>("~use_faster", par_.use_faster, true);
+  ros::param::param<bool>("~keep_optimizing_after_found", par_.keep_optimizing_after_found, false);
 
   // And now obtain the parameters from the mapper
   std::vector<double> world_dimensions;
@@ -809,6 +810,11 @@ void CVX::replanCB(const ros::TimerEvent& e)
     return;
   }
 
+  sg_whole_.ResetToNormalState();
+  sg_safe_.ResetToNormalState();
+
+  int status_started = planner_status_;
+
   double t0replanCB = ros::Time::now().toSec();
   // printf("replanCB: Before mtx_state!!!\n");
   mtx_state.lock();
@@ -868,8 +874,9 @@ void CVX::replanCB(const ros::TimerEvent& e)
     printf("STATUS=GOAL_REACHED\n");
   }
 
-  if (status_ == GOAL_SEEN || status_ == GOAL_REACHED || planner_status_ == REPLANNED ||
-      (status_ == YAWING && optimized_ == true))  // TODO (changed for the jackal, added optimized_ == true)
+  if (status_ == GOAL_SEEN || status_ == GOAL_REACHED || (status_ == YAWING && optimized_ == true) ||
+      (planner_status_ == REPLANNED && par_.keep_optimizing_after_found == false))  // TODO (changed for the jackal,
+                                                                                    // added optimized_ == true)
   {
     /*    printf("No replanning needed because planner_status_=%d and/or status_=%d \n", planner_status_, status_);
         printf("or because status_=%d\n", status_);*/
@@ -895,29 +902,46 @@ void CVX::replanCB(const ros::TimerEvent& e)
   double x0[9];
   if (X_initialized_)  // Needed to skip the first time (X_ still not initialized)
   {
-    mtx_k.lock();
-
-    mtx_offsets.lock();
-    k_initial_cond_1_ = std::min(k_ + deltaT_, (int)(X_.rows() - 1));
-
-    log_.entered_safe_path = 0;
-    if (k_initial_cond_1_ >= indexR_ && status_ == TRAVELING)  // Here index_R_ has the value of the previous replanning
-                                                               // step
+    if (planner_status_ != REPLANNED)  // If I've already replanned, just keep finding new trajectories but with the
+                                       // previous initial condition. The last one found when P reaches A will the one
+                                       // be chosen
     {
-      ROS_WARN("Switched to the SAFE PATH!!");
-      log_.entered_safe_path = 1;
+      mtx_k.lock();
+      mtx_offsets.lock();
+      // k_initial_cond_1_ = std::min(k_ + deltaT_, (int)(X_.rows() - 1));
+
+      log_.entered_safe_path = 0;
+
+      k_initial_cond_1_ = std::min(k_ + deltaT_, (int)(X_.rows() - 1));
+      if (par_.use_smart_deltaT)
+      {
+        int states_remaining = (indexR_ - k_);  // states remaining to start executing the rescue path.
+        k_initial_cond_1_ = (states_remaining > deltaT_min_) ?
+                                std::min(std::max(indexR_ - 1, 0), (int)(X_.rows() - 1)) :
+                                k_initial_cond_1_;
+        std::cout << "states_remaining=" << states_remaining << std::endl;
+        std::cout << "k_initial_cond_1_=" << k_initial_cond_1_ << "/ (safe path is " << indexR_ << " --> "
+                  << (int)(X_.rows() - 1) << " )" << std::endl;
+      }
+
+      if (k_initial_cond_1_ >= indexR_ && status_ == TRAVELING)  // Here index_R_ has the value of the previous
+                                                                 // replanning step
+      {
+        ROS_WARN("Switched to the SAFE PATH!!");
+        log_.entered_safe_path = 1;
+      }
+
+      log_.deltaT_percentage = (k_initial_cond_1_ - k_) / (1.0 * (indexR_ - k_));
+      log_.deltaT = deltaT_;
+      // log_.deltaP2Rold = deltaTp_old_ - k_;
+      log_.k = k_;
+      // log_.deltaTp_old = deltaTp_old_;
+      mtx_offsets.unlock();
+      mtx_k.unlock();
+      // printf("Ahora mismo, k_initial_cond_1=%d\n", k_initial_cond_1_);
+
+      updateInitialCond(k_initial_cond_1_);
     }
-
-    log_.deltaT_percentage = (k_initial_cond_1_ - k_) / (1.0 * (indexR_ - k_));
-    log_.deltaT = deltaT_;
-    // log_.deltaP2Rold = deltaTp_old_ - k_;
-    log_.k = k_;
-    // log_.deltaTp_old = deltaTp_old_;
-    mtx_offsets.unlock();
-    mtx_k.unlock();
-    // printf("Ahora mismo, k_initial_cond_1=%d\n", k_initial_cond_1_);
-
-    updateInitialCond(k_initial_cond_1_);
 
     mtx_initial_cond.lock();
 
@@ -953,7 +977,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
   Eigen::Vector3d A;
   A << x0[0], x0[1], x0[2];
 
-  // std::cout << "A" << A.transpose() << std::endl;
+  std::cout << "A" << A.transpose() << std::endl;
 
   static bool first_time = true;  // how many times I've solved JPSk
 
@@ -1212,6 +1236,13 @@ void CVX::replanCB(const ros::TimerEvent& e)
       return;
     }
 
+    if (planner_status_ == START_REPLANNING && status_started == REPLANNED)
+    {
+      /*      std::cout << bold << "Solved everything but the publisher already copied current matrix, exiting" << reset
+                      << std::endl;*/
+      return;
+    }
+
     MyTimer fill_whole_t(true);
     sg_whole_.fillXandU();
     // std::cout << bold << blue << "Fill Whole:  " << std::fixed << fill_whole_t << "ms" << reset << std::endl;
@@ -1392,6 +1423,14 @@ void CVX::replanCB(const ros::TimerEvent& e)
       std::cout << red << "No solution found for the safe path" << reset << std::endl;
       return;
     }
+
+    if (planner_status_ == START_REPLANNING && status_started == REPLANNED)
+    {
+      /*      std::cout << bold << "Solved everything but the publisher already copied current matrix, exiting" << reset
+                      << std::endl;*/
+      return;
+    }
+
     log_.gurobi_safe_ms = sg_safe_.runtime_ms_;
     log_.gurobi_safe_ms_mine = safe_gurobi_t.ElapsedMs();
     log_.gurobi_safe_trials = sg_safe_.trials_;
@@ -1480,6 +1519,13 @@ void CVX::replanCB(const ros::TimerEvent& e)
     pubTraj(sg_whole_.X_temp_, WHOLE);
   }
 
+  if (planner_status_ == START_REPLANNING && status_started == REPLANNED)
+  {
+    /*    std::cout << bold << "Solved everything but the publisher already copied current matrix, exiting" << reset
+                  << std::endl;*/
+    return;
+  }
+
   ///////////////////////////////////////////////////////////
   ///////////////       OTHER STUFF    //////////////////////
   ///////////////////////////////////////////////////////////
@@ -1527,8 +1573,14 @@ void CVX::replanCB(const ros::TimerEvent& e)
   // std::cout << "min_states_deltaTp:  " << std::fixed << par_.min_states_deltaTp << " states" << std::endl;
   // deltaTp_ = std::max(par_.factor_deltaTp * states_last_replan, (double)par_.min_states_deltaTp);  // deltaTp
   // std::cout << "Next deltaTp_:  " << std::fixed << deltaTp_ << " states" << std::endl;
-  deltaT_ = std::max(par_.factor_deltaT * states_last_replan,
-                     (double)par_.min_states_deltaT);  // Delta_t
+
+  if (planner_status_ != REPLANNED)  // If already have a solution, keep using the same deltaT_
+  {
+    deltaT_ = std::max(par_.factor_deltaT * states_last_replan,
+                       (double)par_.min_states_deltaT);  // Delta_t
+
+    deltaT_min_ = par_.factor_min_deltaT * states_last_replan;
+  }
 
   mtx_offsets.unlock();
 
@@ -1592,6 +1644,12 @@ int CVX::findIndexR(int indexH)
             std::cout << "pos=" << pos.transpose() << std::endl;
             std::cout << "vel=" << vel.transpose() << std::endl;*/
       indexR = i;
+
+      if (indexR == 0)
+      {
+        std::cout << bold << red << "R was taken in A" << reset << std::endl;
+      }
+
       break;
     }
   }
@@ -1955,6 +2013,10 @@ void CVX::pubCB(const ros::TimerEvent& e)
     {
       to_land_ == false;
       printf("************Reseteando a 0!\n");
+      // reset the current optimizations (not needed because I already have a solution)
+      sg_whole_.StopExecution();
+      sg_safe_.StopExecution();
+
       force_reset_to_0_ = false;
       mtx_X_U_temp.lock();
       mtx_X_U.lock();
@@ -1974,6 +2036,8 @@ void CVX::pubCB(const ros::TimerEvent& e)
     {  // I've published what I planned --> plan again
       std::cout << bold << magenta << "Rejecting current plan, planning again. Suggestion: Increase delta_t" << reset
                 << std::endl;
+      sg_whole_.StopExecution();
+      sg_safe_.StopExecution();
       mtx_planner_status_.lock();
       planner_status_ = START_REPLANNING;
       status_ = TRAVELING;

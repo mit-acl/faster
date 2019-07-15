@@ -7,6 +7,41 @@
 #define WHOLE_TRAJ 0
 #define RESCUE_PATH 1
 
+mycallback::mycallback()
+{
+  should_terminate_ = false;
+}
+
+void mycallback::callback()
+{  // This function is called periodically along the optimization process.
+  // It is called several times more after terminating the program
+  if (should_terminate_ == true)
+  {
+    // std::cout << "Aborting the execution of the current optimization" << std::endl;
+    GRBCallback::abort();  // It seems that this function only does effect when inside the function callback() of this
+                           // class
+    // terminated_ = true;
+  }
+}
+
+/*void mycallback::abortar()
+{
+  GRBCallback::abort();
+}*/
+
+void SolverGurobi::StopExecution()
+{
+  // cb_.abortar();
+  // cb_.terminated_ = false;
+  cb_.should_terminate_ = true;
+  std::cout << "Activated flag to stop execution" << std::endl;
+}
+
+void SolverGurobi::ResetToNormalState()
+{
+  cb_.should_terminate_ = false;
+}
+
 SolverGurobi::SolverGurobi()
 {
   std::cout << "In the Gurobi Constructor\n";
@@ -24,6 +59,10 @@ SolverGurobi::SolverGurobi()
   double x0[9] = { 5, 11.5, 0.5, 0, 0, 0, 0, 0, 0 };
   double xf[9] = { 14, 5, 2.5, 0, 0, 0, 0, 0, 0 };
   double max_values[3] = { v_max_, a_max_, j_max_ };
+
+  cb_ = mycallback();
+
+  m.setCallback(&cb_);  // The callback will be called periodically along the optimization
 
   /*  setDC(0.01);  LO HAGO EN CVX
   set_max(max_values);  LO HAGO EN CVX
@@ -594,11 +633,12 @@ bool SolverGurobi::genNewTraj()
   //{
   runtime_ms_ = 0;
 
-  for (double i = factor_initial_; i <= factor_final_ && solved == false; i = i + factor_increment_)
+  for (double i = factor_initial_; i <= factor_final_ && solved == false && cb_.should_terminate_ == false;
+       i = i + factor_increment_)
   {
     trials_ = trials_ + 1;
     findDT(i);
-    // std::cout << "Going to try with dt_= " << dt_ << std::endl;
+    // std::cout << "Going to try with dt_= " << dt_ << ", should_terminate_=" << cb_.should_terminate_ << std::endl;
     setPolytopesConstraints();
     // std::cout << "Setting x0" << std::endl;
     setConstraintsX0();
@@ -623,6 +663,8 @@ bool SolverGurobi::genNewTraj()
       // std::cout << "Factor= " << i << "(dt_= " << dt_ << ")---> didn't worked" << std::endl;
     }
   }
+
+  cb_.should_terminate_ = false;  // Should be at the end of genNewTaj, not at the beginning
 
   //}
 
@@ -731,6 +773,10 @@ bool SolverGurobi::callOptimizer()
   // m.write(ros::package::getPath("cvx") + "/models/model_" + std::to_string(temporal_) + ".lp");
 
   // std::cout << "*************************Starting Optimization" << std::endl;
+
+  // Solve model and capture solution information
+  m.optimize();
+
   auto start = std::chrono::steady_clock::now();
   m.optimize();
   auto end = std::chrono::steady_clock::now();
@@ -817,6 +863,11 @@ bool SolverGurobi::callOptimizer()
     {
       // printf("GUROBI Status: Numerical issues\n");
       // printf("Model may be infeasible or unbounded\n");  // Taken from the Gurobi documentation
+    }
+
+    if (optimstatus == GRB_INTERRUPTED)
+    {
+      printf("GUROBI Status: Interrumped by the user\n");
     }
   }
   return solved;

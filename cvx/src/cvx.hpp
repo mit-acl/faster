@@ -90,7 +90,6 @@ struct parameters
 {
   bool use_ff;
   bool visual;
-  bool use_vel;
 
   double wdx;
   double wdy;
@@ -106,6 +105,8 @@ struct parameters
 
   double factor_deltaTp;
   double factor_deltaT;
+  double factor_min_deltaT;
+
   int min_states_deltaTp;
   int min_states_deltaT;
 
@@ -151,6 +152,8 @@ struct parameters
   double delta_H;
 
   bool use_faster;
+  bool keep_optimizing_after_found;
+  bool use_smart_deltaT;
 };
 
 //####Class CVX
@@ -350,6 +353,7 @@ private:
   // int deltaTp_old_ = 1000;
   // int deltaTp_ = 10;
   int deltaT_ = 10;
+  int deltaT_min_ = 10;
   int indexR_ = 0;
 
   int markerID_ = 0;

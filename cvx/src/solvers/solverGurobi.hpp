@@ -43,6 +43,17 @@ inline double solvePolynomialOrder2(Eigen::Vector3f& coeff)
   return std::numeric_limits<float>::max();
 }
 
+class mycallback : public GRBCallback
+{
+public:
+  bool should_terminate_;
+  mycallback();  // constructor
+  // void abortar();
+
+protected:
+  void callback();
+};
+
 class SolverGurobi
 {
 public:
@@ -55,6 +66,8 @@ public:
 
   double** getx();
   double** getu();
+
+  void callbackFunction();
 
   // void setQ(double q);
   void setN(int N);
@@ -85,6 +98,9 @@ public:
   void createVars();
   void setThreads(int threads);
   void setVerbose(int verbose);
+
+  void StopExecution();
+  void ResetToNormalState();
 
   void setDistances(vec_Vecf<3>& samples, std::vector<double> dist_near_obs);
 
@@ -124,6 +140,7 @@ public:
   double runtime_ms_ = 0;
   double factor_that_worked_ = 0;
   int N_ = 10;
+  mycallback cb_;
 
 protected:
   double cost_;
