@@ -184,6 +184,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   pub_intersec_points_ = nh_.advertise<visualization_msgs::MarkerArray>("intersection_points", 1);
   pub_log_ = nh_.advertise<acl_msgs::Cvx>("log_topic", 1);
   pub_trajs_sphere_ = nh_.advertise<visualization_msgs::MarkerArray>("trajs_sphere", 1);
+  pub_traj_committed_colored_ = nh_.advertise<visualization_msgs::MarkerArray>("traj_committed_colored", 1);
 
   occup_grid_sub_.subscribe(nh_, "occup_grid", 1);
   unknown_grid_sub_.subscribe(nh_, "unknown_grid", 1);
@@ -1517,6 +1518,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
       pubTraj(tmp, SAFE);
     }
     pubTraj(sg_whole_.X_temp_, WHOLE);
+    pubTraj(X_temp_, COMMITTED);
   }
 
   if (planner_status_ == START_REPLANNING && status_started == REPLANNED)
@@ -2693,6 +2695,84 @@ void CVX::pubTraj(Eigen::MatrixXd& X, int type)
   {
     pub_traj_safe_.publish(traj);
   }
+
+  if (type == COMMITTED)
+  {
+    geometry_msgs::Point p_last;
+    p_last.x = X(0, 0);
+    p_last.y = X(0, 1);
+    p_last.z = X(0, 2);
+
+    clearMarkerArray(&traj_committed_colored_, &pub_traj_committed_colored_);
+    clearMarkerColoredTraj();
+    int j = 6000;
+    for (int i = 0; i < X.rows(); i = i + 1)
+    {
+      j = j + 1;
+      double vel = (X.block(i, 3, 1, 3)).norm();
+      visualization_msgs::Marker m;
+      m.type = visualization_msgs::Marker::ARROW;
+      m.header.frame_id = "world";
+      m.header.stamp = ros::Time::now();
+      m.action = visualization_msgs::Marker::ADD;
+      m.id = j;
+      m.color = getColorJet(vel, 0, par_.v_max);
+      m.scale.x = 0.15;
+      m.scale.y = 0;
+      m.scale.z = 0;
+      // std::cout << "Mandando bloque" << X.block(i, 0, 1, 3) << std::endl;
+      geometry_msgs::Point p;
+      p.x = X(i, 0);
+      p.y = X(i, 1);
+      p.z = X(i, 2);
+      m.points.push_back(p_last);
+      m.points.push_back(p);
+      // std::cout << "pushing marker\n" << m << std::endl;
+      p_last = p;
+      traj_committed_colored_.markers.push_back(m);
+      pub_traj_committed_colored_.publish(traj_committed_colored_);
+    }
+
+    /*    geometry_msgs::Point p_last = eigen2point(traj[0]);
+
+        bool first_element = true;
+        int i = 50000;  // large enough to prevent conflict with other markers
+        int j = 0;*/
+
+    /*    for (const auto& it : traj)
+        {
+          i++;
+          if (first_element and type == visualization_msgs::Marker::ARROW)  // skip the first element
+          {
+            first_element = false;
+            continue;
+          }
+
+          visualization_msgs::Marker m;
+          m.type = type;
+          m.action = visualization_msgs::Marker::ADD;
+          m.id = i;
+          m.color = color;
+          // m.scale.z = 1;
+
+          m.header.frame_id = "world";
+          m.header.stamp = ros::Time::now();
+          geometry_msgs::Point p = eigen2point(it);
+          if (type == visualization_msgs::Marker::ARROW)
+          {
+            m.scale.x = 0.02;
+            m.scale.y = 0.04;
+            m.points.push_back(p_last);
+            m.points.push_back(p);
+            // std::cout << "pushing marker\n" << m << std::endl;
+            p_last = p;
+          }
+          else
+
+            (*m_array).markers.push_back(m);
+          j = j + 1;
+        }*/
+  }
 }
 
 void CVX::createMarkerSetOfArrows(Eigen::MatrixXd X, bool isFree)
@@ -2751,6 +2831,21 @@ void CVX::clearMarkerActualTraj()
   m.scale.z = 1;
   pub_actual_traj_.publish(m);
   actual_trajID_ = 0;
+}
+
+void CVX::clearMarkerColoredTraj()
+{
+  // printf("In clearMarkerActualTraj\n");
+
+  visualization_msgs::Marker m;
+  m.type = visualization_msgs::Marker::ARROW;
+  m.action = visualization_msgs::Marker::DELETEALL;
+  m.id = 0;
+  m.scale.x = 0.02;
+  m.scale.y = 0.04;
+  m.scale.z = 1;
+  pub_actual_traj_.publish(m);
+  // actual_trajID_ = 0;
 }
 
 void CVX::clearMarkerSetOfArrows()

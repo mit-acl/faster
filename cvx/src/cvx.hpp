@@ -62,6 +62,7 @@
 
 #define WHOLE 1  // Whole trajectory (part of which is planned on unkonwn space)
 #define SAFE 2   // Safe path
+#define COMMITTED 3
 
 #define OCCUPIED_SPACE 1
 #define UNKOWN_AND_OCCUPIED_SPACE 2
@@ -192,6 +193,7 @@ private:
   void createMarkerSetOfArrows(Eigen::MatrixXd X, bool isFree);
   void clearMarkerSetOfArrows();
   void clearMarkerActualTraj();
+  void clearMarkerColoredTraj();
   void mapCB(const sensor_msgs::PointCloud2::ConstPtr& pcl2ptr_msg,
              const sensor_msgs::PointCloud2::ConstPtr& pcl2ptr_msg2);  // Callback for the occupancy pcloud
   void unkCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg);     // Callback for the unkown pcloud
@@ -301,6 +303,7 @@ private:
   ros::Publisher pub_point_M_;
   ros::Publisher pub_point_E_;
   ros::Publisher pub_point_H_;
+  ros::Publisher pub_traj_committed_colored_;
 
   ros::Publisher pub_planning_vis_;
   ros::Publisher pub_intersec_points_;
@@ -342,6 +345,7 @@ private:
   visualization_msgs::MarkerArray path_jps2_fix_;
   visualization_msgs::MarkerArray path_jps_safe_;
   visualization_msgs::MarkerArray path_jps_whole_;
+  visualization_msgs::MarkerArray traj_committed_colored_;
 
   visualization_msgs::MarkerArray intersec_points_;
   visualization_msgs::MarkerArray samples_safe_path_;

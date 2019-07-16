@@ -64,9 +64,9 @@ kdist: 2
 delta_a: 0.7
 delta_H: 0.7
 
-use_faster: true  #if false, it will plan only in free space
-keep_optimizing_after_found: true #if true, the planner will keep optimizing after having found a trajectory (until the drone arrives at point A)
-use_smart_deltaT: true #if true, A will be tried be be chosen in R{k-1} (unless there is too little time remaining, given by factor_min_deltaT)
+use_faster: false  #if false, it will plan only in free space
+keep_optimizing_after_found: false #if true, the planner will keep optimizing after having found a trajectory (until the drone arrives at point A)
+use_smart_deltaT: false #if true, A will be tried be be chosen in R{k-1} (unless there is too little time remaining, given by factor_min_deltaT)
 
 
 
