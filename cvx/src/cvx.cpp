@@ -48,7 +48,6 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   ros::param::param<int>("~N_whole", par_.N_whole, 10);
 
   ros::param::param<double>("~factor_deltaT", par_.factor_deltaT, 1.5);
-  // ros::param::param<int>("~min_states_deltaTp", par_.min_states_deltaTp, 0);
   ros::param::param<int>("~min_states_deltaT", par_.min_states_deltaT, 0);
   ros::param::param<double>("~factor_min_deltaT", par_.factor_min_deltaT, 1.0);
 
@@ -83,6 +82,7 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   ros::param::param<double>("~kv", par_.kv, 2.0);
   ros::param::param<double>("~kdist", par_.kdist, 2.0);
   ros::param::param<double>("~kalpha", par_.kalpha, 2.0);
+  ros::param::param<double>("~hack", par_.hack, 2.0);  // hacktodo
 
   ros::param::param<double>("~delta_a", par_.delta_a, 0.5);
   ros::param::param<double>("~delta_H", par_.delta_H, 0.7);
@@ -162,16 +162,18 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
 
   pub_goal_jackal_ = nh_.advertise<geometry_msgs::Twist>("goal_jackal", 1);
   pub_goal_ = nh_.advertise<acl_msgs::QuadGoal>("goal", 1);
-  pub_point_G_ = nh_.advertise<geometry_msgs::PointStamped>("point_G", 1);
+
   pub_traj_whole_ = nh_.advertise<nav_msgs::Path>("traj_whole", 1);
   pub_traj_safe_ = nh_.advertise<nav_msgs::Path>("traj_safe", 1);
 
   pub_setpoint_ = nh_.advertise<visualization_msgs::Marker>("setpoint", 1);
   pub_intersectionI_ = nh_.advertise<visualization_msgs::Marker>("intersection_I", 1);
+  pub_point_G_ = nh_.advertise<geometry_msgs::PointStamped>("point_G", 1);
   pub_point_E_ = nh_.advertise<visualization_msgs::Marker>("point_E", 1);
   pub_point_R_ = nh_.advertise<visualization_msgs::Marker>("point_R", 1);
   pub_point_M_ = nh_.advertise<visualization_msgs::Marker>("point_M", 1);
   pub_point_H_ = nh_.advertise<visualization_msgs::Marker>("point_H", 1);
+  pub_point_A_ = nh_.advertise<visualization_msgs::Marker>("point_A", 1);
 
   pub_actual_traj_ = nh_.advertise<visualization_msgs::Marker>("actual_traj", 1);
   pub_path_jps1_ = nh_.advertise<visualization_msgs::MarkerArray>("path_jps1", 1);
@@ -185,6 +187,8 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   pub_log_ = nh_.advertise<acl_msgs::Cvx>("log_topic", 1);
   pub_trajs_sphere_ = nh_.advertise<visualization_msgs::MarkerArray>("trajs_sphere", 1);
   pub_traj_committed_colored_ = nh_.advertise<visualization_msgs::MarkerArray>("traj_committed_colored", 1);
+  pub_traj_whole_colored_ = nh_.advertise<visualization_msgs::MarkerArray>("traj_whole_colored", 1);
+  pub_traj_safe_colored_ = nh_.advertise<visualization_msgs::MarkerArray>("traj_safe_colored", 1);
 
   occup_grid_sub_.subscribe(nh_, "occup_grid", 1);
   unknown_grid_sub_.subscribe(nh_, "unknown_grid", 1);
@@ -210,14 +214,13 @@ CVX::CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pu
   // If you want another thread for the replanCB: replanCBTimer_ = nh_.createTimer(ros::Duration(par_.dc),
   // &CVX::replanCB, this);
 
-  // Initialize setpoint marker
-
   setpoint_ = getMarkerSphere(0.35, ORANGE_TRANS);
-  R_ = getMarkerSphere(0.10, ORANGE_TRANS);
-  I_ = getMarkerSphere(0.10, YELLOW);
-  E_ = getMarkerSphere(0.1, RED);
-  M_ = getMarkerSphere(0.1, BLUE);
-  H_ = getMarkerSphere(0.1, GREEN);
+  R_ = getMarkerSphere(0.35, ORANGE_TRANS);
+  I_ = getMarkerSphere(0.35, YELLOW);
+  E_ = getMarkerSphere(0.35, RED);
+  M_ = getMarkerSphere(0.35, BLUE);
+  H_ = getMarkerSphere(0.35, GREEN);
+  A_ = getMarkerSphere(0.35, RED);
 
   // mtx_G.lock();
   G_ << 0, 0, 0;
@@ -795,6 +798,8 @@ void CVX::createMoreVertexes(vec_Vecf<3>& path, double d)
 
 void CVX::replanCB(const ros::TimerEvent& e)
 {
+  par_.use_faster = !par_.use_faster;  // hacktodo
+
   // print_status();
   MyTimer replanCB_t(true);
   MyTimer otherStuff_t(true);
@@ -949,7 +954,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
     x0[0] = stateA_.pos.x;
     x0[1] = stateA_.pos.y;
     x0[2] = stateA_.pos.z;
-    x0[3] = stateA_.vel.x;
+    x0[3] = par_.hack * par_.v_max;  // stateA_.vel.x;  hacktodo
     x0[4] = stateA_.vel.y;
     x0[5] = stateA_.vel.z;
     x0[6] = stateA_.accel.x;
@@ -973,6 +978,15 @@ void CVX::replanCB(const ros::TimerEvent& e)
     x0[8] = 0;
 
     mtx_initial_cond.unlock();
+  }
+
+  if (par_.visual)
+  {
+    A_.header.stamp = ros::Time::now();
+    A_.pose.position.x = stateA_.pos.x;
+    A_.pose.position.y = stateA_.pos.y;
+    A_.pose.position.z = stateA_.pos.z;
+    pub_point_A_.publish(A_);
   }
 
   Eigen::Vector3d A;
@@ -1385,7 +1399,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
       x0_safe[0] = stateA_.pos.x;
       x0_safe[1] = stateA_.pos.y;
       x0_safe[2] = stateA_.pos.z;
-      x0_safe[3] = stateA_.vel.x;
+      x0_safe[3] = (takeoff_done_ == true) ? par_.hack * par_.v_max : stateA_.vel.x;  // stateA_.vel.x;hacktodo
       x0_safe[4] = stateA_.vel.y;
       x0_safe[5] = stateA_.vel.z;
       x0_safe[6] = stateA_.accel.x;
@@ -1395,17 +1409,19 @@ void CVX::replanCB(const ros::TimerEvent& e)
 
     sg_safe_.setXf(xf_safe);
     sg_safe_.setX0(x0_safe);
-    // std::cout << "InitialCond Safe= " << x0_safe[0] << ", " << x0_safe[1] << ", " << x0_safe[2] << std::endl;
-    // std::cout << "stateA_= " << stateA_ << std::endl;
-    // std::cout << "FinalCond Safe= " << xf_safe[0] << ", " << xf_safe[1] << ", " << xf_safe[2] << std::endl;
-    // std::cout << "Setting polytopes for safe" << std::endl;
     sg_safe_.setPolytopes(l_constraints_safe_);
     // std::cout << "Polytopes set=" << l_constraints_safe_.size() << std::endl;
 
     bool isMinside = l_constraints_safe_[l_constraints_safe_.size() - 1].inside(M);
 
     bool shouldForceFinalConstraint_for_Safe =
-        ((isMinside && takeoff_done_) || par_.use_faster == false) ? true : false;
+        (par_.use_faster == false) ? true : false;  // hacktodo pero quiza ahora es mejor, era ((isMinside &&
+                                                    // takeoff_done_) || par_.use_faster == false) ? true : false;
+
+    std::cout << "shouldForceFinalConstraint_for_Safe=" << shouldForceFinalConstraint_for_Safe << std::endl;
+    std::cout << "par_.use_faster=" << par_.use_faster << std::endl;
+    std::cout << "takeoff_done_=" << takeoff_done_ << std::endl;
+    std::cout << "isMinside=" << isMinside << std::endl;
     sg_safe_.setForceFinalConstraint(shouldForceFinalConstraint_for_Safe);
 
     if (l_constraints_safe_[0].inside(posR) == false)
@@ -1518,7 +1534,12 @@ void CVX::replanCB(const ros::TimerEvent& e)
       pubTraj(tmp, SAFE);
     }
     pubTraj(sg_whole_.X_temp_, WHOLE);
-    pubTraj(X_temp_, COMMITTED);
+    pubTraj(X_temp_, COMMITTED_COLORED);
+    pubTraj(sg_whole_.X_temp_, WHOLE_COLORED);
+    if (needToComputeSafePath == true)
+    {
+      pubTraj(sg_safe_.X_temp_, SAFE_COLORED);
+    }
   }
 
   if (planner_status_ == START_REPLANNING && status_started == REPLANNED)
@@ -1541,6 +1562,12 @@ void CVX::replanCB(const ros::TimerEvent& e)
   optimized_ = true;
   mtx_planner_status_.lock();
   planner_status_ = REPLANNED;
+
+  if (takeoff_done_ == true)
+  {
+    planner_status_ = START_REPLANNING;  // hacktodo
+  }
+
   mtx_planner_status_.unlock();
   // printf("ReplanCB: planner_status_ = REPLANNED\n");
   // std::cout << red << bold << "Above9" << reset << std::endl;
@@ -1587,12 +1614,11 @@ void CVX::replanCB(const ros::TimerEvent& e)
   mtx_offsets.unlock();
 
   // Time allocation
-  double new_init_whole =
-      std::max(sg_whole_.factor_that_worked_ - par_.gamma_whole, 1.0);         // sg_whole_.factor_that_worked_ - 0.25;
+  double new_init_whole = 1;  // hacktodo std::max(sg_whole_.factor_that_worked_ - par_.gamma_whole, 1.0);
   double new_final_whole = sg_whole_.factor_that_worked_ + par_.gammap_whole;  // high end factor is not a problem
   sg_whole_.setFactorInitialAndFinalAndIncrement(new_init_whole, new_final_whole, par_.increment_whole);
 
-  double new_init_safe = std::max(sg_safe_.factor_that_worked_ - par_.gamma_safe, 1.0);
+  double new_init_safe = 1;  // hacktodo std::max(sg_safe_.factor_that_worked_ - par_.gamma_safe, 1.0);
   double new_final_safe = sg_safe_.factor_that_worked_ + par_.gammap_safe;  // high end factor is not a problem
   sg_safe_.setFactorInitialAndFinalAndIncrement(new_init_safe, new_final_safe, par_.increment_safe);
 
@@ -2010,8 +2036,9 @@ void CVX::pubCB(const ros::TimerEvent& e)
        // ROS_WARN("Optimization took too long. Increase deltaT");
     }
 
-    if ((planner_status_ == REPLANNED && (k_ == k_initial_cond_ || to_land_ == true)) ||  // Should be k_==
-        (force_reset_to_0_ && planner_status_ == REPLANNED))
+    if (((planner_status_ == REPLANNED && (k_ == k_initial_cond_ || to_land_ == true)) ||  // Should be k_==
+         (force_reset_to_0_ && planner_status_ == REPLANNED)) &&
+        takeoff_done_ == false)  // hacktodo
     {
       to_land_ == false;
       printf("************Reseteando a 0!\n");
@@ -2696,83 +2723,65 @@ void CVX::pubTraj(Eigen::MatrixXd& X, int type)
     pub_traj_safe_.publish(traj);
   }
 
-  if (type == COMMITTED)
+  clearMarkerColoredTraj();
+  clearMarkerArray(&traj_committed_colored_, &pub_traj_committed_colored_);
+  clearMarkerArray(&traj_whole_colored_, &pub_traj_whole_colored_);
+  clearMarkerArray(&traj_safe_colored_, &pub_traj_safe_colored_);
+
+  if (type == COMMITTED_COLORED)
   {
-    geometry_msgs::Point p_last;
-    p_last.x = X(0, 0);
-    p_last.y = X(0, 1);
-    p_last.z = X(0, 2);
-
-    clearMarkerArray(&traj_committed_colored_, &pub_traj_committed_colored_);
-    clearMarkerColoredTraj();
-    int j = 6000;
-    for (int i = 0; i < X.rows(); i = i + 1)
-    {
-      j = j + 1;
-      double vel = (X.block(i, 3, 1, 3)).norm();
-      visualization_msgs::Marker m;
-      m.type = visualization_msgs::Marker::ARROW;
-      m.header.frame_id = "world";
-      m.header.stamp = ros::Time::now();
-      m.action = visualization_msgs::Marker::ADD;
-      m.id = j;
-      m.color = getColorJet(vel, 0, par_.v_max);
-      m.scale.x = 0.15;
-      m.scale.y = 0;
-      m.scale.z = 0;
-      // std::cout << "Mandando bloque" << X.block(i, 0, 1, 3) << std::endl;
-      geometry_msgs::Point p;
-      p.x = X(i, 0);
-      p.y = X(i, 1);
-      p.z = X(i, 2);
-      m.points.push_back(p_last);
-      m.points.push_back(p);
-      // std::cout << "pushing marker\n" << m << std::endl;
-      p_last = p;
-      traj_committed_colored_.markers.push_back(m);
-      pub_traj_committed_colored_.publish(traj_committed_colored_);
-    }
-
-    /*    geometry_msgs::Point p_last = eigen2point(traj[0]);
-
-        bool first_element = true;
-        int i = 50000;  // large enough to prevent conflict with other markers
-        int j = 0;*/
-
-    /*    for (const auto& it : traj)
-        {
-          i++;
-          if (first_element and type == visualization_msgs::Marker::ARROW)  // skip the first element
-          {
-            first_element = false;
-            continue;
-          }
-
-          visualization_msgs::Marker m;
-          m.type = type;
-          m.action = visualization_msgs::Marker::ADD;
-          m.id = i;
-          m.color = color;
-          // m.scale.z = 1;
-
-          m.header.frame_id = "world";
-          m.header.stamp = ros::Time::now();
-          geometry_msgs::Point p = eigen2point(it);
-          if (type == visualization_msgs::Marker::ARROW)
-          {
-            m.scale.x = 0.02;
-            m.scale.y = 0.04;
-            m.points.push_back(p_last);
-            m.points.push_back(p);
-            // std::cout << "pushing marker\n" << m << std::endl;
-            p_last = p;
-          }
-          else
-
-            (*m_array).markers.push_back(m);
-          j = j + 1;
-        }*/
+    traj_committed_colored_ = Matrix2ColoredMarkerArray(X, type);
+    pub_traj_committed_colored_.publish(traj_committed_colored_);
   }
+
+  if (type == WHOLE_COLORED)
+  {
+    traj_whole_colored_ = Matrix2ColoredMarkerArray(X, type);
+    pub_traj_whole_colored_.publish(traj_whole_colored_);
+  }
+
+  if (type == SAFE_COLORED)
+  {
+    traj_safe_colored_ = Matrix2ColoredMarkerArray(X, type);
+    pub_traj_safe_colored_.publish(traj_safe_colored_);
+  }
+}
+
+visualization_msgs::MarkerArray CVX::Matrix2ColoredMarkerArray(Eigen::MatrixXd& X, int type)
+{
+  geometry_msgs::Point p_last;
+  visualization_msgs::MarkerArray marker_array;
+  p_last.x = X(0, 0);
+  p_last.y = X(0, 1);
+  p_last.z = X(0, 2);
+
+  int j = type * 9000;
+  for (int i = 0; i < X.rows(); i = i + 1)
+  {
+    j = j + 1;
+    double vel = (X.block(i, 3, 1, 3)).norm();
+    visualization_msgs::Marker m;
+    m.type = visualization_msgs::Marker::ARROW;
+    m.header.frame_id = "world";
+    m.header.stamp = ros::Time::now();
+    m.action = visualization_msgs::Marker::ADD;
+    m.id = j;
+    m.color = getColorJet(vel, 0, 1 * par_.v_max);  // note that par_.v_max is per axis!
+    m.scale.x = 0.15;
+    m.scale.y = 0;
+    m.scale.z = 0;
+    // std::cout << "Mandando bloque" << X.block(i, 0, 1, 3) << std::endl;
+    geometry_msgs::Point p;
+    p.x = X(i, 0);
+    p.y = X(i, 1);
+    p.z = X(i, 2);
+    m.points.push_back(p_last);
+    m.points.push_back(p);
+    // std::cout << "pushing marker\n" << m << std::endl;
+    p_last = p;
+    marker_array.markers.push_back(m);
+  }
+  return marker_array;
 }
 
 void CVX::createMarkerSetOfArrows(Eigen::MatrixXd X, bool isFree)

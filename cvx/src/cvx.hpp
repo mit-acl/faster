@@ -62,7 +62,9 @@
 
 #define WHOLE 1  // Whole trajectory (part of which is planned on unkonwn space)
 #define SAFE 2   // Safe path
-#define COMMITTED 3
+#define COMMITTED_COLORED 3
+#define WHOLE_COLORED 4
+#define SAFE_COLORED 5
 
 #define OCCUPIED_SPACE 1
 #define UNKOWN_AND_OCCUPIED_SPACE 2
@@ -104,11 +106,9 @@ struct parameters
   int N_whole;
   int N_safe;
 
-  double factor_deltaTp;
   double factor_deltaT;
   double factor_min_deltaT;
 
-  int min_states_deltaTp;
   int min_states_deltaT;
 
   double Ra;
@@ -155,6 +155,8 @@ struct parameters
   bool use_faster;
   bool keep_optimizing_after_found;
   bool use_smart_deltaT;
+
+  double hack;
 };
 
 //####Class CVX
@@ -171,6 +173,7 @@ private:
 
   SolverGurobi sg_whole_;  // solver gurobi whole trajectory
   SolverGurobi sg_safe_;   // solver gurobi whole trajectory
+
   // class methods
   // void pubTraj(double** x);
   void pubTraj(Eigen::MatrixXd& X, int type);
@@ -268,12 +271,15 @@ private:
   int findIndexR(int indexH);
   int findIndexH(bool& needToComputeSafePath);
 
+  visualization_msgs::MarkerArray Matrix2ColoredMarkerArray(Eigen::MatrixXd& X, int type);
+
   visualization_msgs::Marker setpoint_;
   visualization_msgs::Marker R_;
   visualization_msgs::Marker I_;
   visualization_msgs::Marker E_;
   visualization_msgs::Marker M_;
   visualization_msgs::Marker H_;
+  visualization_msgs::Marker A_;
   acl_msgs::QuadGoal quadGoal_;
   acl_msgs::QuadGoal stateA_;  // It's the initial condition for the solver
   acl_msgs::QuadFlightMode flight_mode_;
@@ -303,7 +309,10 @@ private:
   ros::Publisher pub_point_M_;
   ros::Publisher pub_point_E_;
   ros::Publisher pub_point_H_;
+  ros::Publisher pub_point_A_;
   ros::Publisher pub_traj_committed_colored_;
+  ros::Publisher pub_traj_whole_colored_;
+  ros::Publisher pub_traj_safe_colored_;
 
   ros::Publisher pub_planning_vis_;
   ros::Publisher pub_intersec_points_;
@@ -346,6 +355,8 @@ private:
   visualization_msgs::MarkerArray path_jps_safe_;
   visualization_msgs::MarkerArray path_jps_whole_;
   visualization_msgs::MarkerArray traj_committed_colored_;
+  visualization_msgs::MarkerArray traj_whole_colored_;
+  visualization_msgs::MarkerArray traj_safe_colored_;
 
   visualization_msgs::MarkerArray intersec_points_;
   visualization_msgs::MarkerArray samples_safe_path_;
