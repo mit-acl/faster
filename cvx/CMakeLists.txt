@@ -53,11 +53,20 @@ include_directories(${catkin_INCLUDE_DIRS})
 set(GUROBI_LIBRARIES "$ENV{GUROBI_HOME}/lib/libgurobi_c++.a;$ENV{GUROBI_HOME}/lib/libgurobi81.so;$ENV{GUROBI_HOME}/lib/" )
 
 add_executable(${PROJECT_NAME}_node src/main.cpp src/cvx.cpp src/solvers/solverGurobi.cpp)
+
 #IF CVXGEN and GUROBI are required:
 #target_link_libraries(${PROJECT_NAME}_node ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${JPS3D_LIBRARIES} ${DECOMP_UTIL_LIBRARIES} ${CMAKE_CURRENT_LIST_DIR}/src/solvers/cvxgen/libcvx_vel.so ${CMAKE_CURRENT_LIST_DIR}/src/solvers/cvxgen/libcvx_accel.so ${CMAKE_CURRENT_LIST_DIR}/src/solvers/cvxgen/libcvx_jerk.so ${GUROBI_LIBRARIES})
 #IF only GUROBI is required:
 target_link_libraries(${PROJECT_NAME}_node ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${JPS3D_LIBRARIES} ${DECOMP_UTIL_LIBRARIES} ${GUROBI_LIBRARIES})
+
+
 add_dependencies(${PROJECT_NAME}_node ${catkin_EXPORTED_TARGETS} )
+
+
+
+add_executable(${PROJECT_NAME}_node_novale src/main_novale.cpp)
+add_dependencies(${PROJECT_NAME}_node_novale ${catkin_EXPORTED_TARGETS} )
+target_link_libraries(${PROJECT_NAME}_node_novale ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
 
 add_executable(gurobi_continuous_exec gurobi_continuous.cpp)
