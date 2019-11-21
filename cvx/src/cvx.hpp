@@ -18,19 +18,13 @@
 #include <acl_msgs/TermGoal.h>
 #include <nav_msgs/Odometry.h>
 
-#include <mutex>
-
 // TimeSynchronizer includes
 #include <message_filters/subscriber.h>
 #include <message_filters/synchronizer.h>
 #include <message_filters/sync_policies/exact_time.h>
 #include <message_filters/sync_policies/approximate_time.h>
 
-// JPS3D includes
 #include "timer.hpp"
-#include "read_map.hpp"
-#include <jps_basis/data_utils.h>
-#include <jps_planner/jps_planner/jps_planner.h>
 
 #include "utils.hpp"
 
@@ -38,10 +32,7 @@
 //#include "solvers/solvers.hpp" CVXGEN solver interface
 #include "solvers/solverGurobi.hpp"
 
-// Convex Decomposition includes
-#include <decomp_ros_utils/data_ros_utils.h>
-#include <decomp_util/ellipsoid_decomp.h>
-#include <decomp_util/seed_decomp.h>
+#include "jps_manager.hpp"
 
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/CameraInfo.h>
@@ -65,9 +56,6 @@
 #define COMMITTED_COLORED 3
 #define WHOLE_COLORED 4
 #define SAFE_COLORED 5
-
-#define OCCUPIED_SPACE 1
-#define UNKOWN_AND_OCCUPIED_SPACE 2
 
 #define JPSk_NORMAL 1
 #define JPS2_NORMAL 2
@@ -166,13 +154,10 @@ public:
   CVX(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pub_CB);
 
 private:
-  // CVXGEN solvers
-  // Solver<VEL> solver_vel_;
-  // Solver<ACCEL> solver_accel_;
-  // Solver<JERK> solver_jerk_;
-
   SolverGurobi sg_whole_;  // solver gurobi whole trajectory
   SolverGurobi sg_safe_;   // solver gurobi whole trajectory
+
+  JPS_Manager jps_manager_;  // Manager of JPS
 
   // class methods
   // void pubTraj(double** x);
@@ -217,10 +202,10 @@ private:
                                    std::vector<double> radii = std::vector<double>());
   visualization_msgs::MarkerArray clearArrows();
   // geometry_msgs::Vector3 vectorNull();
-  geometry_msgs::Vector3 getPos(int i);
-  geometry_msgs::Vector3 getVel(int i);
-  geometry_msgs::Vector3 getAccel(int i);
-  geometry_msgs::Vector3 getJerk(int i);
+  Eigen::Vector3d getPos(int i);
+  Eigen::Vector3d getVel(int i);
+  Eigen::Vector3d getAccel(int i);
+  Eigen::Vector3d getJerk(int i);
 
   // double solveVelAndGetCost(vec_Vecf<3> path);
   void updateInitialCond(int i);
@@ -232,9 +217,6 @@ private:
   void publishJPSPath(vec_Vecf<3>& path, int i);
   void clearJPSPathVisualization(int i);
 
-  void updateJPSMap(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr);
-  vec_Vecf<3> solveJPS3D(Vec3f& start, Vec3f& goal, bool* solved, int i);
-
   void pubTerminalGoal();
 
   void pubJPSIntersection(Eigen::Vector3d& inters);
@@ -245,23 +227,13 @@ private:
   void publishJPS2handIntersection(vec_Vecf<3> JPS2_fix, Eigen::Vector3d& inter1, Eigen::Vector3d& inter2,
                                    bool solvedFix);
 
-  vec_Vecf<3> fix(vec_Vecf<3>& JPS_old, Eigen::Vector3d& start, Eigen::Vector3d& goal, bool* solved);
+  // vec_Vecf<3> fix(vec_Vecf<3>& JPS_old, Eigen::Vector3d& start, Eigen::Vector3d& goal, bool* solved);
 
   // double getDistanceToFirstCollisionJPSwithUnkonwnspace(vec_Vecf<3> path, bool* thereIsIntersection);
-
-  void cvxEllipsoidDecompUnkOcc2(vec_Vecf<3>& path);
-  void cvxEllipsoidDecompOcc(vec_Vecf<3>& path);
-  void cvxSeedDecompUnkOcc(Vecf<3>& seed);
 
   // vec_Vecf<3> sampleJPS(vec_Vecf<3>& path, int n);
 
   // std::vector<double> getDistToNearestObs(vec_Vecf<3>& points);
-
-  Eigen::Vector3d getIntersectionJPSwithPolytope(vec_Vecf<3>& path, std::vector<LinearConstraint3D>& constraints,
-                                                 bool& thereIsIntersection);
-
-  std::vector<Eigen::Vector3d> simulateForward(Eigen::Vector3d& pos_init, Eigen::Vector3d& vel_init,
-                                               Eigen::Vector3d& accel_init, Eigen::MatrixXd& jerk_sent);
 
   void createMoreVertexes(vec_Vecf<3>& path, double d);
 
@@ -280,9 +252,9 @@ private:
   visualization_msgs::Marker H_;
   visualization_msgs::Marker A_;
   acl_msgs::QuadGoal quadGoal_;
-  acl_msgs::QuadGoal stateA_;  // It's the initial condition for the solver
+  state stateA_;  // It's the initial condition for the solver
   acl_msgs::QuadFlightMode flight_mode_;
-  acl_msgs::State state_;
+  state state_;
   Eigen::Vector3d G_;       // This goal is always inside of the map
   Eigen::Vector3d G_term_;  // This goal is the clicked goal
 
@@ -424,7 +396,7 @@ private:
   std::mutex mtx_frontier;
   std::mutex mtx_inst;  // mutex of instanteneous data (v_kdtree_new_pcls_)
   std::mutex mtx_goals;
-  std::mutex mtx_jps_map_util;  // mutex for map_util_ and planner_ptr_
+
   std::mutex mtx_k;
   std::mutex mtx_X_U_temp;
   std::mutex mtx_X_U_safe;
@@ -437,9 +409,6 @@ private:
 
   std::mutex mtx_G;
   std::mutex mtx_G_term;
-
-  std::shared_ptr<JPS::VoxelMapUtil> map_util_;
-  std::unique_ptr<JPSPlanner3D> planner_ptr_;
 
   bool X_initialized_ = false;
 
@@ -458,14 +427,8 @@ private:
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_map_;
 
-  vec_Vec3f vec_o_;   // Vector that contains the occupied points
-  vec_Vec3f vec_uo_;  // Vector that contains the unkown and occupied points
+  // SeedDecomp3D seed_decomp_util_;
 
-  SeedDecomp3D seed_decomp_util_;
-  EllipsoidDecomp3D ellip_decomp_util_;
-  EllipsoidDecomp3D ellip_decomp_util_uo2_;
-
-  vec_Vecf<3> JPS_k_m_1_;
   bool takeoff_done_ = false;
 
   bool state_initialized_ = false;

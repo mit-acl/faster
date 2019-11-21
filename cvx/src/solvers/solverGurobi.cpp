@@ -458,28 +458,38 @@ Eigen::MatrixXd SolverGurobi::getU()
   return U_temp_;
 }
 
-void SolverGurobi::setX0(double x0[])
+void SolverGurobi::setX0(state& data)
 {
-  // printf("Setting initial condition:\n");
-  int input_order = 3;
-  for (int i = 0; i < 9; i++)
-  {
-    // std::cout << x0[i] << "  ";
-    x0_[i] = x0[i];
-  }
-  // std::cout << std::endl;
+  Eigen::Vector3d pos = data.pos;
+  Eigen::Vector3d vel = data.vel;
+  Eigen::Vector3d accel = data.accel;
+
+  x0_[0] = data.pos.x();
+  x0_[1] = data.pos.y();
+  x0_[2] = data.pos.z();
+  x0_[3] = data.vel.x();
+  x0_[4] = data.vel.y();
+  x0_[5] = data.vel.z();
+  x0_[6] = data.accel.x();
+  x0_[7] = data.accel.y();
+  x0_[8] = data.accel.z();
 }
 
-void SolverGurobi::setXf(double xf[])
+void SolverGurobi::setXf(state& data)
 {
-  // printf("Setting final condition:\n");
+  Eigen::Vector3d pos = data.pos;
+  Eigen::Vector3d vel = data.vel;
+  Eigen::Vector3d accel = data.accel;
 
-  for (int i = 0; i < 9; i++)
-  {
-    // std::cout << xf[i] << "  ";
-    xf_[i] = xf[i];
-  }
-  // std::cout << "\nFinal Condtion set" << std::endl;
+  xf_[0] = data.pos.x();
+  xf_[1] = data.pos.y();
+  xf_[2] = data.pos.z();
+  xf_[3] = data.vel.x();
+  xf_[4] = data.vel.y();
+  xf_[5] = data.vel.z();
+  xf_[6] = data.accel.x();
+  xf_[7] = data.accel.y();
+  xf_[8] = data.accel.z();
 }
 
 void SolverGurobi::setConstraintsXf()

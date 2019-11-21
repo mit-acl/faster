@@ -17,6 +17,54 @@
 #include <unsupported/Eigen/Polynomials>
 using namespace termcolor;
 
+struct state
+{
+  Eigen::Vector3d pos = Eigen::Vector3d::Zero();
+  Eigen::Vector3d vel = Eigen::Vector3d::Zero();
+  Eigen::Vector3d accel = Eigen::Vector3d::Zero();
+
+  void setPos(double x, double y, double z)
+  {
+    pos << x, y, z;
+  }
+  void setVel(double x, double y, double z)
+  {
+    pos << x, y, z;
+  }
+  void setAccel(double x, double y, double z)
+  {
+    pos << x, y, z;
+  }
+
+  void setPos(Eigen::Vector3d& data)
+  {
+    pos << data.x(), data.y(), data.z();
+  }
+
+  void setVel(Eigen::Vector3d& data)
+  {
+    vel << data.x(), data.y(), data.z();
+  }
+
+  void setAccel(Eigen::Vector3d& data)
+  {
+    accel << data.x(), data.y(), data.z();
+  }
+
+  void setState(Eigen::Matrix<double, 9, 1>& data)
+  {
+    pos << data(0, 0), data(1, 0), data(2, 0);
+    vel << data(3, 0), data(4, 0), data(5, 0);
+    accel << data(6, 0), data(7, 0), data(8, 0);
+  }
+  void setZero()
+  {
+    pos = Eigen::Vector3d::Zero();
+    vel = Eigen::Vector3d::Zero();
+    accel = Eigen::Vector3d::Zero();
+  }
+};
+
 // TODO: This function is the same as solvePolyOrder2 but with other name (weird conflicts...)
 inline double solvePolynomialOrder2(Eigen::Vector3f& coeff)
 {
@@ -71,9 +119,9 @@ public:
 
   // void setQ(double q);
   void setN(int N);
-  void setX0(double x0[]);
+  void setX0(state& data);
   // void set_u0(double u0[]);
-  void setXf(double xf[]);
+  void setXf(state& data);
   void resetXandU();
   void set_max(double max_values[3]);
   bool genNewTraj();

@@ -272,3 +272,337 @@ void CVX::pubintersecPoint(Eigen::Vector3d p, bool add)
     intersec_points_.markers.clear();
   }
 }
+
+std::vector<Eigen::Vector3d> simulateForward(Eigen::Vector3d& pos_init, Eigen::Vector3d& vel_init,
+                                             Eigen::Vector3d& accel_init, Eigen::MatrixXd& jerk_sent);
+
+std::vector<Eigen::Vector3d> CVX::simulateForward(Eigen::Vector3d& pos_init, Eigen::Vector3d& vel_init,
+                                                  Eigen::Vector3d& accel_init, Eigen::MatrixXd& jerk_sent)
+{
+  double t = 0.01;
+
+  Eigen::Vector3d pos;
+  Eigen::Vector3d vel;
+  Eigen::Vector3d accel;
+  Eigen::Vector3d jerk;
+
+  Eigen::Vector3d pos0 = pos_init;
+  Eigen::Vector3d vel0 = vel_init;
+  Eigen::Vector3d accel0 = accel_init;
+
+  std::cout << "SIMULATED ONLINE!:" << std::endl;
+  std::cout << pos0.transpose() << "  " << vel0.transpose() << "  " << accel0.transpose() << std::endl;
+  std::cout << "going to simulate forward,jerk_sent.rows()=" << jerk_sent.rows() << std::endl;
+
+  for (int j = 0; j < jerk_sent.rows(); j++)
+  {
+    // std::cout << "Simulating forward" << std::endl;
+    jerk = jerk_sent.row(j).transpose();
+    pos = (1 / 6.0) * jerk * t * t * t + accel0 * t * t / 2.0 + vel0 * t + pos0;
+    /*    std::cout << "accel0 * t" << (accel0 * t).transpose() << std::endl;
+        std::cout << "vel0" << (vel0).transpose() << std::endl;
+
+        std::cout << "accel0 * t" << (accel0 * t).transpose() << std::endl;*/
+
+    vel = (1 / 2.0) * jerk * t * t + accel0 * t + vel0;
+    accel = jerk * t + accel0;
+
+    pos0 = pos;
+    accel0 = accel;
+    vel0 = vel;
+
+    std::cout << pos.transpose() << "  " << vel.transpose() << "  " << accel.transpose() << std::endl;
+  }
+
+  std::vector<Eigen::Vector3d> result;
+  result.push_back(pos);
+  result.push_back(vel);
+  result.push_back(accel);
+  return result;
+}
+
+Eigen::Vector3d getIntersectionJPSwithPolytope(vec_Vecf<3>& path, std::vector<LinearConstraint3D>& constraints,
+                                               bool& thereIsIntersection);
+
+// Compute the intersection of JPS with the first polytope of the vector "constraints" (each element of "constraints"
+// represents a polytope)
+Eigen::Vector3d CVX::getIntersectionJPSwithPolytope(vec_Vecf<3>& path, std::vector<LinearConstraint3D>& constraints,
+                                                    bool& thereIsIntersection)
+{
+  // std::cout << "**IntersectionF:Path given=" << std::endl;
+  // printElementsOfJPS(path);
+  LinearConstraint3D constraint = constraints[0];
+  // Each element of cs_vector is a pair (A,b) representing a polytope
+  bool there_is_intersection = false;
+  int last_id_inside = 0;
+  // std::cout << "Inside Finding intersection" << std::endl;
+  for (size_t i = 0; i < path.size(); i++)
+  {
+    if (constraint.inside(path[i]) == false)  // If a vertex of the path is not in JPS
+    {
+      there_is_intersection = true;
+      break;
+    }
+    else
+    {
+      last_id_inside = i;
+    }
+  }
+
+  // std::cout << "**IntersectionF: there_is_intersection= " << there_is_intersection << std::endl;
+
+  thereIsIntersection = there_is_intersection;
+  if (there_is_intersection == false)
+  {  // If no intersection, return last point in the path
+    return path[path.size() - 1];
+  }
+
+  // std::cout << "Out Looop 2" << std::endl;
+
+  int n_of_faces = constraint.b().rows();
+  MatDNf<3> A = constraint.A();
+  VecDf b = constraint.b();
+
+  /*  for (int m = 0; m < b.size(); m++)
+    {
+      std::cout << "b[m] is" << b[m] << std::endl;
+    }
+
+    for (int m = 0; m < A.rows(); m++)
+    {
+      std::cout << "A[m] is " << A.row(m) << std::endl;
+    }*/
+  // std::cout << "A directamente es\n" << A << std::endl;
+
+  Eigen::Vector3d inters;
+  /*  std::cout << "last_id_inside=" << last_id_inside << std::endl;
+    std::cout << "Num of el in path " << path.size() << std::endl;
+    std::cout << "Number of faces " << n_of_faces << std::endl;*/
+
+  int j = 0;
+  vec_Vecf<3> intersections;
+  for (size_t j = 0; j < n_of_faces; j++)
+  {
+    bool intersection_with_this_face = false;
+    Eigen::Vector4d coeff;
+    Eigen::Vector3d normal = A.row(j);  // normal vector
+    coeff << normal(0), normal(1), normal(2), -b(j);
+    // std::cout << "j=" << j << std::endl;
+
+    intersection_with_this_face =
+        getIntersectionWithPlane(path[last_id_inside], path[last_id_inside + 1], coeff, inters);
+    // std::cout << "j despues=" << j << std::endl;
+    if (intersection_with_this_face == true)
+    {
+      intersections.push_back(inters);
+
+      // break;
+    }
+  }
+
+  if (intersections.size() == 0)
+  {  // There is no intersection
+    ROS_ERROR("This is impossible, there should be an intersection");
+  }
+
+  std::vector<double> distances;
+
+  // And now take the nearest intersection
+  for (size_t i = 0; i < intersections.size(); i++)
+  {
+    double distance = (intersections[i] - path[0]).norm();
+    distances.push_back(distance);
+  }
+  int minElementIndex = std::min_element(distances.begin(), distances.end()) - distances.begin();
+  inters = intersections[minElementIndex];
+  // std::cout << "Plane coeff" << coeff.transpose() << std::endl;
+  // std::cout << "Intersection=" << inters.transpose() << " is the correct one!" << std::endl;
+  // std::cout << "Reached this point" << std::endl;
+
+  if (par_.visual == true)
+  {
+    I_.header.stamp = ros::Time::now();
+    I_.pose.position.x = inters(0);
+    I_.pose.position.y = inters(1);
+    I_.pose.position.z = inters(2);
+    pub_intersectionI_.publish(I_);
+  }
+
+  // std::cout << "Going to return" << inters.transpose() << std::endl;
+  return inters;
+}
+
+vec_Vecf<3> CVX::fix(vec_Vecf<3>& JPS_old, Eigen::Vector3d& start, Eigen::Vector3d& goal, bool* solved)
+{
+  vec_Vecf<3> fix;
+  vec_Vecf<3> JPS_old_original = JPS_old;
+  bool thereIsIntersection = false;
+
+  vec_Vecf<3> path_start2fix;  // referenceFs has to be initialized
+  vec_Vecf<3> path_fix2goal;
+  // std::cout << "*********In fix0.6" << std::endl;
+  path_start2fix.clear();
+  path_fix2goal.clear();
+  vec_Vecf<3> path_fixed;
+
+  // std::cout << "*********In fix0.7" << std::endl;
+  Eigen::Vector3d inters1 = getFirstCollisionJPS(JPS_old, &thereIsIntersection, MAP,
+                                                 RETURN_INTERSECTION);  // intersection starting from start
+  // std::cout << "Here thereIsIntersection=" << thereIsIntersection << std::endl;
+  // std::cout << "*********In fix2" << std::endl;
+
+  if (thereIsIntersection)
+  {
+    // std::cout << "*********In fix2.5" << std::endl;
+    clearJPSPathVisualization(2);
+    vec_Vecf<3> tmp = JPS_old;
+    // std::cout << "*****tmp is:" << std::endl;
+    // printElementsOfJPS(tmp);
+    std::reverse(tmp.begin(), tmp.end());  // flip all the vector
+    Eigen::Vector3d inters2 = getFirstCollisionJPS(tmp, &thereIsIntersection, MAP,
+                                                   RETURN_INTERSECTION);  // intersection starting from the goal
+
+    // std::reverse(path_fix2goal.begin(), path_fix2goal.end());
+    bool solvedFix, solvedStart2Fix, solvedFix2Goal;
+    // std::cout << "*********In fix3" << std::endl;
+
+    if ((inters1 - inters2).lpNorm<1>() > 0.01)  // Hack to delete corner cases TODO
+    // if (inters1.isApprox(inters2, 0.01))
+    {
+      fix = jps_manager_.solveJPS3D(inters1, inters2, &solvedFix, 2);
+    }
+    else
+    {
+      fix.push_back(inters1);
+    }
+
+    if ((start - inters1).lpNorm<1>() > 0.01)  // Hack to delete corner cases TODO
+    // if (start.isApprox(inters1, 0.01))
+    {
+      path_start2fix = jps_manager_.solveJPS3D(start, inters1, &solvedStart2Fix, 2);
+    }
+    else
+    {
+      path_start2fix.push_back(start);
+    }
+
+    if ((inters2 - goal).lpNorm<1>() > 0.01)  // Hack to delete corner cases TODO
+    // if (inters2.isApprox(goal, 0.01))
+    {
+      path_fix2goal = jps_manager_.solveJPS3D(inters2, goal, &solvedFix2Goal, 2);
+    }
+    else
+    {
+      path_fix2goal.push_back(goal);
+    }
+
+    // printf("AQUI4\n");
+
+    // printf("After calling solveJPSD\n");
+    bool solved_complete_fix = solvedFix && solvedStart2Fix && solvedFix2Goal;
+    if (solved_complete_fix == false)
+    {
+      printf("**************Couldn't find some part of the fixed path**********\n");
+      *solved = false;
+    }
+
+    else
+    {
+      *solved = true;
+
+      path_fixed.clear();
+      path_fixed.insert(path_fixed.end(), path_start2fix.begin(), path_start2fix.end());
+      path_fixed.insert(path_fixed.end(), fix.begin() + 1, fix.end());
+      path_fixed.insert(path_fixed.end(), path_fix2goal.begin() + 1, path_fix2goal.end());
+      /*      printf("***************Start to fix******************\n");
+            printElementsOfJPS(path_start2fix);
+            printf("***************Fix***************************\n");
+            printElementsOfJPS(fix);
+            printf("***************Fix to Goal***************************\n");
+            printElementsOfJPS(path_fix2goal);
+            printf("***************Everything***************************\n");
+            printElementsOfJPS(path_fixed);*/
+      if (par_.visual == true)
+      {
+        publishJPS2handIntersection(path_fixed, inters1, inters2, solved_complete_fix);
+      }
+    }
+  }
+
+  else
+  {
+    printf("there is no intersection\n");
+    /*   std::cout << "the start is " << start.transpose() << std::endl;
+      std::cout << "the goal is " << goal.transpose() << std::endl;*/
+
+    *solved = true;
+    // JPS_old[0] = start;
+    // JPS_old[JPS_old.size() - 1] = goal;
+
+    /*    std::cout << "voy a copiar" << std::endl;
+        printElementsOfJPS(JPS_old_original);*/
+
+    std::copy(JPS_old_original.begin(), JPS_old_original.end(), back_inserter(path_fixed));  // Copy JPS_old into fix
+    // fix = JPS_old;
+    path_fixed[0] = start;
+    path_fixed[path_fixed.size() - 1] = goal;
+
+    /*    std::cout << "Lo copiado" << std::endl;
+        printElementsOfJPS(path_fixed);*/
+
+    if (par_.visual == true)
+    {
+      publishJPS2handIntersection(path_fixed, path_fixed[0], path_fixed[path_fixed.size() - 1], 1);
+    }
+  }
+  // printf("finisshing fix\n");
+
+  return path_fixed;
+}
+
+void CVX::publishJPS2handIntersection(vec_Vecf<3> JPS2_fix, Eigen::Vector3d& inter1, Eigen::Vector3d& inter2,
+                                      bool solvedFix)
+{
+  // printf("Going to publish\n");
+  /*vec_Vecf<3> traj, visualization_msgs::MarkerArray* m_array*/
+  clearJPSPathVisualization(2);
+  // path_jps_ = clearArrows();
+
+  // vectorOfVectors2MarkerArray(JPS2, &path_jps2_, color(RED));
+  if (solvedFix == true)
+  {
+    vectorOfVectors2MarkerArray(JPS2_fix, &path_jps2_, color(GREEN));
+  }
+
+  visualization_msgs::Marker m1;
+  m1.header.frame_id = "world";
+  m1.id = 19865165;
+  m1.type = visualization_msgs::Marker::SPHERE;
+  m1.scale = vectorUniform(0.3);
+  m1.color = color(BLUE_TRANS);
+  m1.pose.position = eigen2point(inter1);
+  path_jps2_.markers.push_back(m1);
+
+  visualization_msgs::Marker m2;
+  m2.header.frame_id = "world";
+  m2.id = 19865166;
+  m2.type = visualization_msgs::Marker::SPHERE;
+  m2.scale = vectorUniform(0.3);
+  m2.color = color(RED_TRANS);
+  m2.pose.position = eigen2point(inter2);
+  path_jps2_.markers.push_back(m2);
+
+  pub_path_jps2_.publish(path_jps2_);
+}
+
+if (l_constraints_whole_[0].inside(A) == false)
+{
+  std::cout << red << "First point of whole traj is outside" << reset << std::endl;
+}
+
+if (planner_status_ == START_REPLANNING && status_started == REPLANNED)
+{
+  /*      std::cout << bold << "Solved everything but the publisher already copied current matrix, exiting" << reset
+                  << std::endl;*/
+  return;
+}

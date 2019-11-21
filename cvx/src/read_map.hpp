@@ -1,7 +1,11 @@
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
 #include <yaml-cpp/yaml.h>
 #include <iostream>
 #include <fstream>
 #include <jps_basis/data_utils.h>
+
+#include <memory>
 
 template <class Ti, class Tf>
 class MapReader

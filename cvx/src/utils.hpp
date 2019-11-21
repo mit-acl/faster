@@ -6,8 +6,11 @@
 #include <geometry_msgs/Vector3.h>
 #include <geometry_msgs/Point.h>
 #include <visualization_msgs/Marker.h>
+#include <jps_basis/data_utils.h>
 #include "termcolor.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.h"
+#include "visualization_msgs/Marker.h"
+#include "visualization_msgs/MarkerArray.h"
 
 #define RED 1
 #define RED_TRANS 2
@@ -30,6 +33,9 @@
 
 #define WHOLE_TRAJ 0
 #define RESCUE_PATH 1
+
+#define OCCUPIED_SPACE 1
+#define UNKOWN_AND_OCCUPIED_SPACE 2
 
 // inline is needed to avoid the "multiple definitions" error. Other option is to create the utils.cpp file, and put
 // there the function (and here only the prototype)
@@ -549,6 +555,15 @@ inline Eigen::Vector3d vec2eigen(geometry_msgs::Vector3 vector)
 {
   Eigen::Vector3d tmp;
   tmp << vector.x, vector.y, vector.z;
+  return tmp;
+}
+
+inline geometry_msgs::Vector3 eigen2rosvector(Eigen::Vector3d vector)
+{
+  geometry_msgs::Vector3 tmp;
+  tmp.x = vector(0, 0);
+  tmp.y = vector(1, 0);
+  tmp.z = vector(2, 0);
   return tmp;
 }
 
@@ -1076,6 +1091,15 @@ inline Eigen::Vector3d projectPointToBox(Eigen::Vector3d& P1, Eigen::Vector3d& P
   inters = intersections[minElementIndex];
 
   return inters;
+}
+
+inline void deleteVertexes(vec_Vecf<3>& JPS_path, int max_value)
+{
+  if (JPS_path.size() > max_value + 1)  // If I have more than (max_value + 1) vertexes
+  {
+    JPS_path.erase(JPS_path.begin() + max_value + 1,
+                   JPS_path.end());  // Force JPS to have less than max_value elements
+  }
 }
 
 #endif
