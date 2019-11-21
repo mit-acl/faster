@@ -987,4 +987,95 @@ std::ostream& operator<<(std::ostream& out, const std::vector<T>& v)
   return out;
 }
 
+inline visualization_msgs::MarkerArray Matrix2ColoredMarkerArray(Eigen::MatrixXd& X, int type, double max_value)
+{
+  geometry_msgs::Point p_last;
+  visualization_msgs::MarkerArray marker_array;
+  p_last.x = X(0, 0);
+  p_last.y = X(0, 1);
+  p_last.z = X(0, 2);
+
+  int j = type * 9000;
+  for (int i = 0; i < X.rows(); i = i + 1)
+  {
+    j = j + 1;
+    double vel = (X.block(i, 3, 1, 3)).norm();
+    visualization_msgs::Marker m;
+    m.type = visualization_msgs::Marker::ARROW;
+    m.header.frame_id = "world";
+    m.header.stamp = ros::Time::now();
+    m.action = visualization_msgs::Marker::ADD;
+    m.id = j;
+    m.color = getColorJet(vel, 0, max_value);  // note that par_.v_max is per axis!
+    m.scale.x = 0.15;
+    m.scale.y = 0;
+    m.scale.z = 0;
+    // std::cout << "Mandando bloque" << X.block(i, 0, 1, 3) << std::endl;
+    geometry_msgs::Point p;
+    p.x = X(i, 0);
+    p.y = X(i, 1);
+    p.z = X(i, 2);
+    m.points.push_back(p_last);
+    m.points.push_back(p);
+    // std::cout << "pushing marker\n" << m << std::endl;
+    p_last = p;
+    marker_array.markers.push_back(m);
+  }
+  return marker_array;
+}
+
+// P1-P2 is the direction used for projection. P2 is the goal clicked. wdx, wdy and wdz are the widths of a 3D box
+// centered on P1
+inline Eigen::Vector3d projectPointToBox(Eigen::Vector3d& P1, Eigen::Vector3d& P2, double wdx, double wdy, double wdz)
+{
+  double x_max = P1(0) + wdx / 2;
+  double x_min = P1(0) - wdx / 2;
+  double y_max = P1(1) + wdy / 2;
+  double y_min = P1(1) - wdy / 2;
+  double z_max = P1(2) + wdz / 2;
+  double z_min = P1(2) - wdz / 2;
+
+  if ((P2(0) < x_max && P2(0) > x_min) && (P2(1) < y_max && P2(1) > y_min) && (P2(2) < z_max && P2(2) > z_min))
+  {
+    // Clicked goal is inside the map
+    return P2;
+  }
+  Eigen::Vector3d inters;
+  std::vector<Eigen::Vector4d> all_planes = {
+    Eigen::Vector4d(1, 0, 0, -x_max),  // Plane X right
+    Eigen::Vector4d(-1, 0, 0, x_min),  // Plane X left
+    Eigen::Vector4d(0, 1, 0, -y_max),  // Plane Y right
+    Eigen::Vector4d(0, -1, 0, y_min),  // Plane Y left
+    Eigen::Vector4d(0, 0, 1, -z_max),  // Plane Z up
+    Eigen::Vector4d(0, 0, -1, z_min)   // Plane Z down
+  };
+
+  vec_Vecf<3> intersections;
+
+  int axis;  // 1 is x, 2 is y, 3 is z
+  for (int i = 0; i < 6; i++)
+  {
+    if (getIntersectionWithPlane(P1, P2, all_planes[i], inters) == true)
+    {
+      intersections.push_back(inters);
+    }
+  }
+
+  if (intersections.size() == 0)
+  {  // There is no intersection
+    ROS_ERROR("This is impossible, there should be an intersection");
+  }
+  std::vector<double> distances;
+  // And now take the nearest intersection
+  for (size_t i = 0; i < intersections.size(); i++)
+  {
+    double distance = (intersections[i] - P1).norm();
+    distances.push_back(distance);
+  }
+  int minElementIndex = std::min_element(distances.begin(), distances.end()) - distances.begin();
+  inters = intersections[minElementIndex];
+
+  return inters;
+}
+
 #endif
