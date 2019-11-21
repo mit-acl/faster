@@ -1,5 +1,5 @@
 // Authors: Jesus Tordesillas
-// Date: August 2018, December 2018
+// Date: August 2018, December 2018, November 2019
 
 #include "cvx.hpp"
 #include "geometry_msgs/PointStamped.h"
@@ -798,7 +798,7 @@ void CVX::createMoreVertexes(vec_Vecf<3>& path, double d)
 
 void CVX::replanCB(const ros::TimerEvent& e)
 {
-  par_.use_faster = !par_.use_faster;  // hacktodo
+  // par_.use_faster = !par_.use_faster;  // hacktodo
 
   // print_status();
   MyTimer replanCB_t(true);
@@ -954,7 +954,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
     x0[0] = stateA_.pos.x;
     x0[1] = stateA_.pos.y;
     x0[2] = stateA_.pos.z;
-    x0[3] = par_.hack * par_.v_max;  // stateA_.vel.x;  hacktodo
+    x0[3] = stateA_.vel.x;  // par_.hack * par_.v_max;   hacktodo
     x0[4] = stateA_.vel.y;
     x0[5] = stateA_.vel.z;
     x0[6] = stateA_.accel.x;
@@ -1399,7 +1399,7 @@ void CVX::replanCB(const ros::TimerEvent& e)
       x0_safe[0] = stateA_.pos.x;
       x0_safe[1] = stateA_.pos.y;
       x0_safe[2] = stateA_.pos.z;
-      x0_safe[3] = (takeoff_done_ == true) ? par_.hack * par_.v_max : stateA_.vel.x;  // stateA_.vel.x;hacktodo
+      x0_safe[3] = stateA_.vel.x;  //(takeoff_done_ == true) ? par_.hack * par_.v_max : stateA_.vel.x;  hacktodo
       x0_safe[4] = stateA_.vel.y;
       x0_safe[5] = stateA_.vel.z;
       x0_safe[6] = stateA_.accel.x;
@@ -1563,10 +1563,10 @@ void CVX::replanCB(const ros::TimerEvent& e)
   mtx_planner_status_.lock();
   planner_status_ = REPLANNED;
 
-  if (takeoff_done_ == true)
-  {
-    planner_status_ = START_REPLANNING;  // hacktodo
-  }
+  /*  if (takeoff_done_ == true)
+    {
+      planner_status_ = START_REPLANNING;  // hacktodo
+    }*/
 
   mtx_planner_status_.unlock();
   // printf("ReplanCB: planner_status_ = REPLANNED\n");
@@ -1614,11 +1614,11 @@ void CVX::replanCB(const ros::TimerEvent& e)
   mtx_offsets.unlock();
 
   // Time allocation
-  double new_init_whole = 1;  // hacktodo std::max(sg_whole_.factor_that_worked_ - par_.gamma_whole, 1.0);
+  double new_init_whole = std::max(sg_whole_.factor_that_worked_ - par_.gamma_whole, 1.0);  // 1;  // hacktodo
   double new_final_whole = sg_whole_.factor_that_worked_ + par_.gammap_whole;  // high end factor is not a problem
   sg_whole_.setFactorInitialAndFinalAndIncrement(new_init_whole, new_final_whole, par_.increment_whole);
 
-  double new_init_safe = 1;  // hacktodo std::max(sg_safe_.factor_that_worked_ - par_.gamma_safe, 1.0);
+  double new_init_safe = std::max(sg_safe_.factor_that_worked_ - par_.gamma_safe, 1.0);  // 1;  // hacktodo
   double new_final_safe = sg_safe_.factor_that_worked_ + par_.gammap_safe;  // high end factor is not a problem
   sg_safe_.setFactorInitialAndFinalAndIncrement(new_init_safe, new_final_safe, par_.increment_safe);
 
@@ -2037,8 +2037,7 @@ void CVX::pubCB(const ros::TimerEvent& e)
     }
 
     if (((planner_status_ == REPLANNED && (k_ == k_initial_cond_ || to_land_ == true)) ||  // Should be k_==
-         (force_reset_to_0_ && planner_status_ == REPLANNED)) &&
-        takeoff_done_ == false)  // hacktodo
+         (force_reset_to_0_ && planner_status_ == REPLANNED)))  //&& takeoff_done_ == false)  // hacktodo
     {
       to_land_ == false;
       printf("************Reseteando a 0!\n");

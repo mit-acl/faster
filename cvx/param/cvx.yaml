@@ -6,8 +6,8 @@ dc: 0.01            #(seconds) Duration for the interpolation=Value of the timer
 goal_radius: 0.1    #(m) Drone has arrived to the goal when distance_to_goal<GOAL_RADIUS
 drone_radius: 0.3  #(m) Used for collision checking
 
-N_whole: 20 #[-] Number of discretization points in the whole trajectory
-N_safe: 20 #[-] Number of discretization points in the safe path
+N_whole: 6 #[-] Number of discretization points in the whole trajectory
+N_safe: 6 #[-] Number of discretization points in the safe path
 
 factor_deltaT: 3
 factor_min_deltaT: 1
@@ -15,7 +15,7 @@ factor_min_deltaT: 1
 min_states_deltaT: 0  #15
 
 Ra: 0.5            # [m] Minimum radius of the first sphere
-Ra_max: 15            # [m] Maximum radius of the first sphere
+Ra_max: 4            # [m] Maximum radius of the first sphere
 Rb: 9.0             # [m] Radius of the second sphere
 w_max: 1          # [rd/s] Maximum angular velocity. 0.4 for Hardware
 alpha_filter_dyaw: 0 #was 0.92  #[] Filter parameter for dyaw, \in [0,1]. Higher--> More aggressive filtering
@@ -27,9 +27,9 @@ inflation_jps: 0.6  #[m] The obstacles are inflated (to run JPS) by this amount
 factor_jps: 1  #[m] JPS is run with resolution=factor_jps*(resolution of the map)
 
 
-v_max: 6.5   #[m/s]  1.4
-a_max: 6.0   #[m/s2] 1.4
-j_max: 20.0  #[m/s3] 35
+v_max: 5.0   #[m/s]  1.4
+a_max: 5.0   #[m/s2] 1.4
+j_max: 8.0  #[m/s3] 35
 
 z_land: 0.02 #[m] z goal for landing
 
@@ -42,9 +42,9 @@ gamma_safe: 20         #[-]
 gammap_safe: 20    #[-]
 increment_safe: 0.1   #[-]
 
-max_poly_whole: 4 #Should be less than N_whole 
-max_poly_safe: 4 #Should be less than N_safe
-dist_max_vertexes: 5 #[m] Maximum distance between two vertexes in the JPS before doing the cvx decomp (more vertexes are added to force this)
+max_poly_whole: 3 #Should be less than N_whole 
+max_poly_safe: 3 #Should be less than N_safe
+dist_max_vertexes: 1.5 #[m] Maximum distance between two vertexes in the JPS before doing the cvx decomp (more vertexes are added to force this)
 gurobi_threads: 1 #[threads] Number of threads that Gurobi will use. If computer is maxed out, threads=1 works faster!
 gurobi_verbose: 0 #Verbosity of Gurobi. 0 or 1
 
