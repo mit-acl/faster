@@ -1,0 +1,198 @@
+#include "geometry_msgs/PointStamped.h"
+#include "geometry_msgs/Twist.h"
+#include "nav_msgs/Path.h"
+#include "visualization_msgs/MarkerArray.h"
+
+#include "ros/ros.h"
+
+#include "visualization_msgs/Marker.h"
+#include "visualization_msgs/MarkerArray.h"
+#include <sensor_msgs/point_cloud_conversion.h>
+#include <pcl/kdtree/kdtree_flann.h>
+#include <tf2_ros/transform_listener.h>
+#include <tf2_ros/buffer.h>
+
+#include <atomic>
+
+#include <Eigen/Dense>
+
+#include <acl_msgs/Cvx.h>
+#include <acl_msgs/State.h>
+#include <acl_msgs/QuadGoal.h>
+#include <acl_msgs/QuadFlightMode.h>
+#include <acl_msgs/TermGoal.h>
+#include <nav_msgs/Odometry.h>
+
+// TimeSynchronizer includes
+#include <message_filters/subscriber.h>
+#include <message_filters/synchronizer.h>
+#include <message_filters/sync_policies/exact_time.h>
+#include <message_filters/sync_policies/approximate_time.h>
+
+#include "utils.hpp"
+
+#include <sensor_msgs/Image.h>
+#include <sensor_msgs/CameraInfo.h>
+
+#include "faster.hpp"
+#include "faster_types.hpp"
+
+#define WHOLE 1  // Whole trajectory (part of which is planned on unkonwn space)
+#define SAFE 2   // Safe path
+#define COMMITTED_COLORED 3
+#define WHOLE_COLORED 4
+#define SAFE_COLORED 5
+
+#define JPSk_NORMAL 1
+#define JPS2_NORMAL 2
+#define JPS_WHOLE 3
+#define JPS_SAFE 4
+
+//####Class CVX
+class FasterRos
+{
+public:
+  FasterRos(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pub_CB);
+
+private:
+  std::unique_ptr<Faster> faster_ptr_;
+
+  // class methods
+  void pubTraj(const std::vector<state>& data, int type);
+  void terminalGoalCB(const acl_msgs::TermGoal& msg);
+  void stateCB(const acl_msgs::State& msg);
+  // void odomCB(const nav_msgs::Odometry& odom_ptr);
+  void modeCB(const acl_msgs::QuadFlightMode& msg);
+  void pubCB(const ros::TimerEvent& e);
+  void replanCB(const ros::TimerEvent& e);
+
+  visualization_msgs::Marker createMarkerLineStrip(Eigen::MatrixXd X);
+  // void clearMarkerSetOfArrows();
+  void clearMarkerActualTraj();
+  void clearMarkerColoredTraj();
+  void mapCB(const sensor_msgs::PointCloud2::ConstPtr& pcl2ptr_msg,
+             const sensor_msgs::PointCloud2::ConstPtr& pcl2ptr_msg2);  // Callback for the occupancy pcloud
+  void unkCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg);     // Callback for the unkown pcloud
+  void pclCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg);
+  void frontierCB(const sensor_msgs::PointCloud2ConstPtr& pcl2ptr_msg);
+
+  void pubActualTraj();
+  visualization_msgs::MarkerArray clearArrows();
+  // geometry_msgs::Vector3 vectorNull();
+
+  // double solveVelAndGetCost(vec_Vecf<3> path);
+  void updateInitialCond(int i);
+  // void pubPlanningVisual(Eigen::Vector3d center, double ra, double rb, Eigen::Vector3d B1, Eigen::Vector3d C1);
+  // void pubintersecPoint(Eigen::Vector3d p, bool add);
+  void yaw(double diff, acl_msgs::QuadGoal& quad_goal);
+
+  void clearMarkerArray(visualization_msgs::MarkerArray* tmp, ros::Publisher* publisher);
+  void publishJPSPath(vec_Vecf<3>& path, int i);
+  void clearJPSPathVisualization(int i);
+
+  void pubG(state G);
+
+  void pubJPSIntersection(Eigen::Vector3d& inters);
+  Eigen::Vector3d getFirstCollisionJPS(vec_Vecf<3>& path, bool* thereIsIntersection, int map = MAP,
+                                       int type_return = RETURN_LAST_VERTEX);
+  Eigen::Vector3d projectClickedGoal(Eigen::Vector3d& P1);
+
+  void publishJPS2handIntersection(vec_Vecf<3> JPS2_fix, Eigen::Vector3d& inter1, Eigen::Vector3d& inter2,
+                                   bool solvedFix);
+
+  void createMoreVertexes(vec_Vecf<3>& path, double d);
+
+  bool ARisInFreeSpace(int index);
+
+  int findIndexR(int indexH);
+  int findIndexH(bool& needToComputeSafePath);
+
+  void publishPoly(const vec_E<Polyhedron<3>>& poly, int type);
+  // visualization_msgs::MarkerArray Matrix2ColoredMarkerArray(Eigen::MatrixXd& X, int type);
+
+  visualization_msgs::Marker R_;
+  visualization_msgs::Marker I_;
+  visualization_msgs::Marker E_;
+  visualization_msgs::Marker M_;
+  visualization_msgs::Marker H_;
+  visualization_msgs::Marker A_;
+  visualization_msgs::Marker setpoint_;
+
+  ros::NodeHandle nh_;
+  ros::NodeHandle nh_replan_CB_;
+  ros::NodeHandle nh_pub_CB_;
+
+  ros::Publisher pub_goal_jackal_;
+  ros::Publisher pub_point_G_;
+  ros::Publisher pub_goal_;
+  ros::Publisher pub_traj_whole_;
+  ros::Publisher pub_traj_safe_;
+  ros::Publisher pub_setpoint_;
+  ros::Publisher pub_trajs_sphere_;
+  ros::Publisher pub_forces_;
+  ros::Publisher pub_actual_traj_;
+  ros::Publisher pub_path_jps1_;
+  ros::Publisher pub_path_jps2_;
+  ros::Publisher pub_path_jps_safe_;
+  ros::Publisher pub_path_jps_whole_;
+  ros::Publisher pub_intersectionI_;
+  ros::Publisher pub_point_R_;
+  ros::Publisher pub_point_M_;
+  ros::Publisher pub_point_E_;
+  ros::Publisher pub_point_H_;
+  ros::Publisher pub_point_A_;
+  ros::Publisher pub_traj_committed_colored_;
+  ros::Publisher pub_traj_whole_colored_;
+  ros::Publisher pub_traj_safe_colored_;
+
+  ros::Publisher pub_planning_vis_;
+  ros::Publisher pub_intersec_points_;
+  ros::Publisher pub_jps_inters_;
+  ros::Publisher pub_samples_safe_path_;
+  ros::Publisher pub_log_;
+  ros::Publisher poly_whole_pub_;
+  ros::Publisher poly_safe_pub_;
+
+  // ros::Publisher cvx_decomp_poly_uo_pub_;
+  ros::Subscriber sub_goal_;
+  ros::Subscriber sub_state_;
+  ros::Subscriber sub_odom_;
+  ros::Subscriber sub_mode_;
+  ros::Subscriber sub_vicon_;
+
+  // Eigen::Vector3d accel_vicon_;
+
+  ros::Subscriber sub_frontier_;
+  ros::Timer pubCBTimer_;
+  ros::Timer replanCBTimer_;
+
+  parameters par_;     // where all the parameters are
+  acl_msgs::Cvx log_;  // to log all the data
+  tf2_ros::Buffer tf_buffer_;
+  tf2_ros::TransformListener* tfListener;
+  std::string name_drone_;
+
+  visualization_msgs::MarkerArray trajs_sphere_;  // all the trajectories generated in the sphere
+  visualization_msgs::MarkerArray path_jps1_;
+  visualization_msgs::MarkerArray path_jps2_;
+  visualization_msgs::MarkerArray path_jps2_fix_;
+  visualization_msgs::MarkerArray path_jps_safe_;
+  visualization_msgs::MarkerArray path_jps_whole_;
+  visualization_msgs::MarkerArray traj_committed_colored_;
+  visualization_msgs::MarkerArray traj_whole_colored_;
+  visualization_msgs::MarkerArray traj_safe_colored_;
+
+  visualization_msgs::MarkerArray intersec_points_;
+  visualization_msgs::MarkerArray samples_safe_path_;
+
+  message_filters::Subscriber<sensor_msgs::PointCloud2> occup_grid_sub_;
+  message_filters::Subscriber<sensor_msgs::PointCloud2> unknown_grid_sub_;
+  typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::PointCloud2, sensor_msgs::PointCloud2>
+      MySyncPolicy;
+  typedef message_filters::Synchronizer<MySyncPolicy> Sync;
+  boost::shared_ptr<Sync> sync_;
+
+  int markerID_ = 0;
+  int markerID_last_ = 0;
+  int actual_trajID_ = 0;
+};
