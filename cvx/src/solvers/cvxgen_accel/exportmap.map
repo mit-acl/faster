@@ -1,9 +1,0 @@
-{
-global: 
-	accel_initialize_optimizer;
-	accel_optimize;
-	accel_load_default_data;
-	accel_get_state;
-	accel_get_control;
-local: *;
-};
