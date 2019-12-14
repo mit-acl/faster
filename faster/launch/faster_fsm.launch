@@ -1,0 +1,16 @@
+<launch>
+	<arg name="quad"/>
+	<!-- vicon or full -->
+	<arg name="room" default="vicon"/>
+	<arg name="z_alt" default="1.0"/>
+	
+	<!-- Faster fsm -->
+	<node ns="$(arg quad)" name="fsm" pkg="faster" type="faster_commands.py" output="screen"/>
+
+	<!-- Start Rviz -->
+	<node pkg="rviz" type="rviz" name="rviz" args="-d $(find acl_demos)/rviz_cfgs/cvx.rviz"/>
+
+	<!-- Start GUI -->
+	<node pkg="rqt_gui" type="rqt_gui" name="rqt_gui" args="--perspective-file $(find acl_demos)/rqt_cfgs/demo_interface.perspective"/>
+
+</launch>

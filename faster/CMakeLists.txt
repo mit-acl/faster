@@ -31,6 +31,7 @@ find_package(catkin REQUIRED COMPONENTS
 	roscpp
 	rospy
 	acl_msgs
+	faster_msgs
 	sensor_msgs
 	pcl_ros
 	decomp_util

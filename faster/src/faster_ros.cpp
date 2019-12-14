@@ -132,6 +132,7 @@ FasterRos::FasterRos(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::Node
   pub_setpoint_ = nh_.advertise<visualization_msgs::Marker>("setpoint", 1);
   pub_intersectionI_ = nh_.advertise<visualization_msgs::Marker>("intersection_I", 1);
   pub_point_G_ = nh_.advertise<geometry_msgs::PointStamped>("point_G", 1);
+  pub_point_G_term_ = nh_.advertise<geometry_msgs::PointStamped>("point_G_term", 1);
   pub_point_E_ = nh_.advertise<visualization_msgs::Marker>("point_E", 1);
   pub_point_R_ = nh_.advertise<visualization_msgs::Marker>("point_R", 1);
   pub_point_M_ = nh_.advertise<visualization_msgs::Marker>("point_M", 1);
@@ -155,8 +156,8 @@ FasterRos::FasterRos(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::Node
   unknown_grid_sub_.subscribe(nh_, "unknown_grid", 1);
   sync_.reset(new Sync(MySyncPolicy(1), occup_grid_sub_, unknown_grid_sub_));
   sync_->registerCallback(boost::bind(&FasterRos::mapCB, this, _1, _2));
-  sub_goal_ = nh_.subscribe("term_goal", 1, &FasterRos::terminalGoalCB, this);
-  sub_mode_ = nh_.subscribe("flightmode", 1, &FasterRos::modeCB, this);
+  sub_goal_ = nh_.subscribe("/move_base_simple/goal", 1, &FasterRos::terminalGoalCB, this);
+  sub_mode_ = nh_.subscribe("fastermode", 1, &FasterRos::modeCB, this);
   sub_state_ = nh_.subscribe("state", 1, &FasterRos::stateCB, this);
   // sub_odom_ = nh_.subscribe("odom", 1, &FasterRos::odomCB, this);
 
@@ -306,7 +307,7 @@ void FasterRos::stateCB(const acl_msgs::State& msg)
     log_.veloc_norm = vel.norm();*/
 }
 
-void FasterRos::modeCB(const acl_msgs::QuadFlightMode& msg)
+void FasterRos::modeCB(const faster_msgs::Mode& msg)
 {
   faster_ptr_->changeMode(msg.mode);
 }
@@ -511,7 +512,7 @@ void FasterRos::pubActualTraj()
   p_last = p;
 }
 
-void FasterRos::pubG(state G)
+/*void FasterRos::pubG(state G)
 {
   geometry_msgs::PointStamped p;
   p.header.frame_id = "world";
@@ -519,7 +520,7 @@ void FasterRos::pubG(state G)
   p.point = eigen2point(G.pos);
   // mtx_G.unlock();
   pub_point_G_.publish(p);
-}
+}*/
 
 void FasterRos::clearMarkerActualTraj()
 {
@@ -568,16 +569,25 @@ void FasterRos::mapCB(const sensor_msgs::PointCloud2::ConstPtr& pcl2ptr_map_ros,
   faster_ptr_->updateMap(pclptr_map, pclptr_unk);
 }
 
-void FasterRos::terminalGoalCB(const acl_msgs::TermGoal& msg)
+void FasterRos::pubState(const state& data, const ros::Publisher pub)
 {
-  state term_goal;
-  term_goal.setPos(msg.pos.x, msg.pos.y, msg.pos.z);
+  geometry_msgs::PointStamped p;
+  p.header.frame_id = "world";
+  p.point = eigen2point(data.pos);
+  pub.publish(p);
+}
 
-  faster_ptr_->setTerminalGoal(term_goal);
+void FasterRos::terminalGoalCB(const geometry_msgs::PoseStamped& msg)
+{
+  state G_term;
+  G_term.setPos(msg.pose.position.x, msg.pose.position.y, 1.0);  // TODO
+  faster_ptr_->setTerminalGoal(G_term);
 
   state G;  // projected goal
   faster_ptr_->getG(G);
-  pubG(G);
+
+  pubState(G_term, pub_point_G_term_);
+  pubState(G, pub_point_G_);
 
   clearMarkerActualTraj();
   // std::cout << "Exiting from goalCB\n";

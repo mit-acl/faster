@@ -1,4 +1,5 @@
 #include "geometry_msgs/PointStamped.h"
+#include "geometry_msgs/PoseStamped.h"
 #include "geometry_msgs/Twist.h"
 #include "nav_msgs/Path.h"
 #include "visualization_msgs/MarkerArray.h"
@@ -19,9 +20,9 @@
 #include <acl_msgs/Cvx.h>
 #include <acl_msgs/State.h>
 #include <acl_msgs/QuadGoal.h>
-#include <acl_msgs/QuadFlightMode.h>
 #include <acl_msgs/TermGoal.h>
 #include <nav_msgs/Odometry.h>
+#include <faster_msgs/Mode.h>
 
 // TimeSynchronizer includes
 #include <message_filters/subscriber.h>
@@ -59,10 +60,11 @@ private:
 
   // class methods
   void pubTraj(const std::vector<state>& data, int type);
-  void terminalGoalCB(const acl_msgs::TermGoal& msg);
+  void terminalGoalCB(const geometry_msgs::PoseStamped& msg);
+  void pubState(const state& msg, const ros::Publisher pub);
   void stateCB(const acl_msgs::State& msg);
   // void odomCB(const nav_msgs::Odometry& odom_ptr);
-  void modeCB(const acl_msgs::QuadFlightMode& msg);
+  void modeCB(const faster_msgs::Mode& msg);
   void pubCB(const ros::TimerEvent& e);
   void replanCB(const ros::TimerEvent& e);
 
@@ -90,7 +92,7 @@ private:
   void publishJPSPath(vec_Vecf<3>& path, int i);
   void clearJPSPathVisualization(int i);
 
-  void pubG(state G);
+  // void pubG(state G);
 
   void pubJPSIntersection(Eigen::Vector3d& inters);
   Eigen::Vector3d getFirstCollisionJPS(vec_Vecf<3>& path, bool* thereIsIntersection, int map = MAP,
@@ -124,6 +126,7 @@ private:
 
   ros::Publisher pub_goal_jackal_;
   ros::Publisher pub_point_G_;
+  ros::Publisher pub_point_G_term_;
   ros::Publisher pub_goal_;
   ros::Publisher pub_traj_whole_;
   ros::Publisher pub_traj_safe_;
