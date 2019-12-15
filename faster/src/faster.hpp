@@ -119,7 +119,7 @@ private:
   // void Faster::pubCB(const ros::TimerEvent& e)
   // void pubCB();
 
-  void appendToPlan(int k_whole, const std::vector<state>& whole, int k_safe, const std::vector<state>& safe);
+  bool appendToPlan(int k_end_whole, const std::vector<state>& whole, int k_safe, const std::vector<state>& safe);
 
   bool initialized();
 
@@ -208,6 +208,7 @@ private:
   std::mutex mtx_initial_cond;
   std::mutex mtx_state;
   std::mutex mtx_offsets;
+  std::mutex mtx_plan_;
   // std::mutex mtx_factors;
 
   std::mutex mtx_G;

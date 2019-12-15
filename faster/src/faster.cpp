@@ -604,12 +604,13 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
   //////////////////////////////////////////////////////////////////////////
 
   state A;
-  int k_whole, k_safe;
+  int k_whole, k_safe, k_end_whole;
   if (X_initialized_)  // Needed to skip the first time (X_ still not initialized)
   {
     if (planner_status_ != PlannerStatus::REPLANNED)
     {
       k_whole = std::min(deltaT_, (int)(plan_.size() - 1));
+      k_end_whole = plan_.size() - k_whole;
       A = plan_[k_whole];
     }
   }
@@ -617,6 +618,8 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
   {
     std::cout << bold << "X is not initialized yet" << reset << std::endl;
     A = state_local;
+    k_end_whole = 0;
+    k_whole = 0;
   }
 
   //////////////////////////////////////////////////////////////////////////
@@ -777,18 +780,12 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
     {
       x0_safe = stateA_;
     }
-    std::cout << "Here" << std::endl;
-    // std::cout << "Polytopes set=" << l_constraints_safe_.size() << std::endl;
 
-    bool isMinside = l_constraints_safe_[l_constraints_safe_.size() - 1].inside(M.pos);
-
-    bool shouldForceFinalConstraint_for_Safe =
-        (par_.use_faster == false) ? true : false;  // hacktodo pero quiza ahora es mejor, era ((isMinside &&
-                                                    // takeoff_done_) || par_.use_faster == false) ? true : false;
+    bool shouldForceFinalConstraint_for_Safe = (par_.use_faster == false) ? true : false;
 
     if (l_constraints_safe_[0].inside(x0_safe.pos) == false)
     {
-      ROS_ERROR("First point of safe traj is outside");
+      std::cout << red << "First point of safe traj is outside" << reset << std::endl;
     }
 
     sg_safe_.setX0(x0_safe);
@@ -819,7 +816,10 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
 
   std::cout << "Going to append" << std::endl;
 
-  appendToPlan(k_whole, sg_whole_.X_temp_, k_safe, sg_safe_.X_temp_);
+  if (appendToPlan(k_end_whole, sg_whole_.X_temp_, k_safe, sg_safe_.X_temp_) != true)
+  {
+    return;
+  }
 
   ///////////////////////////////////////////////////////////
   ///////////////       OTHER STUFF    //////////////////////
@@ -830,8 +830,9 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
   planner_status_ = PlannerStatus::REPLANNED;
 
   mtx_planner_status_.unlock();
-  state F = sg_safe_.X_temp_.back();  // Final point of the safe path (\equiv final point of the comitted path)
 
+  // Check if we have planned until G_term
+  state F = sg_safe_.X_temp_.back();  // Final point of the safe path (\equiv final point of the comitted path)
   double dist = (G_term_.pos - F.pos).norm();
   if (dist < par_.goal_radius)
   {
@@ -855,34 +856,62 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
   mtx_offsets.unlock();
 
   // Time allocation
-  double new_init_whole = std::max(sg_whole_.factor_that_worked_ - par_.gamma_whole, 1.0);  // 1;  // hacktodo
-  double new_final_whole = sg_whole_.factor_that_worked_ + par_.gammap_whole;  // high end factor is not a problem
+  double new_init_whole = std::max(sg_whole_.factor_that_worked_ - par_.gamma_whole, 1.0);
+  double new_final_whole = sg_whole_.factor_that_worked_ + par_.gammap_whole;
   sg_whole_.setFactorInitialAndFinalAndIncrement(new_init_whole, new_final_whole, par_.increment_whole);
 
-  double new_init_safe = std::max(sg_safe_.factor_that_worked_ - par_.gamma_safe, 1.0);  // 1;  // hacktodo
-  double new_final_safe = sg_safe_.factor_that_worked_ + par_.gammap_safe;  // high end factor is not a problem
+  double new_init_safe = std::max(sg_safe_.factor_that_worked_ - par_.gamma_safe, 1.0);
+  double new_final_safe = sg_safe_.factor_that_worked_ + par_.gammap_safe;
   sg_safe_.setFactorInitialAndFinalAndIncrement(new_init_safe, new_final_safe, par_.increment_safe);
 
   return;
 }
 
-void Faster::appendToPlan(int k_whole, const std::vector<state>& whole, int k_safe, const std::vector<state>& safe)
+bool Faster::appendToPlan(int k_end_whole, const std::vector<state>& whole, int k_safe, const std::vector<state>& safe)
 {
+  mtx_plan_.lock();
+
   std::cout << "Erasing" << std::endl;
-
-  plan_.erase(plan_.begin() + k_whole, plan_.end());
-
-  std::cout << "Erased" << std::endl;
-
-  for (int i = 0; i < k_safe; i++)
+  bool output;
+  int plan_size = plan_.size();
+  std::cout << "plan_.size()= " << plan_.size() << std::endl;
+  std::cout << "plan_size - k_end_whole = " << plan_size - k_end_whole << std::endl;
+  if ((plan_size - k_end_whole) < 0)
   {
-    plan_.push_back(whole[i]);
+    std::cout << bold << red << "Already publised the point A" << reset << std::endl;
+    output = false;
+  }
+  else
+  {
+    std::cout << "(plan_.size() - k_end_whole)= " << (plan_.size() - k_end_whole) << std::endl;
+    std::cout << "plan_.size()= " << plan_.size() << std::endl;
+    std::cout << "k_end_whole)= " << k_end_whole << std::endl;
+
+    plan_.erase(plan_.end() - k_end_whole, plan_.end());
+
+    std::cout << "Erased" << std::endl;
+
+    std::cout << "k_safe = " << k_safe << std::endl;
+    std::cout << "whole.size() = " << whole.size() << std::endl;
+    for (int i = 0; i < k_safe; i++)
+    {
+      std::cout << "i= " << i << std::endl;
+      plan_.push_back(whole[i]);
+    }
+
+    std::cout << "k_safe = " << k_safe << std::endl;
+    std::cout << "whole.size() = " << whole.size() << std::endl;
+    for (int i = 0; i < safe.size(); i++)
+    {
+      plan_.push_back(safe[i]);
+    }
+    std::cout << "Pushed everything back" << std::endl;
+
+    output = true;
   }
 
-  for (int i = 0; i < safe.size(); i++)
-  {
-    plan_.push_back(safe[i]);
-  }
+  mtx_plan_.unlock();
+  return output;
 }
 
 // void Faster::pubCB(const ros::TimerEvent& e)
@@ -894,8 +923,9 @@ void Faster::getNextGoal(state& next_goal)
   }
 
   mtx_goals.lock();
-  next_goal.setZero();
+  mtx_plan_.lock();
 
+  next_goal.setZero();
   next_goal = plan_.front();
   if (plan_.size() > 1)
   {
@@ -903,6 +933,9 @@ void Faster::getNextGoal(state& next_goal)
   }
   next_goal.yaw = 0;
   next_goal.dyaw = 0;
+
+  mtx_goals.unlock();
+  mtx_plan_.unlock();
 
   /*  if (flight_mode_.mode == LAND)
     {
