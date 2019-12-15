@@ -14,6 +14,7 @@
 #include <pcl/point_types.h>
 #include <pcl/kdtree/kdtree_flann.h>
 #include "faster_types.hpp"
+#include <deque>
 
 #define RED 1
 #define RED_TRANS 2
@@ -39,6 +40,10 @@
 
 #define OCCUPIED_SPACE 1
 #define UNKOWN_AND_OCCUPIED_SPACE 2
+
+void printStateDeque(std::deque<state>& data);
+
+void printStateVector(std::vector<state>& data);
 
 void vectorOfVectors2MarkerArray(vec_Vecf<3> traj, visualization_msgs::MarkerArray* m_array, std_msgs::ColorRGBA color,
                                  int type = visualization_msgs::Marker::ARROW,

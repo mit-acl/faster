@@ -129,8 +129,6 @@ private:
 
   // SeedDecomp3D seed_decomp_util_;
 
-  bool takeoff_done_ = false;
-
   bool state_initialized_ = false;
 
   double current_yaw_ = 0;
@@ -151,7 +149,6 @@ private:
   int indexR_ = 0;
 
   Eigen::MatrixXd U_safe_, X_safe_;
-  bool optimized_;
   double spinup_time_;
   double z_start_;
   // double u_min_, u_max_, z_start_, spinup_time_, z_land_;
@@ -213,8 +210,6 @@ private:
 
   std::mutex mtx_G;
   std::mutex mtx_G_term;
-
-  bool X_initialized_ = false;
 
   Eigen::Vector3d pos_old_;
   Eigen::Vector3d B_;

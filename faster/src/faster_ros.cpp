@@ -210,7 +210,6 @@ void FasterRos::replanCB(const ros::TimerEvent& e)
     vec_Vecf<3> JPS_whole;
     vec_E<Polyhedron<3>> poly_safe;
     vec_E<Polyhedron<3>> poly_whole;
-
     std::vector<state> X_safe;
     std::vector<state> X_whole;
 
@@ -218,8 +217,6 @@ void FasterRos::replanCB(const ros::TimerEvent& e)
     clearJPSPathVisualization(2);
     publishJPSPath(JPS_safe, JPS_SAFE);
     publishJPSPath(JPS_whole, JPS_WHOLE);
-
-    std::cout << "poly_whole= " << poly_whole.size() << std::endl;
 
     publishPoly(poly_safe, SAFE);
     publishPoly(poly_whole, WHOLE);

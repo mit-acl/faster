@@ -29,7 +29,6 @@ typedef ROSTimer MyTimer;
 
 Faster::Faster(parameters par) : par_(par)
 {
-  optimized_ = false;
   // flight_mode_ = flight_mode_.NOT_FLYING;
   flight_mode_.mode = GO;  // TODO (changed for the jackal)
 
@@ -154,9 +153,6 @@ void Faster::updateMap(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_map, pcl::Poin
                                 jps_manager_.vec_o_.end());  // append known space
   }
 
-  std::cout << "jps_manager_.vec_o_.size()= " << jps_manager_.vec_o_.size() << std::endl;
-  std::cout << "jps_manager_.vec_o_.size()= " << jps_manager_.vec_uo_.size() << std::endl;
-
   mtx_map.unlock();
   mtx_unk.unlock();
 }
@@ -171,8 +167,7 @@ void Faster::setTerminalGoal(state& term_goal)
   G_term_.pos = term_goal.pos;
   Eigen::Vector3d temp = state_.pos;
   G_.pos = projectPointToBox(temp, G_term_.pos, par_.wdx, par_.wdy, par_.wdz);
-  drone_status_ = (drone_status_ == DroneStatus::GOAL_REACHED) ? DroneStatus::YAWING : DroneStatus::TRAVELING;
-  planner_status_ = PlannerStatus::START_REPLANNING;
+  changeDroneStatus(DroneStatus::TRAVELING);  // TODO: This should be YAWING
 
   terminal_goal_initialized_ = true;
 
@@ -566,7 +561,7 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
   sg_safe_.ResetToNormalState();
 
   //////////////////////////////////////////////////////////////////////////
-  ///////////////////////// Project GTerm //////////////////////////////////
+  ///////////////////////// G <-- Project GTerm ////////////////////////////
   //////////////////////////////////////////////////////////////////////////
 
   mtx_state.lock();
@@ -582,18 +577,17 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
   mtx_G_term.unlock();
   mtx_state.unlock();
 
+  // Check if we have reached the goal
   double dist_to_goal = (G_term.pos - state_local.pos).norm();
-
   if (dist_to_goal < par_.goal_radius)
   {
     changeDroneStatus(DroneStatus::GOAL_REACHED);
   }
-
-  if (drone_status_ == DroneStatus::GOAL_SEEN || drone_status_ == DroneStatus::GOAL_REACHED ||
-      (drone_status_ == DroneStatus::YAWING && optimized_ == true))
+  // Don't plan if drone is not traveling
+  if (drone_status_ == DroneStatus::GOAL_REACHED || (drone_status_ == DroneStatus::YAWING))
   {
-    /*    printf("No replanning needed because planner_status_=%d and/or status_=%d \n", planner_status_, status_);
-        printf("or because status_=%d\n", status_);*/
+    std::cout << "No replanning needed because" << std::endl;
+    print_status();
     return;
   }
 
@@ -604,23 +598,11 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
   //////////////////////////////////////////////////////////////////////////
 
   state A;
-  int k_whole, k_safe, k_end_whole;
-  if (X_initialized_)  // Needed to skip the first time (X_ still not initialized)
-  {
-    if (planner_status_ != PlannerStatus::REPLANNED)
-    {
-      k_whole = std::min(deltaT_, (int)(plan_.size() - 1));
-      k_end_whole = plan_.size() - k_whole;
-      A = plan_[k_whole];
-    }
-  }
-  else
-  {
-    std::cout << bold << "X is not initialized yet" << reset << std::endl;
-    A = state_local;
-    k_end_whole = 0;
-    k_whole = 0;
-  }
+  int k_safe, k_end_whole;
+
+  // If k_end_whole=0, then A = plan_.back() = plan_[plan_.size() - 1]
+  k_end_whole = std::max((int)plan_.size() - deltaT_, 0);
+  A = plan_[plan_.size() - 1 - k_end_whole];
 
   //////////////////////////////////////////////////////////////////////////
   ///////////////////////// Solve JPS //////////////////////////////////////
@@ -661,7 +643,6 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
   if (par_.use_faster == true)
   {
     vec_Vecf<3> JPS_whole = JPS_in;
-    printElementsOfJPS(JPS_whole);
     deleteVertexes(JPS_whole, par_.max_poly_whole);
     E.pos = JPS_whole[JPS_whole.size() - 1];
 
@@ -675,7 +656,6 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
     E.pos = (isGinside_whole == true) ? G.pos : E.pos;
 
     // Set Initial cond, Final cond, and polytopes for the whole traj
-
     sg_whole_.setX0(A);
     sg_whole_.setXf(E);
     sg_whole_.setPolytopes(l_constraints_whole_);
@@ -696,11 +676,10 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
     }
 
     // Get Results
-    std::cout << "Here1" << std::endl;
     sg_whole_.fillXandU();
-    std::cout << "Here2" << std::endl;
-    X_whole_out = sg_whole_.X_temp_;
 
+    // Copy for visualization
+    X_whole_out = sg_whole_.X_temp_;
     JPS_whole_out = JPS_whole;
   }
   else
@@ -710,6 +689,10 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
     dummy_vector.push_back(dummy);
     sg_whole_.X_temp_ = dummy_vector;
   }
+
+  std::cout << "This is the WHOLE TRAJECTORY" << std::endl;
+  printStateVector(sg_whole_.X_temp_);
+  std::cout << "===========================" << std::endl;
 
   //////////////////////////////////////////////////////////////////////////
   ///////////////// Solve with GUROBI Safe trajectory /////////////////////
@@ -731,9 +714,10 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
     needToComputeSafePath = true;
   }
 
-  if (needToComputeSafePath == false and takeoff_done_ == true)
+  if (needToComputeSafePath == false)
   {
     k_safe = indexH;
+    sg_safe_.X_temp_ = std::vector<state>();  // 0 elements
   }
   else
   {
@@ -807,13 +791,15 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
     sg_safe_.fillXandU();
     X_safe_out = sg_safe_.X_temp_;
     std::cout << "filled the solutions" << std::endl;
+  }
 
-  }  // End of need to compute the safe path
+  std::cout << "This is the SAFE TRAJECTORY" << std::endl;
+  printStateVector(sg_safe_.X_temp_);
+  std::cout << "===========================" << std::endl;
 
   ///////////////////////////////////////////////////////////
   ///////////////       Append RESULTS    ////////////////////
   ///////////////////////////////////////////////////////////
-
   std::cout << "Going to append" << std::endl;
 
   if (appendToPlan(k_end_whole, sg_whole_.X_temp_, k_safe, sg_safe_.X_temp_) != true)
@@ -821,19 +807,27 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
     return;
   }
 
+  mtx_plan_.lock();
+  std::cout << "This is the COMMITED TRAJECTORY" << std::endl;
+  printStateDeque(plan_);
+  std::cout << "===========================" << std::endl;
+  mtx_plan_.unlock();
+
   ///////////////////////////////////////////////////////////
   ///////////////       OTHER STUFF    //////////////////////
   //////////////////////////////////////////////////////////
 
-  optimized_ = true;
-  mtx_planner_status_.lock();
-  planner_status_ = PlannerStatus::REPLANNED;
+  /*  mtx_planner_status_.lock();
+    planner_status_ = PlannerStatus::REPLANNED;
 
-  mtx_planner_status_.unlock();
+    mtx_planner_status_.unlock();*/
 
   // Check if we have planned until G_term
-  state F = sg_safe_.X_temp_.back();  // Final point of the safe path (\equiv final point of the comitted path)
+  state F = plan_.back();  // Final point of the safe path (\equiv final point of the comitted path)
+  std::cout << "F is " << std::endl;
+  F.print();
   double dist = (G_term_.pos - F.pos).norm();
+  std::cout << "Computed norm" << std::endl;
   if (dist < par_.goal_radius)
   {
     changeDroneStatus(DroneStatus::GOAL_SEEN);
@@ -845,13 +839,13 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
                                                                              // would have been needed for
                                                                              // the last replan
 
-  if (planner_status_ != PlannerStatus::REPLANNED)  // If already have a solution, keep using the same deltaT_
-  {
-    deltaT_ = std::max(par_.factor_deltaT * states_last_replan,
-                       (double)par_.min_states_deltaT);  // Delta_t
+  /*  if (planner_status_ != PlannerStatus::REPLANNED)  // If already have a solution, keep using the same deltaT_
+    {
+      deltaT_ = std::max(par_.factor_deltaT * states_last_replan,
+                         (double)par_.min_states_deltaT);  // Delta_t
 
-    deltaT_min_ = par_.factor_min_deltaT * states_last_replan;
-  }
+      deltaT_min_ = par_.factor_min_deltaT * states_last_replan;
+    }*/
 
   mtx_offsets.unlock();
 
@@ -876,7 +870,7 @@ bool Faster::appendToPlan(int k_end_whole, const std::vector<state>& whole, int 
   int plan_size = plan_.size();
   std::cout << "plan_.size()= " << plan_.size() << std::endl;
   std::cout << "plan_size - k_end_whole = " << plan_size - k_end_whole << std::endl;
-  if ((plan_size - k_end_whole) < 0)
+  if ((plan_size - 1 - k_end_whole) < 0)
   {
     std::cout << bold << red << "Already publised the point A" << reset << std::endl;
     output = false;
@@ -887,7 +881,7 @@ bool Faster::appendToPlan(int k_end_whole, const std::vector<state>& whole, int 
     std::cout << "plan_.size()= " << plan_.size() << std::endl;
     std::cout << "k_end_whole)= " << k_end_whole << std::endl;
 
-    plan_.erase(plan_.end() - k_end_whole, plan_.end());
+    plan_.erase(plan_.end() - k_end_whole - 1, plan_.end());
 
     std::cout << "Erased" << std::endl;
 
@@ -895,7 +889,6 @@ bool Faster::appendToPlan(int k_end_whole, const std::vector<state>& whole, int 
     std::cout << "whole.size() = " << whole.size() << std::endl;
     for (int i = 0; i < k_safe; i++)
     {
-      std::cout << "i= " << i << std::endl;
       plan_.push_back(whole[i]);
     }
 
@@ -1211,18 +1204,18 @@ void Faster::print_status()
       break;
   }
 
-  switch (planner_status_)
-  {
-    case PlannerStatus::FIRST_PLAN:
-      std::cout << bold << "planner_status_=FIRST_PLAN" << reset << std::endl;
-      break;
-    case PlannerStatus::START_REPLANNING:
-      std::cout << bold << "planner_status_=START_REPLANNING" << reset << std::endl;
-      break;
-    case PlannerStatus::REPLANNED:
-      std::cout << bold << "planner_status_=REPLANNED" << reset << std::endl;
-      break;
-  }
+  /*  switch (planner_status_)
+    {
+      case PlannerStatus::FIRST_PLAN:
+        std::cout << bold << "planner_status_=FIRST_PLAN" << reset << std::endl;
+        break;
+      case PlannerStatus::START_REPLANNING:
+        std::cout << bold << "planner_status_=START_REPLANNING" << reset << std::endl;
+        break;
+      case PlannerStatus::REPLANNED:
+        std::cout << bold << "planner_status_=REPLANNED" << reset << std::endl;
+        break;
+    }*/
 
   switch (flight_mode_.mode)
   {
@@ -1248,7 +1241,4 @@ void Faster::print_status()
       std::cout << bold << "flight_mode_=KILL" << reset << std::endl;
       break;
   }
-
-  std::cout << bold << "optimized_=" << optimized_ << reset << std::endl;
-  std::cout << bold << "takeoff_done_=" << takeoff_done_ << reset << std::endl;
 }

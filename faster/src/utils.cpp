@@ -5,6 +5,22 @@
   double r, g, b;
 } COLOUR;*/
 
+void printStateDeque(std::deque<state>& data)
+{
+  for (int i = 0; i < data.size(); i++)
+  {
+    data[i].printHorizontal();
+  }
+}
+
+void printStateVector(std::vector<state>& data)
+{
+  for (int i = 0; i < data.size(); i++)
+  {
+    data[i].printHorizontal();
+  }
+}
+
 void vectorOfVectors2MarkerArray(vec_Vecf<3> traj, visualization_msgs::MarkerArray* m_array, std_msgs::ColorRGBA color,
                                  int type, std::vector<double> radii)
 {

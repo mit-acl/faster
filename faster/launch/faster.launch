@@ -5,7 +5,7 @@
 	<arg name="goal_jackal_topic" default="jackal_velocity_controller_mio/cmd_vel"/> 
 
 
-	<node ns="$(arg quad)" name="faster" pkg="faster" type="faster_node" output="screen" clear_params="true" launch-prefix="xterm -e gdb --args" > 
+	<node ns="$(arg quad)" name="faster" pkg="faster" type="faster_node" output="screen" clear_params="true"> 
 
     <rosparam file="$(find faster)/param/faster.yaml" command="load"/>
     <rosparam file="$(find global_mapper_ros)/cfg/global_mapper.yaml" command="load" ns="mapper"/>
