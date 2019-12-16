@@ -564,10 +564,6 @@ void SolverGurobi::resetXandU()
   size = (size < 2) ? 2 : size;  // force size to be at least 2
   std::vector<state> tmp(size);
   X_temp_ = tmp;  // Eigen::MatrixXd::Zero(size, 12);
-
-  std::cout << "RESETTING X, SIZE=" << size << std::endl;
-
-  std::cout << "RESETTING X, X_temp_.size()=" << X_temp_.size() << std::endl;
 }
 
 void SolverGurobi::setMaxConstraints()
@@ -642,7 +638,7 @@ bool SolverGurobi::genNewTraj()
   {
     trials_ = trials_ + 1;
     findDT(i);
-    // std::cout << "Going to try with dt_= " << dt_ << ", should_terminate_=" << cb_.should_terminate_ << std::endl;
+    std::cout << "Going to try with dt_= " << dt_ << ", should_terminate_=" << cb_.should_terminate_ << std::endl;
     setPolytopesConstraints();
     // std::cout << "Setting x0" << std::endl;
     setConstraintsX0();

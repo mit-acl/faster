@@ -36,11 +36,11 @@ z_land: 0.02 #[m] z goal for landing
 #Factors for time allocation
 gamma_whole: 20       #[-]
 gammap_whole: 20  #[-]
-increment_whole: 0.1 #[-]
+increment_whole: 1.0 #[-]
 
 gamma_safe: 20         #[-]
 gammap_safe: 20    #[-]
-increment_safe: 0.1   #[-]
+increment_safe: 1.0   #[-]
 
 max_poly_whole: 3 #Should be less than N_whole 
 max_poly_safe: 3 #Should be less than N_safe

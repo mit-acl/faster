@@ -260,59 +260,6 @@ void FasterRos::stateCB(const acl_msgs::State& msg)
   quaternion2Euler(msg.quat, roll, pitch, yaw);
   state_tmp.setYaw(yaw);
   faster_ptr_->updateState(state_tmp);
-
-  /*  double roll, pitch, yaw;
-    quaternion2Euler(msg.quat, roll, pitch, yaw);
-    current_yaw_ = yaw;
-
-    if (state_initialized_ == false)
-    {
-      quadGoal_.pos = msg.pos;
-      quadGoal_.vel = msg.vel;
-      quadGoal_.yaw = yaw;
-    }
-
-    mtx_state.lock();
-    state state_;
-    state_.setPos(msg.pos.x, msg.pos.y, msg.pos.z);
-    state_.setVel(msg.vel.x, msg.vel.y, msg.vel.z);
-    state_.setAccel(0.0, 0.0, 0.0);
-    state_initialized_ = true;
-    mtx_state.unlock();*/
-
-  // Stop updating when we get GO
-  /*  if (flight_mode_.mode == flight_mode_.NOT_FLYING || flight_mode_.mode == flight_mode_.KILL)
-    {
-      quadGoal_.pos = msg.pos;
-      quadGoal_.vel = msg.vel;
-
-      double roll, pitch, yaw;
-      quaternion2Euler(msg.quat, roll, pitch, yaw);
-      quadGoal_.yaw = yaw;
-      z_start_ = msg.pos.z;
-      z_start_ = std::max(0.0, z_start_);
-      mtx_initial_cond.lock();
-      stateA_.pos = state_.pos;
-      mtx_initial_cond.unlock();
-    }*/
-
-  /*  static int i = 0;
-    i++;
-
-    if (status_ != GOAL_REACHED && par_.visual == true)
-    {
-      pubActualTraj();
-    }
-
-    if (i % 10 == 0 && status_ != GOAL_REACHED && i != 0)
-    {
-      Eigen::Vector3d actual_pos(msg.pos.x, msg.pos.y, msg.pos.z);
-      // Don't use the state to compute the total distance (it's very noisy)
-      // log_.total_dist = log_.total_dist + (actual_pos - pos_old_).norm();
-      // pos_old_ = actual_pos;
-    }
-    Eigen::Vector3d vel(msg.vel.x, msg.vel.y, msg.vel.z);
-    log_.veloc_norm = vel.norm();*/
 }
 
 void FasterRos::modeCB(const faster_msgs::Mode& msg)
