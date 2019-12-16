@@ -4,9 +4,6 @@
 #include <unistd.h>
 #include <ros/package.h>
 
-#define WHOLE_TRAJ 0
-#define RESCUE_PATH 1
-
 mycallback::mycallback()
 {
   should_terminate_ = false;
@@ -14,10 +11,9 @@ mycallback::mycallback()
 
 void mycallback::callback()
 {  // This function is called periodically along the optimization process.
-  // It is called several times more after terminating the program
+  //  It is called several times more after terminating the program
   if (should_terminate_ == true)
   {
-    // std::cout << "Aborting the execution of the current optimization" << std::endl;
     GRBCallback::abort();  // This function only does effect when inside the function callback() of this class
     // terminated_ = true;
   }
@@ -115,36 +111,20 @@ void SolverGurobi::setObjective()  // I need to set it every time, because the o
   m.setObjective(control_cost, GRB_MINIMIZE);
 }
 
-void SolverGurobi::fillXandU()
+void SolverGurobi::fillX()
 {
-  // std::cout << "in fillXandU" << std::endl;
   double t = 0;
   int interval = 0;
   //#pragma omp parallel for
   //  {
-  // std::cout << "voy a fill" << std::endl;
-  // std::cout << "U_temp_.rows()=" << U_temp_.rows() << std::endl;
+
   for (int i = 0; i < X_temp_.size(); i++)
   {
-    // std::cout << "row=" << i << std::endl;
     t = t + DC;
-    // std::cout << "t=" << t << std::endl;
     if (t > dt_ * (interval + 1))
     {
       interval = std::min(interval + 1, N_ - 1);
-
-      // std::cout << "*****Interval=" << interval << std::endl;
     }
-
-    // std::cout << "t_rel=" << t - interval * dt_ << std::endl;
-    double jerkx = getJerk(interval, t - interval * dt_, 0).getValue();
-    double jerky = getJerk(interval, t - interval * dt_, 1).getValue();
-    double jerkz = getJerk(interval, t - interval * dt_, 2).getValue();
-
-    /*    Eigen::Matrix<double, 1, 3> input;
-        input << jerkx, jerky, jerkz;
-
-        U_temp_.row(i) = input;*/
 
     double posx = getPos(interval, t - interval * dt_, 0).getValue();
     double posy = getPos(interval, t - interval * dt_, 1).getValue();
@@ -157,6 +137,10 @@ void SolverGurobi::fillXandU()
     double accelx = getAccel(interval, t - interval * dt_, 0).getValue();
     double accely = getAccel(interval, t - interval * dt_, 1).getValue();
     double accelz = getAccel(interval, t - interval * dt_, 2).getValue();
+
+    double jerkx = getJerk(interval, t - interval * dt_, 0).getValue();
+    double jerky = getJerk(interval, t - interval * dt_, 1).getValue();
+    double jerkz = getJerk(interval, t - interval * dt_, 2).getValue();
 
     state state_i;
     state_i.setPos(posx, posy, posz);
@@ -173,33 +157,7 @@ void SolverGurobi::fillXandU()
   X_temp_[X_temp_.size() - 1].vel = Eigen::Vector3d::Zero().transpose();
   X_temp_[X_temp_.size() - 1].accel = Eigen::Vector3d::Zero().transpose();
   X_temp_[X_temp_.size() - 1].jerk = Eigen::Vector3d::Zero().transpose();
-
-  // std::cout << "end of fillXandU" << std::endl;
-  /*  std::cout << "***********The final states are***********" << std::endl;
-    std::cout << X_temp_.row(X_temp_.rows() - 1).transpose() << std::endl;
-
-    std::cout << "***********The final conditions were***********" << std::endl;
-    std::cout << xf_[0] << std::endl;
-    std::cout << xf_[1] << std::endl;
-    std::cout << xf_[2] << std::endl;
-    std::cout << xf_[3] << std::endl;
-    std::cout << xf_[4] << std::endl;
-    std::cout << xf_[5] << std::endl;
-    std::cout << xf_[6] << std::endl;
-    std::cout << xf_[7] << std::endl;
-    std::cout << xf_[8] << std::endl;*/
-
-  /*  std::cout << "***********The states are***********" << std::endl;
-    std::cout << X_temp_ << std::endl;
-    std::cout << "***********The input is***********" << std::endl;
-    std::cout << U_temp_ << std::endl;*/
 }
-
-/*void SolverGurobi::setSamplesPenalize(vec_Vecf<3>& samples_penalize)
-{
-  samples_penalize_.clear();
-  samples_penalize_ = samples_penalize;
-}*/
 
 void SolverGurobi::setForceFinalConstraint(bool forceFinalConstraint)
 {
@@ -322,28 +280,12 @@ void SolverGurobi::setPolytopesConstraints()
       }
     }
   }
-  // std::cout << "Done POLYTOPES=" << std::endl;
-}
-
-int SolverGurobi::getN()
-{
-  return N_;
 }
 
 void SolverGurobi::setDC(double dc)
 {
   DC = dc;
 }
-
-/*Eigen::MatrixXd SolverGurobi::getX()
-{
-  return X_temp_;
-}*/
-
-/*Eigen::MatrixXd SolverGurobi::getU()
-{
-  return U_temp_;
-}*/
 
 void SolverGurobi::setX0(state& data)
 {
@@ -389,18 +331,9 @@ void SolverGurobi::setConstraintsXf()
 
   final_cons.clear();
 
-  // std::cout << "Setting Final Constraints!!" << std::endl;
   // Constraint xT==x_final
   for (int i = 0; i < 3; i++)
   {
-    /*    final_cons.push_back(m.addConstr(getPos(N_ - 1, dt_, i) - xf_[i] <= 0.1));   // Final position
-        final_cons.push_back(m.addConstr(getPos(N_ - 1, dt_, i) - xf_[i] >= -0.1));  // Final position
-
-        final_cons.push_back(m.addConstr(getVel(N_ - 1, dt_, i) - xf_[i + 3] <= 0.05));   // Final velocity
-        final_cons.push_back(m.addConstr(getVel(N_ - 1, dt_, i) - xf_[i + 3] >= -0.05));  // Final velocity
-
-        final_cons.push_back(m.addConstr(getAccel(N_ - 1, dt_, i) - xf_[i + 6] <= 0.05));   // Final acceleration
-        final_cons.push_back(m.addConstr(getAccel(N_ - 1, dt_, i) - xf_[i + 6] >= -0.05));  // Final acceleration*/
     if (forceFinalConstraint_ == true)
     {
       // std::cout << "*********FORCING FINAL CONSTRAINT******" << std::endl;
@@ -427,8 +360,6 @@ void SolverGurobi::setConstraintsX0()
   // Constraint x0==x_initial
   for (int i = 0; i < 3; i++)
   {
-    // std::cout << "x0_[i]= " << x0_[i] << std::endl;
-    // std::cout << "Position" << std::endl;
     init_cons.push_back(m.addConstr(getPos(0, 0, i) == x0_[i],
                                     "InitialPosAxis_" + std::to_string(i)));  // Initial position
                                                                               // std::cout << "Velocity" << std::endl;
@@ -440,12 +371,12 @@ void SolverGurobi::setConstraintsX0()
   }
 }
 
-void SolverGurobi::resetXandU()
+void SolverGurobi::resetX()
 {
   int size = (int)(N_)*dt_ / DC;
   size = (size < 2) ? 2 : size;  // force size to be at least 2
   std::vector<state> tmp(size);
-  X_temp_ = tmp;  // Eigen::MatrixXd::Zero(size, 12);
+  X_temp_ = tmp;
 }
 
 void SolverGurobi::setMaxConstraints()
@@ -467,12 +398,7 @@ void SolverGurobi::setMaxConstraints()
   }
 }
 
-/*void SolverGurobi::setQ(double q)
-{
-  q_ = q;
-}*/
-
-void SolverGurobi::set_max(double max_values[3])
+void SolverGurobi::setBounds(double max_values[3])
 {
   v_max_ = max_values[0];
   a_max_ = max_values[1];
@@ -493,15 +419,13 @@ bool SolverGurobi::genNewTraj()
 {
   bool solved = false;
 
-  // std::cout << "Factor_initial= " << factor_initial_ << std::endl;
-  // std::cout << "Factor_final= " << factor_final_ << std::endl;
   trials_ = 0;
 
-  /*  std::cout << "A es esto:\n";
-    // std::cout << "Number of rows= " << bb.rows() << std::endl;
+  /*  std::cout << "A is\n";
     std::cout << polytopes_[0].A() << std::endl;
     std::cout << "B es esto:\n";
-    std::cout << polytopes_[0].b().transpose() << std::endl;*/
+    std::cout << polytopes_[0].b().transpose() << std::endl;
+    std::cout << "Number of rows= " << bb.rows() << std::endl;*/
 
   if (factor_initial_ < 1)
   {
@@ -521,7 +445,7 @@ bool SolverGurobi::genNewTraj()
     setConstraintsXf();
     setDynamicConstraints();
     setObjective();
-    resetXandU();
+    resetX();
 
     solved = callOptimizer();
     /*    if (solved == true)
@@ -561,10 +485,7 @@ void SolverGurobi::setWMax(double w_max)
 
 void SolverGurobi::findDT(double factor)
 {
-  // double dt = 2 * getDTInitial();
   dt_ = factor * std::max(getDTInitial(), 2 * DC);
-  // std::cout << "Trying dt=" << dt_ << std::endl;
-  // dt_ = 1;
 }
 
 void SolverGurobi::setDynamicConstraints()
@@ -643,7 +564,7 @@ bool SolverGurobi::callOptimizer()
 
   runtime_ms_ = runtime_ms_ + m.get(GRB_DoubleAttr_Runtime) * 1000;
 
-  /*  times_log.open("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/times_log.txt", std::ios_base::app);
+  /*  times_log.open("/home/jtorde/Desktop/ws/src/acl-planning/faster/models/times_log.txt", std::ios_base::app);
     times_log << elapsed << "\n";
     times_log.close();*/
 
@@ -718,7 +639,7 @@ bool SolverGurobi::callOptimizer()
   }
   return solved;
 
-  // printf("Going out from callOptimizer, optimstatus= %d\n", optimstatus);
+  // printf("Optimstatus= %d\n", optimstatus);
   // std::cout << "*************************Finished Optimization" << std::endl;
 
   /*  std::cout << "\nOBJECTIVE: " << m.get(GRB_DoubleAttr_ObjVal) << std::endl;
@@ -728,8 +649,7 @@ bool SolverGurobi::callOptimizer()
 }
 
 double SolverGurobi::getDTInitial()
-{  // TODO: Not sure if this is right or not. Implement also for Jerk? See page 4, (up-right part) of Search-based
-   // Motion Planning for Quadrotors using Linear Quadratic Minimum Time Control
+{
   double dt_initial = 0;
   float t_vx = 0;
   float t_vy = 0;
@@ -740,9 +660,6 @@ double SolverGurobi::getDTInitial()
   float t_jx = 0;
   float t_jy = 0;
   float t_jz = 0;
-
-  /*  std::cout << "get DT, x0_=" << x0_[0] << " " << x0_[1] << " " << x0_[2] << "--> xf_=" << xf_[0] << " " << xf_[1]
-              << " " << xf_[2] << std::endl;*/
 
   t_vx = fabs(xf_[0] - x0_[0]) / v_max_;
   t_vy = fabs(xf_[1] - x0_[1]) / v_max_;
@@ -819,22 +736,6 @@ double SolverGurobi::getDTInitial()
   t_ax = MinPositiveElement(realRoots_ax);
   t_ay = MinPositiveElement(realRoots_ay);
   t_az = MinPositiveElement(realRoots_az);
-
-  /*  // Solve equation xf=x0+v0t+0.5*a*t^2
-    Eigen::Vector3f coeff3x(0.5 * accelx, v0x, x0_[0] - xf_[0]);
-    Eigen::Vector3f coeff3y(0.5 * accely, v0y, x0_[1] - xf_[1]);
-    Eigen::Vector3f coeff3z(0.5 * accelz, v0z, x0_[2] - xf_[2]);
-
-
-
-    std::cout << "Coefficients for accel" << std::endl;
-    std::cout << "Coeff3x=" << coeff3x.transpose() << std::endl;
-    std::cout << "Coeff3y=" << coeff3y.transpose() << std::endl;
-    std::cout << "Coeff3z=" << coeff3z.transpose() << std::endl;
-
-    t_ax = solvePolynomialOrder2(coeff3x);
-    t_ay = solvePolynomialOrder2(coeff3y);
-    t_az = solvePolynomialOrder2(coeff3z);*/
 
   /*  printf("times accel: t_ax, t_ay, t_az:\n");
     std::cout << t_ax << "  " << t_ay << "  " << t_az << std::endl;

@@ -54,36 +54,31 @@ class SolverGurobi
 {
 public:
   SolverGurobi();
-  void interpolate(int var, double** u, double** x);
-  void obtainByDerivation(double** u, double** x);
-  double getCost();
-  // Eigen::MatrixXd getX();
-
-  void callbackFunction();
 
   // void setQ(double q);
   void setN(int N);
   void setX0(state& data);
   // void set_u0(double u0[]);
   void setXf(state& data);
-  void resetXandU();
-  void set_max(double max_values[3]);
+  void resetX();
+  void setBounds(double max_values[3]);
   bool genNewTraj();
   bool callOptimizer();
   double getDTInitial();
-  int getN();
+
   void setDC(double dc);
   void setPolytopes(std::vector<LinearConstraint3D> polytopes);
   void setPolytopesConstraints();
   void findDT(double factor);
-  void fillXandU();
+  void fillX();
   void setObjective();
   void setConstraintsXf();
   void setConstraintsX0();
   void setDynamicConstraints();
   void setForceFinalConstraint(bool forceFinalConstraint);
-  void setWMax(double w_max);
 
+  // For the jackal
+  void setWMax(double w_max);
   bool isWmaxSatisfied();
 
   void setMaxConstraints();

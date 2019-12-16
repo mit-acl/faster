@@ -1,7 +1,5 @@
 /* Author: Jesus Tordesillas Torres
    1-November-2018
-   I tried during 4 hours to implement it using Eigen, but didn't succeed. I think it's possible using NumTraits and
-   ScalarBinaryOpTraits templates of Eigen (to allow "symbolic" multiplications)
  */
 
 // Continuous version, and with polytope constraints.

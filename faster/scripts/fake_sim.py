@@ -2,8 +2,6 @@
 import roslib
 import rospy
 import math
-from geometry_msgs.msg import PoseStamped
-from geometry_msgs.msg import Pose
 from acl_msgs.msg import QuadGoal, State
 from gazebo_msgs.msg import ModelState
 import numpy as np
@@ -53,7 +51,7 @@ class FakeSim:
 
 
         drone_quaternion_with_yaw=[];
-        
+
         if(LA.norm(accel)>0.001 and LA.norm(np.cross(accel, axis_z))>0.0001):
           norm_accel=LA.norm(accel)
           accel=accel/norm_accel
@@ -70,7 +68,7 @@ class FakeSim:
           roll=euler[2]
           drone_quaternion_with_yaw = quaternion_from_euler(data.yaw, pitch, roll, 'szyx')
 
-        else:
+        else: #Take only the yaw angle
           drone_quaternion_with_yaw = quaternion_from_euler(data.yaw, 0, 0, 'szyx')
 
         gazebo_state.pose.orientation.x = drone_quaternion_with_yaw[0]

@@ -17,11 +17,11 @@ find_package(GUROBI REQUIRED)
 if(GUROBI_FOUND)
   message(STATUS "GUROBI FOUND")
 else(GUROBI_FOUND)
-  message(FATAL_ERROR "!!! GUROBI NOT FOUND !!!")
+  message(FATAL_ERROR "GUROBI NOT FOUND!")
 endif(GUROBI_FOUND)
 
 
-set(CMAKE_BUILD_TYPE RelWithDebInfo) #From terminal: catkin config -DCMAKE_BUILD_TYPE=Release (or RelWithDebInfo)
+set(CMAKE_BUILD_TYPE Release) #From terminal: catkin config -DCMAKE_BUILD_TYPE=Release (or RelWithDebInfo)
 
 include_directories(${GUROBI_INCLUDE_DIRS})
 #set(GUROBI_LIBRARIES "${GUROBI_CXX_LIBRARY};${GUROBI_LIBRARY}" )

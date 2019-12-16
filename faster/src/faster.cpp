@@ -18,8 +18,6 @@ typedef Timer MyTimer;
 
 Faster::Faster(parameters par) : par_(par)
 {
-  // flight_mode_ = flight_mode_.NOT_FLYING;
-  // flight_mode_.mode = GO;  // TODO (changed for the jackal)
   drone_status_ == DroneStatus::YAWING;
   // mtx_G.lock();
   G_.pos << 0, 0, 0;
@@ -29,8 +27,6 @@ Faster::Faster(parameters par) : par_(par)
   mtx_initial_cond.lock();
   stateA_.setZero();
   mtx_initial_cond.unlock();
-
-  // log_.total_dist = 0;
 
   // Setup of jps_manager
   std::cout << "par_.wdx / par_.res =" << par_.wdx / par_.res << std::endl;
@@ -48,8 +44,7 @@ Faster::Faster(parameters par) : par_(par)
   sg_whole_.setN(par_.N_whole);
   sg_whole_.createVars();
   sg_whole_.setDC(par_.dc);
-  sg_whole_.set_max(max_values);
-  sg_whole_.setMode(WHOLE_TRAJ);
+  sg_whole_.setBounds(max_values);
   sg_whole_.setForceFinalConstraint(true);
   sg_whole_.setFactorInitialAndFinalAndIncrement(1, 10, par_.increment_whole);
   sg_whole_.setVerbose(par_.gurobi_verbose);
@@ -60,8 +55,7 @@ Faster::Faster(parameters par) : par_(par)
   sg_safe_.setN(par_.N_safe);
   sg_safe_.createVars();
   sg_safe_.setDC(par_.dc);
-  sg_safe_.set_max(max_values);
-  sg_safe_.setMode(WHOLE_TRAJ);  // SAFE_PATH
+  sg_safe_.setBounds(max_values);
   sg_safe_.setForceFinalConstraint(false);
   sg_safe_.setFactorInitialAndFinalAndIncrement(1, 10, par_.increment_safe);
   sg_safe_.setVerbose(par_.gurobi_verbose);
@@ -624,7 +618,7 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
     }
 
     // Get Results
-    sg_whole_.fillXandU();
+    sg_whole_.fillX();
 
     // Copy for visualization
     X_whole_out = sg_whole_.X_temp_;
@@ -733,7 +727,7 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
     }
 
     // Get the solution
-    sg_safe_.fillXandU();
+    sg_safe_.fillX();
     X_safe_out = sg_safe_.X_temp_;
   }
 
@@ -987,42 +981,4 @@ void Faster::print_status()
       std::cout << bold << "status_=GOAL_REACHED" << reset << std::endl;
       break;
   }
-
-  /*  switch (planner_status_)
-    {
-      case PlannerStatus::FIRST_PLAN:
-        std::cout << bold << "planner_status_=FIRST_PLAN" << reset << std::endl;
-        break;
-      case PlannerStatus::START_REPLANNING:
-        std::cout << bold << "planner_status_=START_REPLANNING" << reset << std::endl;
-        break;
-      case PlannerStatus::REPLANNED:
-        std::cout << bold << "planner_status_=REPLANNED" << reset << std::endl;
-        break;
-    }*/
-
-  /*  switch (flight_mode_.mode)
-    {
-      case NOT_FLYING:
-        std::cout << bold << "flight_mode_=NOT_FLYING" << reset << std::endl;
-        break;
-      case TAKEOFF:
-        std::cout << bold << "flight_mode_=TAKEOFF" << reset << std::endl;
-        break;
-      case LAND:
-        std::cout << bold << "flight_mode_=LAND" << reset << std::endl;
-        break;
-      case INIT:
-        std::cout << bold << "flight_mode_=INIT" << reset << std::endl;
-        break;
-      case GO:
-        std::cout << bold << "flight_mode_=GO" << reset << std::endl;
-        break;
-      case ESTOP:
-        std::cout << bold << "flight_mode_=ESTOP" << reset << std::endl;
-        break;
-      case KILL:
-        std::cout << bold << "flight_mode_=KILL" << reset << std::endl;
-        break;
-    }*/
 }
