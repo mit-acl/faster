@@ -256,6 +256,9 @@ void FasterRos::stateCB(const acl_msgs::State& msg)
   state_tmp.setPos(msg.pos.x, msg.pos.y, msg.pos.z);
   state_tmp.setVel(msg.vel.x, msg.vel.y, msg.vel.z);
   state_tmp.setAccel(0.0, 0.0, 0.0);
+  double roll, pitch, yaw;
+  quaternion2Euler(msg.quat, roll, pitch, yaw);
+  state_tmp.setYaw(yaw);
   faster_ptr_->updateState(state_tmp);
 
   /*  double roll, pitch, yaw;

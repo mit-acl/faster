@@ -95,49 +95,54 @@ struct state
   double yaw = 0;
   double dyaw = 0;
 
-  void setPos(double x, double y, double z)
+  void setPos(const double x, const double y, const double z)
   {
     pos << x, y, z;
   }
-  void setVel(double x, double y, double z)
+  void setVel(const double x, const double y, const double z)
   {
     vel << x, y, z;
   }
-  void setAccel(double x, double y, double z)
+  void setAccel(const double x, const double y, const double z)
   {
     accel << x, y, z;
   }
 
-  void setJerk(double x, double y, double z)
+  void setJerk(const double x, const double y, const double z)
   {
     jerk << x, y, z;
   }
 
-  void setPos(Eigen::Vector3d& data)
+  void setPos(const Eigen::Vector3d& data)
   {
     pos << data.x(), data.y(), data.z();
   }
 
-  void setVel(Eigen::Vector3d& data)
+  void setVel(const Eigen::Vector3d& data)
   {
     vel << data.x(), data.y(), data.z();
   }
 
-  void setAccel(Eigen::Vector3d& data)
+  void setAccel(const Eigen::Vector3d& data)
   {
     accel << data.x(), data.y(), data.z();
   }
 
-  void setJerk(Eigen::Vector3d& data)
+  void setJerk(const Eigen::Vector3d& data)
   {
     jerk << data.x(), data.y(), data.z();
   }
 
-  void setState(Eigen::Matrix<double, 9, 1>& data)
+  void setState(const Eigen::Matrix<double, 9, 1>& data)
   {
     pos << data(0, 0), data(1, 0), data(2, 0);
     vel << data(3, 0), data(4, 0), data(5, 0);
     accel << data(6, 0), data(7, 0), data(8, 0);
+  }
+
+  void setYaw(const double& data)
+  {
+    yaw = data;
   }
   void setZero()
   {

@@ -24,10 +24,11 @@ class Behavior_Selector:
         self.pubMode = rospy.Publisher("faster/mode",Mode,queue_size=1,latch=True) #TODO Namespace
         self.pubClickedPoint = rospy.Publisher("/move_base_simple/goal",PoseStamped,queue_size=1,latch=True)
 
+        self.alt_taken_off = 1; #Altitude when hovering after taking off
         self.alt_ground = 0; #Altitude of the ground
         self.initialized=False;
 
-
+    #In rospy, the callbacks are all of them in separate threads
     def stateCB(self, data):
         self.pose.position.x = data.pos.x
         self.pose.position.y = data.pos.y
@@ -56,6 +57,7 @@ class Behavior_Selector:
         if req.mode == req.END and self.mode.mode==self.mode.GO:
             print "Landing"
             self.land()
+            print "Landing done"
 
 
     def sendMode(self):
@@ -64,14 +66,13 @@ class Behavior_Selector:
 
 
     def takeOff(self):
-        actual_position=self.pose.position;
         goal=QuadGoal();
-        goal.pos.x = actual_position.x;
-        goal.pos.y = actual_position.y;
-        goal.pos.z = actual_position.z;
-
-        while(goal.pos.z<=actual_position.z + 1): #TODO hard-coded 1
-            goal.pos.z = goal.pos.z+0.0035;
+        goal.pos.x = self.pose.position.x;
+        goal.pos.y = self.pose.position.y;
+        goal.pos.z = self.pose.position.z;
+        #Note that self.pose.position is being updated in the parallel callback
+        while(  abs(self.pose.position.z-self.alt_taken_off)>0.1  ): 
+            goal.pos.z = min(goal.pos.z+0.0035, self.alt_taken_off);
             #rospy.sleep(0.004) #TODO hard-coded
             self.sendGoal(goal)
         rospy.sleep(1.5) 
@@ -79,14 +80,14 @@ class Behavior_Selector:
         self.sendMode();
 
     def land(self):
-        actual_position=self.pose.position;
         goal=QuadGoal();
-        goal.pos.x = actual_position.x;
-        goal.pos.y = actual_position.y;
-        goal.pos.z = actual_position.z;
+        goal.pos.x = self.pose.position.x;
+        goal.pos.y = self.pose.position.y;
+        goal.pos.z = self.pose.position.z;
 
-        while(goal.pos.z>=self.alt_ground):
-            goal.pos.z = goal.pos.z-0.0035;
+        #Note that self.pose.position is being updated in the parallel callback
+        while(abs(self.pose.position.z-self.alt_ground)>0.1):
+            goal.pos.z = max(goal.pos.z-0.0035, self.alt_ground);
             self.sendGoal(goal)
         #Kill motors once we are on the ground
         self.kill()

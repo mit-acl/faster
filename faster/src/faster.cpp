@@ -460,6 +460,7 @@ void Faster::updateState(state data)
   {
     state tmp;
     tmp.pos = data.pos;
+    tmp.yaw = data.yaw;
     plan_.push_back(tmp);
   }
 
@@ -888,12 +889,12 @@ void Faster::getDesiredYaw(state& next_goal)
   {
     case DroneStatus::YAWING:
       desired_yaw = atan2(G_.pos[1] - next_goal.pos[1], G_.pos[0] - next_goal.pos[0]);
-      diff = desired_yaw - previous_yaw_;
+      diff = desired_yaw - state_.yaw;
       break;
     case DroneStatus::TRAVELING:
     case DroneStatus::GOAL_SEEN:
       desired_yaw = atan2(M_.pos[1] - next_goal.pos[1], M_.pos[0] - next_goal.pos[0]);
-      diff = desired_yaw - previous_yaw_;
+      diff = desired_yaw - state_.yaw;
       break;
     case DroneStatus::GOAL_REACHED:
       diff = 0.0;
