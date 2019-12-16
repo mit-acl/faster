@@ -9,11 +9,12 @@
 #include "visualization_msgs/Marker.h"
 #include "visualization_msgs/MarkerArray.h"
 #include <sensor_msgs/point_cloud_conversion.h>
+#include <pcl_conversions/pcl_conversions.h>
 #include <pcl/kdtree/kdtree_flann.h>
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/buffer.h>
 
-#include <atomic>
+//#include <atomic>
 
 #include <Eigen/Dense>
 
@@ -198,4 +199,5 @@ private:
   int markerID_ = 0;
   int markerID_last_ = 0;
   int actual_trajID_ = 0;
+  // faster_msgs::Mode mode_;
 };

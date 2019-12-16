@@ -218,6 +218,8 @@ void SolverGurobi::fillXandU()
   // haven't planned again).
   // U_temp_.row(U_temp_.rows() - 1) = Eigen::Vector3d::Zero().transpose();
 
+  X_temp_[X_temp_.size() - 1].vel = Eigen::Vector3d::Zero().transpose();
+  X_temp_[X_temp_.size() - 1].accel = Eigen::Vector3d::Zero().transpose();
   X_temp_[X_temp_.size() - 1].jerk = Eigen::Vector3d::Zero().transpose();
 
   // std::cout << "end of fillXandU" << std::endl;

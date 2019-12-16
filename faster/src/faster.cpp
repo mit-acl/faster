@@ -1,37 +1,26 @@
 #include "faster.hpp"
 
-#include <pcl_conversions/pcl_conversions.h>
 #include <pcl/kdtree/kdtree.h>
-#include <pcl/filters/filter.h>
-#include <pcl/filters/crop_box.h>
-#include <pcl/filters/passthrough.h>
 #include <Eigen/StdVector>
-
-#include <tf2_sensor_msgs/tf2_sensor_msgs.h>
-
 #include <stdio.h>
 #include <math.h>
 #include <algorithm>
 #include <vector>
-#include <assert.h>
 #include <stdlib.h>
-
-#include <sensor_msgs/point_cloud_conversion.h>
-#include <nav_msgs/Path.h>
 
 using namespace JPS;
 using namespace termcolor;
 
-// Uncomment only one to choose the type of timer you want:
-typedef ROSTimer MyTimer;
+// Uncomment the type of timer you want:
+// typedef ROSTimer MyTimer;
 // typedef ROSWallTimer MyTimer;
-// typedef Timer MyTimer;
+typedef Timer MyTimer;
 
 Faster::Faster(parameters par) : par_(par)
 {
   // flight_mode_ = flight_mode_.NOT_FLYING;
-  flight_mode_.mode = GO;  // TODO (changed for the jackal)
-
+  // flight_mode_.mode = GO;  // TODO (changed for the jackal)
+  drone_status_ == DroneStatus::YAWING;
   // mtx_G.lock();
   G_.pos << 0, 0, 0;
   // mtx_G.unlock();
@@ -81,20 +70,9 @@ Faster::Faster(parameters par) : par_(par)
 
   pclptr_unk_ = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
   pclptr_map_ = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
+
+  resetInitialization();
 }
-
-/*void Faster::yaw(double diff, acl_msgs::QuadGoal& quad_goal)
-{
-  saturate(diff, -par_.dc * par_.w_max, par_.dc * par_.w_max);
-  double dyaw_not_filtered;
-
-  dyaw_not_filtered = copysign(1, diff) * par_.w_max;
-
-  dyaw_filtered_ = (1 - par_.alpha_filter_dyaw) * dyaw_not_filtered + par_.alpha_filter_dyaw * dyaw_filtered_;
-  quad_goal.dyaw = dyaw_filtered_;
-
-  quad_goal.yaw += dyaw_filtered_ * par_.dc;
-}*/
 
 void Faster::createMoreVertexes(vec_Vecf<3>& path, double d)
 {
@@ -167,7 +145,7 @@ void Faster::setTerminalGoal(state& term_goal)
   G_term_.pos = term_goal.pos;
   Eigen::Vector3d temp = state_.pos;
   G_.pos = projectPointToBox(temp, G_term_.pos, par_.wdx, par_.wdy, par_.wdz);
-  changeDroneStatus(DroneStatus::TRAVELING);  // TODO: This should be YAWING
+  changeDroneStatus(DroneStatus::YAWING);  // TODO: This should be YAWING
 
   terminal_goal_initialized_ = true;
 
@@ -474,73 +452,43 @@ Eigen::Vector3d Faster::getFirstCollisionJPS(vec_Vecf<3>& path, bool* thereIsInt
   return result;
 }
 
-void Faster::changeMode(int new_mode)
-{
-  flight_mode_.mode = new_mode;
-
-  /*  if (flight_mode_.mode == LAND)  //&& flight_mode_ != flight_mode_.LAND
-    {
-      printf("LANDING\n");
-
-      mtx_goals.lock();
-      mtx_state.lock();
-
-      state x0 = state_;
-      state xf = state_;
-      xf.pos[2] = par_.z_land;
-
-      mtx_state.unlock();
-      mtx_goals.unlock();
-
-      sg_whole_.setXf(xf);
-      sg_whole_.setX0(x0);
-      std::vector<LinearConstraint3D> l_constraints_empty;
-      sg_whole_.setPolytopes(l_constraints_empty);
-      bool solved_landing = false;
-      solved_landing = sg_whole_.genNewTraj();
-
-      if (solved_landing == false)
-      {
-        std::cout << bold << red << "No solution for landing" << reset << std ::endl;
-      }
-      else
-      {
-        std::cout << "solution found" << std::endl;
-        sg_whole_.fillXandU();
-        to_land_ = true;
-        mtx_X_U_temp.lock();
-        X_temp_ = sg_whole_.X_temp_;
-        mtx_X_U_temp.unlock();
-        mtx_planner_status_.lock();
-        planner_status_ = REPLANNED;
-        mtx_planner_status_.unlock();
-      }
-    }*/
-}
-
 void Faster::updateState(state data)
 {
   state_ = data;
 
   if (state_initialized_ == false)
   {
-    plan_.push_back(state_);
+    state tmp;
+    tmp.pos = data.pos;
+    plan_.push_back(tmp);
   }
 
   state_initialized_ = true;
 }
 
-bool Faster::initialized()
+bool Faster::initializedAllExceptPlanner()
 {
   if (!state_initialized_ || !kdtree_map_initialized_ || !kdtree_unk_initialized_ || !terminal_goal_initialized_)
   {
-    std::cout << red << bold << ("Waiting to initialize kdTree_map and/or kdTree_unk and/or goal_click and/or state_")
-              << reset << std::endl;
-
     std::cout << "state_initialized_= " << state_initialized_ << std::endl;
     std::cout << "kdtree_map_initialized_= " << kdtree_map_initialized_ << std::endl;
     std::cout << "kdtree_unk_initialized_= " << kdtree_unk_initialized_ << std::endl;
     std::cout << "terminal_goal_initialized_= " << terminal_goal_initialized_ << std::endl;
+    return false;
+  }
+  return true;
+}
+
+bool Faster::initialized()
+{
+  if (!state_initialized_ || !kdtree_map_initialized_ || !kdtree_unk_initialized_ || !terminal_goal_initialized_ ||
+      !planner_initialized_)
+  {
+    std::cout << "state_initialized_= " << state_initialized_ << std::endl;
+    std::cout << "kdtree_map_initialized_= " << kdtree_map_initialized_ << std::endl;
+    std::cout << "kdtree_unk_initialized_= " << kdtree_unk_initialized_ << std::endl;
+    std::cout << "terminal_goal_initialized_= " << terminal_goal_initialized_ << std::endl;
+    std::cout << "planner_initialized_= " << planner_initialized_ << std::endl;
     return false;
   }
   return true;
@@ -552,7 +500,7 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
 {
   MyTimer replanCB_t(true);
 
-  if (initialized() == false)
+  if (initializedAllExceptPlanner() == false)
   {
     return;
   }
@@ -690,9 +638,9 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
     sg_whole_.X_temp_ = dummy_vector;
   }
 
-  std::cout << "This is the WHOLE TRAJECTORY" << std::endl;
-  printStateVector(sg_whole_.X_temp_);
-  std::cout << "===========================" << std::endl;
+  /*  std::cout << "This is the WHOLE TRAJECTORY" << std::endl;
+    printStateVector(sg_whole_.X_temp_);
+    std::cout << "===========================" << std::endl;*/
 
   //////////////////////////////////////////////////////////////////////////
   ///////////////// Solve with GUROBI Safe trajectory /////////////////////
@@ -700,9 +648,9 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
 
   vec_Vecf<3> JPSk_inside_sphere_tmp = JPS_in;
   bool thereIsIntersection2;
-  state M;
-  M.pos = getFirstCollisionJPS(JPSk_inside_sphere_tmp, &thereIsIntersection2, UNKNOWN_MAP,
-                               RETURN_INTERSECTION);  // results saved in JPSk_inside_sphere_tmp
+  // state M;
+  M_.pos = getFirstCollisionJPS(JPSk_inside_sphere_tmp, &thereIsIntersection2, UNKNOWN_MAP,
+                                RETURN_INTERSECTION);  // results saved in JPSk_inside_sphere_tmp
 
   bool needToComputeSafePath;
   int indexH = findIndexH(needToComputeSafePath);
@@ -747,7 +695,7 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
 
     // delete extra vertexes
     deleteVertexes(JPS_safe, par_.max_poly_safe);
-    M.pos = JPS_safe[JPS_safe.size() - 1];
+    M_.pos = JPS_safe[JPS_safe.size() - 1];
 
     // compute convex decomposition of JPS_safe
     jps_manager_.cvxEllipsoidDecomp(JPS_safe, UNKOWN_AND_OCCUPIED_SPACE, l_constraints_safe_, poly_safe_out);
@@ -755,7 +703,7 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
     JPS_safe_out = JPS_safe;
 
     bool isGinside = l_constraints_safe_[l_constraints_safe_.size() - 1].inside(G.pos);
-    M.pos = (isGinside == true) ? G.pos : M.pos;
+    M_.pos = (isGinside == true) ? G.pos : M_.pos;
 
     state x0_safe;
     x0_safe = R;
@@ -773,7 +721,7 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
     }
 
     sg_safe_.setX0(x0_safe);
-    sg_safe_.setXf(M);  // only used to compute dt
+    sg_safe_.setXf(M_);  // only used to compute dt
     sg_safe_.setPolytopes(l_constraints_safe_);
     sg_safe_.setForceFinalConstraint(shouldForceFinalConstraint_for_Safe);
     MyTimer safe_gurobi_t(true);
@@ -793,9 +741,9 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
     std::cout << "filled the solutions" << std::endl;
   }
 
-  std::cout << "This is the SAFE TRAJECTORY" << std::endl;
-  printStateVector(sg_safe_.X_temp_);
-  std::cout << "===========================" << std::endl;
+  /*  std::cout << "This is the SAFE TRAJECTORY" << std::endl;
+    printStateVector(sg_safe_.X_temp_);
+    std::cout << "===========================" << std::endl;*/
 
   ///////////////////////////////////////////////////////////
   ///////////////       Append RESULTS    ////////////////////
@@ -807,12 +755,12 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
     return;
   }
 
-  mtx_plan_.lock();
-  std::cout << "This is the COMMITED TRAJECTORY" << std::endl;
-  printStateDeque(plan_);
-  std::cout << "===========================" << std::endl;
-  mtx_plan_.unlock();
-
+  /*  mtx_plan_.lock();
+    std::cout << "This is the COMMITED TRAJECTORY" << std::endl;
+    printStateDeque(plan_);
+    std::cout << "===========================" << std::endl;
+    mtx_plan_.unlock();
+  */
   ///////////////////////////////////////////////////////////
   ///////////////       OTHER STUFF    //////////////////////
   //////////////////////////////////////////////////////////
@@ -858,7 +806,18 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
   double new_final_safe = sg_safe_.factor_that_worked_ + par_.gammap_safe;
   sg_safe_.setFactorInitialAndFinalAndIncrement(new_init_safe, new_final_safe, par_.increment_safe);
 
+  planner_initialized_ = true;
+
   return;
+}
+
+void Faster::resetInitialization()
+{
+  planner_initialized_ = false;
+  state_initialized_ = false;
+  kdtree_map_initialized_ = false;
+  kdtree_unk_initialized_ = false;
+  terminal_goal_initialized_ = false;
 }
 
 bool Faster::appendToPlan(int k_end_whole, const std::vector<state>& whole, int k_safe, const std::vector<state>& safe)
@@ -907,12 +866,52 @@ bool Faster::appendToPlan(int k_end_whole, const std::vector<state>& whole, int 
   return output;
 }
 
-// void Faster::pubCB(const ros::TimerEvent& e)
-void Faster::getNextGoal(state& next_goal)
+void Faster::yaw(double diff, state& next_goal)
 {
-  if (initialized() == false)
+  saturate(diff, -par_.dc * par_.w_max, par_.dc * par_.w_max);
+  double dyaw_not_filtered;
+
+  dyaw_not_filtered = copysign(1, diff) * par_.w_max;
+
+  dyaw_filtered_ = (1 - par_.alpha_filter_dyaw) * dyaw_not_filtered + par_.alpha_filter_dyaw * dyaw_filtered_;
+  next_goal.dyaw = dyaw_filtered_;
+
+  next_goal.yaw += dyaw_filtered_ * par_.dc;
+}
+
+void Faster::getDesiredYaw(state& next_goal)
+{
+  double diff = 0.0;
+  double desired_yaw = 0.0;
+
+  switch (drone_status_)
   {
-    return;
+    case DroneStatus::YAWING:
+      desired_yaw = atan2(G_.pos[1] - next_goal.pos[1], G_.pos[0] - next_goal.pos[0]);
+      diff = desired_yaw - previous_yaw_;
+      break;
+    case DroneStatus::TRAVELING:
+    case DroneStatus::GOAL_SEEN:
+      desired_yaw = atan2(M_.pos[1] - next_goal.pos[1], M_.pos[0] - next_goal.pos[0]);
+      diff = desired_yaw - previous_yaw_;
+      break;
+    case DroneStatus::GOAL_REACHED:
+      diff = 0.0;
+  }
+
+  angle_wrap(diff);
+  if (fabs(diff) < 0.04 && drone_status_ == DroneStatus::YAWING)
+  {
+    changeDroneStatus(DroneStatus::TRAVELING);
+  }
+  yaw(diff, next_goal);
+}
+
+bool Faster::getNextGoal(state& next_goal)
+{
+  if (initializedAllExceptPlanner() == false)
+  {
+    return false;
   }
 
   mtx_goals.lock();
@@ -924,222 +923,16 @@ void Faster::getNextGoal(state& next_goal)
   {
     plan_.pop_front();
   }
-  next_goal.yaw = 0;
-  next_goal.dyaw = 0;
+  getDesiredYaw(next_goal);
+
+  previous_yaw_ = next_goal.yaw;
 
   mtx_goals.unlock();
   mtx_plan_.unlock();
-
-  /*  if (flight_mode_.mode == LAND)
-    {
-      double d = sqrt(pow(quadGoal_.pos.z - par_.z_land, 2));
-      if (d < 0.1)
-      {
-        ros::Duration(1.0).sleep();
-        flight_mode_.mode = NOT_FLYING;
-      }
-    }*/
-
-  /*  if (quadGoal_.cut_power && (flight_mode_ == flight_mode_.TAKEOFF || flight_mode_ == flight_mode_.GO))
-    {
-      double then = ros::Time::now().toSec();
-      double diff = 0;
-      while (diff < 0.5)  // spinup_time_
-      {
-        quadGoal_.header.stamp = ros::Time::now();
-        diff = ros::Time::now().toSec() - then;
-        quadGoal_.cut_power = 0;
-        ros::Duration(0.01).sleep();
-        pub_goal_.publish(quadGoal_);
-      }
-    }*/
-
-  /////////////////// Commenting below, 16:41
-
-  /*  if (optimized_ && flight_mode_.mode != NOT_FLYING && flight_mode_.mode != KILL)
-    {
-      // quadGoal_.cut_power = false;
-
-      mtx_k.lock();
-
-      k_ = std::min(k_, (int)(X_.rows() - 1));
-
-      if (k_ > k_initial_cond_ && status_ == TRAVELING)
-      {  // The initial condition of the optimization was already sent to the drone!
-         // ROS_WARN("Optimization took too long. Increase deltaT");
-      }
-
-      if (((planner_status_ == PlannerStatus::REPLANNED && (k_ == k_initial_cond_ || to_land_ == true)) ||  // Should be
-                                                                                                            // k_==
-           (force_reset_to_0_ && planner_status_ == PlannerStatus::REPLANNED)))  //&& takeoff_done_ == false)  //
-    hacktodo
-      {
-        to_land_ == false;
-        printf("************Reseteando a 0!\n");
-        // reset the current optimizations (not needed because I already have a solution)
-        sg_whole_.StopExecution();
-        sg_safe_.StopExecution();
-
-        force_reset_to_0_ = false;
-        mtx_X_U_temp.lock();
-        mtx_X_U.lock();
-        X_ = X_temp_;
-        U_ = U_temp_;
-        mtx_X_U.unlock();
-        mtx_X_U_temp.unlock();
-        X_initialized_ = true;
-        k_ = 0;  // Start again publishing the waypoints in X_ from the first row
-        mtx_planner_status_.lock();
-        planner_status_ = PlannerStatus::START_REPLANNING;
-        mtx_planner_status_.unlock();
-        // printf("pucCB2: planner_status_=START_REPLANNING\n");
-      }
-
-      if ((planner_status_ == PlannerStatus::REPLANNED && (k_ > k_initial_cond_)))
-      {  // I've published what I planned --> plan again
-        std::cout << bold << magenta << "Rejecting current plan, planning again. Suggestion: Increase delta_t" << reset
-                  << std::endl;
-        sg_whole_.StopExecution();
-        sg_safe_.StopExecution();
-        mtx_planner_status_.lock();
-        planner_status_ = PlannerStatus::START_REPLANNING;
-        status_ = TRAVELING;
-        mtx_planner_status_.unlock();
-      }
-
-      k_ = std::min(k_, (int)(X_.rows() - 1));
-      mtx_k.unlock();
-
-      next_goal.pos = getPos(k_);
-      next_goal.vel = getVel(k_);
-      next_goal.accel = (par_.use_ff) * getAccel(k_);
-      next_goal.jerk = (par_.use_ff) * getJerk(k_);
-      next_goal.dyaw = 0;
-
-      if (status_ == YAWING)
-      {
-        double desired_yaw = atan2(G_.pos[1] - next_goal.pos[1], G_.pos[0] - next_goal.pos[0]);
-        double diff = desired_yaw - next_goal.yaw;
-        angle_wrap(diff);
-
-        if (fabs(diff) < 0.04)
-        {
-          status_ = TRAVELING;
-        }
-        else
-        {
-          // printf("Yawing\n");
-        }
-      }
-
-      if ((status_ == TRAVELING || status_ == GOAL_SEEN))
-      {
-        // double desired_yaw = atan2(quadGoal_.vel.y, quadGoal_.vel.x);
-        desired_yaw_B_ = atan2(B_[1] - next_goal.pos[1], B_[0] - next_goal.pos[0]);
-        double diff = desired_yaw_B_ - next_goal.yaw;
-        angle_wrap(diff);
-        // std::cout << red << bold << std::setprecision(6) << "diff after wrappping=" << diff << reset << std::endl;
-        if (JPSk_solved_ == true and takeoff_done_ == true and fabs(diff) > 0.04)  // only yaw if diff is big enough
-        {
-          // yaw(diff, quadGoal_);
-        }
-
-        if (JPSk_solved_ == false)
-        {
-          next_goal.dyaw = 0;
-        }
-      }
-      if (status_ == GOAL_REACHED || takeoff_done_ == false)
-      {
-        next_goal.dyaw = 0;
-        next_goal.yaw = next_goal.yaw;
-      }
-
-      mtx_k.lock();
-      k_++;
-
-      mtx_k.unlock();
-    }*/
-  /////////////////// Commented above, 16:41
-  /*  else
-    {
-      quadGoal_.cut_power = true;
-    }*/
-
-  /*  ////////////////////////////////
-    // NOW generate all the things needed for the jackal
-    geometry_msgs::Twist cmd_jackal;
-
-    if (status_ == YAWING)
-    {
-      cmd_jackal.angular.z = quadGoal_.dyaw;
-    }
-
-    else if (status_ == GOAL_REACHED)
-    {
-      // don't send commands
-    }
-    else if (k_ >= (int)(X_.rows() - 1) && status_ != GOAL_SEEN)  // stopped at the end of a trajectory, but GOAL not
-                                                                  // REACHED --> yaw
-    {
-      double angle = current_yaw_ - desired_yaw_B_;  // quadGoal_.yaw;
-      angle_wrap(angle);
-      int direction = (angle > 0) ? -1 : 1;
-      cmd_jackal.angular.z = direction * par_.w_max;
-    }
-    else
-    {
-      double x = quadGoal_.pos.x;
-      double y = quadGoal_.pos.y;
-      double xd = quadGoal_.vel.x;
-      double yd = quadGoal_.vel.y;
-      double xd2 = quadGoal_.accel.x;
-      double yd2 = quadGoal_.accel.y;
-
-      double v_desired = sqrt(pow(xd, 2) + pow(yd, 2));
-      double alpha = current_yaw_ - atan2(y - state_.pos.y(), x - state_.pos.x());
-      angle_wrap(alpha);                                                    // wrap between -pi and pi
-      int forward = (alpha <= 3.14 / 2.0 && alpha > -3.14 / 2.0) ? 1 : -1;  // 1 if forward, -1 if backwards
-      double dist_error = forward * sqrt(pow(x - state_.pos.x(), 2) + pow(y - state_.pos.y(), 2));
-      alpha = (fabs(dist_error) < 0.1) ? 0 : alpha;
-
-      // See http://mathworld.wolfram.com/Curvature.html (diff(phi)/diff(t))
-      double numerator = xd * yd2 - yd * xd2;
-      double denominator = xd * xd + yd * yd;
-      double w_desired = (denominator > 0.01) ? numerator / denominator : 0;
-      double desired_yaw = (fabs(xd) < 0.001 || fabs(dist_error) < 0.03) ? desired_yaw_old_ : atan2(yd, xd);
-
-      desired_yaw_old_ = desired_yaw;
-      double yaw_error = current_yaw_ - desired_yaw;
-      angle_wrap(yaw_error);  // wrap between -pi and pi
-
-      double alpha_dot = (alpha - alpha_before_) / par_.dc;
-      alpha_before_ = alpha;
-
-      if (fabs(dist_error) > 0.15)
-      {
-        cmd_jackal.linear.x = par_.kdist * dist_error;
-        cmd_jackal.angular.z = -par_.kalpha * alpha;
-      }
-      else
-      {
-        cmd_jackal.linear.x = par_.kv * v_desired;
-        cmd_jackal.angular.z = par_.kw * w_desired - par_.kyaw * yaw_error;
-      }
-    }
-    // std::cout << "Publishing Jackal Goal" << std::endl;
-    pub_goal_jackal_.publish(cmd_jackal);
-    ///////////////////////////////////////////////*/
-
-  // std::cout << "Publishing QUAD Goal" << std::endl;
-
-  // std::cout << "QUAD Goal published" << std::endl;
-
-  // printf("End pubCB\n");
-  // printf("#########Time in pubCB %0.2f ms\n", 1000 * (ros::Time::now().toSec() - t0pubCB));
-  // mtx_goals.unlock();
+  return true;
 }
 
+// Debugging funcctions
 void Faster::changeDroneStatus(int new_status)
 {
   if (new_status == drone_status_)
@@ -1217,28 +1010,28 @@ void Faster::print_status()
         break;
     }*/
 
-  switch (flight_mode_.mode)
-  {
-    case NOT_FLYING:
-      std::cout << bold << "flight_mode_=NOT_FLYING" << reset << std::endl;
-      break;
-    case TAKEOFF:
-      std::cout << bold << "flight_mode_=TAKEOFF" << reset << std::endl;
-      break;
-    case LAND:
-      std::cout << bold << "flight_mode_=LAND" << reset << std::endl;
-      break;
-    case INIT:
-      std::cout << bold << "flight_mode_=INIT" << reset << std::endl;
-      break;
-    case GO:
-      std::cout << bold << "flight_mode_=GO" << reset << std::endl;
-      break;
-    case ESTOP:
-      std::cout << bold << "flight_mode_=ESTOP" << reset << std::endl;
-      break;
-    case KILL:
-      std::cout << bold << "flight_mode_=KILL" << reset << std::endl;
-      break;
-  }
+  /*  switch (flight_mode_.mode)
+    {
+      case NOT_FLYING:
+        std::cout << bold << "flight_mode_=NOT_FLYING" << reset << std::endl;
+        break;
+      case TAKEOFF:
+        std::cout << bold << "flight_mode_=TAKEOFF" << reset << std::endl;
+        break;
+      case LAND:
+        std::cout << bold << "flight_mode_=LAND" << reset << std::endl;
+        break;
+      case INIT:
+        std::cout << bold << "flight_mode_=INIT" << reset << std::endl;
+        break;
+      case GO:
+        std::cout << bold << "flight_mode_=GO" << reset << std::endl;
+        break;
+      case ESTOP:
+        std::cout << bold << "flight_mode_=ESTOP" << reset << std::endl;
+        break;
+      case KILL:
+        std::cout << bold << "flight_mode_=KILL" << reset << std::endl;
+        break;
+    }*/
 }

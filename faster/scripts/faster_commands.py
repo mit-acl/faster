@@ -5,7 +5,7 @@
 import rospy
 from faster_msgs.msg import Mode
 from acl_msgs.msg import QuadGoal, State
-from geometry_msgs.msg import Pose
+from geometry_msgs.msg import Pose, PoseStamped
 from behavior_selector.srv import MissionModeChange
 import math
 
@@ -21,7 +21,8 @@ class Behavior_Selector:
         self.pose = Pose();
         self.mode.mode=self.mode.ON_GROUND
         self.pubGoal = rospy.Publisher('goal', QuadGoal, queue_size=1)
-        self.pubMode = rospy.Publisher("fastermode",Mode,queue_size=1,latch=True)
+        self.pubMode = rospy.Publisher("faster/mode",Mode,queue_size=1,latch=True) #TODO Namespace
+        self.pubClickedPoint = rospy.Publisher("/move_base_simple/goal",PoseStamped,queue_size=1,latch=True)
 
         self.alt_ground = 0; #Altitude of the ground
         self.initialized=False;
@@ -34,6 +35,7 @@ class Behavior_Selector:
         self.pose.orientation = data.quat
 
         if(self.initialized==False):
+            self.pubFirstGoal()
             self.initialized=True
 
     #Called when buttom pressed in the interface
@@ -45,6 +47,7 @@ class Behavior_Selector:
         if req.mode == req.START and self.mode.mode==self.mode.ON_GROUND:
             print "Taking off"
             self.takeOff()
+            print "Take off done"
 
         if req.mode == req.KILL:
             print "Killing"
@@ -67,10 +70,11 @@ class Behavior_Selector:
         goal.pos.y = actual_position.y;
         goal.pos.z = actual_position.z;
 
-        while(goal.pos.z<=actual_position.z + 1):
+        while(goal.pos.z<=actual_position.z + 1): #TODO hard-coded 1
             goal.pos.z = goal.pos.z+0.0035;
+            #rospy.sleep(0.004) #TODO hard-coded
             self.sendGoal(goal)
-
+        rospy.sleep(1.5) 
         self.mode.mode=self.mode.GO
         self.sendMode();
 
@@ -98,6 +102,15 @@ class Behavior_Selector:
         goal.yaw = quat2yaw(self.pose.orientation)
         goal.header.stamp = rospy.get_rostime()
         self.pubGoal.publish(goal)
+
+    def pubFirstGoal(self):
+        msg=PoseStamped()
+        msg.pose.position.x=self.pose.position.x
+        msg.pose.position.y=self.pose.position.y
+        msg.pose.position.z=1.0
+        msg.header.frame_id="world"
+        msg.header.stamp = rospy.get_rostime()
+        self.pubClickedPoint.publish(msg)
 
                   
 def startNode():

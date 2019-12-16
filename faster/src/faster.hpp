@@ -1,10 +1,10 @@
 #pragma once
 // replanCB(const ros::TimerEvent& e)
-#include <pcl_conversions/pcl_conversions.h>
+//#include <pcl_conversions/pcl_conversions.h>
 #include <pcl/kdtree/kdtree.h>
-#include <pcl/filters/filter.h>
+/*#include <pcl/filters/filter.h>
 #include <pcl/filters/crop_box.h>
-#include <pcl/filters/passthrough.h>
+#include <pcl/filters/passthrough.h>*/
 #include <Eigen/StdVector>
 
 #include "timer.hpp"
@@ -14,7 +14,6 @@
 #include <math.h>
 #include <algorithm>
 #include <vector>
-#include <assert.h>
 #include <stdlib.h>
 
 #include "faster_types.hpp"
@@ -46,29 +45,9 @@ enum PlannerStatus
   START_REPLANNING = 1,
   REPLANNED = 2
 };
-// planner_status_
-
-// flightmode
-#define NOT_FLYING 0
-#define TAKEOFF 1
-#define LAND 2
-#define INIT 3
-#define GO 4
-#define ESTOP 5
-#define KILL 6
-
-struct flightmode
-{
-  int mode;
-};
 
 using namespace JPS;
 using namespace termcolor;
-
-// Uncomment only one to choose the type of timer you want:
-typedef ROSTimer MyTimer;
-// typedef ROSWallTimer MyTimer;
-// typedef Timer MyTimer;
 
 class Faster
 {
@@ -77,20 +56,28 @@ public:
   void replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E<Polyhedron<3>>& poly_safe_out,
               vec_E<Polyhedron<3>>& poly_whole_out, std::vector<state>& X_safe_out, std::vector<state>& X_whole_out);
   void updateState(state data);
-  void changeMode(int new_mode);
+  // void changeMode(int new_mode);
   void updateMap(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_map, pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_unk);
-  void getNextGoal(state& next_goal);
+  bool getNextGoal(state& next_goal);
   void getState(state& data);
   void getG(state& G);
   void setTerminalGoal(state& term_goal);
+  void resetInitialization();
 
 private:
+  state M_;
   std::deque<state> plan_;
+
+  double previous_yaw_ = 0.0;
 
   SolverGurobi sg_whole_;  // solver gurobi whole trajectory
   SolverGurobi sg_safe_;   // solver gurobi whole trajectory
 
   JPS_Manager jps_manager_;  // Manager of JPS
+
+  void yaw(double diff, state& next_goal);
+
+  void getDesiredYaw(state& next_goal);
 
   // void yaw(double diff, acl_msgs::QuadGoal& quad_goal);
   void createMoreVertexes(vec_Vecf<3>& path, double d);
@@ -122,6 +109,7 @@ private:
   bool appendToPlan(int k_end_whole, const std::vector<state>& whole, int k_safe, const std::vector<state>& safe);
 
   bool initialized();
+  bool initializedAllExceptPlanner();
 
   void print_status();
 
@@ -130,6 +118,7 @@ private:
   // SeedDecomp3D seed_decomp_util_;
 
   bool state_initialized_ = false;
+  bool planner_initialized_ = false;
 
   double current_yaw_ = 0;
 
@@ -159,10 +148,7 @@ private:
 
   bool kdtree_map_initialized_ = 0;
   bool kdtree_unk_initialized_ = 0;
-  bool kdtree_frontier_initialized_ = 0;
-  // vector that has all the kdtrees of the pclouds not included in the map:
-  std::vector<kdTreeStamped> v_kdtree_new_pcls_;
-  bool replanning_needed_ = true;
+
   bool terminal_goal_initialized_ = false;
 
   int cells_x_;  // Number of cells of the map in X
@@ -218,7 +204,7 @@ private:
   bool JPSk_solved_ = false;
 
   state stateA_;  // It's the initial condition for the solver
-  flightmode flight_mode_;
+  // flightmode flight_mode_;
   state state_;
   state G_;       // This goal is always inside of the map
   state G_term_;  // This goal is the clicked goal

@@ -32,7 +32,7 @@ private:
   high_resolution_clock::time_point _start;
 };
 
-class ROSTimer
+/*class ROSTimer
 {
 public:
   ROSTimer(bool run = false)
@@ -86,5 +86,5 @@ public:
 
 private:
   double _start;
-};
-}
+};*/
+}  // namespace JPS

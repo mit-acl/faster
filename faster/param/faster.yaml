@@ -3,7 +3,7 @@
 use_ff: true # use feedforward
 visual: true #publish visualization stuff
 dc: 0.01            #(seconds) Duration for the interpolation=Value of the timer pubGoal
-goal_radius: 0.1    #(m) Drone has arrived to the goal when distance_to_goal<GOAL_RADIUS
+goal_radius: 0.3    #(m) Drone has arrived to the goal when distance_to_goal<GOAL_RADIUS
 drone_radius: 0.3  #(m) Used for collision checking
 
 N_whole: 6 #[-] Number of discretization points in the whole trajectory

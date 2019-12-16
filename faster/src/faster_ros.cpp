@@ -1,4 +1,5 @@
 #include "faster_ros.hpp"
+#include <sensor_msgs/point_cloud_conversion.h>
 
 // this object is created in the faster_ros_node
 FasterRos::FasterRos(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pub_CB)
@@ -157,13 +158,20 @@ FasterRos::FasterRos(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::Node
   sync_.reset(new Sync(MySyncPolicy(1), occup_grid_sub_, unknown_grid_sub_));
   sync_->registerCallback(boost::bind(&FasterRos::mapCB, this, _1, _2));
   sub_goal_ = nh_.subscribe("/move_base_simple/goal", 1, &FasterRos::terminalGoalCB, this);
-  sub_mode_ = nh_.subscribe("fastermode", 1, &FasterRos::modeCB, this);
+  sub_mode_ = nh_.subscribe("mode", 1, &FasterRos::modeCB, this);
   sub_state_ = nh_.subscribe("state", 1, &FasterRos::stateCB, this);
   // sub_odom_ = nh_.subscribe("odom", 1, &FasterRos::odomCB, this);
 
   // Timers
   pubCBTimer_ = nh_pub_CB_.createTimer(ros::Duration(par_.dc), &FasterRos::pubCB, this);
   replanCBTimer_ = nh_.createTimer(ros::Duration(par_.dc), &FasterRos::replanCB, this);
+
+  // For now stop all these subscribers/timers until we receive GO
+  occup_grid_sub_.unsubscribe();
+  unknown_grid_sub_.unsubscribe();
+  sub_state_.shutdown();
+  pubCBTimer_.stop();
+  replanCBTimer_.stop();
 
   // Markers
   setpoint_ = getMarkerSphere(0.35, ORANGE_TRANS);
@@ -306,37 +314,60 @@ void FasterRos::stateCB(const acl_msgs::State& msg)
 
 void FasterRos::modeCB(const faster_msgs::Mode& msg)
 {
-  faster_ptr_->changeMode(msg.mode);
+  // faster_ptr_->changeMode(msg.mode);
+
+  if (msg.mode != msg.GO)
+  {  // FASTER DOES NOTHING
+    std::cout << "Killing everything!" << std::endl;
+    occup_grid_sub_.unsubscribe();
+    unknown_grid_sub_.unsubscribe();
+    sub_state_.shutdown();
+    pubCBTimer_.stop();
+    replanCBTimer_.stop();
+    faster_ptr_->resetInitialization();
+  }
+  else
+  {  // The mode changed to GO
+    std::cout << "Initializing everything!" << std::endl;
+    occup_grid_sub_.subscribe();
+    unknown_grid_sub_.subscribe();
+
+    sub_state_ = nh_.subscribe("state", 1, &FasterRos::stateCB, this);  // TODO duplicated from above
+
+    pubCBTimer_.start();
+    replanCBTimer_.start();
+  }
 }
 
 void FasterRos::pubCB(const ros::TimerEvent& e)
 {
   state next_goal;
-  faster_ptr_->getNextGoal(next_goal);
+  if (faster_ptr_->getNextGoal(next_goal))
+  {
+    acl_msgs::QuadGoal quadGoal;
+    // visualization_msgs::Marker setpoint;
+    // Pub setpoint maker.  setpoint_ is the last quadGoal sent to the drone
 
-  acl_msgs::QuadGoal quadGoal;
-  // visualization_msgs::Marker setpoint;
-  // Pub setpoint maker.  setpoint_ is the last quadGoal sent to the drone
+    // printf("Publicando Goal=%f, %f, %f\n", quadGoal_.pos.x, quadGoal_.pos.y, quadGoal_.pos.z);
 
-  // printf("Publicando Goal=%f, %f, %f\n", quadGoal_.pos.x, quadGoal_.pos.y, quadGoal_.pos.z);
+    quadGoal.pos = eigen2rosvector(next_goal.pos);
+    quadGoal.vel = eigen2rosvector(next_goal.vel);
+    quadGoal.accel = eigen2rosvector(next_goal.accel);
+    quadGoal.jerk = eigen2rosvector(next_goal.jerk);
+    quadGoal.dyaw = next_goal.dyaw;
+    quadGoal.yaw = next_goal.yaw;
+    quadGoal.header.stamp = ros::Time::now();
+    quadGoal.header.frame_id = "world";
 
-  quadGoal.pos = eigen2rosvector(next_goal.pos);
-  quadGoal.vel = eigen2rosvector(next_goal.vel);
-  quadGoal.accel = eigen2rosvector(next_goal.accel);
-  quadGoal.jerk = eigen2rosvector(next_goal.jerk);
-  quadGoal.dyaw = next_goal.dyaw;
-  quadGoal.yaw = next_goal.yaw;
-  quadGoal.header.stamp = ros::Time::now();
-  quadGoal.header.frame_id = "world";
+    pub_goal_.publish(quadGoal);
 
-  pub_goal_.publish(quadGoal);
+    setpoint_.header.stamp = ros::Time::now();
+    setpoint_.pose.position.x = quadGoal.pos.x;
+    setpoint_.pose.position.y = quadGoal.pos.y;
+    setpoint_.pose.position.z = quadGoal.pos.z;
 
-  setpoint_.header.stamp = ros::Time::now();
-  setpoint_.pose.position.x = quadGoal.pos.x;
-  setpoint_.pose.position.y = quadGoal.pos.y;
-  setpoint_.pose.position.z = quadGoal.pos.z;
-
-  pub_setpoint_.publish(setpoint_);
+    pub_setpoint_.publish(setpoint_);
+  }
 }
 
 void FasterRos::clearJPSPathVisualization(int i)

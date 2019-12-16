@@ -1,13 +1,13 @@
 #pragma once
 
-#include <pcl/kdtree/kdtree_flann.h>
+//#include <pcl/kdtree/kdtree_flann.h>
 
-struct kdTreeStamped
+/*struct kdTreeStamped
 {
   pcl::KdTreeFLANN<pcl::PointXYZ> kdTree;
   ros::Time time;
 };
-
+*/
 struct polytope
 {
   Eigen::MatrixXd A;
