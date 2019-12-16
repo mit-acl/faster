@@ -71,6 +71,7 @@ Faster::Faster(parameters par) : par_(par)
   pclptr_unk_ = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
   pclptr_map_ = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
 
+  changeDroneStatus(DroneStatus::GOAL_REACHED);
   resetInitialization();
 }
 
@@ -639,9 +640,9 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
     sg_whole_.X_temp_ = dummy_vector;
   }
 
-  /*  std::cout << "This is the WHOLE TRAJECTORY" << std::endl;
-    printStateVector(sg_whole_.X_temp_);
-    std::cout << "===========================" << std::endl;*/
+  std::cout << "This is the WHOLE TRAJECTORY" << std::endl;
+  printStateVector(sg_whole_.X_temp_);
+  std::cout << "===========================" << std::endl;
 
   //////////////////////////////////////////////////////////////////////////
   ///////////////// Solve with GUROBI Safe trajectory /////////////////////
@@ -742,9 +743,9 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
     std::cout << "filled the solutions" << std::endl;
   }
 
-  /*  std::cout << "This is the SAFE TRAJECTORY" << std::endl;
-    printStateVector(sg_safe_.X_temp_);
-    std::cout << "===========================" << std::endl;*/
+  std::cout << "This is the SAFE TRAJECTORY" << std::endl;
+  printStateVector(sg_safe_.X_temp_);
+  std::cout << "===========================" << std::endl;
 
   ///////////////////////////////////////////////////////////
   ///////////////       Append RESULTS    ////////////////////
@@ -756,12 +757,12 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
     return;
   }
 
-  /*  mtx_plan_.lock();
-    std::cout << "This is the COMMITED TRAJECTORY" << std::endl;
-    printStateDeque(plan_);
-    std::cout << "===========================" << std::endl;
-    mtx_plan_.unlock();
-  */
+  mtx_plan_.lock();
+  std::cout << "This is the COMMITED TRAJECTORY" << std::endl;
+  printStateDeque(plan_);
+  std::cout << "===========================" << std::endl;
+  mtx_plan_.unlock();
+
   ///////////////////////////////////////////////////////////
   ///////////////       OTHER STUFF    //////////////////////
   //////////////////////////////////////////////////////////
@@ -847,7 +848,7 @@ bool Faster::appendToPlan(int k_end_whole, const std::vector<state>& whole, int 
 
     std::cout << "k_safe = " << k_safe << std::endl;
     std::cout << "whole.size() = " << whole.size() << std::endl;
-    for (int i = 0; i < k_safe; i++)
+    for (int i = 0; i <= k_safe; i++)
     {
       plan_.push_back(whole[i]);
     }
@@ -877,7 +878,10 @@ void Faster::yaw(double diff, state& next_goal)
   dyaw_filtered_ = (1 - par_.alpha_filter_dyaw) * dyaw_not_filtered + par_.alpha_filter_dyaw * dyaw_filtered_;
   next_goal.dyaw = dyaw_filtered_;
 
-  next_goal.yaw += dyaw_filtered_ * par_.dc;
+  std::cout << "Before next_goal.yaw=" << next_goal.yaw << std::endl;
+
+  next_goal.yaw = previous_yaw_ + dyaw_filtered_ * par_.dc;
+  std::cout << "After next_goal.yaw=" << next_goal.yaw << std::endl;
 }
 
 void Faster::getDesiredYaw(state& next_goal)
@@ -888,8 +892,9 @@ void Faster::getDesiredYaw(state& next_goal)
   switch (drone_status_)
   {
     case DroneStatus::YAWING:
-      desired_yaw = atan2(G_.pos[1] - next_goal.pos[1], G_.pos[0] - next_goal.pos[0]);
+      desired_yaw = atan2(G_term_.pos[1] - next_goal.pos[1], G_term_.pos[0] - next_goal.pos[0]);
       diff = desired_yaw - state_.yaw;
+      std::cout << "diff1= " << diff << std::endl;
       break;
     case DroneStatus::TRAVELING:
     case DroneStatus::GOAL_SEEN:
@@ -897,7 +902,9 @@ void Faster::getDesiredYaw(state& next_goal)
       diff = desired_yaw - state_.yaw;
       break;
     case DroneStatus::GOAL_REACHED:
-      diff = 0.0;
+      next_goal.dyaw = 0.0;
+      next_goal.yaw = previous_yaw_;
+      return;
   }
 
   angle_wrap(diff);
@@ -905,13 +912,16 @@ void Faster::getDesiredYaw(state& next_goal)
   {
     changeDroneStatus(DroneStatus::TRAVELING);
   }
+  std::cout << "diff2= " << diff << std::endl;
   yaw(diff, next_goal);
+  std::cout << "yaw3= " << next_goal.yaw << std::endl;
 }
 
 bool Faster::getNextGoal(state& next_goal)
 {
   if (initializedAllExceptPlanner() == false)
   {
+    std::cout << "Not publishing new goal!!" << std::endl;
     return false;
   }
 
@@ -933,7 +943,7 @@ bool Faster::getNextGoal(state& next_goal)
   return true;
 }
 
-// Debugging funcctions
+// Debugging functions
 void Faster::changeDroneStatus(int new_status)
 {
   if (new_status == drone_status_)

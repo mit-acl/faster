@@ -564,22 +564,11 @@ void SolverGurobi::resetXandU()
   size = (size < 2) ? 2 : size;  // force size to be at least 2
   std::vector<state> tmp(size);
   X_temp_ = tmp;  // Eigen::MatrixXd::Zero(size, 12);
+
+  std::cout << "RESETTING X, SIZE=" << size << std::endl;
+
+  std::cout << "RESETTING X, X_temp_.size()=" << X_temp_.size() << std::endl;
 }
-
-/*double SolverGurobi::getCost()
-{
-  double term_cost = 0;
-
-  for (int i = 0; i < 3 * INPUT_ORDER; i++)
-  {
-    term_cost = term_cost + q_ * pow(x_[N_][i] - xf_[i], 2);
-  }
-        printf("real total cost=%f\n", jerk_get_cost());
-        printf("real jerk cost=%f\n", jerk_get_cost() - term_cost);
-  cost_ = (jerk_get_cost() - term_cost) * N_ * dt_ / (j_max_ * j_max_);
-
-  return cost_;
-}*/
 
 void SolverGurobi::setMaxConstraints()
 {
@@ -663,6 +652,7 @@ bool SolverGurobi::genNewTraj()
     // setDistanceConstraints();
     setObjective();
     resetXandU();
+
     solved = callOptimizer();
     /*    if (solved == true)
         {
