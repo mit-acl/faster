@@ -1,5 +1,5 @@
 <launch>
-	<arg name="quad"/>
+	<arg name="quad" default="SQ01s"/>
 	<!-- vicon or full -->
 	<arg name="room" default="vicon"/>
 	<arg name="z_alt" default="1.0"/>

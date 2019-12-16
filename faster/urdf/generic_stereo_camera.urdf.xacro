@@ -1,0 +1,117 @@
+<?xml version="1.0"?>
+
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  
+  <xacro:property name="M_PI" value="3.1415926535897931" />
+
+  <xacro:macro name="generic_stereo_camera" params="name parent *origin ros_topic cam_info_topic update_rate res_x res_y image_format hfov baseline">
+    
+  <!-- Stereo Camera -->
+  <joint name="${name}_left_camera_frame_joint" type="fixed">
+    <!-- optical frame collocated with tilting DOF -->
+    <xacro:insert_block name="origin" />
+    <parent link="${parent}"/>
+    <child link="${name}_left_camera_frame"/>
+  </joint>
+  <link name="${name}_left_camera_frame">
+<!--    <inertial>
+      <mass value="1e-5" />
+      <origin xyz="-0.075493 0.035033383 0.02574"/>
+      <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6" />
+    </inertial>-->
+  </link>
+  <joint name="${name}_left_camera_optical_frame_joint" type="fixed">
+    <origin xyz="0 0 0" rpy="-1.5708 0.0 -1.5708" />
+    <parent link="${name}_left_camera_frame" />
+    <child link="${name}_left_camera_optical_frame"/>
+  </joint>
+  <link name="${name}_left_camera_optical_frame"/>
+  <gazebo reference="${name}_left_camera_frame">
+    <sensor type="multicamera" name="stereo_camera">
+      <!-- see MultiSenseSLPlugin.h for available modes -->
+      <update_rate>30.0</update_rate>
+      <camera name="left">
+        <!-- Spec sheet says 80deg X 45deg @ 1024x544pix.  Based on feedback
+             from teams, we're instead doing 80deg X 80deg @ 800x800pix. -->
+        <horizontal_fov>1.3962634</horizontal_fov>
+        <image>
+          <width>800</width>
+          <height>800</height>
+          <format>R8G8B8</format>
+        </image>
+        <clip>
+          <near>0.02</near>
+          <far>300</far>
+        </clip>
+        <noise>
+          <type>gaussian</type>
+          <!-- Noise is sampled independently per pixel on each frame.  
+               That pixel's noise value is added to each of its color
+               channels, which at that point lie in the range [0,1].
+               The stddev value of 0.007 is based on experimental data 
+               from a camera in a Sandia hand pointed at a static scene
+               in a couple of different lighting conditions.  -->
+          <mean>0.0</mean>
+          <stddev>0.007</stddev>
+        </noise>
+      </camera>
+      <camera name="right">
+        <pose>0 ${-baseline} 0 0 0 0</pose>
+        <!-- Spec sheet says 80deg X 45deg @ 1024x544pix.  Based on feedback
+             from teams, we're instead doing 80deg X 80deg @ 800x800pix. -->
+        <horizontal_fov>1.3962634</horizontal_fov>
+        <image>
+          <width>800</width>
+          <height>800</height>
+          <format>R8G8B8</format>
+        </image>
+        <clip>
+          <near>0.02</near>
+          <far>300</far>
+        </clip>
+        <noise>
+          <type>gaussian</type>
+          <!-- Noise is sampled independently per pixel on each frame.  
+               That pixel's noise value is added to each of its color
+               channels, which at that point lie in the range [0,1].
+               The stddev value of 0.007 is based on experimental data 
+               from a camera in a Sandia hand pointed at a static scene
+               in a couple of different lighting conditions.  -->
+          <mean>0.0</mean>
+          <stddev>0.007</stddev>
+        </noise>
+      </camera>
+      <plugin name="stereo_camera_controller" filename="libgazebo_ros_multicamera.so">
+        <cameraName>${name}</cameraName>
+        <imageTopicName>image_raw</imageTopicName>
+        <cameraInfoTopicName>camera_info</cameraInfoTopicName>
+        <frameName>${name}_left_camera_optical_frame</frameName>
+        <!--<rightFrameName>right_camera_optical_frame</rightFrameName>-->
+        <hackBaseline>${baseline}</hackBaseline>
+      </plugin>
+    </sensor>
+  </gazebo>
+
+
+  <joint name="${name}_right_camera_frame_joint" type="fixed">
+    <origin xyz="0.0 ${-baseline} -0.0"/>
+    <parent link="${name}_left_camera_frame"/>
+    <child link="${name}_right_camera_frame"/>
+  </joint>
+  <link name="${name}_right_camera_frame">
+<!--    <inertial>
+      <mass value="1e-5" />
+      <origin xyz="-0.075493 -0.034966617 0.02574"/>
+      <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6" />
+    </inertial>-->
+  </link>
+  <joint name="${name}_right_camera_optical_frame_joint" type="fixed">
+    <origin xyz="0 0 0" rpy="-1.5708 0.0 -1.5708" />
+    <parent link="${name}_right_camera_frame" />
+    <child link="${name}_right_camera_optical_frame"/>
+  </joint>
+  <link name="${name}_right_camera_optical_frame"/>
+  
+  </xacro:macro>
+
+</robot>

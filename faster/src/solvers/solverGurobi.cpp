@@ -1,5 +1,5 @@
 #include "solverGurobi.hpp"
-#include "solverGurobi_utils.hpp"  //This must go here, and not in solverGurobi.hpp
+#include "solverGurobi_utils.hpp"
 #include <chrono>
 #include <unistd.h>
 #include <ros/package.h>
@@ -18,21 +18,13 @@ void mycallback::callback()
   if (should_terminate_ == true)
   {
     // std::cout << "Aborting the execution of the current optimization" << std::endl;
-    GRBCallback::abort();  // It seems that this function only does effect when inside the function callback() of this
-                           // class
+    GRBCallback::abort();  // This function only does effect when inside the function callback() of this class
     // terminated_ = true;
   }
 }
 
-/*void mycallback::abortar()
-{
-  GRBCallback::abort();
-}*/
-
 void SolverGurobi::StopExecution()
 {
-  // cb_.abortar();
-  // cb_.terminated_ = false;
   cb_.should_terminate_ = true;
   std::cout << "Activated flag to stop execution" << std::endl;
 }
@@ -59,36 +51,6 @@ SolverGurobi::SolverGurobi()
   cb_ = mycallback();
 
   m.setCallback(&cb_);  // The callback will be called periodically along the optimization
-
-  /*  setDC(0.01);  LO HAGO EN CVX
-  set_max(max_values);  LO HAGO EN CVX
-
-    setX0(x0);   LO HAGO EN CVX
-    setXf(xf);   LO HAGO EN CVX
-
-
-    setMaxConstraints();  // Only needed to set once///////////////////////
-
-
- // setPolytopes();  LO HAGO EN CVX
-
-    genNewTraj();
-
-
-
-  // Solve*/
-
-  /*catch (GRBException e)
-  {
-    cout << "Error code = " << e.getErrorCode() << endl;
-    cout << e.getMessage() << endl;
-  }*/
-  /*catch (...)
-  {
-    cout << "Exception during optimization" << endl;
-  }*/
-
-  // delete env;
 }
 
 void SolverGurobi::setN(int N)
@@ -203,21 +165,11 @@ void SolverGurobi::fillXandU()
     state_i.setJerk(jerkx, jerky, jerkz);
     X_temp_[i] = (state_i);
   }
-  // std::cout << "After the loop" << std::endl;
+
   // }  // End pragma parallel
-
-  /*  int last = X_temp_.rows() - 1;
-
-    // Force the final velocity and acceleration to be exactly the final conditions
-    Eigen::Matrix<double, 1, 9> final_cond;
-    final_cond << X_temp_(last, 0), X_temp_(last, 1), X_temp_(last, 2), xf_[3], xf_[4], xf_[5], xf_[6], xf_[7], xf_[8];
-    X_temp_.row(X_temp_.rows() - 1) = final_cond;
-  */
 
   // Force the final input to be 0 (I'll keep applying this input if when I arrive to the final state I still
   // haven't planned again).
-  // U_temp_.row(U_temp_.rows() - 1) = Eigen::Vector3d::Zero().transpose();
-
   X_temp_[X_temp_.size() - 1].vel = Eigen::Vector3d::Zero().transpose();
   X_temp_[X_temp_.size() - 1].accel = Eigen::Vector3d::Zero().transpose();
   X_temp_[X_temp_.size() - 1].jerk = Eigen::Vector3d::Zero().transpose();
@@ -249,61 +201,9 @@ void SolverGurobi::fillXandU()
   samples_penalize_ = samples_penalize;
 }*/
 
-void SolverGurobi::setDistances(vec_Vecf<3>& samples,
-                                std::vector<double> dist_near_obs)  // Distance values (used for the
-                                                                    // rescue path, used in the distance constraint4s)
-{
-  samples_ = samples;
-  dist_near_obs_ = dist_near_obs;
-}
-
 void SolverGurobi::setForceFinalConstraint(bool forceFinalConstraint)
 {
   forceFinalConstraint_ = forceFinalConstraint;
-}
-
-void SolverGurobi::setDistanceConstraints()  // Set the distance constraints
-{
-  // Remove previous distance constraints
-  for (int i = 0; i < distances_cons.size(); i++)
-  {
-    m.remove(distances_cons[i]);
-  }
-  distances_cons.clear();
-
-  for (int t = 0; t < samples_.size(); t++)
-  {
-    std::vector<GRBLinExpr> p = { samples_[t][0], samples_[t][1], samples_[t][2] };
-    /*    double tau = 0;
-        double interval = t;
-        if (t == samples_.size() - 1)  // If the last interval --> constraint at the end of that interval
-        {
-          tau = dt_;
-          interval = t - 1;
-        }*/
-    /*    GRBLinExpr posx = getPos(interval, tau, 0);
-        GRBLinExpr posy = getPos(interval, tau, 1);
-        GRBLinExpr posz = getPos(interval, tau, 2);*/
-    // std::vector<GRBLinExpr> var = { posx, posy, posz };
-
-    // std::cout << "Going to set Distance Constraints, interval=" << t << std::endl;
-
-    std::vector<GRBLinExpr> cp0 = getCP0(t);  // Control Point 0
-    std::vector<GRBLinExpr> cp1 = getCP1(t);  // Control Point 1
-    std::vector<GRBLinExpr> cp2 = getCP2(t);  // Control Point 2
-    std::vector<GRBLinExpr> cp3 = getCP3(t);  // Control Point 3
-
-    double epsilon = dist_near_obs_[t] * dist_near_obs_[t];
-    // printf("Cons with distance=%f ", sqrt(epsilon));
-    // std::cout << "For the sample=" << samples_[t].transpose() << std::endl;
-
-    distances_cons.push_back(m.addQConstr(GetNorm2(cp0 - p) <= epsilon));
-    /*    distances_cons.push_back(m.addQConstr(GetNorm2(cp1 - p) <= epsilon));
-        distances_cons.push_back(m.addQConstr(GetNorm2(cp2 - p) <= epsilon));*/
-    distances_cons.push_back(m.addQConstr(GetNorm2(cp3 - p) <= epsilon));
-
-    // std::cout << "Setting Epsilon=" << sqrt(epsilon) << std::endl;
-  }
 }
 
 void SolverGurobi::setPolytopes(std::vector<LinearConstraint3D> polytopes)
@@ -350,20 +250,17 @@ void SolverGurobi::setPolytopesConstraints()
 
   if (polytopes_.size() > 0)  // If there are polytope constraints
   {
-    if (mode_ == WHOLE_TRAJ)
+    // Declare binary variables
+    for (int t = 0; t < N_ + 1; t++)
     {
-      // Declare binary variables
-      for (int t = 0; t < N_ + 1; t++)
+      std::vector<GRBVar> row;
+      for (int i = 0; i < polytopes_.size(); i++)  // For all the polytopes
       {
-        std::vector<GRBVar> row;
-        for (int i = 0; i < polytopes_.size(); i++)  // For all the polytopes
-        {
-          GRBVar variable =
-              m.addVar(-GRB_INFINITY, GRB_INFINITY, 0, GRB_BINARY, "s" + std::to_string(i) + "_" + std::to_string(t));
-          row.push_back(variable);
-        }
-        b.push_back(row);
+        GRBVar variable =
+            m.addVar(-GRB_INFINITY, GRB_INFINITY, 0, GRB_BINARY, "s" + std::to_string(i) + "_" + std::to_string(t));
+        row.push_back(variable);
       }
+      b.push_back(row);
     }
 
     // std::cout << "NUMBER OF POLYTOPES=" << polytopes_.size() << std::endl;
@@ -375,16 +272,14 @@ void SolverGurobi::setPolytopesConstraints()
     {
       // std::cout << "*********************t= " << t << std::endl;
 
-      if (mode_ == WHOLE_TRAJ)
+      GRBLinExpr sum = 0;
+      for (int col = 0; col < b[0].size(); col++)
       {
-        GRBLinExpr sum = 0;
-        for (int col = 0; col < b[0].size(); col++)
-        {
-          sum = sum + b[t][col];
-        }
-        at_least_1_pol_cons.push_back(m.addConstr(sum == 1, "At_least_1_pol_t_" + std::to_string(t)));  // at least in
-                                                                                                        // one polytope
+        sum = sum + b[t][col];
       }
+      at_least_1_pol_cons.push_back(m.addConstr(sum == 1, "At_least_1_pol_t_" + std::to_string(t)));  // at least in
+                                                                                                      // one polytope
+
       std::vector<GRBLinExpr> cp0 = getCP0(t);  // Control Point 0
       std::vector<GRBLinExpr> cp1 = getCP1(t);  // Control Point 1
       std::vector<GRBLinExpr> cp2 = getCP2(t);  // Control Point 2
@@ -417,25 +312,12 @@ void SolverGurobi::setPolytopesConstraints()
           std::string name3 =
               "Poly" + std::to_string(n_poly) + "_face" + std::to_string(i) + "_t" + std::to_string(t) + "_cp3";
           // std::cout << "Plane=" << i << "out of" << bb.rows() - 1 << std::endl;
-          if (mode_ == WHOLE_TRAJ)
-          {  // If b[t,0]==1, all the control points are in that polytope
+          // If b[t,0]==1, all the control points are in that polytope
 
-            polytopes_cons.push_back(m.addGenConstrIndicator(b[t][n_poly], 1, Acp0[i], GRB_LESS_EQUAL, bb[i], name0));
-            polytopes_cons.push_back(m.addGenConstrIndicator(b[t][n_poly], 1, Acp1[i], GRB_LESS_EQUAL, bb[i], name1));
-            polytopes_cons.push_back(m.addGenConstrIndicator(b[t][n_poly], 1, Acp2[i], GRB_LESS_EQUAL, bb[i], name2));
-            polytopes_cons.push_back(m.addGenConstrIndicator(b[t][n_poly], 1, Acp3[i], GRB_LESS_EQUAL, bb[i], name3));
-          }
-          if (mode_ == RESCUE_PATH)  // There will be only one polytope --> all the control points in that polytope
-          {
-            // std::cout << "Setting POLYTOPES=3" << std::endl;
-            polytope_cons.push_back(m.addConstr(Acp0[i] <= bb[i], name0));
-            // std::cout << "Setting POLYTOPES=3.5" << std::endl;
-            polytope_cons.push_back(m.addConstr(Acp1[i] <= bb[i], name1));
-            // std::cout << "Setting POLYTOPES=3.6" << std::endl;
-            polytope_cons.push_back(m.addConstr(Acp2[i] <= bb[i], name2));
-            polytope_cons.push_back(m.addConstr(Acp3[i] <= bb[i], name3));
-            // std::cout << "Setting POLYTOPES=4" << std::endl;
-          }
+          polytopes_cons.push_back(m.addGenConstrIndicator(b[t][n_poly], 1, Acp0[i], GRB_LESS_EQUAL, bb[i], name0));
+          polytopes_cons.push_back(m.addGenConstrIndicator(b[t][n_poly], 1, Acp1[i], GRB_LESS_EQUAL, bb[i], name1));
+          polytopes_cons.push_back(m.addGenConstrIndicator(b[t][n_poly], 1, Acp2[i], GRB_LESS_EQUAL, bb[i], name2));
+          polytopes_cons.push_back(m.addGenConstrIndicator(b[t][n_poly], 1, Acp3[i], GRB_LESS_EQUAL, bb[i], name3));
         }
       }
     }
@@ -595,9 +477,6 @@ void SolverGurobi::set_max(double max_values[3])
   v_max_ = max_values[0];
   a_max_ = max_values[1];
   j_max_ = max_values[2];
-  std::cout << "MAX Values:" << v_max_ << std::endl;
-  std::cout << "MAX Values:" << a_max_ << std::endl;
-  std::cout << "MAX Values:" << j_max_ << std::endl;
 
   setMaxConstraints();
 }
@@ -629,8 +508,6 @@ bool SolverGurobi::genNewTraj()
     std::cout << "factor_initial_ is less than one, it doesn't make sense" << std::endl;
   }
 
-  // if (mode_ == WHOLE_TRAJ)
-  //{
   runtime_ms_ = 0;
 
   for (double i = factor_initial_; i <= factor_final_ && solved == false && cb_.should_terminate_ == false;
@@ -638,14 +515,11 @@ bool SolverGurobi::genNewTraj()
   {
     trials_ = trials_ + 1;
     findDT(i);
-    std::cout << "Going to try with dt_= " << dt_ << ", should_terminate_=" << cb_.should_terminate_ << std::endl;
+    // std::cout << "Going to try with dt_= " << dt_ << ", should_terminate_=" << cb_.should_terminate_ << std::endl;
     setPolytopesConstraints();
-    // std::cout << "Setting x0" << std::endl;
     setConstraintsX0();
     setConstraintsXf();
-    // std::cout << "Setting dynamic constraints" << std::endl;
     setDynamicConstraints();
-    // setDistanceConstraints();
     setObjective();
     resetXandU();
 
@@ -666,8 +540,6 @@ bool SolverGurobi::genNewTraj()
   }
 
   cb_.should_terminate_ = false;  // Should be at the end of genNewTaj, not at the beginning
-
-  //}
 
   return solved;
 }
@@ -749,35 +621,18 @@ bool SolverGurobi::callOptimizer()
 {
   // int threads = m.get(GRB_IntParam_Threads);
 
-  // std::cout << "Running Gurobi with " << threads << " cthreads" << std::endl;
-
   bool solved = true;
-  // std::cout << "CALLING OPTIMIZER OF GUROBI" << std::endl;
 
   // Select these parameteres with the tuning Tool of Gurobi
-
-  /*  if (mode_ == RESCUE_PATH)
-    {
-      m.set("NumericFocus", "3");
-      m.set("Presolve", "0");
-    }
-
-    if (mode_ == WHOLE_TRAJ)
-    {
-      m.set("NumericFocus", "3");
-      m.set("Presolve", "0");
-    }*/
+  // m.set("NumericFocus", "3");
+  // m.set("Presolve", "0");
 
   m.update();
   temporal_ = temporal_ + 1;
   // printf("Writing into model.lp number=%d\n", temporal_);
   // m.write(ros::package::getPath("faster") + "/models/model2_" + std::to_string(temporal_) + ".lp");
 
-  // std::cout << "*************************Starting Optimization" << std::endl;
-
   // Solve model and capture solution information
-  m.optimize();
-
   auto start = std::chrono::steady_clock::now();
   m.optimize();
   auto end = std::chrono::steady_clock::now();
@@ -796,15 +651,7 @@ bool SolverGurobi::callOptimizer()
   int optimstatus = m.get(GRB_IntAttr_Status);
   if (optimstatus == GRB_OPTIMAL)
   {
-    if (mode_ == WHOLE_TRAJ)
-    {
-      // m.write(ros::package::getPath("cvx") + "/models/model_wt" + std::to_string(temporal_) + ".lp");
-    }
-    if (mode_ == RESCUE_PATH)
-    {
-      // m.write(ros::package::getPath("cvx") + "/models/model_rp" + std::to_string(temporal_) + ".lp");
-    }
-    // printf("GUROBI SOLUTION: Optimal");
+    // m.write(ros::package::getPath("faster") + "/models/model_wt" + std::to_string(temporal_) + ".lp");
 
     /*    if (polytopes_cons.size() > 0)  // Print the binary matrix only if I've included the polytope constraints
         {
@@ -845,11 +692,9 @@ bool SolverGurobi::callOptimizer()
     // total_not_solved = total_not_solved + 1;
     // std::cout << "TOTAL NOT SOLVED" << total_not_solved << std::endl;
     // No solution
-    if (mode_ == RESCUE_PATH)
-    {
-      // m.write("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/model_rp" + std::to_string(temporal_) +
-      //         "dt=" + std::to_string(dt_) + ".lp");
-    }
+
+    // m.write("/home/jtorde/Desktop/ws/src/acl-planning/cvx/models/model_rp" + std::to_string(temporal_) +
+    //        "dt=" + std::to_string(dt_) + ".lp");
     solved = false;
     if (optimstatus == GRB_INF_OR_UNBD)
     {
@@ -880,45 +725,6 @@ bool SolverGurobi::callOptimizer()
 
 
 */
-
-  /*  // printf("In callOptimizer\n");
-    bool converged = false;
-
-    // ROS_INFO("dt I found= %0.2f", dt_found);
-    double dt = getDTInitial();  // 0.025
-                                 // ROS_INFO("empezando con, dt = %0.2f", dt);
-
-    double** x;
-    int i = 0;
-    int r = 0;
-    while (1)
-    {
-      dt = dt + 4 * 0.025;  // To make sure that it will converge in very few iterations (hopefully only 1)
-      i = i + 1;
-      // printf("Loading default data!\n");
-
-      jerk_load_default_data(dt, v_max_, a_max_, j_max_, x0_, xf_, q_);
-      r = jerk_optimize();
-      if (r == 1)
-      {
-        x = jerk_get_state();
-        converged = checkConvergence(x[N_]);
-      }
-
-      if (converged == 1)
-      {
-        break;
-      }
-      // dt += 0.025;
-    }
-
-    if (i > 1)
-    {
-      printf("Iterations = %d\n", i);
-      printf("Iterations>1, if you increase dt at the beginning, it would be faster\n");
-    }
-    // ROS_INFO("Iterations = %d\n", i);
-    // ROS_INFO("converged, dt = %f", dt);*/
 }
 
 double SolverGurobi::getDTInitial()
@@ -941,9 +747,6 @@ double SolverGurobi::getDTInitial()
   t_vx = fabs(xf_[0] - x0_[0]) / v_max_;
   t_vy = fabs(xf_[1] - x0_[1]) / v_max_;
   t_vz = fabs(xf_[2] - x0_[2]) / v_max_;
-  // printf("%f\n", t_vx);
-  // printf("%f\n", t_vy);
-  // printf("%f\n", t_vz);
 
   /*  printf("times vel: t_ax, t_ay, t_az:\n");
     std::cout << t_vx << "  " << t_vy << "  " << t_vz << std::endl;*/

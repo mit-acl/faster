@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+
+<robot name="quadrotor" xmlns:xacro="http://www.ros.org/wiki/xacro">
+   
+    <xacro:property name="M_PI" value="3.1415926535897931" />
+    
+    <!-- Included URDF Files -->
+    <xacro:include filename="$(find hector_quadrotor_description)/urdf/quadrotor_base.urdf.xacro" />
+    
+    <!-- Instantiate quadrotor_base_macro once (has no parameters atm) -->
+    <xacro:quadrotor_base_macro />
+    
+    <!-- Downward facing camera -->
+    <xacro:include filename="$(find hector_sensors_description)/urdf/generic_camera.urdf.xacro" />
+    <xacro:generic_camera name="downward_cam" parent="base_link" ros_topic="camera/image" cam_info_topic="camera/camera_info" update_rate="20" res_x="640" res_y="480" image_format="L8" hfov="100">
+      <origin xyz="0.4 0.0 -0.0" rpy="0 ${M_PI/2} 0"/>
+    </xacro:generic_camera>
+    
+</robot>
+  

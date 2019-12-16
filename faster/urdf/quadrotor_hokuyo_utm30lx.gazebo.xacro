@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+
+<robot name="quadrotor" xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <xacro:include filename="$(find acl_sim)/urdf/quadrotor_hokuyo_utm30lx.urdf.xacro" />
+</robot>
+

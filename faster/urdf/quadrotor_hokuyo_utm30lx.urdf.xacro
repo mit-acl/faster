@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+
+<robot name="quadrotor" xmlns:xacro="http://www.ros.org/wiki/xacro">
+   
+    <xacro:property name="M_PI" value="3.1415926535897931" />
+    
+    <!-- Included URDF Files -->
+    <xacro:include filename="$(find acl_sim)/urdf/quadrotor_base.urdf.xacro" />
+    
+    <!-- Instantiate quadrotor_base_macro once (has no parameters atm) -->
+    <xacro:quadrotor_base_macro />
+    
+    <!-- Hokuyo UTM-30LX mounted upside down below the quadrotor body -->
+    <xacro:include filename="$(find acl_sim)/urdf/hokuyo_utm30lx.urdf.xacro" />
+    <xacro:hokuyo_utm30lx name="laser0" parent="base_link" ros_topic="scan" update_rate="40" ray_count="1081" min_angle="-135" max_angle="135">
+      <origin xyz="0.0 0.0 0.07" rpy="0 0 0"/>
+    </xacro:hokuyo_utm30lx>
+    
+    <!-- Forward facing camera -->
+    <xacro:include filename="$(find acl_sim)/urdf/generic_camera.urdf.xacro" />
+    <xacro:generic_camera name="front_cam" parent="base_link" ros_topic="camera/image" cam_info_topic="camera/camera_info" update_rate="10" res_x="320" res_y="240" image_format="R8G8B8" hfov="90">
+      <origin xyz="0.05 0.0 -0.06" rpy="0 0 0"/>
+    </xacro:generic_camera>
+    
+</robot>
+  

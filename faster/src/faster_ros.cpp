@@ -534,15 +534,12 @@ void FasterRos::clearMarkerColoredTraj()
 void FasterRos::mapCB(const sensor_msgs::PointCloud2::ConstPtr& pcl2ptr_map_ros,
                       const sensor_msgs::PointCloud2::ConstPtr& pcl2ptr_unk_ros)
 {
-  std::cout << "In mapCB" << std::endl;
   // Occupied Space Point Cloud
   pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_map(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::fromROSMsg(*pcl2ptr_map_ros, *pclptr_map);
   // Unknown Space Point Cloud
   pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_unk(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::fromROSMsg(*pcl2ptr_unk_ros, *pclptr_unk);
-
-  std::cout << "Going to update Map" << std::endl;
 
   faster_ptr_->updateMap(pclptr_map, pclptr_unk);
 }

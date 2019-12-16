@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+
+<robot name="quadrotor" xmlns:xacro="http://www.ros.org/wiki/xacro">
+   
+    <xacro:property name="M_PI" value="3.1415926535897931" />
+    
+    <!-- Included URDF Files -->
+    <xacro:include filename="$(find acl_sim)/urdf/quadrotor_base.urdf.xacro" />
+    
+    <!-- Instantiate quadrotor_base_macro once (has no parameters atm) -->
+    <xacro:quadrotor_base_macro />
+    
+    <!-- Hokuyo UTM-30LX mounted upside down below the quadrotor body -->
+    <xacro:include filename="$(find acl_sim)/urdf/hokuyo_utm30lx.urdf.xacro" />
+    <xacro:hokuyo_utm30lx name="laser0" parent="base_link" ros_topic="scan" update_rate="40" ray_count="1081" min_angle="-135" max_angle="135">
+      <origin xyz="0.0 0.0 -0.097" rpy="${M_PI} 0 0"/>
+    </xacro:hokuyo_utm30lx>
+    
+    <!-- Asus Xiton Live Pro -->
+    <xacro:include filename="$(find acl_sim)/urdf/asus_camera.urdf.xacro" />
+    <xacro:asus_camera name="camera" parent="base_link">
+      <origin xyz="0.1 0.0 -0.03" rpy="0 ${M_PI/9} 0"/>
+    </xacro:asus_camera>
+    
+</robot>
+  

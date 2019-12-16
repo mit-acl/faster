@@ -103,8 +103,6 @@ void Faster::updateMap(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_map, pcl::Poin
   pclptr_map_ = pclptr_map;
   pclptr_unk_ = pclptr_unk;
 
-  std::cout << "state_.pos=" << state_.pos << std::endl;
-
   jps_manager_.updateJPSMap(pclptr_map_, state_.pos);  // Update even where there are no points
 
   if (pclptr_map_->width != 0 && pclptr_map_->height != 0)  // Point Cloud is not empty
@@ -178,8 +176,6 @@ int Faster::findIndexR(int indexH)
   posHk << sg_whole_.X_temp_[indexH].pos(0), sg_whole_.X_temp_[indexH].pos(1);
   int indexR = indexH;
 
-  std::cout << "Here5" << std::endl;
-
   for (int i = 0; i <= indexH; i = i + 1)  // Loop from A to H
   {
     Eigen::Vector2d vel;
@@ -239,7 +235,7 @@ int Faster::findIndexH(bool& needToComputeSafePath)
     {
       if (sqrt(pointNKNSquaredDistance[0]) < par_.drone_radius)
       {
-        needToComputeSafePath = true;  // There is intersection, so there is need to compute rescue path
+        needToComputeSafePath = true;  // There is intersection, so there is need to compute safe path
         indexH = (int)(par_.delta_H * i);
         break;
       }
@@ -538,8 +534,8 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
   // Don't plan if drone is not traveling
   if (drone_status_ == DroneStatus::GOAL_REACHED || (drone_status_ == DroneStatus::YAWING))
   {
-    std::cout << "No replanning needed because" << std::endl;
-    print_status();
+    // std::cout << "No replanning needed because" << std::endl;
+    // print_status();
     return;
   }
 
@@ -642,9 +638,9 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
     sg_whole_.X_temp_ = dummy_vector;
   }
 
-  std::cout << "This is the WHOLE TRAJECTORY" << std::endl;
-  printStateVector(sg_whole_.X_temp_);
-  std::cout << "===========================" << std::endl;
+  /*  std::cout << "This is the WHOLE TRAJECTORY" << std::endl;
+    printStateVector(sg_whole_.X_temp_);
+    std::cout << "===========================" << std::endl;*/
 
   //////////////////////////////////////////////////////////////////////////
   ///////////////// Solve with GUROBI Safe trajectory /////////////////////
@@ -673,10 +669,8 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
   }
   else
   {
-    std::cout << "Before the lock" << std::endl;
     mtx_X_U_temp.lock();
 
-    std::cout << "Here4" << std::endl;
     k_safe = findIndexR(indexH);
     state R = sg_whole_.X_temp_[k_safe];
 
@@ -694,7 +688,7 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
     {
       JPSk_inside_sphere_tmp[0] = A.pos;
     }
-    std::cout << "Here5" << std::endl;
+
     vec_Vecf<3> JPS_safe = JPSk_inside_sphere_tmp;
 
     // delete extra vertexes
@@ -738,16 +732,14 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
       return;
     }
 
-    std::cout << "Going to fill the solutions" << std::endl;
     // Get the solution
     sg_safe_.fillXandU();
     X_safe_out = sg_safe_.X_temp_;
-    std::cout << "filled the solutions" << std::endl;
   }
 
-  std::cout << "This is the SAFE TRAJECTORY" << std::endl;
-  printStateVector(sg_safe_.X_temp_);
-  std::cout << "===========================" << std::endl;
+  /*  std::cout << "This is the SAFE TRAJECTORY" << std::endl;
+    printStateVector(sg_safe_.X_temp_);
+    std::cout << "===========================" << std::endl;*/
 
   ///////////////////////////////////////////////////////////
   ///////////////       Append RESULTS    ////////////////////
@@ -759,20 +751,15 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
     return;
   }
 
-  mtx_plan_.lock();
-  std::cout << "This is the COMMITED TRAJECTORY" << std::endl;
-  printStateDeque(plan_);
-  std::cout << "===========================" << std::endl;
-  mtx_plan_.unlock();
+  /*  mtx_plan_.lock();
+    std::cout << "This is the COMMITED TRAJECTORY" << std::endl;
+    printStateDeque(plan_);
+    std::cout << "===========================" << std::endl;
+    mtx_plan_.unlock();*/
 
   ///////////////////////////////////////////////////////////
   ///////////////       OTHER STUFF    //////////////////////
   //////////////////////////////////////////////////////////
-
-  /*  mtx_planner_status_.lock();
-    planner_status_ = PlannerStatus::REPLANNED;
-
-    mtx_planner_status_.unlock();*/
 
   // Check if we have planned until G_term
   state F = plan_.back();  // Final point of the safe path (\equiv final point of the comitted path)
@@ -790,15 +777,6 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
   int states_last_replan = ceil(replanCB_t.ElapsedMs() / (par_.dc * 1000));  // Number of states that
                                                                              // would have been needed for
                                                                              // the last replan
-
-  /*  if (planner_status_ != PlannerStatus::REPLANNED)  // If already have a solution, keep using the same deltaT_
-    {
-      deltaT_ = std::max(par_.factor_deltaT * states_last_replan,
-                         (double)par_.min_states_deltaT);  // Delta_t
-
-      deltaT_min_ = par_.factor_min_deltaT * states_last_replan;
-    }*/
-
   mtx_offsets.unlock();
 
   // Time allocation
@@ -969,7 +947,7 @@ void Faster::changeDroneStatus(int new_status)
       std::cout << bold << "status_=GOAL_REACHED" << reset;
       break;
   }
-  std::cout << " to";
+  std::cout << " to ";
 
   switch (new_status)
   {

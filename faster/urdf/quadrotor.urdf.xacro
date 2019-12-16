@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+
+<robot
+  name="quadrotor"
+  xmlns:xacro="http://www.ros.org/wiki/xacro"
+>
+
+    <!-- Included URDF Files -->
+    <xacro:include filename="$(find acl_sim)/urdf/quadrotor_base.urdf.xacro" />
+    
+    <!-- Instantiate quadrotor_base_macro once (has no parameters atm) -->
+    <xacro:quadrotor_base_macro />
+
+      <!-- Sonar height sensor -->
+    <xacro:include filename="$(find acl_sim)/urdf/sonar_sensor.urdf.xacro" /> 
+    <xacro:sonar_sensor name="sonar" parent="base_link" >
+      <origin xyz="-0.03 -0.03 -0.01" rpy="0 ${90*pi/180} 0"/>
+    </xacro:sonar_sensor>
+
+</robot>

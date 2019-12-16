@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:include filename="$(find hector_xacro_tools)/urdf/sensor_macros.urdf.xacro" />
+  
+  <xacro:macro name="thermaleye_camera_model" params="name parent *origin">
+    <joint name="${name}_joint" type="fixed">
+      <xacro:insert_block name="origin" />
+      <parent link="${parent}"/>
+      <child link="${name}_frame"/>
+    </joint>
+    
+    <link name="${name}_frame">
+      <xacro:inertial_sphere mass="0.01" diameter="0.07" />
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+          <mesh filename="package://hector_sensors_description/meshes/thermaleye_camera/thermaleye_camera_hector_v2.dae"/>
+        </geometry>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+          <mesh filename="package://hector_sensors_description/meshes/thermaleye_camera/thermaleye_camera_hector_v2.stl"/>
+        </geometry>
+      </collision>
+    </link>
+    
+    <xacro:add_optical_frame name="${name}" />
+  </xacro:macro>
+</robot>
+
