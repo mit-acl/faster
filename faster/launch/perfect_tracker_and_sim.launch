@@ -1,18 +1,16 @@
 <launch>
 	<arg name="quad" default="SQ01s"/>
 	
-
     <!-- Arguments -->
-    <arg name="veh" default="SQ"/>
-    <arg name="num" default="01"/>
-    <arg name="joy" default="false"/>
-    <arg name="bag" default="false"/>
+    <!--<arg name="joy" default="false"/>-->
     <arg name="gazebo" default="true"/>
 
     <arg name="x" default="0" />
     <arg name="y" default="0" />
     <arg name="z" default="0" />
     
+
+    <!-- Spawn vehicle in Gazebo -->
     <group if="$(arg gazebo)">
 
         <!-- Spawn vehicle in gazebo -->
@@ -33,7 +31,7 @@
     <!-- Vicon to world tf -->
     <node pkg="tf" type="static_transform_publisher" name="vicon2world" args="0 0 0 0 0 0 world vicon 100" />
 
-	<!-- Faster fsm -->
-	<node ns="$(arg quad)" name="fake_sim" pkg="faster" type="fake_sim.py" output="screen"/>
+    <!-- Start Perfect Tracker -->
+	<node ns="$(arg quad)" name="perfect_tracker" pkg="faster" type="perfect_tracker.py" output="screen"/>
 
 </launch>

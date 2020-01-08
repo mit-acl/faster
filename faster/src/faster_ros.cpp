@@ -38,14 +38,6 @@ FasterRos::FasterRos(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::Node
   safeGetParam(nh_, "gammap_safe", par_.gammap_safe);
   safeGetParam(nh_, "increment_safe", par_.increment_safe);
 
-  // Parameters for the ground robot (jackal):
-  /*  safeGetParam(nh_,"kw", par_.kw, 2.0);
-    safeGetParam(nh_,"kyaw", par_.kyaw, 2.0);
-    safeGetParam(nh_,"kdalpha", par_.kdalpha, 2.0);
-    safeGetParam(nh_,"kv", par_.kv, 2.0);
-    safeGetParam(nh_,"kdist", par_.kdist, 2.0);
-    safeGetParam(nh_,"kalpha", par_.kalpha, 2.0);*/
-
   safeGetParam(nh_, "delta_a", par_.delta_a);
   safeGetParam(nh_, "delta_H", par_.delta_H);
 
@@ -58,10 +50,17 @@ FasterRos::FasterRos(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::Node
 
   safeGetParam(nh_, "use_faster", par_.use_faster);
 
+  // Parameters for the ground robot (jackal):
+  /*  safeGetParam(nh_,"kw", par_.kw);
+    safeGetParam(nh_,"kyaw", par_.kyaw);
+    safeGetParam(nh_,"kdalpha", par_.kdalpha);
+    safeGetParam(nh_,"kv", par_.kv);
+    safeGetParam(nh_,"kdist", par_.kdist);
+    safeGetParam(nh_,"kalpha", par_.kalpha);*/
+
   // And now obtain the parameters from the mapper
   std::vector<double> world_dimensions;
-  std::vector<double> tmp{ 10, 10, 4 };
-  ros::param::param<std::vector<double>>("mapper/world_dimensions", world_dimensions, tmp);
+  safeGetParam(nh_, "mapper/world_dimensions", world_dimensions);
   safeGetParam(nh_, "mapper/resolution", par_.res);
 
   par_.wdx = world_dimensions[0];

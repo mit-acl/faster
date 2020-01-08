@@ -164,7 +164,7 @@ void Faster::getState(state& data)
 
 int Faster::findIndexR(int indexH)
 {
-  // Ignore z to obtain this heuristics (if not it can become VERY conservative)
+  // Ignore z to obtain this heuristics (if not it can become very conservative)
   // mtx_X_U_temp.lock();
   Eigen::Vector2d posHk;
   posHk << sg_whole_.X_temp_[indexH].pos(0), sg_whole_.X_temp_[indexH].pos(1);

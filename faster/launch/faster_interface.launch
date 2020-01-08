@@ -1,11 +1,8 @@
 <launch>
 	<arg name="quad" default="SQ01s"/>
-	<!-- vicon or full -->
-	<arg name="room" default="vicon"/>
-	<arg name="z_alt" default="1.0"/>
 	
-	<!-- Faster fsm -->
-	<node ns="$(arg quad)" name="fsm" pkg="faster" type="faster_commands.py" output="screen"/>
+	<!-- Start faster commands -->
+	<node ns="$(arg quad)" name="faster_commands" pkg="faster" type="faster_commands.py" output="screen"/>
 
 	<!-- Start Rviz -->
 	<node pkg="rviz" type="rviz" name="rviz" args="-d $(find acl_demos)/rviz_cfgs/cvx.rviz"/>
