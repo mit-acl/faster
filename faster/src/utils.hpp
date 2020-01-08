@@ -177,4 +177,15 @@ Eigen::Vector3d projectPointToBox(Eigen::Vector3d& P1, Eigen::Vector3d& P2, doub
 
 void deleteVertexes(vec_Vecf<3>& JPS_path, int max_value);
 
+template <typename T>
+inline bool safeGetParam(ros::NodeHandle& nh, std::string const& param_name, T& param_value)
+{
+  if (!nh.getParam(param_name, param_value))
+  {
+    ROS_ERROR("Failed to find parameter: %s", nh.resolveName(param_name, true).c_str());
+    exit(1);
+  }
+  return true;
+}
+
 #endif

@@ -1,13 +1,5 @@
 #pragma once
 
-//#include <pcl/kdtree/kdtree_flann.h>
-
-/*struct kdTreeStamped
-{
-  pcl::KdTreeFLANN<pcl::PointXYZ> kdTree;
-  ros::Time time;
-};
-*/
 struct polytope
 {
   Eigen::MatrixXd A;
@@ -81,8 +73,6 @@ struct parameters
   bool use_faster;
   bool keep_optimizing_after_found;
   bool use_smart_deltaT;
-
-  double hack;
 };
 
 struct state

@@ -48,23 +48,18 @@ dist_max_vertexes: 1.5 #[m] Maximum distance between two vertexes in the JPS bef
 gurobi_threads: 1 #[threads] Number of threads that Gurobi will use. If computer is maxed out, threads=1 works faster!
 gurobi_verbose: 0 #Verbosity of Gurobi. 0 or 1
 
-#Parameters for the ground robot:
-kw: 1
-kyaw: 1.5
-kdalpha: 0.0
-kalpha: 3
-
-kv: 2
-kdist: 2
+#Parameters for the ground robot (jackal):
+# kw: 1
+# kyaw: 1.5
+# kdalpha: 0.0
+# kalpha: 3
+# kv: 2
+# kdist: 2
 
 delta_a: 1.0
 delta_H: 1.0
 
-hack: 0.75
-
 use_faster: true  #if false, it will plan only in free space
-keep_optimizing_after_found: false #if true, the planner will keep optimizing after having found a trajectory (until the drone arrives at point A)
-use_smart_deltaT: false #if true, A will be tried be be chosen in R{k-1} (unless there is too little time remaining, given by factor_min_deltaT)
 
 
 

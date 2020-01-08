@@ -5,72 +5,64 @@
 FasterRos::FasterRos(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pub_CB)
   : nh_(nh), nh_replan_CB_(nh_replan_CB), nh_pub_CB_(nh_pub_CB)
 {
-  ros::param::param<bool>("~use_ff", par_.use_ff, 1);
-  ros::param::param<bool>("~visual", par_.visual, true);
+  // fla_utils::SafeGetParam(pnh_, "global_frame", params_.global_frame);
 
-  ros::param::param<double>("~dc", par_.dc, 0.01);
-  ros::param::param<double>("~goal_radius", par_.goal_radius, 0.2);
-  ros::param::param<double>("~drone_radius", par_.drone_radius, 0.15);
+  safeGetParam(nh_, "use_ff", par_.use_ff);
+  safeGetParam(nh_, "visual", par_.visual);
 
-  ros::param::param<int>("~N_safe", par_.N_safe, 10);
-  ros::param::param<int>("~N_whole", par_.N_whole, 10);
+  safeGetParam(nh_, "dc", par_.dc);
+  safeGetParam(nh_, "goal_radius", par_.goal_radius);
+  safeGetParam(nh_, "drone_radius", par_.drone_radius);
 
-  ros::param::param<double>("~factor_deltaT", par_.factor_deltaT, 1.5);
-  ros::param::param<double>("~factor_min_deltaT", par_.factor_min_deltaT, 1.0);
+  safeGetParam(nh_, "N_safe", par_.N_safe);
+  safeGetParam(nh_, "N_whole", par_.N_whole);
 
-  ros::param::param<int>("~min_states_deltaT", par_.min_states_deltaT, 0);
+  safeGetParam(nh_, "Ra", par_.Ra);
+  safeGetParam(nh_, "Ra_max", par_.Ra_max);
+  safeGetParam(nh_, "w_max", par_.w_max);
+  safeGetParam(nh_, "alpha_filter_dyaw", par_.alpha_filter_dyaw);
 
-  ros::param::param<double>("~Ra", par_.Ra, 2.0);
-  ros::param::param<double>("~Ra_max", par_.Ra_max, 2.5);
-  ros::param::param<double>("~w_max", par_.w_max, 0.5);
-  ros::param::param<double>("~alpha_filter_dyaw", par_.alpha_filter_dyaw, 0.8);
-  ros::param::param<double>("~alpha_0_deg", par_.alpha_0_deg, 15);
-  ros::param::param<double>("~z_ground", par_.z_ground, 0.0);
-  ros::param::param<double>("~z_max", par_.z_max, 5.0);
-  ros::param::param<double>("~inflation_jps", par_.inflation_jps, 0.8);
-  ros::param::param<double>("~factor_jps", par_.factor_jps, 2);
+  safeGetParam(nh_, "z_ground", par_.z_ground);
+  safeGetParam(nh_, "z_max", par_.z_max);
+  safeGetParam(nh_, "inflation_jps", par_.inflation_jps);
+  safeGetParam(nh_, "factor_jps", par_.factor_jps);
 
-  ros::param::param<double>("~v_max", par_.v_max, 2.0);
-  ros::param::param<double>("~a_max", par_.a_max, 2.0);
-  ros::param::param<double>("~j_max", par_.j_max, 10.0);
+  safeGetParam(nh_, "v_max", par_.v_max);
+  safeGetParam(nh_, "a_max", par_.a_max);
+  safeGetParam(nh_, "j_max", par_.j_max);
 
-  ros::param::param<double>("~z_land", par_.z_land, 0.02);
+  safeGetParam(nh_, "gamma_whole", par_.gamma_whole);
+  safeGetParam(nh_, "gammap_whole", par_.gammap_whole);
+  safeGetParam(nh_, "increment_whole", par_.increment_whole);
+  safeGetParam(nh_, "gamma_safe", par_.gamma_safe);
+  safeGetParam(nh_, "gammap_safe", par_.gammap_safe);
+  safeGetParam(nh_, "increment_safe", par_.increment_safe);
 
-  ros::param::param<double>("cntrl/spinup_time", par_.spinup_time, 0.5);
+  // Parameters for the ground robot (jackal):
+  /*  safeGetParam(nh_,"kw", par_.kw, 2.0);
+    safeGetParam(nh_,"kyaw", par_.kyaw, 2.0);
+    safeGetParam(nh_,"kdalpha", par_.kdalpha, 2.0);
+    safeGetParam(nh_,"kv", par_.kv, 2.0);
+    safeGetParam(nh_,"kdist", par_.kdist, 2.0);
+    safeGetParam(nh_,"kalpha", par_.kalpha, 2.0);*/
 
-  ros::param::param<double>("~gamma_whole", par_.gamma_whole, 4.0);
-  ros::param::param<double>("~gammap_whole", par_.gammap_whole, 4.0);
-  ros::param::param<double>("~increment_whole", par_.increment_whole, 1.0);
-  ros::param::param<double>("~gamma_safe", par_.gamma_safe, 4.0);
-  ros::param::param<double>("~gammap_safe", par_.gammap_safe, 4.0);
-  ros::param::param<double>("~increment_safe", par_.increment_safe, 1.0);
+  safeGetParam(nh_, "delta_a", par_.delta_a);
+  safeGetParam(nh_, "delta_H", par_.delta_H);
 
-  ros::param::param<double>("~kw", par_.kw, 2.0);
-  ros::param::param<double>("~kyaw", par_.kyaw, 2.0);
-  ros::param::param<double>("~kdalpha", par_.kdalpha, 2.0);
-  ros::param::param<double>("~kv", par_.kv, 2.0);
-  ros::param::param<double>("~kdist", par_.kdist, 2.0);
-  ros::param::param<double>("~kalpha", par_.kalpha, 2.0);
-  ros::param::param<double>("~hack", par_.hack, 2.0);  // hacktodo
+  safeGetParam(nh_, "max_poly_whole", par_.max_poly_whole);
+  safeGetParam(nh_, "max_poly_safe", par_.max_poly_safe);
+  safeGetParam(nh_, "dist_max_vertexes", par_.dist_max_vertexes);
 
-  ros::param::param<double>("~delta_a", par_.delta_a, 0.5);
-  ros::param::param<double>("~delta_H", par_.delta_H, 0.7);
+  safeGetParam(nh_, "gurobi_threads", par_.gurobi_threads);
+  safeGetParam(nh_, "gurobi_verbose", par_.gurobi_verbose);
 
-  ros::param::param<int>("~max_poly_whole", par_.max_poly_whole, 4);
-  ros::param::param<int>("~max_poly_safe", par_.max_poly_safe, 4);
-  ros::param::param<double>("~dist_max_vertexes", par_.dist_max_vertexes, 1.5);
-
-  ros::param::param<int>("~gurobi_threads", par_.gurobi_threads, 1);
-  ros::param::param<int>("~gurobi_verbose", par_.gurobi_verbose, 0);
-
-  ros::param::param<bool>("~use_faster", par_.use_faster, true);
-  ros::param::param<bool>("~keep_optimizing_after_found", par_.keep_optimizing_after_found, false);
+  safeGetParam(nh_, "use_faster", par_.use_faster);
 
   // And now obtain the parameters from the mapper
   std::vector<double> world_dimensions;
   std::vector<double> tmp{ 10, 10, 4 };
-  ros::param::param<std::vector<double>>("~/mapper/world_dimensions", world_dimensions, tmp);
-  ros::param::param<double>("~/mapper/resolution", par_.res, 0.15);
+  ros::param::param<std::vector<double>>("mapper/world_dimensions", world_dimensions, tmp);
+  safeGetParam(nh_, "mapper/resolution", par_.res);
 
   par_.wdx = world_dimensions[0];
   par_.wdy = world_dimensions[1];
@@ -123,10 +115,8 @@ FasterRos::FasterRos(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::Node
     }
   */
 
-  markerID_ = 0;
-
   // Publishers
-  pub_goal_jackal_ = nh_.advertise<geometry_msgs::Twist>("goal_jackal", 1);
+  // pub_goal_jackal_ = nh_.advertise<geometry_msgs::Twist>("goal_jackal", 1);
   pub_goal_ = nh_.advertise<acl_msgs::QuadGoal>("goal", 1);
   pub_traj_whole_ = nh_.advertise<nav_msgs::Path>("traj_whole", 1);
   pub_traj_safe_ = nh_.advertise<nav_msgs::Path>("traj_safe", 1);
@@ -147,7 +137,7 @@ FasterRos::FasterRos(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::Node
   poly_whole_pub_ = nh.advertise<decomp_ros_msgs::PolyhedronArray>("poly_whole", 1, true);
   poly_safe_pub_ = nh.advertise<decomp_ros_msgs::PolyhedronArray>("poly_safe", 1, true);
   pub_jps_inters_ = nh_.advertise<geometry_msgs::PointStamped>("jps_intersection", 1);
-  pub_log_ = nh_.advertise<acl_msgs::Cvx>("log_topic", 1);
+  // pub_log_ = nh_.advertise<acl_msgs::Cvx>("log_topic", 1);
   pub_traj_committed_colored_ = nh_.advertise<visualization_msgs::MarkerArray>("traj_committed_colored", 1);
   pub_traj_whole_colored_ = nh_.advertise<visualization_msgs::MarkerArray>("traj_whole_colored", 1);
   pub_traj_safe_colored_ = nh_.advertise<visualization_msgs::MarkerArray>("traj_safe_colored", 1);
@@ -157,7 +147,7 @@ FasterRos::FasterRos(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::Node
   unknown_grid_sub_.subscribe(nh_, "unknown_grid", 1);
   sync_.reset(new Sync(MySyncPolicy(1), occup_grid_sub_, unknown_grid_sub_));
   sync_->registerCallback(boost::bind(&FasterRos::mapCB, this, _1, _2));
-  sub_goal_ = nh_.subscribe("/move_base_simple/goal", 1, &FasterRos::terminalGoalCB, this);
+  sub_goal_ = nh_.subscribe("term_goal", 1, &FasterRos::terminalGoalCB, this);
   sub_mode_ = nh_.subscribe("mode", 1, &FasterRos::modeCB, this);
   sub_state_ = nh_.subscribe("state", 1, &FasterRos::stateCB, this);
   // sub_odom_ = nh_.subscribe("odom", 1, &FasterRos::odomCB, this);
@@ -195,7 +185,7 @@ FasterRos::FasterRos(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::Node
   {
     try
     {
-      tf_buffer_.lookupTransform("world", name_drone_ + "/camera", ros::Time::now(), ros::Duration(0.5));  //
+      tf_buffer_.lookupTransform(world_name_, name_drone_ + "/camera", ros::Time::now(), ros::Duration(0.5));  //
       break;
     }
     catch (tf2::TransformException& ex)
@@ -237,7 +227,7 @@ void FasterRos::publishPoly(const vec_E<Polyhedron<3>>& poly, int type)
 {
   // std::cout << "Going to publish= " << (poly[0].hyperplanes())[0].n_ << std::endl;
   decomp_ros_msgs::PolyhedronArray poly_msg = DecompROS::polyhedron_array_to_ros(poly);
-  poly_msg.header.frame_id = "world";
+  poly_msg.header.frame_id = world_name_;
 
   switch (type)
   {
@@ -268,7 +258,6 @@ void FasterRos::modeCB(const faster_msgs::Mode& msg)
 
   if (msg.mode != msg.GO)
   {  // FASTER DOES NOTHING
-    std::cout << "Killing everything!" << std::endl;
     occup_grid_sub_.unsubscribe();
     unknown_grid_sub_.unsubscribe();
     sub_state_.shutdown();
@@ -278,7 +267,6 @@ void FasterRos::modeCB(const faster_msgs::Mode& msg)
   }
   else
   {  // The mode changed to GO
-    std::cout << "Initializing everything!" << std::endl;
     occup_grid_sub_.subscribe();
     unknown_grid_sub_.subscribe();
 
@@ -307,7 +295,7 @@ void FasterRos::pubCB(const ros::TimerEvent& e)
     quadGoal.dyaw = next_goal.dyaw;
     quadGoal.yaw = next_goal.yaw;
     quadGoal.header.stamp = ros::Time::now();
-    quadGoal.header.frame_id = "world";
+    quadGoal.header.frame_id = world_name_;
 
     pub_goal_.publish(quadGoal);
 
@@ -393,7 +381,7 @@ void FasterRos::pubTraj(const std::vector<state>& data, int type)
   nav_msgs::Path traj;
   traj.poses.clear();
   traj.header.stamp = ros::Time::now();
-  traj.header.frame_id = "world";
+  traj.header.frame_id = world_name_;
 
   geometry_msgs::PoseStamped temp_path;
 
@@ -446,7 +434,7 @@ void FasterRos::pubTraj(const std::vector<state>& data, int type)
 void FasterRos::pubJPSIntersection(Eigen::Vector3d& inters)
 {
   geometry_msgs::PointStamped p;
-  p.header.frame_id = "world";
+  p.header.frame_id = world_name_;
   p.point = eigen2point(inters);
   pub_jps_inters_.publish(p);
 }
@@ -480,7 +468,7 @@ void FasterRos::pubActualTraj()
   m.scale.y = 0;
   m.scale.z = 0;
   m.header.stamp = ros::Time::now();
-  m.header.frame_id = "world";
+  m.header.frame_id = world_name_;
 
   geometry_msgs::Point p;
   p = eigen2point(act_pos);
@@ -493,7 +481,7 @@ void FasterRos::pubActualTraj()
 /*void FasterRos::pubG(state G)
 {
   geometry_msgs::PointStamped p;
-  p.header.frame_id = "world";
+  p.header.frame_id =world_name_;
   // mtx_G.lock();
   p.point = eigen2point(G.pos);
   // mtx_G.unlock();
@@ -517,14 +505,12 @@ void FasterRos::clearMarkerActualTraj()
 
 void FasterRos::clearMarkerColoredTraj()
 {
-  // printf("In clearMarkerActualTraj\n");
-
   visualization_msgs::Marker m;
   m.type = visualization_msgs::Marker::ARROW;
   m.action = visualization_msgs::Marker::DELETEALL;
   m.id = 0;
-  m.scale.x = 0.02;
-  m.scale.y = 0.04;
+  m.scale.x = 1;
+  m.scale.y = 1;
   m.scale.z = 1;
   pub_actual_traj_.publish(m);
   // actual_trajID_ = 0;
@@ -547,7 +533,7 @@ void FasterRos::mapCB(const sensor_msgs::PointCloud2::ConstPtr& pcl2ptr_map_ros,
 void FasterRos::pubState(const state& data, const ros::Publisher pub)
 {
   geometry_msgs::PointStamped p;
-  p.header.frame_id = "world";
+  p.header.frame_id = world_name_;
   p.point = eigen2point(data.pos);
   pub.publish(p);
 }

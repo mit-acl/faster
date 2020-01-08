@@ -1,7 +1,8 @@
+#pragma once
+
 #include "geometry_msgs/PointStamped.h"
 #include "geometry_msgs/PoseStamped.h"
-#include "geometry_msgs/Twist.h"
-#include "nav_msgs/Path.h"
+//#include "geometry_msgs/Twist.h"
 #include "visualization_msgs/MarkerArray.h"
 
 #include "ros/ros.h"
@@ -10,7 +11,6 @@
 #include "visualization_msgs/MarkerArray.h"
 #include <sensor_msgs/point_cloud_conversion.h>
 #include <pcl_conversions/pcl_conversions.h>
-#include <pcl/kdtree/kdtree_flann.h>
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/buffer.h>
 
@@ -21,8 +21,7 @@
 #include <acl_msgs/Cvx.h>
 #include <acl_msgs/State.h>
 #include <acl_msgs/QuadGoal.h>
-#include <acl_msgs/TermGoal.h>
-#include <nav_msgs/Odometry.h>
+//#include <nav_msgs/Odometry.h>
 #include <faster_msgs/Mode.h>
 
 // TimeSynchronizer includes
@@ -32,9 +31,6 @@
 #include <message_filters/sync_policies/approximate_time.h>
 
 #include "utils.hpp"
-
-#include <sensor_msgs/Image.h>
-#include <sensor_msgs/CameraInfo.h>
 
 #include "faster.hpp"
 #include "faster_types.hpp"
@@ -113,6 +109,8 @@ private:
   void publishPoly(const vec_E<Polyhedron<3>>& poly, int type);
   // visualization_msgs::MarkerArray Matrix2ColoredMarkerArray(Eigen::MatrixXd& X, int type);
 
+  std::string world_name_ = "world";
+
   visualization_msgs::Marker R_;
   visualization_msgs::Marker I_;
   visualization_msgs::Marker E_;
@@ -132,8 +130,6 @@ private:
   ros::Publisher pub_traj_whole_;
   ros::Publisher pub_traj_safe_;
   ros::Publisher pub_setpoint_;
-  ros::Publisher pub_trajs_sphere_;
-  ros::Publisher pub_forces_;
   ros::Publisher pub_actual_traj_;
   ros::Publisher pub_path_jps1_;
   ros::Publisher pub_path_jps2_;
@@ -196,8 +192,6 @@ private:
   typedef message_filters::Synchronizer<MySyncPolicy> Sync;
   boost::shared_ptr<Sync> sync_;
 
-  int markerID_ = 0;
-  int markerID_last_ = 0;
   int actual_trajID_ = 0;
   // faster_msgs::Mode mode_;
 };
