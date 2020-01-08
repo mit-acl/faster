@@ -1,0 +1,15 @@
+- git:
+    local-name: acl-gazebo
+    uri: git@gitlab.com:mit-acl/acl-gazebo.git
+    version: master
+- git:
+    local-name: catkin_simple
+    uri: https://github.com/catkin/catkin_simple.git
+    version: master
+- git:
+    local-name: snapstack_msgs
+    uri: https://gitlab.com/mit-acl/fsw/snap-stack/snapstack_msgs.git
+    version: master
+
+
+    

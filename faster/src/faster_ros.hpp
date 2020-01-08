@@ -18,9 +18,9 @@
 
 #include <Eigen/Dense>
 
-#include <acl_msgs/Cvx.h>
-#include <acl_msgs/State.h>
-#include <acl_msgs/QuadGoal.h>
+//#include <snapstack_msgs/Cvx.h>
+#include <snapstack_msgs/State.h>
+#include <snapstack_msgs/QuadGoal.h>
 //#include <nav_msgs/Odometry.h>
 #include <faster_msgs/Mode.h>
 
@@ -59,7 +59,7 @@ private:
   void pubTraj(const std::vector<state>& data, int type);
   void terminalGoalCB(const geometry_msgs::PoseStamped& msg);
   void pubState(const state& msg, const ros::Publisher pub);
-  void stateCB(const acl_msgs::State& msg);
+  void stateCB(const snapstack_msgs::State& msg);
   // void odomCB(const nav_msgs::Odometry& odom_ptr);
   void modeCB(const faster_msgs::Mode& msg);
   void pubCB(const ros::TimerEvent& e);
@@ -83,7 +83,7 @@ private:
   void updateInitialCond(int i);
   // void pubPlanningVisual(Eigen::Vector3d center, double ra, double rb, Eigen::Vector3d B1, Eigen::Vector3d C1);
   // void pubintersecPoint(Eigen::Vector3d p, bool add);
-  void yaw(double diff, acl_msgs::QuadGoal& quad_goal);
+  void yaw(double diff, snapstack_msgs::QuadGoal& quad_goal);
 
   void clearMarkerArray(visualization_msgs::MarkerArray* tmp, ros::Publisher* publisher);
   void publishJPSPath(vec_Vecf<3>& path, int i);
@@ -166,8 +166,8 @@ private:
   ros::Timer pubCBTimer_;
   ros::Timer replanCBTimer_;
 
-  parameters par_;     // where all the parameters are
-  acl_msgs::Cvx log_;  // to log all the data
+  parameters par_;  // where all the parameters are
+  // snapstack_msgs::Cvx log_;  // to log all the data
   tf2_ros::Buffer tf_buffer_;
   tf2_ros::TransformListener* tfListener;
   std::string name_drone_;

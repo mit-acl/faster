@@ -5,9 +5,9 @@
 	<node ns="$(arg quad)" name="faster_commands" pkg="faster" type="faster_commands.py" output="screen"/>
 
 	<!-- Start Rviz -->
-	<node pkg="rviz" type="rviz" name="rviz" args="-d $(find acl_demos)/rviz_cfgs/cvx.rviz"/>
+	<node pkg="rviz" type="rviz" name="rviz" args="-d $(find faster)/rviz_cfgs/cvx.rviz"/>
 
 	<!-- Start GUI -->
-	<node pkg="rqt_gui" type="rqt_gui" name="rqt_gui" args="--perspective-file $(find acl_demos)/rqt_cfgs/demo_interface.perspective"/>
+	<node pkg="rqt_gui" type="rqt_gui" name="rqt_gui" args="--perspective-file $(find faster)/rqt_cfgs/demo_interface.perspective"/>
 
 </launch>

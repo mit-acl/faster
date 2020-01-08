@@ -30,7 +30,7 @@ include_directories(${GUROBI_INCLUDE_DIRS})
 find_package(catkin REQUIRED COMPONENTS 
 	roscpp
 	rospy
-	acl_msgs
+	snapstack_msgs
 	faster_msgs
 	sensor_msgs
 	pcl_ros

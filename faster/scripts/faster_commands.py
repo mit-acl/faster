@@ -4,7 +4,7 @@
 
 import rospy
 from faster_msgs.msg import Mode
-from acl_msgs.msg import QuadGoal, State
+from snapstack_msgs.msg import QuadGoal, State
 from geometry_msgs.msg import Pose, PoseStamped
 from behavior_selector.srv import MissionModeChange
 import math

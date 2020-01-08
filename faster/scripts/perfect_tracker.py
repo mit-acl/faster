@@ -2,7 +2,7 @@
 import roslib
 import rospy
 import math
-from acl_msgs.msg import QuadGoal, State
+from snapstack_msgs.msg import QuadGoal, State
 from gazebo_msgs.msg import ModelState
 import numpy as np
 from numpy import linalg as LA

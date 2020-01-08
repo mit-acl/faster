@@ -9,8 +9,7 @@ drone_radius: 0.3  #(m) Used for collision checking
 N_whole: 6 #[-] Number of discretization points in the whole trajectory
 N_safe: 6 #[-] Number of discretization points in the safe path
 
-Ra: 0.5            # [m] Minimum radius of the first sphere
-Ra_max: 4            # [m] Maximum radius of the first sphere
+Ra: 4.0            # [m] Radius of the sphere S
 w_max: 1          # [rd/s] Maximum angular velocity. 0.4 for Hardware
 alpha_filter_dyaw: 0 #was 0.92  #[] Filter parameter for dyaw, \in [0,1]. Higher--> More aggressive filtering
 

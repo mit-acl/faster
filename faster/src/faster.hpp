@@ -79,7 +79,7 @@ private:
 
   void getDesiredYaw(state& next_goal);
 
-  // void yaw(double diff, acl_msgs::QuadGoal& quad_goal);
+  // void yaw(double diff, snapstack_msgs::QuadGoal& quad_goal);
   void createMoreVertexes(vec_Vecf<3>& path, double d);
 
   int findIndexR(int indexH);

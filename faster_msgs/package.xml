@@ -2,7 +2,7 @@
 <package>
   <name>faster_msgs</name>
   <version>0.0.0</version>
-  <description>The acl_msgs package</description>
+  <description>The snapstack_msgs package</description>
 
   <!-- One maintainer tag required, multiple allowed, one person per tag --> 
   <!-- Example:  -->

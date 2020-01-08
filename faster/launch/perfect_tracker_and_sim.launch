@@ -14,7 +14,7 @@
     <group if="$(arg gazebo)">
 
         <!-- Spawn vehicle in gazebo -->
-        <include file="$(find faster)/launch/spawn_quadrotor_with_asus.launch">
+        <include file="$(find acl_sim)/launch/spawn_quadrotor_with_asus.launch">
             <arg name="name" value="$(arg quad)"/>
             <arg name="tf_prefix" default="$(optenv ROS_NAMESPACE)"/>
             <arg name="x" value="$(arg x)"/>

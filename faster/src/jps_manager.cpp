@@ -138,16 +138,6 @@ vec_Vecf<3> JPS_Manager::solveJPS3D(Vec3f& start_sent, Vec3f& goal_sent, bool* s
 
   Vec3f originalStart = start;
 
-  // Jesus commented this on 21st Nov, 2019
-  /*  if (flight_mode_.mode != flight_mode_.GO || takeoff_done_ == false)
-    {
-      vec_Vecf<3> solution;
-      solution.push_back(start);
-      solution.push_back(goal);
-      *solved = true;
-      return solution;
-    }*/
-
   pcl::PointXYZ pcl_start = eigenPoint2pclPoint(start);
   pcl::PointXYZ pcl_goal = eigenPoint2pclPoint(goal);
 

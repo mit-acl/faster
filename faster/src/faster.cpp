@@ -565,7 +565,7 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
   ///////////////////////// Find JPS_in ////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////
 
-  double ra = std::min((dist_to_goal - 0.001), par_.Ra_max);  // radius of the sphere S
+  double ra = std::min((dist_to_goal - 0.001), par_.Ra);  // radius of the sphere S
   bool noPointsOutsideS;
   int li1;  // last index inside the sphere of JPSk
   state E;

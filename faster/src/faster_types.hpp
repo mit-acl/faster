@@ -10,12 +10,6 @@ struct parameters
 {
   bool use_ff;
   bool visual;
-  double spinup_time;
-
-  double wdx;
-  double wdy;
-  double wdz;
-  double res;
 
   double dc;
   double goal_radius;
@@ -24,16 +18,10 @@ struct parameters
   int N_whole;
   int N_safe;
 
-  double factor_deltaT;
-  double factor_min_deltaT;
-
-  int min_states_deltaT;
-
   double Ra;
-  double Ra_max;
   double w_max;
   double alpha_filter_dyaw;
-  double alpha_0_deg;
+
   double z_ground;
   double z_max;
   double inflation_jps;
@@ -43,15 +31,15 @@ struct parameters
   double a_max;
   double j_max;
 
-  double z_land;
-
   double gamma_whole;
   double gammap_whole;
   double increment_whole;
-
   double gamma_safe;
   double gammap_safe;
   double increment_safe;
+
+  double delta_a;
+  double delta_H;
 
   int max_poly_whole;
   int max_poly_safe;
@@ -60,19 +48,19 @@ struct parameters
   int gurobi_threads;
   int gurobi_verbose;
 
-  double kw;
-  double kyaw;
-  double kdalpha;
-  double kv;
-  double kdist;
-  double kalpha;
-
-  double delta_a;
-  double delta_H;
-
   bool use_faster;
-  bool keep_optimizing_after_found;
-  bool use_smart_deltaT;
+
+  double wdx;
+  double wdy;
+  double wdz;
+  double res;
+
+  /*  double kw;
+    double kyaw;
+    double kdalpha;
+    double kv;
+    double kdist;
+    double kalpha;*/
 };
 
 struct state

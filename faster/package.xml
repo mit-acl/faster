@@ -23,8 +23,8 @@
   <build_depend>jps3d</build_depend>
   <build_depend>jps3d</build_depend>
 
-  <build_depend>acl_msgs</build_depend>
-  <build_depend>acl_msgs</build_depend>
+  <build_depend>snapstack_msgs</build_depend>
+  <build_depend>snapstack_msgs</build_depend>
 
   <build_depend>decomp_util</build_depend>
   <build_depend>decomp_ros_utils</build_depend>

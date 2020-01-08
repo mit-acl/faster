@@ -18,7 +18,6 @@ FasterRos::FasterRos(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::Node
   safeGetParam(nh_, "N_whole", par_.N_whole);
 
   safeGetParam(nh_, "Ra", par_.Ra);
-  safeGetParam(nh_, "Ra_max", par_.Ra_max);
   safeGetParam(nh_, "w_max", par_.w_max);
   safeGetParam(nh_, "alpha_filter_dyaw", par_.alpha_filter_dyaw);
 
@@ -116,7 +115,7 @@ FasterRos::FasterRos(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::Node
 
   // Publishers
   // pub_goal_jackal_ = nh_.advertise<geometry_msgs::Twist>("goal_jackal", 1);
-  pub_goal_ = nh_.advertise<acl_msgs::QuadGoal>("goal", 1);
+  pub_goal_ = nh_.advertise<snapstack_msgs::QuadGoal>("goal", 1);
   pub_traj_whole_ = nh_.advertise<nav_msgs::Path>("traj_whole", 1);
   pub_traj_safe_ = nh_.advertise<nav_msgs::Path>("traj_safe", 1);
   pub_setpoint_ = nh_.advertise<visualization_msgs::Marker>("setpoint", 1);
@@ -136,7 +135,7 @@ FasterRos::FasterRos(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::Node
   poly_whole_pub_ = nh.advertise<decomp_ros_msgs::PolyhedronArray>("poly_whole", 1, true);
   poly_safe_pub_ = nh.advertise<decomp_ros_msgs::PolyhedronArray>("poly_safe", 1, true);
   pub_jps_inters_ = nh_.advertise<geometry_msgs::PointStamped>("jps_intersection", 1);
-  // pub_log_ = nh_.advertise<acl_msgs::Cvx>("log_topic", 1);
+  // pub_log_ = nh_.advertise<snapstack_msgs::Cvx>("log_topic", 1);
   pub_traj_committed_colored_ = nh_.advertise<visualization_msgs::MarkerArray>("traj_committed_colored", 1);
   pub_traj_whole_colored_ = nh_.advertise<visualization_msgs::MarkerArray>("traj_whole_colored", 1);
   pub_traj_safe_colored_ = nh_.advertise<visualization_msgs::MarkerArray>("traj_safe_colored", 1);
@@ -239,7 +238,7 @@ void FasterRos::publishPoly(const vec_E<Polyhedron<3>>& poly, int type)
   }
 }
 
-void FasterRos::stateCB(const acl_msgs::State& msg)
+void FasterRos::stateCB(const snapstack_msgs::State& msg)
 {
   state state_tmp;
   state_tmp.setPos(msg.pos.x, msg.pos.y, msg.pos.z);
@@ -281,7 +280,7 @@ void FasterRos::pubCB(const ros::TimerEvent& e)
   state next_goal;
   if (faster_ptr_->getNextGoal(next_goal))
   {
-    acl_msgs::QuadGoal quadGoal;
+    snapstack_msgs::QuadGoal quadGoal;
     // visualization_msgs::Marker setpoint;
     // Pub setpoint maker.  setpoint_ is the last quadGoal sent to the drone
 
