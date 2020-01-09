@@ -1,3 +1,20 @@
+# FASTER: Fast and Safe Trajectory Planner for Flights in Unknown Environments #
+
+Code used for the paper:
+
+**FASTER: Fast and Safe Trajectory Planner for Flights in Unknown Environments** (IROS 2019) ([pdf](https://arxiv.org/abs/1903.03558), [video](https://www.youtube.com/watch?v=gwV0YRs5IWs))
+
+```
+@inproceedings{tordesillas2019faster,
+  title={{FASTER}: Fast and Safe Trajectory Planner for Flights in Unknown Environments},
+  author={Tordesillas, Jesus and Lopez, Brett T and How, Jonathan P},
+  booktitle={2019 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)},
+  year={2019},
+  organization={IEEE}
+}
+
+```
+
 ## Instructions
 Install [Gurobi](https://www.gurobi.com/) (you can test your installation typing `gurobi.sh` in the terminal).
 
