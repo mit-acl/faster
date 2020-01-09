@@ -16,7 +16,7 @@ catkin build
 And finally open 5 terminals and execute these commands:
 ```
 roslaunch acl_sim start_world.launch
-roslaunch faster perfect_tracker_and_sim.launch
+roslaunch acl_sim perfect_tracker_and_sim.launch
 roslaunch global_mapper_ros global_mapper_node.launch
 roslaunch faster faster_interface.launch
 roslaunch faster faster.launch
@@ -25,6 +25,8 @@ Now you can click `Takeoff` in the GUI, and then, in RVIZ, press `G` (or click t
 
 ## Architecture:
 
+
+![](./faster/imgs/diagram.png) 
 
 
 
