@@ -29,6 +29,9 @@ Now you can click `Takeoff` in the GUI, and then, in RVIZ, press `G` (or click t
 ![](./faster/imgs/diagram.png) 
 
 
+## Credits:
+This package uses code from the [JPS3D](https://github.com/KumarRobotics/jps3d) and [DecompROS](https://github.com/sikang/DecompROS) repos (included in the `thirdparty` folder), so credit to them as well. 
+
 
 
 
