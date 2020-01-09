@@ -5,7 +5,7 @@
       "keys": {
         "running-plugins": {
           "type": "repr",
-          "repr": "{u'rqt_mission_gui/MissionModePlugin': [1]}"
+          "repr": "{u'behavior_selector/MissionModePlugin': [1]}"
         }
       },
       "groups": {
@@ -117,7 +117,7 @@
             }
           }
         },
-        "plugin__rqt_mission_gui__MissionModePlugin__1": {
+        "plugin__behavior_selector__MissionModePlugin__1": {
           "keys": {},
           "groups": {
             "dock_widget__MissionModePluginUi": {

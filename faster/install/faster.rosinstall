@@ -11,12 +11,8 @@
     uri: https://gitlab.com/mit-acl/fsw/snap-stack/snapstack_msgs.git
     version: master
 - git:
-    local-name: rqt_mission_gui
-    uri: git@gitlab.com:mit-acl/rqt_mission_gui.git
-    version: master
-- git:
     local-name: behavior_selector
-    uri: git@gitlab.com:mit-acl/behavior_selector.git
+    uri: git@gitlab.com:mit-acl/fsw/behavior_selector.git
     version: master
 
     

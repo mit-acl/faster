@@ -1,8 +1,6 @@
 # FASTER: Fast and Safe Trajectory Planner for Flights in Unknown Environments #
 
-Code used for the paper:
-
-**FASTER: Fast and Safe Trajectory Planner for Flights in Unknown Environments** (IROS 2019) ([pdf](https://arxiv.org/abs/1903.03558), [video](https://www.youtube.com/watch?v=gwV0YRs5IWs))
+Code used for the paper **FASTER: Fast and Safe Trajectory Planner for Flights in Unknown Environments** (IROS 2019) ([pdf](https://arxiv.org/abs/1903.03558), [video](https://www.youtube.com/watch?v=gwV0YRs5IWs))
 
 ```
 @inproceedings{tordesillas2019faster,
