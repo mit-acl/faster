@@ -62,6 +62,7 @@ cd ..
 catkin config -DCMAKE_BUILD_TYPE=Release
 catkin build
 ```
+Then, in `faster.yaml`, set `use_ground_robot` to `true`  
 
 And finally open 4 terminals and execute these commands
 ```
@@ -75,6 +76,8 @@ roslaunch faster faster.launch quad:=JA01
 
 
 ![](./faster/imgs/diagram.png) 
+
+Note that for the case of a ground robot, we do provide a real simulation 
 
 
 ## Credits:
