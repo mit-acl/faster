@@ -55,8 +55,7 @@ sudo apt-get install ros-kinetic-robot-localization ros-kinetic-lms1xx ros-kinet
 Then download the ground_robot-specific packages and compile the repo:
 
 ```
-cd src
-wstool merge -t ./faster/faster/install/faster_ground_robot.rosinstall
+wstool merge ./faster/faster/install/faster_ground_robot.rosinstall
 wstool update -j8
 cd ..
 catkin config -DCMAKE_BUILD_TYPE=Release

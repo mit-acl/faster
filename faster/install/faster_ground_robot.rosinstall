@@ -1,4 +1,4 @@
 - git:
     local-name: multi_jackal
-    uri: git@gitlab.com:mit-acl/multi_jackal.git
+    uri: git@github.com:mit-acl/multi_jackal.git
     version: 2a919454d55bebe3b5395396e593ab09b302719f
