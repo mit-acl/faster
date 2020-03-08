@@ -61,7 +61,17 @@ cd ..
 catkin config -DCMAKE_BUILD_TYPE=Release
 catkin build
 ```
-Then, in `faster.yaml`, set `use_ground_robot` to `true`  
+
+Then, in `faster.yaml`, change these parameters:
+```
+drone_radius: 0.5
+
+v_max: 1.4   #[m/s]  
+a_max: 1.4   #[m/s2] 
+j_max: 5.0   #[m/s3]
+
+use_ground_robot: true  
+```
 
 And finally open 4 terminals and execute these commands
 ```
