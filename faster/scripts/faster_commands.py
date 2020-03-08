@@ -24,6 +24,10 @@ class Behavior_Selector:
         self.pubMode = rospy.Publisher("faster/mode",Mode,queue_size=1,latch=True) #TODO Namespace
         self.pubClickedPoint = rospy.Publisher("/move_base_simple/goal",PoseStamped,queue_size=1,latch=True)
 
+        self.is_ground_robot=rospy.get_param('~is_ground_robot', False);
+
+        print("self.is_ground_robot=", self.is_ground_robot)
+
         self.alt_taken_off = 1; #Altitude when hovering after taking off
         self.alt_ground = 0; #Altitude of the ground
         self.initialized=False;
@@ -70,6 +74,8 @@ class Behavior_Selector:
         goal.pos.x = self.pose.position.x;
         goal.pos.y = self.pose.position.y;
         goal.pos.z = self.pose.position.z;
+        if(self.is_ground_robot==True):
+            self.alt_taken_off=self.pose.position.z;
         #Note that self.pose.position is being updated in the parallel callback
         while(  abs(self.pose.position.z-self.alt_taken_off)>0.1  ): 
             goal.pos.z = min(goal.pos.z+0.0035, self.alt_taken_off);
@@ -78,6 +84,7 @@ class Behavior_Selector:
         rospy.sleep(1.5) 
         self.mode.mode=self.mode.GO
         self.sendMode();
+
 
     def land(self):
         goal=QuadGoal();

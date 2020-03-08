@@ -493,11 +493,12 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
                     std::vector<state>& X_whole_out)
 {
   MyTimer replanCB_t(true);
-
+  std::cout << "In replanCB" << std::endl;
   if (initializedAllExceptPlanner() == false)
   {
     return;
   }
+  std::cout << "After" << std::endl;
 
   sg_whole_.ResetToNormalState();
   sg_safe_.ResetToNormalState();
@@ -525,11 +526,13 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
   {
     changeDroneStatus(DroneStatus::GOAL_REACHED);
   }
+  std::cout << "After2" << std::endl;
+
   // Don't plan if drone is not traveling
   if (drone_status_ == DroneStatus::GOAL_REACHED || (drone_status_ == DroneStatus::YAWING))
   {
-    // std::cout << "No replanning needed because" << std::endl;
-    // print_status();
+    std::cout << "No replanning needed because" << std::endl;
+    print_status();
     return;
   }
 
@@ -852,10 +855,10 @@ void Faster::yaw(double diff, state& next_goal)
   dyaw_filtered_ = (1 - par_.alpha_filter_dyaw) * dyaw_not_filtered + par_.alpha_filter_dyaw * dyaw_filtered_;
   next_goal.dyaw = dyaw_filtered_;
 
-  std::cout << "Before next_goal.yaw=" << next_goal.yaw << std::endl;
+  // std::cout << "Before next_goal.yaw=" << next_goal.yaw << std::endl;
 
   next_goal.yaw = previous_yaw_ + dyaw_filtered_ * par_.dc;
-  std::cout << "After next_goal.yaw=" << next_goal.yaw << std::endl;
+  // std::cout << "After next_goal.yaw=" << next_goal.yaw << std::endl;
 }
 
 void Faster::getDesiredYaw(state& next_goal)
@@ -868,7 +871,7 @@ void Faster::getDesiredYaw(state& next_goal)
     case DroneStatus::YAWING:
       desired_yaw = atan2(G_term_.pos[1] - next_goal.pos[1], G_term_.pos[0] - next_goal.pos[0]);
       diff = desired_yaw - state_.yaw;
-      std::cout << "diff1= " << diff << std::endl;
+      // std::cout << "diff1= " << diff << std::endl;
       break;
     case DroneStatus::TRAVELING:
     case DroneStatus::GOAL_SEEN:
@@ -886,9 +889,9 @@ void Faster::getDesiredYaw(state& next_goal)
   {
     changeDroneStatus(DroneStatus::TRAVELING);
   }
-  std::cout << "diff2= " << diff << std::endl;
+  // std::cout << "diff2= " << diff << std::endl;
   yaw(diff, next_goal);
-  std::cout << "yaw3= " << next_goal.yaw << std::endl;
+  // std::cout << "yaw3= " << next_goal.yaw << std::endl;
 }
 
 bool Faster::getNextGoal(state& next_goal)

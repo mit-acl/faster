@@ -49,6 +49,8 @@ FasterRos::FasterRos(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::Node
 
   safeGetParam(nh_, "use_faster", par_.use_faster);
 
+  safeGetParam(nh_, "is_ground_robot", par_.is_ground_robot);
+
   // Parameters for the ground robot (jackal):
   /*  safeGetParam(nh_,"kw", par_.kw);
     safeGetParam(nh_,"kyaw", par_.kyaw);
@@ -539,7 +541,8 @@ void FasterRos::pubState(const state& data, const ros::Publisher pub)
 void FasterRos::terminalGoalCB(const geometry_msgs::PoseStamped& msg)
 {
   state G_term;
-  G_term.setPos(msg.pose.position.x, msg.pose.position.y, 1.0);  // TODO
+  double height = (par_.is_ground_robot) ? 0.2 : 1.0;  // TODO
+  G_term.setPos(msg.pose.position.x, msg.pose.position.y, height);
   faster_ptr_->setTerminalGoal(G_term);
 
   state G;  // projected goal

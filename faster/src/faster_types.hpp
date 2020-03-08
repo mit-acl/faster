@@ -55,6 +55,8 @@ struct parameters
   double wdz;
   double res;
 
+  bool is_ground_robot;
+
   /*  double kw;
     double kyaw;
     double kdalpha;

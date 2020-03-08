@@ -1,13 +1,18 @@
 <launch>
 	<arg name="quad" default="SQ01s"/>
+	<arg name="is_ground_robot" default="false"/>
 	
 	<!-- Start faster commands -->
-	<node ns="$(arg quad)" name="faster_commands" pkg="faster" type="faster_commands.py" output="screen"/>
+	<node ns="$(arg quad)" name="faster_commands" pkg="faster" type="faster_commands.py" output="screen">
+		<param name="is_ground_robot" type="bool" value="$(arg is_ground_robot)" />
+	</node>
 
 	<!-- Start Rviz -->
-	<node pkg="rviz" type="rviz" name="rviz" args="-d $(find faster)/rviz_cfgs/cvx.rviz"/>
+	<node pkg="rviz" type="rviz" name="rviz" args="-d $(find faster)/rviz_cfgs/cvx_$(arg quad).rviz"/>
 
 	<!-- Start GUI -->
 	<node pkg="rqt_gui" type="rqt_gui" name="rqt_gui" args="--perspective-file $(find faster)/rqt_cfgs/demo_interface.perspective"/>
+
+
 
 </launch>
