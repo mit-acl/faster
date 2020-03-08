@@ -71,12 +71,15 @@ roslaunch faster faster_interface.launch quad:=JA01 is_ground_robot:=true
 roslaunch faster faster.launch quad:=JA01
 ```
 
+Now you can click `Takeoff` in the GUI, and then, in RVIZ, press `G` (or click the option `2D Nav Goal` on the top bar of RVIZ) and click any goal for the ground robot. 
+
+
 ## Architecture:
 
 
 ![](./faster/imgs/diagram.png) 
 
-Note that for the case of a ground robot, we do provide a real simulation 
+Note that for the case of a ground robot, we a real simulation is provided (using the `multi_jackal` package)
 
 
 ## Credits:
