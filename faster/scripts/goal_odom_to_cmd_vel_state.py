@@ -116,6 +116,9 @@ class GoalToCmdVel:
         if (self.state_initialized==False or self.goal_initialized==False):
           return;
 
+        twist=Twist();
+
+
         x = self.goal.pos.x;
         y = self.goal.pos.y;
         xd = self.goal.vel.x;
@@ -135,25 +138,52 @@ class GoalToCmdVel:
 
         dist_error = forward * math.sqrt( (x - self.state.pos.x)**2 + (y - self.state.pos.y)**2  );
 
-        if (dist_error<0.03):
+        if (abs(dist_error)<0.03):
           alpha=0;
 
-        numerator = xd * yd2 - yd * xd2;
-        denominator = xd * xd + yd * yd;
-        w_desired=0.0;
-        if(denominator > 0.01):
-          w_desired=numerator / denominator;
+        vel_norm=LA.norm(np.array([self.goal.vel.x, self.goal.vel.y, self.goal.vel.z]));
 
-        desired_yaw=math.atan2(yd,xd);
+        if (abs(dist_error)<0.10 and vel_norm<0.05): #The robot is just yawing to orient with respect to the goal
 
-        yaw_error = self.current_yaw - desired_yaw;
-        yaw_error=self.wrapPi(yaw_error)
+            yaw_error = self.current_yaw - self.goal.yaw;
+            yaw_error=self.wrapPi(yaw_error)            
+
+            twist.linear.x = 0.0;
+            twist.angular.z = - self.kyaw * yaw_error;
+        else:
+
+            numerator = xd * yd2 - yd * xd2;
+            denominator = xd * xd + yd * yd;
+            w_desired=0.0;
+            if(denominator > 0.01):
+              w_desired=numerator / denominator;
+
+            desired_yaw=math.atan2(yd,xd); #(abs(dist_error)>0.07)*
+            #desired_yaw=math.atan2(yd,xd);
 
 
-        twist=Twist();
+            yaw_error = self.current_yaw - desired_yaw;
+            yaw_error=self.wrapPi(yaw_error)
 
-        twist.linear.x = self.kv * v_desired + self.kdist * dist_error;
-        twist.angular.z = self.kw * w_desired - self.kyaw * yaw_error - self.kalpha * alpha;
+
+            # print " "
+            # self.printAngle(self.goal.yaw,"self.goal.yaw");
+            # self.printAngle(math.atan2(yd,xd),"math.atan2(yd,xd)");
+            # self.printAngle(desired_yaw,"desired_yaw");
+            # self.printAngle(self.current_yaw,"self.current_yaw");
+            # self.printAngle(yaw_error,"yaw_error before wrap");
+            # self.printAngle(yaw_error,"yaw_error");
+
+
+            # self.printAngle(yaw_error,"yaw_error after wrap");
+
+
+
+            twist.linear.x = self.kv * v_desired + self.kdist * dist_error;
+            twist.angular.z = self.kw * w_desired - self.kyaw * yaw_error - self.kalpha * alpha# + self.goal.dyaw;
+
+        # self.printAngle(self.goal.dyaw,"self.goal.dyaw");
+        # print "twist.angular.z", twist.angular.z
 
         # twist.linear.x=self.Kp*(goal.pos.x - self.state.pos.x);
 
@@ -165,6 +195,10 @@ class GoalToCmdVel:
         if(x<0):
             x=x+2 * np.pi
         return x-np.pi   
+
+    def printAngle(self, value, name):
+        print name, '{:.3f}'.format(value), " rad (",'{:.3f}'.format(value*180/3.14), " deg) " 
+
 
 
 
@@ -190,7 +224,7 @@ if __name__ == '__main__':
             rospy.logfatal("This is tyipcally accomplished in a launch file.")
             rospy.logfatal("Command line: ROS_NAMESPACE=mQ01 $ rosrun quad_control joy.py")
         else:
-            print "Starting goal_to_cmd node for: " + ns
+            print "Starting node for: " + ns
             startNode()
     except rospy.ROSInterruptException:
         pass

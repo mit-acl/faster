@@ -75,7 +75,7 @@ is_ground_robot: true
 
 And finally open 4 terminals and execute these commands
 ```
-roslaunch faster jackal.launch
+roslaunch faster ground_robot.launch
 roslaunch global_mapper_ros global_mapper_node.launch quad:=JA01
 roslaunch faster faster_interface.launch quad:=JA01 is_ground_robot:=true
 roslaunch faster faster.launch quad:=JA01
@@ -83,7 +83,6 @@ roslaunch faster faster.launch quad:=JA01
 
 Now you can click `Takeoff` in the GUI, and then, in RVIZ, press `G` (or click the option `2D Nav Goal` on the top bar of RVIZ) and click any goal for the ground robot. 
 
-TODO: Right now the first goal for the ground robot has to be just in front of it. After this, any goal should work. 
 
 
 ## Architecture:
