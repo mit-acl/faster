@@ -41,7 +41,6 @@ class GoalToCmdVel:
         #Publishers
         self.pubCmdVel = rospy.Publisher('jackal_velocity_controller/cmd_vel', Twist, queue_size=1, latch=True)
         self.pubState = rospy.Publisher('state', State, queue_size=1, latch=False)
-        self.state_initialized=False;
 
         #Timers
         self.timer = rospy.Timer(rospy.Duration(0.1), self.cmdVelCB)
@@ -65,7 +64,7 @@ class GoalToCmdVel:
         self.goal.accel.x=0.0;
         self.goal.accel.y=0.0;
 
-
+        self.state_initialized=False;
 
     # def stateCB(self, msg):
     #     self.state.pos.x = msg.pos.x
@@ -95,43 +94,20 @@ class GoalToCmdVel:
 
         self.pubState.publish(self.state)
 
-# Header header
-
-
-# geometry_msgs/Vector3 accel
-# geometry_msgs/Vector3 jerk
-# float64 yaw
-# float64 dyaw
-# bool cut_power
-# bool reset_xy_int
-# bool reset_z_int
-# int8 xy_mode
-# int8 z_mode
-# int8 MODE_POS=0
-# int8 MODE_VEL=1
-# int8 MODE_ACCEL=2
-
-
-
-
-        #self.pose.position.z = msg.pos.z
-        # self.state.quat.x = msg.quat.x
-        # self.state.quat.y = msg.quat.y
-        # self.state.quat.z = msg.quat.z
-        # self.state.quat.w = msg.quat.w
-
         self.state_initialized=True;
 
     def goalCB(self, goal):
 
-        self.goal.pos.x=goal.pos.x;
-        self.goal.pos.y=goal.pos.y;
-        self.goal.pos.z=goal.pos.z;
-        self.goal.vel.x=goal.vel.x;
-        self.goal.vel.y=goal.vel.y;
-        self.goal.vel.z=goal.vel.z;
-        self.goal.accel.x=goal.accel.x;
-        self.goal.accel.y=goal.accel.y;
+        self.goal=goal;
+
+        # self.goal.pos.x=goal.pos.x;
+        # self.goal.pos.y=goal.pos.y;
+        # self.goal.pos.z=goal.pos.z;
+        # self.goal.vel.x=goal.vel.x;
+        # self.goal.vel.y=goal.vel.y;
+        # self.goal.vel.z=goal.vel.z;
+        # self.goal.accel.x=goal.accel.x;
+        # self.goal.accel.y=goal.accel.y;
 
         self.goal_initialized=True;
 
@@ -173,10 +149,6 @@ class GoalToCmdVel:
         yaw_error = self.current_yaw - desired_yaw;
         yaw_error=self.wrapPi(yaw_error)
 
-        # self.goal.x=msg.pos.x
-        # self.goal.y=msg.pos.y
-        # self.goal.z=msg.pos.z
-        # self.goal.yaw=msg.yaw
 
         twist=Twist();
 
@@ -194,37 +166,6 @@ class GoalToCmdVel:
             x=x+2 * np.pi
         return x-np.pi   
 
-
-  # double x = quadGoal_.pos.x;
-  # double y = quadGoal_.pos.y;
-  # double xd = quadGoal_.vel.x;
-  # double yd = quadGoal_.vel.y;
-  # double xd2 = quadGoal_.accel.x;
-  # double yd2 = quadGoal_.accel.y;
-
-  # double v_desired = sqrt(pow(xd, 2) + pow(yd, 2));
-  # double alpha = current_yaw_ - atan2(y - state_.pos.y, x - state_.pos.x);
-  # angle_wrap(alpha);                                                    // wrap between -pi and pi
-  # int forward = (alpha <= 3.14 / 2.0 && alpha > -3.14 / 2.0) ? 1 : -1;  // 1 if forward, -1 if backwards
-  # double dist_error = forward * sqrt(pow(x - state_.pos.x, 2) + pow(y - state_.pos.y, 2));
-  # alpha = (fabs(dist_error) < 0.03) ? 0 : alpha;
-
-
-  # double numerator = xd * yd2 - yd * xd2;
-  # double denominator = xd * xd + yd * yd;
-  # double w_desired = (denominator > 0.01) ? numerator / denominator : 0;
-  # double desired_yaw = (fabs(xd) < 0.001 || fabs(dist_error) < 0.03) ? desired_yaw_old_ : atan2(yd, xd);###############
-
-  # desired_yaw_old_ = desired_yaw;
-  # double yaw_error = current_yaw_ - desired_yaw;
-  # angle_wrap(yaw_error);  // wrap between -pi and pi
-
-
-  # cmd_jackal.linear.x = par_.kv * v_desired + par_.kdist * dist_error;
-  # cmd_jackal.angular.z = par_.kw * w_desired - par_.kyaw * yaw_error - par_.kalpha * alpha;
-
-
-  # pub_goal_jackal_.publish(cmd_jackal);
 
 
 def startNode():
