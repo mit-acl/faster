@@ -37,6 +37,8 @@ class GoalToCmdVel:
 
         self.current_yaw=0.0;
 
+        #Param
+        self.run_controller=rospy.get_param('~run_controller', False);
 
 
         #Publishers
@@ -186,7 +188,8 @@ class GoalToCmdVel:
 
         # twist.linear.x=self.Kp*(goal.pos.x - self.state.pos.x);
 
-        self.pubCmdVel.publish(twist)
+        if(self.run_controller==True):
+            self.pubCmdVel.publish(twist)
 
 
     def wrapPi(self, x):

@@ -1,6 +1,7 @@
 <launch>
 	<arg name="quad" default="SQ01s"/>
 	<arg name="is_ground_robot" default="false"/>
+	<arg name="run_controller" default="false"/>
 	
 	<!-- Start faster commands -->
 	<node ns="$(arg quad)" name="faster_commands" pkg="faster" type="faster_commands.py" output="screen">
@@ -13,6 +14,10 @@
 	<!-- Start GUI -->
 	<node pkg="rqt_gui" type="rqt_gui" name="rqt_gui" args="--perspective-file $(find faster)/rqt_cfgs/demo_interface.perspective"/>
 
+
+	<node ns="$(arg quad)" pkg="faster" type="goal_odom_to_cmd_vel_state.py" name="goal_odom_to_cmd_vel_state" output="screen" />
+		<param name="run_controller" type="bool" value="$(arg run_controller)" />
+	</node>
 
 
 </launch>

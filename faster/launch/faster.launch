@@ -27,10 +27,6 @@
 
 	</node>
 
-<node ns="$(arg quad)" pkg="faster" 
-        type="goal_odom_to_cmd_vel_state.py" 
-        name="goal_odom_to_cmd_vel_state" 
-        output="screen" />
 
 
 </launch>

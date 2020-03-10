@@ -1,10 +1,13 @@
 <launch>
 
 	<arg name="name" default="husky8"/>
+	<arg name="run_controller" default="false"/>
+
 
 	 <include file="$(find faster)/launch/faster_interface.launch">
 	      <arg name="quad" value="$(arg name)"/>
 	      <arg name="is_ground_robot" value="true"/>
+	      <arg name="run_controller" value="false"/>
 	 </include> 
 
 
