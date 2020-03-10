@@ -1,0 +1,15 @@
+<launch>
+
+	<arg name="quad" default="husky8"/>
+
+	 <include file="$(find faster)/launch/faster_interface.launch">
+	      <arg name="quad" value="$(arg name)"/>
+	      <arg name="is_ground_robot" value="true"/>
+	 </include> 
+
+
+	 <include file="$(find faster)/launch/faster.launch">
+	      <arg name="quad" value="$(arg name)"/>
+	 </include> 
+
+</launch>

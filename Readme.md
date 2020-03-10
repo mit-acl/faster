@@ -75,7 +75,7 @@ is_ground_robot: true
 
 And finally open 4 terminals and execute these commands
 ```
-roslaunch faster ground_robot.launch
+roslaunch faster ground_robot_sim.launch
 roslaunch global_mapper_ros global_mapper_node.launch quad:=JA01
 roslaunch faster faster_interface.launch quad:=JA01 is_ground_robot:=true
 roslaunch faster faster.launch quad:=JA01
