@@ -1,6 +1,6 @@
 <launch>
 
-	<arg name="quad" default="husky8"/>
+	<arg name="name" default="husky8"/>
 
 	 <include file="$(find faster)/launch/faster_interface.launch">
 	      <arg name="quad" value="$(arg name)"/>
