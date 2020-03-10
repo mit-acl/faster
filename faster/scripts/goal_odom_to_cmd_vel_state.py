@@ -8,6 +8,7 @@ import math
 from snapstack_msgs.msg import QuadGoal, State
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
+from geometry_msgs.msg import PoseStamped
 from gazebo_msgs.msg import ModelState
 import numpy as np
 from numpy import linalg as LA
@@ -78,19 +79,17 @@ class GoalToCmdVel:
     #     self.state_initialized=True;
 
     def odomCB(self, msg):
-        self.state.pos.x = msg.pose.pose.position.x
-        self.state.pos.y = msg.pose.pose.position.y
-        self.state.pos.z = msg.pose.pose.position.z
+        self.state.pos.x = msg.pose.position.x
+        self.state.pos.y = msg.pose.position.y
+        self.state.pos.z = msg.pose.position.z
 
-        (yaw, _, _)=euler_from_quaternion((msg.pose.pose.orientation.x,msg.pose.pose.orientation.y,msg.pose.pose.orientation.z,msg.pose.pose.orientation.w), "szyx")
+        (yaw, _, _)=euler_from_quaternion((msg.pose.orientation.x,msg.pose.orientation.y,msg.pose.orientation.z,msg.pose.orientation.w), "szyx")
         
         self.current_yaw = yaw;
 
-        self.state.vel = msg.twist.twist.linear
-
-        self.state.quat=msg.pose.pose.orientation;
-
-        self.state.w = msg.twist.twist.angular
+        # self.state.vel = msg.twist.twist.linear
+        # self.state.quat=msg.pose.pose.orientation;
+        # self.state.w = msg.twist.twist.angular
 
         self.pubState.publish(self.state)
 
@@ -209,7 +208,7 @@ def startNode():
     #self.sub_state = rospy.Subscriber("state", State, self.stateCB, queue_size=1)
 
     rospy.Subscriber("goal", QuadGoal, c.goalCB, queue_size=1)
-    rospy.Subscriber("ground_truth/state", Odometry, c.odomCB, queue_size=1) #jackal_velocity_controller/odom   # odometry/local_filtered
+    rospy.Subscriber("pose_topic", PoseStamped, c.odomCB, queue_size=1) #jackal_velocity_controller/odom   # odometry/local_filtered
 
 
     rospy.spin()
