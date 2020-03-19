@@ -100,7 +100,9 @@ Now you can click `Start` in the GUI, and then, in RVIZ, press `G` (or click the
 
 ![](./faster/imgs/diagram.png) 
 
-Note that for the case of a ground robot, a real simulation is provided (using the `multi_jackal` package)
+For the aerial robot, the option 3 is provided (a perfect tracker and a Gazebo simulation to obtain the depth). To make the simulation faster, the physics engine of Gazebo is disabled (see )
+
+For the ground robot, the option 2 is provided (a controller, and a Gazebo simulation with both dynamics and depth (using the `multi_jackal` package)
 
 
 ## Credits:
