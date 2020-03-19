@@ -1,12 +1,9 @@
 #include "faster_ros.hpp"
 #include <sensor_msgs/point_cloud_conversion.h>
 
-// this object is created in the faster_ros_node
-FasterRos::FasterRos(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pub_CB)
-  : nh_(nh), nh_replan_CB_(nh_replan_CB), nh_pub_CB_(nh_pub_CB)
+// This object is created in the faster_ros_node
+FasterRos::FasterRos(ros::NodeHandle nh) : nh_(nh)
 {
-  // fla_utils::SafeGetParam(pnh_, "global_frame", params_.global_frame);
-
   safeGetParam(nh_, "use_ff", par_.use_ff);
   safeGetParam(nh_, "visual", par_.visual);
 
@@ -50,14 +47,6 @@ FasterRos::FasterRos(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::Node
   safeGetParam(nh_, "use_faster", par_.use_faster);
 
   safeGetParam(nh_, "is_ground_robot", par_.is_ground_robot);
-
-  // Parameters for the ground robot (jackal):
-  /*  safeGetParam(nh_,"kw", par_.kw);
-    safeGetParam(nh_,"kyaw", par_.kyaw);
-    safeGetParam(nh_,"kdalpha", par_.kdalpha);
-    safeGetParam(nh_,"kv", par_.kv);
-    safeGetParam(nh_,"kdist", par_.kdist);
-    safeGetParam(nh_,"kalpha", par_.kalpha);*/
 
   // And now obtain the parameters from the mapper
   std::vector<double> world_dimensions;
@@ -153,7 +142,7 @@ FasterRos::FasterRos(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::Node
   // sub_odom_ = nh_.subscribe("odom", 1, &FasterRos::odomCB, this);
 
   // Timers
-  pubCBTimer_ = nh_pub_CB_.createTimer(ros::Duration(par_.dc), &FasterRos::pubCB, this);
+  pubCBTimer_ = nh_.createTimer(ros::Duration(par_.dc), &FasterRos::pubCB, this);
   replanCBTimer_ = nh_.createTimer(ros::Duration(par_.dc), &FasterRos::replanCB, this);
 
   // For now stop all these subscribers/timers until we receive GO
@@ -447,17 +436,6 @@ void FasterRos::pubActualTraj()
   faster_ptr_->getState(current_state);
   Eigen::Vector3d act_pos = current_state.pos;
 
-  /*  // mtx_G.lock();
-    Eigen::Vector3d t_goal = G_;
-    // mtx_G.unlock();
-    float dist_to_goal = (t_goal - act_pos).norm();
-
-    if (dist_to_goal < 2 * par_.goal_radius)
-    {
-      return;
-    }
-  */
-
   visualization_msgs::Marker m;
   m.type = visualization_msgs::Marker::ARROW;
   m.action = visualization_msgs::Marker::ADD;
@@ -477,16 +455,6 @@ void FasterRos::pubActualTraj()
   pub_actual_traj_.publish(m);
   p_last = p;
 }
-
-/*void FasterRos::pubG(state G)
-{
-  geometry_msgs::PointStamped p;
-  p.header.frame_id =world_name_;
-  // mtx_G.lock();
-  p.point = eigen2point(G.pos);
-  // mtx_G.unlock();
-  pub_point_G_.publish(p);
-}*/
 
 void FasterRos::clearMarkerActualTraj()
 {
@@ -554,83 +522,3 @@ void FasterRos::terminalGoalCB(const geometry_msgs::PoseStamped& msg)
   clearMarkerActualTraj();
   // std::cout << "Exiting from goalCB\n";
 }
-
-// Odometry Callback (for the Jackal)
-/*void FasterRos::odomCB(const nav_msgs::Odometry& msg)
-{
-  // ROS_ERROR("In state CB");
-  // printf("(State): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", msg.pos.x, msg.pos.y, msg.pos.z, msg.vel.x, msg.vel.y,
-  //       msg.vel.z);
-
-  mtx_state.lock();
-
-  state state_;
-  state_.setPos(msg.pose.pose.position.x, msg.pose.pose.position.y, msg.pose.pose.position.z);
-  state_.setPos(msg.twist.twist.linear.x, msg.twist.twist.linear.y, msg.twist.twist.linear.z);
-  state_.setAccel(0.0, 0.0, 0.0);
-
-  double roll, pitch, yaw;
-  quaternion2Euler(msg.pose.pose.orientation, roll, pitch, yaw);
-
-  if (state_initialized_ == false)
-  {
-    quadGoal_.pos.x = msg.pose.pose.position.x;
-    quadGoal_.pos.y = msg.pose.pose.position.y;
-    quadGoal_.pos.z = msg.pose.pose.position.z;
-
-    quadGoal_.vel.x = msg.twist.twist.linear.x;
-    quadGoal_.vel.y = msg.twist.twist.linear.y;
-    quadGoal_.vel.z = msg.twist.twist.linear.z;
-
-    quadGoal_.yaw = yaw;
-  }
-
-  state_initialized_ = true;
-  // printf("(State): %0.2f  %0.2f  %0.2f %0.2f  %0.2f  %0.2f\n", msg.pos.x, msg.pos.y, msg.pos.z, msg.vel.x,
-  //     msg.vel.y, msg.vel.z);
-
-  std::cout << bold << red << "IN ODOM CB:" << msg.pose.pose.orientation << reset << std::endl;
-  std::cout << bold << red << "Yaw=" << yaw * 180 / 3.14 << reset << std::endl;
-  current_yaw_ = yaw;
-
-  mtx_state.unlock();
-  // Stop updating when we get GO
-  if (flight_mode_.mode == flight_mode_.NOT_FLYING || flight_mode_.mode == flight_mode_.KILL)
-  {
-    quadGoal_.pos.x = msg.pose.pose.position.x;
-    quadGoal_.pos.y = msg.pose.pose.position.y;
-    quadGoal_.pos.z = msg.pose.pose.position.z;
-
-    quadGoal_.vel.x = msg.twist.twist.linear.x;
-    quadGoal_.vel.y = msg.twist.twist.linear.y;
-    quadGoal_.vel.z = msg.twist.twist.linear.z;
-
-    double roll, pitch, yaw;
-    quaternion2Euler(msg.pose.pose.orientation, roll, pitch, yaw);
-    current_yaw_ = yaw;
-    quadGoal_.yaw = yaw;
-    z_start_ = msg.pose.pose.position.z;
-    z_start_ = std::max(0.0, z_start_);
-    mtx_initial_cond.lock();
-    stateA_.setPos(msg.pose.pose.position.x, msg.pose.pose.position.y, msg.pose.pose.position.z);
-    mtx_initial_cond.unlock();
-  }
-
-  static int i = 0;
-  i++;
-
-  if (status_ != GOAL_REACHED && par_.visual == true)
-  {
-    pubActualTraj();
-  }
-
-  if (i % 10 == 0 && status_ != GOAL_REACHED && i != 0)
-  {
-    Eigen::Vector3d actual_pos(msg.pose.pose.position.x, msg.pose.pose.position.y, msg.pose.pose.position.z);
-    // Don't use the state to compute the total distance (it's very noisy)
-    // log_.total_dist = log_.total_dist + (actual_pos - pos_old_).norm();
-    // pos_old_ = actual_pos;
-  }
-  Eigen::Vector3d vel(msg.twist.twist.linear.x, msg.twist.twist.linear.y, msg.twist.twist.linear.z);
-  log_.veloc_norm = vel.norm();
-}*/

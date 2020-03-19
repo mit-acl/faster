@@ -1,4 +1,4 @@
-#Params for CVX planner
+#Params for FASTER
 
 use_ff: true # use feedforward
 visual: true #publish visualization stuff
@@ -39,16 +39,7 @@ dist_max_vertexes: 1.5 #[m] Maximum distance between two vertexes in the JPS bef
 gurobi_threads: 1 #[threads] Number of threads that Gurobi will use. If computer is maxed out, threads=1 works faster!
 gurobi_verbose: 0 #Verbosity of Gurobi. 0 or 1
 
-use_faster: true  #if false, it will plan only in free space
+use_faster: true  #TODO (this param doesn't work yet) if false, it will plan only in free space
 
 is_ground_robot: false
-
-#Parameters for the ground robot (jackal):
-# kw: 1
-# kyaw: 1.5
-# kdalpha: 0.0
-# kalpha: 3
-# kv: 2
-# kdist: 2
-
 

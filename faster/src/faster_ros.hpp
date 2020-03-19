@@ -46,11 +46,11 @@
 #define JPS_WHOLE 3
 #define JPS_SAFE 4
 
-//####Class CVX
+//####Class FasterRos
 class FasterRos
 {
 public:
-  FasterRos(ros::NodeHandle nh, ros::NodeHandle nh_replan_CB, ros::NodeHandle nh_pub_CB);
+  FasterRos(ros::NodeHandle nh);
 
 private:
   std::unique_ptr<Faster> faster_ptr_;
@@ -120,8 +120,6 @@ private:
   visualization_msgs::Marker setpoint_;
 
   ros::NodeHandle nh_;
-  ros::NodeHandle nh_replan_CB_;
-  ros::NodeHandle nh_pub_CB_;
 
   ros::Publisher pub_goal_jackal_;
   ros::Publisher pub_point_G_;

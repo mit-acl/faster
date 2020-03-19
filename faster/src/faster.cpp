@@ -200,7 +200,7 @@ int Faster::findIndexR(int indexH)
       break;
     }
   }
-  std::cout << red << bold << "indexR=" << indexR << " /" << sg_whole_.X_temp_.size() - 1 << reset << std::endl;
+  std::cout << blue << bold << "indexR=" << indexR << " /" << sg_whole_.X_temp_.size() - 1 << reset << std::endl;
   // std::cout << red << bold << "indexH=" << indexH << " /" << sg_whole_.X_temp_.rows() - 1 << reset << std::endl;
   // mtx_X_U_temp.unlock();
 
@@ -235,7 +235,7 @@ int Faster::findIndexH(bool& needToComputeSafePath)
       }
     }
   }
-  std::cout << red << bold << "indexH=" << indexH << " /" << sg_whole_.X_temp_.size() - 1 << reset << std::endl;
+  std::cout << blue << bold << "indexH=" << indexH << " /" << sg_whole_.X_temp_.size() - 1 << reset << std::endl;
   mtx_unk.unlock();
   mtx_X_U_temp.unlock();
 
@@ -498,7 +498,6 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
   {
     return;
   }
-  std::cout << "After" << std::endl;
 
   sg_whole_.ResetToNormalState();
   sg_safe_.ResetToNormalState();
@@ -526,7 +525,6 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
   {
     changeDroneStatus(DroneStatus::GOAL_REACHED);
   }
-  std::cout << "After2" << std::endl;
 
   // Don't plan if drone is not traveling
   if (drone_status_ == DroneStatus::GOAL_REACHED || (drone_status_ == DroneStatus::YAWING))
@@ -594,7 +592,7 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
     // Convex Decomp around JPS_whole
     MyTimer cvx_ellip_decomp_t(true);
     jps_manager_.cvxEllipsoidDecomp(JPS_whole, OCCUPIED_SPACE, l_constraints_whole_, poly_whole_out);
-    std::cout << "poly_whole_out= " << poly_whole_out.size() << std::endl;
+    // std::cout << "poly_whole_out= " << poly_whole_out.size() << std::endl;
 
     // Check if G is inside poly_whole
     bool isGinside_whole = l_constraints_whole_[l_constraints_whole_.size() - 1].inside(G.pos);
@@ -605,11 +603,12 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
     sg_whole_.setXf(E);
     sg_whole_.setPolytopes(l_constraints_whole_);
 
-    std::cout << "Initial Position is inside= " << l_constraints_whole_[l_constraints_whole_.size() - 1].inside(A.pos)
-              << std::endl;
-    std::cout << "Final Position is inside= " << l_constraints_whole_[l_constraints_whole_.size() - 1].inside(E.pos)
-              << std::endl;
-
+    /*    std::cout << "Initial Position is inside= " << l_constraints_whole_[l_constraints_whole_.size() -
+       1].inside(A.pos)
+                  << std::endl;
+        std::cout << "Final Position is inside= " << l_constraints_whole_[l_constraints_whole_.size() - 1].inside(E.pos)
+                  << std::endl;
+    */
     // Solve with Gurobi
     MyTimer whole_gurobi_t(true);
     bool solved_whole = sg_whole_.genNewTraj();
@@ -741,7 +740,6 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
   ///////////////////////////////////////////////////////////
   ///////////////       Append RESULTS    ////////////////////
   ///////////////////////////////////////////////////////////
-  std::cout << "Going to append" << std::endl;
 
   if (appendToPlan(k_end_whole, sg_whole_.X_temp_, k_safe, sg_safe_.X_temp_) != true)
   {
@@ -760,10 +758,10 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
 
   // Check if we have planned until G_term
   state F = plan_.back();  // Final point of the safe path (\equiv final point of the comitted path)
-  std::cout << "F is " << std::endl;
-  F.print();
+
+  // F.print();
   double dist = (G_term_.pos - F.pos).norm();
-  std::cout << "Computed norm" << std::endl;
+
   if (dist < par_.goal_radius)
   {
     changeDroneStatus(DroneStatus::GOAL_SEEN);
@@ -803,11 +801,10 @@ bool Faster::appendToPlan(int k_end_whole, const std::vector<state>& whole, int 
 {
   mtx_plan_.lock();
 
-  std::cout << "Erasing" << std::endl;
   bool output;
   int plan_size = plan_.size();
-  std::cout << "plan_.size()= " << plan_.size() << std::endl;
-  std::cout << "plan_size - k_end_whole = " << plan_size - k_end_whole << std::endl;
+  /*  std::cout << "plan_.size()= " << plan_.size() << std::endl;
+    std::cout << "plan_size - k_end_whole = " << plan_size - k_end_whole << std::endl;*/
   if ((plan_size - 1 - k_end_whole) < 0)
   {
     std::cout << bold << red << "Already publised the point A" << reset << std::endl;
@@ -815,28 +812,27 @@ bool Faster::appendToPlan(int k_end_whole, const std::vector<state>& whole, int 
   }
   else
   {
-    std::cout << "(plan_.size() - k_end_whole)= " << (plan_.size() - k_end_whole) << std::endl;
-    std::cout << "plan_.size()= " << plan_.size() << std::endl;
-    std::cout << "k_end_whole)= " << k_end_whole << std::endl;
+    /*    std::cout << "(plan_.size() - k_end_whole)= " << (plan_.size() - k_end_whole) << std::endl;
+        std::cout << "plan_.size()= " << plan_.size() << std::endl;
+        std::cout << "k_end_whole)= " << k_end_whole << std::endl;*/
 
     plan_.erase(plan_.end() - k_end_whole - 1, plan_.end());
 
-    std::cout << "Erased" << std::endl;
-
-    std::cout << "k_safe = " << k_safe << std::endl;
-    std::cout << "whole.size() = " << whole.size() << std::endl;
+    /*    std::cout << "Erased" << std::endl;
+        std::cout << "k_safe = " << k_safe << std::endl;
+        std::cout << "whole.size() = " << whole.size() << std::endl;*/
     for (int i = 0; i <= k_safe; i++)
     {
       plan_.push_back(whole[i]);
     }
 
-    std::cout << "k_safe = " << k_safe << std::endl;
-    std::cout << "whole.size() = " << whole.size() << std::endl;
+    /*    std::cout << "k_safe = " << k_safe << std::endl;
+        std::cout << "whole.size() = " << whole.size() << std::endl;*/
     for (int i = 0; i < safe.size(); i++)
     {
       plan_.push_back(safe[i]);
     }
-    std::cout << "Pushed everything back" << std::endl;
+    // std::cout << "Pushed everything back" << std::endl;
 
     output = true;
   }

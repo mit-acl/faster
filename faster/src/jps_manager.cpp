@@ -115,7 +115,6 @@ void JPS_Manager::cvxEllipsoidDecomp(vec_Vecf<3>& path, int type_space, std::vec
 
     l_constraints.push_back(cs);
   }
-  std::cout << "z_groud=" << z_ground_ << std::endl;
   poly_out = ellip_decomp_util_.get_polyhedrons();
 }
 
