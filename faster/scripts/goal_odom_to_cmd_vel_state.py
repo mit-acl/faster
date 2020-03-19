@@ -1,6 +1,12 @@
 #!/usr/bin/env python
 
-#Jesus Tordesillas Torres, March 2020
+# /* ----------------------------------------------------------------------------
+#  * Copyright 2020, Jesus Tordesillas Torres, Aerospace Controls Laboratory
+#  * Massachusetts Institute of Technology
+#  * All Rights Reserved
+#  * Authors: Jesus Tordesillas, et al.
+#  * See LICENSE file for the license information
+#  * -------------------------------------------------------------------------- */
 
 import roslib
 import rospy
@@ -222,7 +228,6 @@ if __name__ == '__main__':
         if str(ns) == '/':
             rospy.logfatal("Need to specify namespace as vehicle name.")
             rospy.logfatal("This is tyipcally accomplished in a launch file.")
-            rospy.logfatal("Command line: ROS_NAMESPACE=mQ01 $ rosrun quad_control joy.py")
         else:
             print "Starting node for: " + ns
             startNode()

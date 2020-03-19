@@ -1,6 +1,12 @@
 #!/usr/bin/env python
 
-#Jesus Tordesillas Torres, December 2019
+# /* ----------------------------------------------------------------------------
+#  * Copyright 2020, Jesus Tordesillas Torres, Aerospace Controls Laboratory
+#  * Massachusetts Institute of Technology
+#  * All Rights Reserved
+#  * Authors: Jesus Tordesillas, et al.
+#  * See LICENSE file for the license information
+#  * -------------------------------------------------------------------------- */
 
 import rospy
 from faster_msgs.msg import Mode
@@ -14,7 +20,7 @@ def quat2yaw(q):
                      1 - 2 * (q.y * q.y + q.z * q.z))
     return yaw
 
-class Behavior_Selector:
+class Faster_Commands:
 
     def __init__(self):
         self.mode=Mode();
@@ -122,12 +128,12 @@ class Behavior_Selector:
 
                   
 def startNode():
-    c = Behavior_Selector()
+    c = Faster_Commands()
     s = rospy.Service("/change_mode",MissionModeChange,c.srvCB)
     rospy.Subscriber("state", State, c.stateCB)
     rospy.spin()
 
 if __name__ == '__main__':
-    rospy.init_node('behavior_selector')  
+    rospy.init_node('faster_commands')  
     startNode()
-    print "Behavior selector started" 
+    print "Faster Commands started" 
