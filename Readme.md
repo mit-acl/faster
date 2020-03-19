@@ -13,6 +13,11 @@ Code used for the paper **FASTER: Fast and Safe Trajectory Planner for Flights i
 
 ```
 
+Flip in roll               |  Flip in pitch            | 
+:-------------------------:|:-------------------------:|
+![](./imgs/uav_sim.gif)       |  ![](./imgs/gr_sim.gif)  |  
+
+
 ## General Setup
 Install [Gurobi](https://www.gurobi.com/) (you can test your installation typing `gurobi.sh` in the terminal).
 
