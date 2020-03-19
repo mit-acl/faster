@@ -13,10 +13,10 @@ Code used for the paper **FASTER: Fast and Safe Trajectory Planner for Flights i
 
 ```
 
-                          |UAV               |  Ground Robot           | 
+                          |          UAV               |  Ground Robot           | 
 :-------------------------:|:-------------------------:|:-------------------------:|
-Sim   |    ![](./faster/imgs/uav_sim.gif)       |  ![](./faster/imgs/gr_sim.gif)  |  
-:-------------------------:|:-------------------------:|
+Sim      |    ![](./faster/imgs/uav_sim.gif)       |  ![](./faster/imgs/gr_sim.gif)  |  
+:-------------------------:|:-------------------------:|:-------------------------:|
 HW |   ![](./faster/imgs/uav_hw.gif)       |  ![](./faster/imgs/gr_hw.gif)  |  
 
 
