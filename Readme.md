@@ -40,7 +40,7 @@ wstool merge ./faster/faster/install/faster.rosinstall
 
 ```
 
-If you are using Gurobi X.Y instead of Gurobi 8.1, you should change the file `libgurobi81.so` to `libgurobiXY.so` in the [CMakeLists.txt](https://github.com/mit-acl/faster/blob/master/faster/CMakeLists.txt).
+If you are using Gurobi X.Y instead of Gurobi 8.1, you should change the name `libgurobi81.so` to `libgurobiXY.so` in the [CMakeLists.txt](https://github.com/mit-acl/faster/blob/master/faster/CMakeLists.txt).
 
 
 ### Instructions to use FASTER with an aerial robot:
