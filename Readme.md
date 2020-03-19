@@ -42,6 +42,10 @@ wstool merge ./faster/faster/install/faster.rosinstall
 
 If you are using Gurobi X.Y instead of Gurobi 8.1, you should change the name `libgurobi81.so` to `libgurobiXY.so` in the [CMakeLists.txt](https://github.com/mit-acl/faster/blob/master/faster/CMakeLists.txt).
 
+In the following, remember (once the workspace is compiled) to add this to your `~/.bashrc`:
+```
+source PATH_TO_YOUR_WS/devel/setup.bash
+``` 
 
 ### Instructions to use FASTER with an aerial robot:
 
@@ -52,11 +56,6 @@ wstool update -j8
 cd ..
 catkin config -DCMAKE_BUILD_TYPE=Release
 catkin build
-```
-
-Now you may want to add this to your `~/.bashrc`:
-```
-source PATH_TO_YOUR_WS/devel/setup.bash
 ```
 
 And finally open 5 terminals and execute these commands:
@@ -85,10 +84,6 @@ catkin config -DCMAKE_BUILD_TYPE=Release
 catkin build
 ```
 
-Now you may want to add this to your `~/.bashrc`:
-```
-source PATH_TO_YOUR_WS/devel/setup.bash
-```
 
 Then, in [`faster.yaml`](https://github.com/mit-acl/faster/tree/master/faster/param), change these parameters:
 ```
