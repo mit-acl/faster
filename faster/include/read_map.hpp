@@ -1,3 +1,5 @@
+// This file is a mofified version of https://github.com/sikang/motion_primitive_library/blob/master/test/read_map.hpp
+
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <yaml-cpp/yaml.h>
