@@ -31,7 +31,7 @@ Install the following dependencies:
 sudo apt-get install ros-kinetic-gazebo-ros-pkgs ros-kinetic-mavros-msgs ros-kinetic-tf2-sensor-msgs
 ```
 
-Create a workspace, clone this repo and its dependencies, and compile the workspace:
+Create a workspace, and clone this repo and its dependencies:
 ```
 mkdir ws && cd ws && mkdir src && cd src
 git clone https://github.com/mit-acl/faster.git
@@ -39,6 +39,9 @@ wstool init
 wstool merge ./faster/faster/install/faster.rosinstall
 
 ```
+
+If you are using Gurobi X.Y instead of Gurobi 8.1, you should change the file `libgurobi81.so` to `libgurobiXY.so` in the [CMakeLists.txt](https://github.com/mit-acl/faster/blob/master/faster/CMakeLists.txt).
+
 
 ### Instructions to use FASTER with an aerial robot:
 
