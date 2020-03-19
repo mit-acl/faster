@@ -5,7 +5,7 @@
 
 UAV               |  Ground Robot           | 
 :-------------------------:|:-------------------------:|
-[![ICRA 2019: Real-Time Planning with Multi-Fidelity Models for Agile Flights in Unkonwn Environments](https://img.youtube.com/vi/E4V2_B8x-UI/0.jpg)](https://www.youtube.com/watch?v=E4V2_B8x-UI "ICRA 2019: Real-Time Planning with Multi-Fidelity Models for Agile Flights in Unkonwn Environments")      |  ![](./faster/imgs/gr_sim.gif)  |  
+[![ICRA 2019: Real-Time Planning with Multi-Fidelity Models for Agile Flights in Unkonwn Environments](./faster/imgs/uav_sim.gif)](https://www.youtube.com/watch?v=E4V2_B8x-UI "ICRA 2019: Real-Time Planning with Multi-Fidelity Models for Agile Flights in Unkonwn Environments")      |  ![](./faster/imgs/gr_sim.gif)  |  
 ![](./faster/imgs/uav_hw.gif)       |  ![](./faster/imgs/gr_hw.gif)  |  
 
 Code used for the paper **FASTER: Fast and Safe Trajectory Planner for Flights in Unknown Environments** (IROS 2019) ([pdf](https://arxiv.org/abs/1903.03558), [video](https://www.youtube.com/watch?v=gwV0YRs5IWs))
