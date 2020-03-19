@@ -5,7 +5,6 @@
  * Authors: Jesus Tordesillas, et al.
  * See LICENSE file for the license information
  * -------------------------------------------------------------------------- */
-    .
 
 #pragma once
 #ifndef SOLVER_GUROBI_UTILS_HPP
@@ -15,10 +14,9 @@
 #include <sstream>
 #include <Eigen/Dense>
 #include <type_traits>
-    // using namespace std;
+// using namespace std;
 
-    inline double
-    MinPositiveElement(std::vector<double> v)
+inline double MinPositiveElement(std::vector<double> v)
 {
   std::sort(v.begin(), v.end());  // sorted in ascending order
   double min_value = 0;
