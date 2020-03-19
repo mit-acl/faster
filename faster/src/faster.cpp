@@ -208,7 +208,7 @@ int Faster::findIndexR(int indexH)
       break;
     }
   }
-  std::cout << blue << bold << "indexR=" << indexR << " /" << sg_whole_.X_temp_.size() - 1 << reset << std::endl;
+  std::cout << blue << "indexR=" << indexR << " /" << sg_whole_.X_temp_.size() - 1 << reset << std::endl;
   // std::cout << red << bold << "indexH=" << indexH << " /" << sg_whole_.X_temp_.rows() - 1 << reset << std::endl;
   // mtx_X_U_temp.unlock();
 
@@ -243,7 +243,7 @@ int Faster::findIndexH(bool& needToComputeSafePath)
       }
     }
   }
-  std::cout << blue << bold << "indexH=" << indexH << " /" << sg_whole_.X_temp_.size() - 1 << reset << std::endl;
+  std::cout << blue << "indexH=" << indexH << " /" << sg_whole_.X_temp_.size() - 1 << reset << std::endl;
   mtx_unk.unlock();
   mtx_X_U_temp.unlock();
 
@@ -298,7 +298,6 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
                     std::vector<state>& X_whole_out)
 {
   MyTimer replanCB_t(true);
-  std::cout << "In replanCB" << std::endl;
   if (initializedAllExceptPlanner() == false)
   {
     return;
@@ -589,6 +588,8 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
   sg_safe_.setFactorInitialAndFinalAndIncrement(new_init_safe, new_final_safe, par_.increment_safe);
 
   planner_initialized_ = true;
+
+  std::cout << bold << blue << "Replanning took " << replanCB_t.ElapsedMs() << " ms" << reset << std::endl;
 
   return;
 }

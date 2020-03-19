@@ -24,7 +24,12 @@ Code used for the paper **FASTER: Fast and Safe Trajectory Planner for Flights i
 
 
 ## General Setup
-Install [Gurobi](https://www.gurobi.com/) (you can test your installation typing `gurobi.sh` in the terminal).
+Install [Gurobi](https://www.gurobi.com/). You can test your installation typing `gurobi.sh` in the terminal. Have a look at [this section](#issues-when-installing-gurobi) if you have any issues.
+
+Install the following dependencies:
+```
+sudo apt-get install ros-kinetic-gazebo-ros-pkgs ros-kinetic-mavros-msgs ros-kinetic-tf2-sensor-msgs
+```
 
 Create a workspace, clone this repo and its dependencies, and compile the workspace:
 ```
@@ -60,7 +65,7 @@ Now you can click `Start` in the GUI, and then, in RVIZ, press `G` (or click the
 
 Install the following dependencies:
 ```
-sudo apt-get install ros-kinetic-robot-localization ros-kinetic-lms1xx ros-kinetic-interactive-marker-twist-server ros-kinetic-hector-gazebo-plugins ros-kinetic-move-base ros-kinetic-ros-control ros-kinetic-ros-controllers ros-kinetic-pointgrey-camera-description ros-kinetic-hardware-interface ros-kinetic-message-to-tf ros-kinetic-gazebo-ros-control
+sudo apt-get install ros-kinetic-control-toolbox ros-kinetic-ros-control ros-kinetic-robot-localization ros-kinetic-lms1xx ros-kinetic-interactive-marker-twist-server ros-kinetic-hector-gazebo-plugins ros-kinetic-move-base ros-kinetic-ros-control ros-kinetic-ros-controllers ros-kinetic-pointgrey-camera-description ros-kinetic-hardware-interface ros-kinetic-message-to-tf ros-kinetic-gazebo-ros-control
 ```
 Then download the ground_robot-specific packages and compile the repo:
 
@@ -72,13 +77,15 @@ catkin config -DCMAKE_BUILD_TYPE=Release
 catkin build
 ```
 
-Then, in `faster.yaml`, change these parameters:
+Then, in [`faster.yaml`](https://github.com/mit-acl/faster/tree/master/faster/param), change these parameters:
 ```
-drone_radius: 0.5
+drone_radius: 0.5  #[m]
 
-v_max: 1.4   #[m/s]  
-a_max: 1.4   #[m/s2] 
-j_max: 5.0   #[m/s3]
+z_max: 0.5         #[m] 
+
+v_max: 1.4         #[m/s]  
+a_max: 1.4         #[m/s2] 
+j_max: 5.0         #[m/s3]
 
 is_ground_robot: true  
 ```
@@ -109,6 +116,19 @@ For the ground robot, the option 2 is provided (a controller, and a Gazebo simul
 This package uses code from the [JPS3D](https://github.com/KumarRobotics/jps3d) and [DecompROS](https://github.com/sikang/DecompROS) repos (included in the `thirdparty` folder), so credit to them as well. 
 
 
+## Issues when installing Gurobi:
 
+If you find the error:
+```
+“gurobi_continuous.cpp:(.text.startup+0x74): undefined reference to
+`GRBModel::set(GRB_StringAttr, std::__cxx11::basic_string<char,
+std::char_traits<char>, std::allocator<char> > const&)'”
+```
+The solution is:
 
+```bash
+cd /opt/gurobi800/linux64/src/build  #Note that the name of the folder gurobi800 changes according to the Gurobi version
+sudo make
+sudo cp libgurobi_c++.a ../../lib/
+```
 
