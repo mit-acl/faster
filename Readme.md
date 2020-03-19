@@ -54,7 +54,7 @@ roslaunch global_mapper_ros global_mapper_node.launch
 roslaunch faster faster_interface.launch
 roslaunch faster faster.launch
 ```
-Now you can click `Takeoff` in the GUI, and then, in RVIZ, press `G` (or click the option `2D Nav Goal` on the top bar of RVIZ) and click any goal for the drone. 
+Now you can click `Start` in the GUI, and then, in RVIZ, press `G` (or click the option `2D Nav Goal` on the top bar of RVIZ) and click any goal for the drone. 
 
 ### Instructions to use FASTER with a ground robot:
 
@@ -91,7 +91,7 @@ roslaunch faster faster_interface.launch quad:=JA01 is_ground_robot:=true
 roslaunch faster faster.launch quad:=JA01
 ```
 
-Now you can click `Takeoff` in the GUI, and then, in RVIZ, press `G` (or click the option `2D Nav Goal` on the top bar of RVIZ) and click any goal for the ground robot. 
+Now you can click `Start` in the GUI, and then, in RVIZ, press `G` (or click the option `2D Nav Goal` on the top bar of RVIZ) and click any goal for the ground robot. 
 
 
 
