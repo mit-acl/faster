@@ -242,209 +242,6 @@ int Faster::findIndexH(bool& needToComputeSafePath)
   return indexH;
 }
 
-bool Faster::ARisInFreeSpace(int index)
-{  // We have to check only against the unkown space (A-R won't intersect the obstacles for sure)
-
-  // std::cout << "In ARisInFreeSpace, radius_drone= " << par_.drone_radius << std::endl;
-  int n = 1;  // find one neighbour
-
-  std::vector<int> pointIdxNKNSearch(n);
-  std::vector<float> pointNKNSquaredDistance(n);
-
-  bool isFree = true;
-
-  // std::cout << "Before mtx_unk" << std::endl;
-  mtx_unk.lock();
-  mtx_X_U_temp.lock();
-  // std::cout << "After mtx_unk. index=" << index << std::endl;
-  for (int i = 0; i < index; i = i + 10)
-  {  // Sample points along the trajectory
-     // std::cout << "i=" << i << std::endl;
-    Eigen::Vector3d tmp = sg_whole_.X_temp_[i].pos;
-    pcl::PointXYZ searchPoint(tmp(0), tmp(1), tmp(2));
-
-    if (kdtree_unk_.nearestKSearch(searchPoint, n, pointIdxNKNSearch, pointNKNSquaredDistance) > 0)
-    {
-      if (sqrt(pointNKNSquaredDistance[0]) < 0.2)
-      {  // TODO: 0.2 is the radius of the drone.
-        std::cout << "A->R collides, with d=" << sqrt(pointNKNSquaredDistance[0])
-                  << ", radius_drone=" << par_.drone_radius << std::endl;
-        isFree = false;
-        break;
-      }
-    }
-  }
-
-  mtx_unk.unlock();
-  mtx_X_U_temp.unlock();
-
-  return isFree;
-}
-
-// Returns the first collision of JPS with the map (i.e. with the known obstacles). Note that JPS will collide with a
-// map B if JPS was computed using an older map A
-// If type_return==Intersection, it returns the last point in the JPS path that is at least par_.inflation_jps from map
-Eigen::Vector3d Faster::getFirstCollisionJPS(vec_Vecf<3>& path, bool* thereIsIntersection, int map, int type_return)
-{
-  vec_Vecf<3> original = path;
-
-  Eigen::Vector3d first_element = path[0];
-  Eigen::Vector3d last_search_point = path[0];
-  Eigen::Vector3d inters = path[0];
-  pcl::PointXYZ pcl_search_point = eigenPoint2pclPoint(path[0]);
-
-  Eigen::Vector3d result;
-
-  // occupied (map)
-  int n = 1;
-  std::vector<int> id_map(n);
-  std::vector<float> dist2_map(n);  // squared distance
-  double r = 1000000;
-  // printElementsOfJPS(path);
-  // printf("In 2\n");
-
-  mtx_map.lock();
-  mtx_unk.lock();
-
-  // Find the next eig_search_point
-  int last_id = -1;  // this is the last index inside the sphere
-  int iteration = 0;
-  while (path.size() > 0)
-  {
-    // std::cout<<red<<"New Iteration, iteration="<<iteration<<reset<<std::endl;
-    // std::cout << red << "Searching from point=" << path[0].transpose() << reset << std::endl;
-    pcl_search_point = eigenPoint2pclPoint(path[0]);
-
-    int number_of_neigh;
-
-    if (map == MAP)
-    {
-      number_of_neigh = kdtree_map_.nearestKSearch(pcl_search_point, n, id_map, dist2_map);
-    }
-    else  // map == UNKNOWN_MAP
-    {
-      number_of_neigh = kdtree_unk_.nearestKSearch(pcl_search_point, n, id_map, dist2_map);
-      // std::cout << "In unknown_map, number of neig=" << number_of_neigh << std::endl;
-    }
-    // printf("************NearestSearch: TotalTime= %0.2f ms\n", 1000 * (ros::Time::now().toSec() - before));
-
-    if (number_of_neigh > 0)
-    {
-      r = sqrt(dist2_map[0]);
-
-      // std::cout << "r=" << r << std::endl;
-      // std::cout << "Point=" << r << std::endl;
-
-      if (r < par_.drone_radius)  // collision of the JPS path and an inflated obstacle --> take last search point
-      {
-        // std::cout << "Collision detected" << std::endl;  // We will return the search_point
-        // pubJPSIntersection(inters);
-        // inters = path[0];  // path[0] is the search_point I'm using.
-        if (iteration == 0)
-        {
-          std::cout << red << bold << "The first point is in collision --> Hacking" << reset << std::endl;
-        }
-        switch (type_return)
-        {
-          case RETURN_LAST_VERTEX:
-            result = last_search_point;
-            break;
-          case RETURN_INTERSECTION:
-            if (iteration == 0)
-            {  // Hacking (TODO)
-              Eigen::Vector3d tmp;
-              tmp << original[0](0) + 0.01, original[0](1), original[0](2);
-              path.clear();
-              path.push_back(original[0]);
-              path.push_back(tmp);
-              result = path[path.size() - 1];
-              // result=original[original.size() - 1];
-            }
-            else
-            {
-              // std::cout << "In Return Intersection, last_id=" << last_id<<el_eliminated<< std::endl;
-              int vertexes_eliminated_tmp = original.size() - path.size() + 1;
-              // std::cout << "In Return Intersection, vertexes_eliminated_tmp=" << vertexes_eliminated_tmp <<
-              // std::endl;
-              original.erase(original.begin() + vertexes_eliminated_tmp,
-                             original.end());  // Now original contains all the elements eliminated
-              original.push_back(path[0]);
-
-              /*              std::cout << "Result before reduceJPSbyDistance" << original[original.size() -
-                 1].transpose()
-                                      << std::endl;*/
-
-              // This is to force the intersection point to be at least par_.drone_radius away from the obstacles
-              reduceJPSbyDistance(original, par_.drone_radius);
-
-              result = original[original.size() - 1];
-
-              // std::cout<<"Result here is"<<result.transpose()<<std::endl;
-
-              path = original;
-            }
-            // Copy the resulting path to the reference
-            /*     std::reverse(original.begin(), original.end());  // flip all the vector
-               result = getFirstIntersectionWithSphere(original, par_.inflation_jps, original[0]);*/
-            break;
-        }
-
-        *thereIsIntersection = true;
-
-        break;  // Leave the while loop
-      }
-
-      bool no_points_outside_sphere = false;
-
-      inters = getFirstIntersectionWithSphere(path, r, path[0], &last_id, &no_points_outside_sphere);
-      // printf("**********Found it*****************\n");
-      if (no_points_outside_sphere == true)
-      {  // JPS doesn't intersect with any obstacle
-        *thereIsIntersection = false;
-        /*        std::cout << "JPS provided doesn't intersect any obstacles, returning the first element of the path
-           you gave " "me\n"
-                          << std::endl;*/
-        result = first_element;
-
-        if (type_return == RETURN_INTERSECTION)
-        {
-          result = original[original.size() - 1];
-          path = original;
-        }
-
-        break;  // Leave the while loop
-      }
-      // printf("In 4\n");
-
-      last_search_point = path[0];
-      // Remove all the points of the path whose id is <= to last_id:
-      path.erase(path.begin(), path.begin() + last_id + 1);
-
-      // and add the intersection as the first point of the path
-      path.insert(path.begin(), inters);
-    }
-    else
-    {  // There is no neighbours
-      *thereIsIntersection = false;
-      ROS_INFO("JPS provided doesn't intersect any obstacles, returning the first element of the path you gave me\n");
-      result = first_element;
-
-      if (type_return == RETURN_INTERSECTION)
-      {
-        result = original[original.size() - 1];
-        path = original;
-      }
-
-      break;
-    }
-    iteration = iteration + 1;
-  }
-  mtx_map.unlock();
-  mtx_unk.unlock();
-
-  return result;
-}
-
 void Faster::updateState(state data)
 {
   state_ = data;
@@ -914,6 +711,209 @@ bool Faster::getNextGoal(state& next_goal)
   mtx_goals.unlock();
   mtx_plan_.unlock();
   return true;
+}
+
+bool Faster::ARisInFreeSpace(int index)
+{  // We have to check only against the unkown space (A-R won't intersect the obstacles for sure)
+
+  // std::cout << "In ARisInFreeSpace, radius_drone= " << par_.drone_radius << std::endl;
+  int n = 1;  // find one neighbour
+
+  std::vector<int> pointIdxNKNSearch(n);
+  std::vector<float> pointNKNSquaredDistance(n);
+
+  bool isFree = true;
+
+  // std::cout << "Before mtx_unk" << std::endl;
+  mtx_unk.lock();
+  mtx_X_U_temp.lock();
+  // std::cout << "After mtx_unk. index=" << index << std::endl;
+  for (int i = 0; i < index; i = i + 10)
+  {  // Sample points along the trajectory
+     // std::cout << "i=" << i << std::endl;
+    Eigen::Vector3d tmp = sg_whole_.X_temp_[i].pos;
+    pcl::PointXYZ searchPoint(tmp(0), tmp(1), tmp(2));
+
+    if (kdtree_unk_.nearestKSearch(searchPoint, n, pointIdxNKNSearch, pointNKNSquaredDistance) > 0)
+    {
+      if (sqrt(pointNKNSquaredDistance[0]) < 0.2)
+      {  // TODO: 0.2 is the radius of the drone.
+        std::cout << "A->R collides, with d=" << sqrt(pointNKNSquaredDistance[0])
+                  << ", radius_drone=" << par_.drone_radius << std::endl;
+        isFree = false;
+        break;
+      }
+    }
+  }
+
+  mtx_unk.unlock();
+  mtx_X_U_temp.unlock();
+
+  return isFree;
+}
+
+// Returns the first collision of JPS with the map (i.e. with the known obstacles). Note that JPS will collide with a
+// map B if JPS was computed using an older map A
+// If type_return==Intersection, it returns the last point in the JPS path that is at least par_.inflation_jps from map
+Eigen::Vector3d Faster::getFirstCollisionJPS(vec_Vecf<3>& path, bool* thereIsIntersection, int map, int type_return)
+{
+  vec_Vecf<3> original = path;
+
+  Eigen::Vector3d first_element = path[0];
+  Eigen::Vector3d last_search_point = path[0];
+  Eigen::Vector3d inters = path[0];
+  pcl::PointXYZ pcl_search_point = eigenPoint2pclPoint(path[0]);
+
+  Eigen::Vector3d result;
+
+  // occupied (map)
+  int n = 1;
+  std::vector<int> id_map(n);
+  std::vector<float> dist2_map(n);  // squared distance
+  double r = 1000000;
+  // printElementsOfJPS(path);
+  // printf("In 2\n");
+
+  mtx_map.lock();
+  mtx_unk.lock();
+
+  // Find the next eig_search_point
+  int last_id = -1;  // this is the last index inside the sphere
+  int iteration = 0;
+  while (path.size() > 0)
+  {
+    // std::cout<<red<<"New Iteration, iteration="<<iteration<<reset<<std::endl;
+    // std::cout << red << "Searching from point=" << path[0].transpose() << reset << std::endl;
+    pcl_search_point = eigenPoint2pclPoint(path[0]);
+
+    int number_of_neigh;
+
+    if (map == MAP)
+    {
+      number_of_neigh = kdtree_map_.nearestKSearch(pcl_search_point, n, id_map, dist2_map);
+    }
+    else  // map == UNKNOWN_MAP
+    {
+      number_of_neigh = kdtree_unk_.nearestKSearch(pcl_search_point, n, id_map, dist2_map);
+      // std::cout << "In unknown_map, number of neig=" << number_of_neigh << std::endl;
+    }
+    // printf("************NearestSearch: TotalTime= %0.2f ms\n", 1000 * (ros::Time::now().toSec() - before));
+
+    if (number_of_neigh > 0)
+    {
+      r = sqrt(dist2_map[0]);
+
+      // std::cout << "r=" << r << std::endl;
+      // std::cout << "Point=" << r << std::endl;
+
+      if (r < par_.drone_radius)  // collision of the JPS path and an inflated obstacle --> take last search point
+      {
+        // std::cout << "Collision detected" << std::endl;  // We will return the search_point
+        // pubJPSIntersection(inters);
+        // inters = path[0];  // path[0] is the search_point I'm using.
+        if (iteration == 0)
+        {
+          std::cout << red << bold << "The first point is in collision --> Hacking" << reset << std::endl;
+        }
+        switch (type_return)
+        {
+          case RETURN_LAST_VERTEX:
+            result = last_search_point;
+            break;
+          case RETURN_INTERSECTION:
+            if (iteration == 0)
+            {  // Hacking (TODO)
+              Eigen::Vector3d tmp;
+              tmp << original[0](0) + 0.01, original[0](1), original[0](2);
+              path.clear();
+              path.push_back(original[0]);
+              path.push_back(tmp);
+              result = path[path.size() - 1];
+              // result=original[original.size() - 1];
+            }
+            else
+            {
+              // std::cout << "In Return Intersection, last_id=" << last_id<<el_eliminated<< std::endl;
+              int vertexes_eliminated_tmp = original.size() - path.size() + 1;
+              // std::cout << "In Return Intersection, vertexes_eliminated_tmp=" << vertexes_eliminated_tmp <<
+              // std::endl;
+              original.erase(original.begin() + vertexes_eliminated_tmp,
+                             original.end());  // Now original contains all the elements eliminated
+              original.push_back(path[0]);
+
+              /*              std::cout << "Result before reduceJPSbyDistance" << original[original.size() -
+                 1].transpose()
+                                      << std::endl;*/
+
+              // This is to force the intersection point to be at least par_.drone_radius away from the obstacles
+              reduceJPSbyDistance(original, par_.drone_radius);
+
+              result = original[original.size() - 1];
+
+              // std::cout<<"Result here is"<<result.transpose()<<std::endl;
+
+              path = original;
+            }
+            // Copy the resulting path to the reference
+            /*     std::reverse(original.begin(), original.end());  // flip all the vector
+               result = getFirstIntersectionWithSphere(original, par_.inflation_jps, original[0]);*/
+            break;
+        }
+
+        *thereIsIntersection = true;
+
+        break;  // Leave the while loop
+      }
+
+      bool no_points_outside_sphere = false;
+
+      inters = getFirstIntersectionWithSphere(path, r, path[0], &last_id, &no_points_outside_sphere);
+      // printf("**********Found it*****************\n");
+      if (no_points_outside_sphere == true)
+      {  // JPS doesn't intersect with any obstacle
+        *thereIsIntersection = false;
+        /*        std::cout << "JPS provided doesn't intersect any obstacles, returning the first element of the path
+           you gave " "me\n"
+                          << std::endl;*/
+        result = first_element;
+
+        if (type_return == RETURN_INTERSECTION)
+        {
+          result = original[original.size() - 1];
+          path = original;
+        }
+
+        break;  // Leave the while loop
+      }
+      // printf("In 4\n");
+
+      last_search_point = path[0];
+      // Remove all the points of the path whose id is <= to last_id:
+      path.erase(path.begin(), path.begin() + last_id + 1);
+
+      // and add the intersection as the first point of the path
+      path.insert(path.begin(), inters);
+    }
+    else
+    {  // There is no neighbours
+      *thereIsIntersection = false;
+      ROS_INFO("JPS provided doesn't intersect any obstacles, returning the first element of the path you gave me\n");
+      result = first_element;
+
+      if (type_return == RETURN_INTERSECTION)
+      {
+        result = original[original.size() - 1];
+        path = original;
+      }
+
+      break;
+    }
+    iteration = iteration + 1;
+  }
+  mtx_map.unlock();
+  mtx_unk.unlock();
+
+  return result;
 }
 
 // Debugging functions

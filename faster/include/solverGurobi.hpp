@@ -6,11 +6,11 @@
 #include <Eigen/Dense>
 #include <type_traits>
 #include <fstream>
-#include "./../termcolor.hpp"
+#include "termcolor.hpp"
 
 #include <decomp_ros_utils/data_ros_utils.h>
 #include <unsupported/Eigen/Polynomials>
-#include "./../faster_types.hpp"
+#include "faster_types.hpp"
 using namespace termcolor;
 
 // TODO: This function is the same as solvePolyOrder2 but with other name (weird conflicts...)

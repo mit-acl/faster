@@ -1,26 +1,19 @@
 #pragma once
-// replanCB(const ros::TimerEvent& e)
-//#include <pcl_conversions/pcl_conversions.h>
+
 #include <pcl/kdtree/kdtree.h>
-/*#include <pcl/filters/filter.h>
-#include <pcl/filters/crop_box.h>
-#include <pcl/filters/passthrough.h>*/
 #include <Eigen/StdVector>
-
-#include "timer.hpp"
-#include "termcolor.hpp"
-
 #include <stdio.h>
 #include <math.h>
 #include <algorithm>
 #include <vector>
 #include <stdlib.h>
 
+#include "timer.hpp"
+#include "termcolor.hpp"
 #include "faster_types.hpp"
 // Solvers includes
 //#include "solvers/solvers.hpp" CVXGEN solver interface
-#include "solvers/solverGurobi.hpp"
-
+#include "solverGurobi.hpp"
 #include "jps_manager.hpp"
 
 #define MAP 1          // MAP refers to the occupancy grid
@@ -56,7 +49,7 @@ public:
   void replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E<Polyhedron<3>>& poly_safe_out,
               vec_E<Polyhedron<3>>& poly_whole_out, std::vector<state>& X_safe_out, std::vector<state>& X_whole_out);
   void updateState(state data);
-  // void changeMode(int new_mode);
+
   void updateMap(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_map, pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_unk);
   bool getNextGoal(state& next_goal);
   void getState(state& data);
@@ -102,10 +95,6 @@ private:
   // map
   Eigen::Vector3d getFirstCollisionJPS(vec_Vecf<3>& path, bool* thereIsIntersection, int map, int type_return);
 
-  //  void replanCB(const ros::TimerEvent& e);
-  // void Faster::pubCB(const ros::TimerEvent& e)
-  // void pubCB();
-
   bool appendToPlan(int k_end_whole, const std::vector<state>& whole, int k_safe, const std::vector<state>& safe);
 
   bool initialized();
@@ -131,8 +120,6 @@ private:
   std::vector<LinearConstraint3D> l_constraints_whole_;  // Polytope (Linear) constraints
   std::vector<LinearConstraint3D> l_constraints_safe_;   // Polytope (Linear) constraints
 
-  // int deltaTp_old_ = 1000;
-  // int deltaTp_ = 10;
   int deltaT_ = 10;
   int deltaT_min_ = 10;
   int indexR_ = 0;
@@ -140,8 +127,7 @@ private:
   Eigen::MatrixXd U_safe_, X_safe_;
   double spinup_time_;
   double z_start_;
-  // double u_min_, u_max_, z_start_, spinup_time_, z_land_;
-  // int N_ = 20;
+
   pcl::KdTreeFLANN<pcl::PointXYZ> kdtree_map_;       // kdtree of the point cloud of the occuppancy grid
   pcl::KdTreeFLANN<pcl::PointXYZ> kdtree_unk_;       // kdtree of the point cloud of the unknown grid
   pcl::KdTreeFLANN<pcl::PointXYZ> kdtree_frontier_;  // kdtree of the frontier
@@ -162,17 +148,9 @@ private:
 
   bool force_reset_to_0_ = 1;
 
-  /*  int k_ = 0;               // Row of X_ that will be published next;
-    int k_initial_cond_ = 0;  // Row of X_ chosen as the initial condition for the planner
-
-    int k_initial_cond_1_ = 0;
-    int k_initial_cond_2_ = 0;*/
-
   vec_Vecf<3> JPS_old_;
 
   double dyaw_filtered_ = 0;
-
-  // pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_map_;
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_map_;
   pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr_unk_;

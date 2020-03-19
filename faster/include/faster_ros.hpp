@@ -17,11 +17,8 @@
 //#include <atomic>
 
 #include <Eigen/Dense>
-
-//#include <snapstack_msgs/Cvx.h>
 #include <snapstack_msgs/State.h>
 #include <snapstack_msgs/QuadGoal.h>
-//#include <nav_msgs/Odometry.h>
 #include <faster_msgs/Mode.h>
 
 // TimeSynchronizer includes
@@ -66,7 +63,7 @@ private:
   void replanCB(const ros::TimerEvent& e);
 
   visualization_msgs::Marker createMarkerLineStrip(Eigen::MatrixXd X);
-  // void clearMarkerSetOfArrows();
+
   void clearMarkerActualTraj();
   void clearMarkerColoredTraj();
   void mapCB(const sensor_msgs::PointCloud2::ConstPtr& pcl2ptr_msg,
@@ -77,19 +74,13 @@ private:
 
   void pubActualTraj();
   visualization_msgs::MarkerArray clearArrows();
-  // geometry_msgs::Vector3 vectorNull();
 
-  // double solveVelAndGetCost(vec_Vecf<3> path);
   void updateInitialCond(int i);
-  // void pubPlanningVisual(Eigen::Vector3d center, double ra, double rb, Eigen::Vector3d B1, Eigen::Vector3d C1);
-  // void pubintersecPoint(Eigen::Vector3d p, bool add);
   void yaw(double diff, snapstack_msgs::QuadGoal& quad_goal);
 
   void clearMarkerArray(visualization_msgs::MarkerArray* tmp, ros::Publisher* publisher);
   void publishJPSPath(vec_Vecf<3>& path, int i);
   void clearJPSPathVisualization(int i);
-
-  // void pubG(state G);
 
   void pubJPSIntersection(Eigen::Vector3d& inters);
   Eigen::Vector3d getFirstCollisionJPS(vec_Vecf<3>& path, bool* thereIsIntersection, int map = MAP,
@@ -107,7 +98,6 @@ private:
   int findIndexH(bool& needToComputeSafePath);
 
   void publishPoly(const vec_E<Polyhedron<3>>& poly, int type);
-  // visualization_msgs::MarkerArray Matrix2ColoredMarkerArray(Eigen::MatrixXd& X, int type);
 
   std::string world_name_ = "world";
 

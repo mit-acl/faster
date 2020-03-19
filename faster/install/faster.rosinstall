@@ -1,6 +1,6 @@
 - git:
     local-name: acl-gazebo
-    uri: git@gitlab.com:mit-acl/lab/acl-gazebo.git
+    uri: https://gitlab.com/mit-acl/lab/acl-gazebo
     version: c72913ec2439a4627645374f1c845d989078618c
 - git:
     local-name: catkin_simple
@@ -12,11 +12,11 @@
     version: 6e91e9afb374be75624b028ac2174aab89581abe
 - git:
     local-name: behavior_selector
-    uri: git@gitlab.com:mit-acl/fsw/behavior_selector.git
+    uri: https://gitlab.com/mit-acl/fsw/behavior_selector
     version: 5fcb5d7005390af87228ad26fdf237ccc83c21f9
 - git:
     local-name: acl-mapping
-    uri: git@gitlab.com:mit-acl/lab/acl-mapping.git
-    version: 31a94a7a94c2b25150c841ce647386fe060e0636
+    uri: https://gitlab.com/mit-acl/lab/acl-mapping
+    version: 1fe4c0d828eed05e2485d7fa9431500adf929b08
 
     
