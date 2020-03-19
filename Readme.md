@@ -54,6 +54,11 @@ catkin config -DCMAKE_BUILD_TYPE=Release
 catkin build
 ```
 
+Now you may want to add this to your `~/.bashrc`:
+```
+source PATH_TO_YOUR_WS/devel/setup.bash
+```
+
 And finally open 5 terminals and execute these commands:
 ```
 roslaunch acl_sim start_world.launch
@@ -78,6 +83,11 @@ wstool update -j8
 cd ..
 catkin config -DCMAKE_BUILD_TYPE=Release
 catkin build
+```
+
+Now you may want to add this to your `~/.bashrc`:
+```
+source PATH_TO_YOUR_WS/devel/setup.bash
 ```
 
 Then, in [`faster.yaml`](https://github.com/mit-acl/faster/tree/master/faster/param), change these parameters:
