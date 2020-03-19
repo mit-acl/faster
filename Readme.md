@@ -1,12 +1,15 @@
 # FASTER: Fast and Safe Trajectory Planner for Flights in Unknown Environments #
 
 
+**Finalist to the Best Paper Award on Safety, Security, and Rescue Robotics in memory of Motohiro Kisoi**
+
 UAV               |  Ground Robot           | 
 :-------------------------:|:-------------------------:|
 ![](./faster/imgs/uav_sim.gif)       |  ![](./faster/imgs/gr_sim.gif)  |  
 ![](./faster/imgs/uav_hw.gif)       |  ![](./faster/imgs/gr_hw.gif)  |  
 
 Code used for the paper **FASTER: Fast and Safe Trajectory Planner for Flights in Unknown Environments** (IROS 2019) ([pdf](https://arxiv.org/abs/1903.03558), [video](https://www.youtube.com/watch?v=gwV0YRs5IWs))
+
 
 ```
 @inproceedings{tordesillas2019faster,
