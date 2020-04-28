@@ -10,6 +10,7 @@ UAV               |  Ground Robot           |
 
 Code used for the paper **FASTER: Fast and Safe Trajectory Planner for Flights in Unknown Environments** (IROS 2019) ([conference paper](https://arxiv.org/abs/1903.03558), [journal paper](https://arxiv.org/abs/2001.04420), [video](https://www.youtube.com/watch?v=gwV0YRs5IWs))
 
+When using FASTER for your research, please cite the following paper:
 
 ```bibtex
 @inproceedings{tordesillas2019faster,
