@@ -8,6 +8,8 @@ UAV               |  Ground Robot           |
 [![IROS 2019: FASTER: Fast and Safe Trajectory Planner for Flights in Unknown Environments](./faster/imgs/uav_sim.gif)](https://www.youtube.com/watch?v=fkkkgomkX10 "IROS 2019: FASTER: Fast and Safe Trajectory Planner for Flights in Unknown Environments")      |  [![IROS 2019: FASTER: Fast and Safe Trajectory Planner for Flights in Unknown Environments](./faster/imgs/gr_sim.gif)](https://youtu.be/L13k44-krcc "IROS 2019: FASTER: Fast and Safe Trajectory Planner for Flights in Unknown Environments") |  
 [![IROS 2019: FASTER: Fast and Safe Trajectory Planner for Flights in Unknown Environments](./faster/imgs/uav_hw.gif)](https://www.youtube.com/watch?v=fkkkgomkX10 "IROS 2019: FASTER: Fast and Safe Trajectory Planner for Flights in Unknown Environments")       |  [![IROS 2019: FASTER: Fast and Safe Trajectory Planner for Flights in Unknown Environments](./faster/imgs/gr_hw.gif)](https://www.youtube.com/watch?v=fkkkgomkX10 "IROS 2019: FASTER: Fast and Safe Trajectory Planner for Flights in Unknown Environments")    |  
 
+## Citation
+
 When using FASTER, please cite this paper ([conference version](https://arxiv.org/abs/1903.03558), [journal version](https://arxiv.org/abs/2001.04420), [video](https://www.youtube.com/watch?v=gwV0YRs5IWs)):
 
 ```bibtex
@@ -22,9 +24,8 @@ When using FASTER, please cite this paper ([conference version](https://arxiv.or
 ```
 
 
-FASTER has been tested with Ubuntu 16.04 and ROS Kinetic (newer ROS versions may require some minor changes, feel free to [create an issue](https://github.com/mit-acl/faster/issues) if you have any problems). The Gurobi versions tested are Gurobi 8.1 and Gurobi 9.0.
-
 ## General Setup
+FASTER has been tested with Ubuntu 16.04 and ROS Kinetic (newer ROS versions may require some minor changes, feel free to [create an issue](https://github.com/mit-acl/faster/issues) if you have any problems). The Gurobi versions tested are Gurobi 8.1 and Gurobi 9.0.
 
 Install [Gurobi](https://www.gurobi.com/). You can test your installation typing `gurobi.sh` in the terminal. Have a look at [this section](#issues-when-installing-gurobi) if you have any issues.
 
