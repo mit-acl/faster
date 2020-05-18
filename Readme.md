@@ -26,7 +26,8 @@ When using FASTER, please cite this paper ([conference version](https://arxiv.or
 
 ## General Setup
 FASTER has been tested with 
-* Ubuntu 16.04/ROS Kinetic and with 
+* Ubuntu 16.04/ROS Kinetic 
+and  
 * Ubuntu 18.04/ROS Melodic 
 
 Other ROS versions may require some minor changes, feel free to [create an issue](https://github.com/mit-acl/faster/issues) if you have any problems). The Gurobi versions tested are Gurobi 8.1 and Gurobi 9.0.
