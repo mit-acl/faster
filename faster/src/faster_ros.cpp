@@ -173,7 +173,7 @@ FasterRos::FasterRos(ros::NodeHandle nh) : nh_(nh)
   // &FasterRos::replanCB, this);
 
   name_drone_ = ros::this_node::getNamespace();
-  name_drone_.erase(0, 2);  // Erase slashes
+  name_drone_.erase(std::remove(name_drone_.begin(), name_drone_.end(), '/'), name_drone_.end());  // remove slashes
 
   tfListener = new tf2_ros::TransformListener(tf_buffer_);
   // wait for body transform to be published before initializing
