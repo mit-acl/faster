@@ -148,3 +148,9 @@ sudo make
 sudo cp libgurobi_c++.a ../../lib/
 ```
 
+## Issues with other possible errors:
+
+You can safely ignore these terminal errors:
+* `Error in REST request` (when using ROS Melodic)
+* `[ERROR] [...]: GazeboRosControlPlugin missing <legacyModeNS> while using DefaultRobotHWSim, defaults to true.` (when using the ground robot)
+* `[ERROR] [...]: No p gain specified for pid.  Namespace: /gazebo_ros_control/pid_gains/front_left_wheel.` (when using the ground robot)
