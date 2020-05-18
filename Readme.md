@@ -25,13 +25,18 @@ When using FASTER, please cite this paper ([conference version](https://arxiv.or
 
 
 ## General Setup
-FASTER has been tested with Ubuntu 16.04 and ROS Kinetic (newer ROS versions may require some minor changes, feel free to [create an issue](https://github.com/mit-acl/faster/issues) if you have any problems). The Gurobi versions tested are Gurobi 8.1 and Gurobi 9.0.
+FASTER has been tested with 
+* Ubuntu 16.04/ROS Kinetic and with 
+* Ubuntu 18.04/ROS Melodic 
+
+Other ROS versions may require some minor changes, feel free to [create an issue](https://github.com/mit-acl/faster/issues) if you have any problems). The Gurobi versions tested are Gurobi 8.1 and Gurobi 9.0.
 
 Install [Gurobi](https://www.gurobi.com/). You can test your installation typing `gurobi.sh` in the terminal. Have a look at [this section](#issues-when-installing-gurobi) if you have any issues.
 
 Install the following dependencies:
 ```
-sudo apt-get install ros-kinetic-gazebo-ros-pkgs ros-kinetic-mavros-msgs ros-kinetic-tf2-sensor-msgs
+ros_v="$(rosversion -d)"
+sudo apt-get install ros-"${ros_v}"-gazebo-ros-pkgs ros-"${ros_v}"-mavros-msgs ros-"${ros_v}"-tf2-sensor-msgs
 ```
 
 Create a workspace, and clone this repo and its dependencies:
@@ -43,7 +48,7 @@ wstool merge ./faster/faster/install/faster.rosinstall
 
 ```
 
-If you are using Gurobi X.Y instead of Gurobi 8.1, you should change the name `libgurobi81.so` to `libgurobiXY.so` in the [CMakeLists.txt](https://github.com/mit-acl/faster/blob/master/faster/CMakeLists.txt).
+If you are using Gurobi X.Y instead of Gurobi 9.0, you should change the name `libgurobi90.so` to `libgurobiXY.so` in the [CMakeLists.txt](https://github.com/mit-acl/faster/blob/master/faster/CMakeLists.txt).
 
 In the following, remember (once the workspace is compiled) to add this to your `~/.bashrc`:
 ```
@@ -75,7 +80,7 @@ Now you can click `Start` in the GUI, and then, in RVIZ, press `G` (or click the
 
 Install the following dependencies:
 ```
-sudo apt-get install ros-kinetic-control-toolbox ros-kinetic-ros-control ros-kinetic-robot-localization ros-kinetic-lms1xx ros-kinetic-interactive-marker-twist-server ros-kinetic-hector-gazebo-plugins ros-kinetic-move-base ros-kinetic-ros-control ros-kinetic-ros-controllers ros-kinetic-pointgrey-camera-description ros-kinetic-hardware-interface ros-kinetic-message-to-tf ros-kinetic-gazebo-ros-control
+sudo apt-get install ros-"${ros_v}"-control-toolbox ros-"${ros_v}"-ros-control ros-"${ros_v}"-robot-localization ros-"${ros_v}"-lms1xx ros-"${ros_v}"-interactive-marker-twist-server ros-"${ros_v}"-hector-gazebo-plugins ros-"${ros_v}"-move-base ros-"${ros_v}"-ros-control ros-"${ros_v}"-ros-controllers ros-"${ros_v}"-pointgrey-camera-description ros-"${ros_v}"-hardware-interface ros-"${ros_v}"-message-to-tf ros-"${ros_v}"-gazebo-ros-control
 ```
 Then download the ground_robot-specific packages and compile the repo:
 
