@@ -29,7 +29,7 @@ FASTER has been tested with
 * Ubuntu 16.04/ROS Kinetic  
 * Ubuntu 18.04/ROS Melodic 
 
-Other ROS versions may require some minor changes, feel free to [create an issue](https://github.com/mit-acl/faster/issues) if you have any problems). The Gurobi versions tested are Gurobi 8.1 and Gurobi 9.0.
+Other ROS versions may require some minor changes, feel free to [create an issue](https://github.com/mit-acl/faster/issues) if you have any problems. The Gurobi versions tested are Gurobi 8.1 and Gurobi 9.0.
 
 Install [Gurobi](https://www.gurobi.com/). You can test your installation typing `gurobi.sh` in the terminal. Have a look at [this section](#issues-when-installing-gurobi) if you have any issues.
 
