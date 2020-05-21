@@ -35,8 +35,7 @@ Install [Gurobi](https://www.gurobi.com/). You can test your installation typing
 
 Install the following dependencies:
 ```
-ros_v="$(rosversion -d)"
-sudo apt-get install ros-"${ros_v}"-gazebo-ros-pkgs ros-"${ros_v}"-mavros-msgs ros-"${ros_v}"-tf2-sensor-msgs
+sudo apt-get install ros-"${ROS_DISTRO}"-gazebo-ros-pkgs ros-"${ROS_DISTRO}"-mavros-msgs ros-"${ROS_DISTRO}"-tf2-sensor-msgs
 ```
 
 Create a workspace, and clone this repo and its dependencies:
@@ -80,7 +79,7 @@ Now you can click `Start` in the GUI, and then, in RVIZ, press `G` (or click the
 
 Install the following dependencies:
 ```
-sudo apt-get install ros-"${ros_v}"-control-toolbox ros-"${ros_v}"-ros-control ros-"${ros_v}"-robot-localization ros-"${ros_v}"-lms1xx ros-"${ros_v}"-interactive-marker-twist-server ros-"${ros_v}"-hector-gazebo-plugins ros-"${ros_v}"-move-base ros-"${ros_v}"-ros-control ros-"${ros_v}"-ros-controllers ros-"${ros_v}"-pointgrey-camera-description ros-"${ros_v}"-hardware-interface ros-"${ros_v}"-message-to-tf ros-"${ros_v}"-gazebo-ros-control
+sudo apt-get install ros-"${ROS_DISTRO}"-control-toolbox ros-"${ROS_DISTRO}"-ros-control ros-"${ROS_DISTRO}"-robot-localization ros-"${ROS_DISTRO}"-lms1xx ros-"${ROS_DISTRO}"-interactive-marker-twist-server ros-"${ROS_DISTRO}"-hector-gazebo-plugins ros-"${ros_v}"-move-base ros-"${ROS_DISTRO}"-ros-control ros-"${ROS_DISTRO}"-ros-controllers ros-"${ROS_DISTRO}"-pointgrey-camera-description ros-"${ROS_DISTRO}"-hardware-interface ros-"${ROS_DISTRO}"-message-to-tf ros-"${ROS_DISTRO}"-gazebo-ros-control
 ```
 Then download the ground_robot-specific packages and compile the repo:
 
