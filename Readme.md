@@ -36,6 +36,7 @@ Install the [Gurobi Optimizer](https://www.gurobi.com/products/gurobi-optimizer/
 Install the following dependencies:
 ```
 sudo apt-get install ros-"${ROS_DISTRO}"-gazebo-ros-pkgs ros-"${ROS_DISTRO}"-mavros-msgs ros-"${ROS_DISTRO}"-tf2-sensor-msgs
+pip install pyquaternion
 ```
 
 Create a workspace, and clone this repo and its dependencies:
