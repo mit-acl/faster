@@ -172,24 +172,6 @@ FasterRos::FasterRos(ros::NodeHandle nh) : nh_(nh)
   // If you want another thread for the replanCB: replanCBTimer_ = nh_.createTimer(ros::Duration(par_.dc),
   // &FasterRos::replanCB, this);
 
-  name_drone_ = ros::this_node::getNamespace();
-  name_drone_.erase(std::remove(name_drone_.begin(), name_drone_.end(), '/'), name_drone_.end());  // remove slashes
-
-  tfListener = new tf2_ros::TransformListener(tf_buffer_);
-  // wait for body transform to be published before initializing
-  ROS_INFO("Waiting for world to camera transform...");
-  while (true)
-  {
-    try
-    {
-      tf_buffer_.lookupTransform(world_name_, name_drone_ + "/camera", ros::Time::now(), ros::Duration(0.5));  //
-      break;
-    }
-    catch (tf2::TransformException& ex)
-    {
-      // nothing
-    }
-  }
   clearMarkerActualTraj();
 
   faster_ptr_ = std::unique_ptr<Faster>(new Faster(par_));
