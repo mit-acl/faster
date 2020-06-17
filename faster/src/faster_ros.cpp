@@ -18,6 +18,7 @@ FasterRos::FasterRos(ros::NodeHandle nh) : nh_(nh)
   safeGetParam(nh_, "dc", par_.dc);
   safeGetParam(nh_, "goal_radius", par_.goal_radius);
   safeGetParam(nh_, "drone_radius", par_.drone_radius);
+  safeGetParam(nh_, "rviz_goal_height", rviz_goal_height_);
 
   safeGetParam(nh_, "N_safe", par_.N_safe);
   safeGetParam(nh_, "N_whole", par_.N_whole);
@@ -499,7 +500,7 @@ void FasterRos::pubState(const state& data, const ros::Publisher pub)
 void FasterRos::terminalGoalCB(const geometry_msgs::PoseStamped& msg)
 {
   state G_term;
-  double height = (par_.is_ground_robot) ? 0.2 : 1.0;  // TODO
+  const double height = (par_.is_ground_robot) ? 0.2 : rviz_goal_height_;
   G_term.setPos(msg.pose.position.x, msg.pose.position.y, height);
   faster_ptr_->setTerminalGoal(G_term);
 

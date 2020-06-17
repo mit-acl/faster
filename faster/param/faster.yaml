@@ -5,6 +5,7 @@ visual: true #publish visualization stuff
 dc: 0.01            #(seconds) Duration for the interpolation=Value of the timer pubGoal
 goal_radius: 0.3    #[m] Drone has arrived to the goal when distance_to_goal<GOAL_RADIUS
 drone_radius: 0.3  #[m] Used for collision checking
+rviz_goal_height: 1  #[m] Assumed height for clicked 2d nav goals in Rviz  (overridden for ground robots)
 
 N_whole: 6 #[-] Number of discretization points in the whole trajectory
 N_safe: 6 #[-] Number of discretization points in the safe path
