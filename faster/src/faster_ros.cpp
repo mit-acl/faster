@@ -112,6 +112,10 @@ FasterRos::FasterRos(ros::NodeHandle nh) : nh_(nh)
     }
   */
 
+  // Initialize FASTER
+  faster_ptr_ = std::unique_ptr<Faster>(new Faster(par_));
+  ROS_INFO("Planner initialized");
+
   // Publishers
   // pub_goal_jackal_ = nh_.advertise<geometry_msgs::Twist>("goal_jackal", 1);
   pub_goal_ = nh_.advertise<snapstack_msgs::QuadGoal>("goal", 1);
@@ -173,10 +177,6 @@ FasterRos::FasterRos(ros::NodeHandle nh) : nh_(nh)
   // &FasterRos::replanCB, this);
 
   clearMarkerActualTraj();
-
-  faster_ptr_ = std::unique_ptr<Faster>(new Faster(par_));
-
-  ROS_INFO("Planner initialized");
 }
 
 void FasterRos::replanCB(const ros::TimerEvent& e)
