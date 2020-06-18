@@ -18,6 +18,7 @@ FasterRos::FasterRos(ros::NodeHandle nh) : nh_(nh)
   safeGetParam(nh_, "dc", par_.dc);
   safeGetParam(nh_, "goal_radius", par_.goal_radius);
   safeGetParam(nh_, "drone_radius", par_.drone_radius);
+  safeGetParam(nh_, "rviz_goal_height", rviz_goal_height_);
 
   safeGetParam(nh_, "N_safe", par_.N_safe);
   safeGetParam(nh_, "N_whole", par_.N_whole);
@@ -112,6 +113,10 @@ FasterRos::FasterRos(ros::NodeHandle nh) : nh_(nh)
     }
   */
 
+  // Initialize FASTER
+  faster_ptr_ = std::unique_ptr<Faster>(new Faster(par_));
+  ROS_INFO("Planner initialized");
+
   // Publishers
   // pub_goal_jackal_ = nh_.advertise<geometry_msgs::Twist>("goal_jackal", 1);
   pub_goal_ = nh_.advertise<snapstack_msgs::QuadGoal>("goal", 1);
@@ -172,29 +177,7 @@ FasterRos::FasterRos(ros::NodeHandle nh) : nh_(nh)
   // If you want another thread for the replanCB: replanCBTimer_ = nh_.createTimer(ros::Duration(par_.dc),
   // &FasterRos::replanCB, this);
 
-  name_drone_ = ros::this_node::getNamespace();
-  name_drone_.erase(std::remove(name_drone_.begin(), name_drone_.end(), '/'), name_drone_.end());  // remove slashes
-
-  tfListener = new tf2_ros::TransformListener(tf_buffer_);
-  // wait for body transform to be published before initializing
-  ROS_INFO("Waiting for world to camera transform...");
-  while (true)
-  {
-    try
-    {
-      tf_buffer_.lookupTransform(world_name_, name_drone_ + "/camera", ros::Time::now(), ros::Duration(0.5));  //
-      break;
-    }
-    catch (tf2::TransformException& ex)
-    {
-      // nothing
-    }
-  }
   clearMarkerActualTraj();
-
-  faster_ptr_ = std::unique_ptr<Faster>(new Faster(par_));
-
-  ROS_INFO("Planner initialized");
 }
 
 void FasterRos::replanCB(const ros::TimerEvent& e)
@@ -517,7 +500,7 @@ void FasterRos::pubState(const state& data, const ros::Publisher pub)
 void FasterRos::terminalGoalCB(const geometry_msgs::PoseStamped& msg)
 {
   state G_term;
-  double height = (par_.is_ground_robot) ? 0.2 : 1.0;  // TODO
+  const double height = (par_.is_ground_robot) ? 0.2 : rviz_goal_height_;
   G_term.setPos(msg.pose.position.x, msg.pose.position.y, height);
   faster_ptr_->setTerminalGoal(G_term);
 
