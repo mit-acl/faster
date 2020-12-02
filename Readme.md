@@ -50,7 +50,7 @@ wstool merge ./faster/faster/install/faster.rosinstall
 
 ```
 
-If you are using Gurobi X.Y instead of Gurobi 9.1, you should change the name `libgurobi91.so` to `libgurobiXY.so` in the [CMakeLists.txt](https://github.com/mit-acl/faster/blob/master/faster/CMakeLists.txt).
+If you are using Gurobi X.Y instead of Gurobi 9.1, you should change the name `libgurobi91.so` to `libgurobiXY.so` in both the [CMakeLists.txt](https://github.com/mit-acl/faster/blob/master/faster/CMakeLists.txt) and the [FindGurobi.cmake](https://github.com/mit-acl/faster/blob/master/faster/FindGUROBI.cmake).
 
 In the following, remember (once the workspace is compiled) to add this to your `~/.bashrc`:
 ```
