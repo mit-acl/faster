@@ -50,8 +50,6 @@ wstool merge ./faster/faster/install/faster.rosinstall
 
 ```
 
-If you are using Gurobi X.Y instead of Gurobi 9.1, you should change the name `libgurobi91.so` to `libgurobiXY.so` in both the [CMakeLists.txt](https://github.com/mit-acl/faster/blob/master/faster/CMakeLists.txt) and the [FindGurobi.cmake](https://github.com/mit-acl/faster/blob/master/faster/FindGUROBI.cmake).
-
 In the following, remember (once the workspace is compiled) to add this to your `~/.bashrc`:
 ```
 source PATH_TO_YOUR_WS/devel/setup.bash
@@ -116,7 +114,7 @@ roslaunch faster faster_interface.launch quad:=JA01 is_ground_robot:=true
 roslaunch faster faster.launch quad:=JA01
 ```
 
-Now you can click `Start` in the GUI, and then, in RVIZ, press `G` (or click the option `2D Nav Goal` on the top bar of RVIZ) and click any goal for the ground robot. 
+The blue grid shown in Rviz is the unknown space and the orange one is the occupied-known space. Now you can click `Start` in the GUI, and then, in RVIZ, press `G` (or click the option `2D Nav Goal` on the top bar of RVIZ) and click any goal for the ground robot. 
 
 
 
