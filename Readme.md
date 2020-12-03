@@ -78,6 +78,8 @@ The blue grid shown in Rviz is the unknown space and the orange one is the occup
 
 ### Instructions to use FASTER with a ground robot:
 
+Note: There are some differences in the performance of the ground robot when using the Gazebo version that comes with ROS Kinetic and the one that comes with ROS Melodic. To achieve a good tracking error (like the one shown [here](https://github.com/mit-acl/faster/blob/master/faster/imgs/gr_sim.gif)), you may have to tune the [gains of the controller](https://github.com/mit-acl/faster/blob/master/faster/scripts/goal_odom_to_cmd_vel_state.py) depending on the specific verion of ROS/Gazebo that you are using. 
+
 Install the following dependencies:
 ```
 sudo apt-get install ros-"${ROS_DISTRO}"-control-toolbox ros-"${ROS_DISTRO}"-ros-control ros-"${ROS_DISTRO}"-robot-localization ros-"${ROS_DISTRO}"-lms1xx ros-"${ROS_DISTRO}"-interactive-marker-twist-server ros-"${ROS_DISTRO}"-hector-gazebo-plugins ros-"${ROS_DISTRO}"-move-base ros-"${ROS_DISTRO}"-ros-control ros-"${ROS_DISTRO}"-ros-controllers ros-"${ROS_DISTRO}"-pointgrey-camera-description ros-"${ROS_DISTRO}"-hardware-interface ros-"${ROS_DISTRO}"-message-to-tf ros-"${ROS_DISTRO}"-gazebo-ros-control
