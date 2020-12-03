@@ -1,12 +1,17 @@
-#Taken from https://support.gurobi.com/hc/en-us/articles/360039499751-How-do-I-use-CMake-to-build-Gurobi-C-C-projects-
+#Taken (and modified) from https://support.gurobi.com/hc/en-us/articles/360039499751-How-do-I-use-CMake-to-build-Gurobi-C-C-projects-
 
 find_path(GUROBI_INCLUDE_DIRS
     NAMES gurobi_c.h
     HINTS ${GUROBI_DIR} $ENV{GUROBI_HOME}
     PATH_SUFFIXES include)
 
+set(gurobi_library_names)
+foreach(ver RANGE 00 99)
+  list(APPEND gurobi_library_names gurobi${ver}) #Different versions of Gurobi
+endforeach()
+
 find_library(GUROBI_LIBRARY
-    NAMES gurobi gurobi91
+    NAMES gurobi ${gurobi_library_names}
     HINTS ${GUROBI_DIR} $ENV{GUROBI_HOME}
     PATH_SUFFIXES lib)
 

@@ -51,7 +51,8 @@ catkin_package(
 
 include_directories(${catkin_INCLUDE_DIRS})
 
-set(GUROBI_LIBRARIES "$ENV{GUROBI_HOME}/lib/libgurobi_c++.a;$ENV{GUROBI_HOME}/lib/libgurobi91.so;$ENV{GUROBI_HOME}/lib/" )
+FILE(GLOB GurobiSOFiles $ENV{GUROBI_HOME}/lib/libgurobi*[0-9].so) #files that are start with libgurobi and end with number.so
+set(GUROBI_LIBRARIES "$ENV{GUROBI_HOME}/lib/libgurobi_c++.a;${GurobiSOFiles};$ENV{GUROBI_HOME}/lib/" )
 
 add_executable(${PROJECT_NAME}_node src/main.cpp src/faster.cpp src/faster_ros.cpp src/utils.cpp  src/jps_manager.cpp src/solverGurobi.cpp)
 target_link_libraries(${PROJECT_NAME}_node ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${JPS3D_LIBRARIES} ${DECOMP_UTIL_LIBRARIES} ${GUROBI_LIBRARIES})
