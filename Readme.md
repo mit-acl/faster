@@ -132,7 +132,7 @@ For the ground robot, the option 2 is provided (a controller, and a Gazebo simul
 ## How do I use this planner with a real robot?
 To run the mapper, you simply need to run the node that publishes the depth image of the camera (for example using [`realsense-ros`](https://github.com/IntelRealSense/realsense-ros) if you are using an Intel RealSense camera). After launching this node, find the name of the topic of the depth image (by doing `rostopic echo`), and finally put that name on the [launch file of the mapper](https://gitlab.com/mit-acl/lab/acl-mapping/-/blob/dev/global-mapper/global_mapper_ros/launch/global_mapper_node.launch#L12). 
 
-Moreover, and as shown in the diagram above, you also need to publish (coming either from an estimator or a motion capture) the current state of the UAV as a [State message](https://gitlab.com/mit-acl/fsw/snap-stack/snapstack_msgs/-/blob/master/msg/State.msg). 
+As shown in the diagram above, the UAV should subscribe to the [Goal message](https://gitlab.com/mit-acl/fsw/snap-stack/snapstack_msgs/-/blob/46a1911faed1a5b1be479df2f969ee4e17304f29/msg/QuadGoal.msg) published by FASTER. The estimator (or the motion capture) should then publish the current state of the UAV as a [State message](https://gitlab.com/mit-acl/fsw/snap-stack/snapstack_msgs/-/blob/master/msg/State.msg). 
 
 
 ## Credits:
