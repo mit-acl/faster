@@ -9,7 +9,7 @@
 - git:
     local-name: snapstack_msgs
     uri: https://gitlab.com/mit-acl/fsw/snap-stack/snapstack_msgs.git
-    version: 6e91e9afb374be75624b028ac2174aab89581abe
+    version: 3e1dee9616bd7e8a467bce5a66c947ebf13a79d8
 - git:
     local-name: behavior_selector
     uri: https://gitlab.com/mit-acl/fsw/behavior_selector

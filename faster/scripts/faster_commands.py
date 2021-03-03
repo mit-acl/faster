@@ -10,7 +10,7 @@
 
 import rospy
 from faster_msgs.msg import Mode
-from snapstack_msgs.msg import QuadGoal, State
+from snapstack_msgs.msg import Goal, State
 from geometry_msgs.msg import Pose, PoseStamped
 from behavior_selector.srv import MissionModeChange
 import math
@@ -26,7 +26,7 @@ class Faster_Commands:
         self.mode=Mode();
         self.pose = Pose();
         self.mode.mode=self.mode.ON_GROUND
-        self.pubGoal = rospy.Publisher('goal', QuadGoal, queue_size=1)
+        self.pubGoal = rospy.Publisher('goal', Goal, queue_size=1)
         self.pubMode = rospy.Publisher("faster/mode",Mode,queue_size=1,latch=True) #TODO Namespace
         self.pubClickedPoint = rospy.Publisher("/move_base_simple/goal",PoseStamped,queue_size=1,latch=True)
 
@@ -76,15 +76,15 @@ class Faster_Commands:
 
 
     def takeOff(self):
-        goal=QuadGoal();
-        goal.pos.x = self.pose.position.x;
-        goal.pos.y = self.pose.position.y;
-        goal.pos.z = self.pose.position.z;
+        goal=Goal();
+        goal.p.x = self.pose.position.x;
+        goal.p.y = self.pose.position.y;
+        goal.p.z = self.pose.position.z;
         if(self.is_ground_robot==True):
             self.alt_taken_off=self.pose.position.z;
         #Note that self.pose.position is being updated in the parallel callback
         while(  abs(self.pose.position.z-self.alt_taken_off)>0.1  ): 
-            goal.pos.z = min(goal.pos.z+0.0035, self.alt_taken_off);
+            goal.p.z = min(goal.p.z+0.0035, self.alt_taken_off);
             #rospy.sleep(0.004) #TODO hard-coded
             self.sendGoal(goal)
         rospy.sleep(1.5) 
@@ -93,20 +93,20 @@ class Faster_Commands:
 
 
     def land(self):
-        goal=QuadGoal();
-        goal.pos.x = self.pose.position.x;
-        goal.pos.y = self.pose.position.y;
-        goal.pos.z = self.pose.position.z;
+        goal=Goal();
+        goal.p.x = self.pose.position.x;
+        goal.p.y = self.pose.position.y;
+        goal.p.z = self.pose.position.z;
 
         #Note that self.pose.position is being updated in the parallel callback
         while(abs(self.pose.position.z-self.alt_ground)>0.1):
-            goal.pos.z = max(goal.pos.z-0.0035, self.alt_ground);
+            goal.p.z = max(goal.p.z-0.0035, self.alt_ground);
             self.sendGoal(goal)
         #Kill motors once we are on the ground
         self.kill()
 
     def kill(self):
-        goal=QuadGoal();
+        goal=Goal();
         goal.cut_power=True
         self.sendGoal(goal)
         self.mode.mode=self.mode.ON_GROUND

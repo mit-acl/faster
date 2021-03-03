@@ -26,7 +26,7 @@
 
 #include <Eigen/Dense>
 #include <snapstack_msgs/State.h>
-#include <snapstack_msgs/QuadGoal.h>
+#include <snapstack_msgs/Goal.h>
 #include <faster_msgs/Mode.h>
 
 // TimeSynchronizer includes
@@ -84,7 +84,7 @@ private:
   visualization_msgs::MarkerArray clearArrows();
 
   void updateInitialCond(int i);
-  void yaw(double diff, snapstack_msgs::QuadGoal& quad_goal);
+  void yaw(double diff, snapstack_msgs::Goal& quad_goal);
 
   void clearMarkerArray(visualization_msgs::MarkerArray* tmp, ros::Publisher* publisher);
   void publishJPSPath(vec_Vecf<3>& path, int i);

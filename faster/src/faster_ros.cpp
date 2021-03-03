@@ -119,7 +119,7 @@ FasterRos::FasterRos(ros::NodeHandle nh) : nh_(nh)
 
   // Publishers
   // pub_goal_jackal_ = nh_.advertise<geometry_msgs::Twist>("goal_jackal", 1);
-  pub_goal_ = nh_.advertise<snapstack_msgs::QuadGoal>("goal", 1);
+  pub_goal_ = nh_.advertise<snapstack_msgs::Goal>("goal", 1);
   pub_traj_whole_ = nh_.advertise<nav_msgs::Path>("traj_whole", 1);
   pub_traj_safe_ = nh_.advertise<nav_msgs::Path>("traj_safe", 1);
   pub_setpoint_ = nh_.advertise<visualization_msgs::Marker>("setpoint", 1);
@@ -262,16 +262,16 @@ void FasterRos::pubCB(const ros::TimerEvent& e)
   state next_goal;
   if (faster_ptr_->getNextGoal(next_goal))
   {
-    snapstack_msgs::QuadGoal quadGoal;
+    snapstack_msgs::Goal quadGoal;
     // visualization_msgs::Marker setpoint;
     // Pub setpoint maker.  setpoint_ is the last quadGoal sent to the drone
 
     // printf("Publicando Goal=%f, %f, %f\n", quadGoal_.pos.x, quadGoal_.pos.y, quadGoal_.pos.z);
 
-    quadGoal.pos = eigen2rosvector(next_goal.pos);
-    quadGoal.vel = eigen2rosvector(next_goal.vel);
-    quadGoal.accel = eigen2rosvector(next_goal.accel);
-    quadGoal.jerk = eigen2rosvector(next_goal.jerk);
+    quadGoal.p = eigen2rosvector(next_goal.pos);
+    quadGoal.v = eigen2rosvector(next_goal.vel);
+    quadGoal.a = eigen2rosvector(next_goal.accel);
+    quadGoal.j = eigen2rosvector(next_goal.jerk);
     quadGoal.dyaw = next_goal.dyaw;
     quadGoal.yaw = next_goal.yaw;
     quadGoal.header.stamp = ros::Time::now();
@@ -280,9 +280,9 @@ void FasterRos::pubCB(const ros::TimerEvent& e)
     pub_goal_.publish(quadGoal);
 
     setpoint_.header.stamp = ros::Time::now();
-    setpoint_.pose.position.x = quadGoal.pos.x;
-    setpoint_.pose.position.y = quadGoal.pos.y;
-    setpoint_.pose.position.z = quadGoal.pos.z;
+    setpoint_.pose.position.x = quadGoal.p.x;
+    setpoint_.pose.position.y = quadGoal.p.y;
+    setpoint_.pose.position.z = quadGoal.p.z;
 
     pub_setpoint_.publish(setpoint_);
   }
