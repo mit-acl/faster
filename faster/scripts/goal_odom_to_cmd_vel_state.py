@@ -11,7 +11,7 @@
 import roslib
 import rospy
 import math
-from snapstack_msgs.msg import QuadGoal, State
+from snapstack_msgs.msg import Goal, State
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from gazebo_msgs.msg import ModelState
@@ -60,15 +60,16 @@ class GoalToCmdVel:
         self.state_initialized=False;
         self.goal_initialized=False;
 
-        self.goal=QuadGoal()
-        self.goal.pos.x=0.0;
-        self.goal.pos.y=0.0;
-        self.goal.pos.z=0.0;
-        self.goal.vel.x=0.0;
-        self.goal.vel.y=0.0;
-        self.goal.vel.z=0.0;
-        self.goal.accel.x=0.0;
-        self.goal.accel.y=0.0;
+        self.goal=Goal()
+        self.goal.p.x=0.0;
+        self.goal.p.y=0.0;
+        self.goal.p.z=0.0;
+        self.goal.v.x=0.0;
+        self.goal.v.y=0.0;
+        self.goal.v.z=0.0;
+        self.goal.a.x=0.0;
+        self.goal.a.y=0.0;
+        self.goal.a.z=0.0;
 
         self.state_initialized=False;
 
@@ -106,14 +107,14 @@ class GoalToCmdVel:
 
         self.goal=goal;
 
-        # self.goal.pos.x=goal.pos.x;
-        # self.goal.pos.y=goal.pos.y;
-        # self.goal.pos.z=goal.pos.z;
-        # self.goal.vel.x=goal.vel.x;
-        # self.goal.vel.y=goal.vel.y;
-        # self.goal.vel.z=goal.vel.z;
-        # self.goal.accel.x=goal.accel.x;
-        # self.goal.accel.y=goal.accel.y;
+        # self.goal.p.x=goal.p.x;
+        # self.goal.p.y=goal.p.y;
+        # self.goal.p.z=goal.p.z;
+        # self.goal.v.x=goal.v.x;
+        # self.goal.v.y=goal.v.y;
+        # self.goal.v.z=goal.v.z;
+        # self.goal.a.x=goal.a.x;
+        # self.goal.a.y=goal.a.y;
 
         self.goal_initialized=True;
 
@@ -125,12 +126,12 @@ class GoalToCmdVel:
         twist=Twist();
 
 
-        x = self.goal.pos.x;
-        y = self.goal.pos.y;
-        xd = self.goal.vel.x;
-        yd = self.goal.vel.y;
-        xd2 = self.goal.accel.x;
-        yd2 = self.goal.accel.y;
+        x = self.goal.p.x;
+        y = self.goal.p.y;
+        xd = self.goal.v.x;
+        yd = self.goal.v.y;
+        xd2 = self.goal.a.x;
+        yd2 = self.goal.a.y;
 
 
         v_desired = math.sqrt(xd**2 + yd**2);
@@ -147,7 +148,7 @@ class GoalToCmdVel:
         if (abs(dist_error)<0.03):
           alpha=0;
 
-        vel_norm=LA.norm(np.array([self.goal.vel.x, self.goal.vel.y, self.goal.vel.z]));
+        vel_norm=LA.norm(np.array([self.goal.v.x, self.goal.v.y, self.goal.v.z]));
 
         if (abs(dist_error)<0.10 and vel_norm<0.05): #The robot is just yawing to orient with respect to the goal
 
@@ -191,7 +192,7 @@ class GoalToCmdVel:
         # self.printAngle(self.goal.dyaw,"self.goal.dyaw");
         # print "twist.angular.z", twist.angular.z
 
-        # twist.linear.x=self.Kp*(goal.pos.x - self.state.pos.x);
+        # twist.linear.x=self.Kp*(goal.p.x - self.state.pos.x);
 
         self.pubCmdVel.publish(twist)
 
