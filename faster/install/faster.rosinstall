@@ -1,7 +1,7 @@
 - git:
     local-name: acl-gazebo
     uri: https://gitlab.com/mit-acl/lab/acl-gazebo
-    version: 4a18bd0812300c9befa7827ef9548932d227cb09
+    version: ce65ebe64b627a46204c090448971092be3a7154
 - git:
     local-name: catkin_simple
     uri: https://github.com/catkin/catkin_simple.git
