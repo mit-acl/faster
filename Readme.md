@@ -76,6 +76,9 @@ roslaunch faster faster.launch
 ```
 The blue grid shown in Rviz is the unknown space and the orange one is the occupied-known space. Now you can click `Start` in the GUI, and then, in RVIZ, press `G` (or click the option `2D Nav Goal` on the top bar of RVIZ) and click any goal for the drone. 
 
+> **_NOTE (TODO):_**  Right now the radius of the drone plotted in Gazebo (which comes from the `scale` field of `quadrotor_base_urdf.xacro`) does not correspond with the radius specified in `faster.yaml`. 
+
+
 ### Instructions to use FASTER with a ground robot:
 
 > **_NOTE:_**  There are some differences in the performance of the ground robot when using the Gazebo version that comes with ROS Kinetic and the one that comes with ROS Melodic. To achieve a good tracking error (like the one shown [here](https://github.com/mit-acl/faster/blob/master/faster/imgs/gr_sim.gif)), you may have to tune the [gains of the controller](https://github.com/mit-acl/faster/blob/master/faster/scripts/goal_odom_to_cmd_vel_state.py) depending on the specific verion of ROS/Gazebo that you are using. 
@@ -100,6 +103,7 @@ Then, in [`faster.yaml`](https://github.com/mit-acl/faster/tree/master/faster/pa
 drone_radius: 0.5  #[m]
 
 z_max: 0.5         #[m] 
+z_ground: -0.2
 
 v_max: 1.4         #[m/s]  
 a_max: 1.4         #[m/s2] 
