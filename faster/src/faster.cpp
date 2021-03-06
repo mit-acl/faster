@@ -523,7 +523,7 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
     sg_safe_.setPolytopes(l_constraints_safe_);
     sg_safe_.setForceFinalConstraint(shouldForceFinalConstraint_for_Safe);
     MyTimer safe_gurobi_t(true);
-    std::cout << "Calling to Gurobi" << std::endl;
+    std::cout << "Calling Gurobi" << std::endl;
     bool solved_safe = sg_safe_.genNewTraj();
 
     if (solved_safe == false)

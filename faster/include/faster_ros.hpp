@@ -190,7 +190,4 @@ private:
 
   int actual_trajID_ = 0;
   // faster_msgs::Mode mode_;
-
-  // Params specific to ROS wrapper
-  double rviz_goal_height_ = 1.;  // [m] Assumed height for clicked 2d nav goals in Rviz  (overridden for ground robots)
 };

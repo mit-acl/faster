@@ -65,6 +65,9 @@ struct parameters
 
   bool is_ground_robot;
 
+  double goal_height;
+  bool force_goal_height;
+
   /*  double kw;
     double kyaw;
     double kdalpha;
