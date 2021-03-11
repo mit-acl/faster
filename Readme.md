@@ -10,7 +10,7 @@ UAV               |  Ground Robot           |
 
 ## Citation
 
-When using FASTER, please cite this paper ([conference version](https://arxiv.org/abs/1903.03558), [journal version](https://arxiv.org/abs/2001.04420), [video](https://www.youtube.com/watch?v=gwV0YRs5IWs)):
+When using FASTER, please cite this paper ([conference version](https://arxiv.org/abs/1903.03558), [journal version](https://arxiv.org/abs/2001.04420), [video](https://www.youtube.com/watch?v=fkkkgomkX10)):
 
 ```bibtex
 @inproceedings{tordesillas2019faster,
