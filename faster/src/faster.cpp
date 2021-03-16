@@ -208,7 +208,7 @@ int Faster::findIndexR(int indexH)
       break;
     }
   }
-  std::cout << blue << "indexR=" << indexR << " /" << sg_whole_.X_temp_.size() - 1 << reset << std::endl;
+  // std::cout << blue << "indexR=" << indexR << " /" << sg_whole_.X_temp_.size() - 1 << reset << std::endl;
   // std::cout << red << bold << "indexH=" << indexH << " /" << sg_whole_.X_temp_.rows() - 1 << reset << std::endl;
   // mtx_X_U_temp.unlock();
 
@@ -243,7 +243,7 @@ int Faster::findIndexH(bool& needToComputeSafePath)
       }
     }
   }
-  std::cout << blue << "indexH=" << indexH << " /" << sg_whole_.X_temp_.size() - 1 << reset << std::endl;
+  // std::cout << blue << "indexH=" << indexH << " /" << sg_whole_.X_temp_.size() - 1 << reset << std::endl;
   mtx_unk.unlock();
   mtx_X_U_temp.unlock();
 
@@ -822,7 +822,7 @@ Eigen::Vector3d Faster::getFirstCollisionJPS(vec_Vecf<3>& path, bool* thereIsInt
         // inters = path[0];  // path[0] is the search_point I'm using.
         if (iteration == 0)
         {
-          std::cout << red << bold << "The first point is in collision --> Hacking" << reset << std::endl;
+          // std::cout << red << bold << "The first point is in collision --> Hacking" << reset << std::endl;
         }
         switch (type_return)
         {

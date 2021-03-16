@@ -215,7 +215,7 @@ def startNode():
     #Subscribers
     #self.sub_state = rospy.Subscriber("state", State, self.stateCB, queue_size=1)
 
-    rospy.Subscriber("goal", QuadGoal, c.goalCB, queue_size=1)
+    rospy.Subscriber("goal", Goal, c.goalCB, queue_size=1)
     rospy.Subscriber("ground_truth/state", Odometry, c.odomCB, queue_size=1) #jackal_velocity_controller/odom   # odometry/local_filtered
 
 
