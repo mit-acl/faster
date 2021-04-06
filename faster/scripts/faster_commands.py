@@ -77,6 +77,7 @@ class Faster_Commands:
 
     def takeOff(self):
         goal=Goal();
+        goal.power=True
         goal.p.x = self.pose.position.x;
         goal.p.y = self.pose.position.y;
         goal.p.z = self.pose.position.z;
@@ -107,7 +108,7 @@ class Faster_Commands:
 
     def kill(self):
         goal=Goal();
-        goal.cut_power=True
+        goal.power=False
         self.sendGoal(goal)
         self.mode.mode=self.mode.ON_GROUND
         self.sendMode()
