@@ -1,6 +1,6 @@
 # FASTER: Fast and Safe Trajectory Planner for Flights in Unknown Environments #
 
-
+**Accepted for publication in the IEEE Transactions on Robotics (T-RO)**
 **Finalist to the Best Paper Award on Safety, Security, and Rescue Robotics (IROS 2019)**
 
 UAV               |  Ground Robot           | 
@@ -10,8 +10,18 @@ UAV               |  Ground Robot           |
 
 ## Citation
 
-When using FASTER, please cite this paper ([conference version](https://arxiv.org/abs/1903.03558), [journal version](https://arxiv.org/abs/2001.04420), [video](https://www.youtube.com/watch?v=fkkkgomkX10)):
+When using FASTER, please cite the following journal paper  ([pdf](https://arxiv.org/abs/2001.04420), [video](https://www.youtube.com/watch?v=fkkkgomkX10))
+```bibtex
+@article{tordesillas2021faster,
+  title={{FASTER}: Fast and Safe Trajectory Planner for Navigation in Unknown Environments},
+  author={Tordesillas, Jesus and How, Jonathan P},
+  journal={IEEE Transactions on Robotics},
+  year={2021},
+  publisher={IEEE}
+}
+```
 
+The conference version is [here](https://arxiv.org/abs/1903.03558): 
 ```bibtex
 @inproceedings{tordesillas2019faster,
   title={{FASTER}: Fast and Safe Trajectory Planner for Flights in Unknown Environments},
