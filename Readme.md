@@ -1,4 +1,4 @@
-# FASTER: Fast and Safe Trajectory Planner for Flights in Unknown Environments #
+# FASTER: Fast and Safe Trajectory Planner for Navigation in Unknown Environments #
 
 **Accepted for publication in the IEEE Transactions on Robotics (T-RO)**
 
