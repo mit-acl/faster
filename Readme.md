@@ -1,8 +1,8 @@
 # FASTER: Fast and Safe Trajectory Planner for Navigation in Unknown Environments #
 
-##**Accepted for publication in the IEEE Transactions on Robotics (T-RO)**
+### **Accepted for publication in the IEEE Transactions on Robotics (T-RO)**
 
-##**Finalist to the Best Paper Award on Safety, Security, and Rescue Robotics (IROS 2019)**
+### **Finalist to the Best Paper Award on Safety, Security, and Rescue Robotics (IROS 2019)**
 
 UAV               |  Ground Robot           | 
 :-------------------------:|:-------------------------:|
