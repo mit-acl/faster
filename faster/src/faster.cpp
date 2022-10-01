@@ -293,6 +293,10 @@ bool Faster::initialized()
   return true;
 }
 
+/////////////////////////////////////
+int counter = 0;
+double total_time = 0;
+////////////////////////////////////
 void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E<Polyhedron<3>>& poly_safe_out,
                     vec_E<Polyhedron<3>>& poly_whole_out, std::vector<state>& X_safe_out,
                     std::vector<state>& X_whole_out)
@@ -300,6 +304,7 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
   MyTimer replanCB_t(true);
   if (initializedAllExceptPlanner() == false)
   {
+    std::cout << "------DEBUG------" << std::endl;
     return;
   }
 
@@ -590,7 +595,11 @@ void Faster::replan(vec_Vecf<3>& JPS_safe_out, vec_Vecf<3>& JPS_whole_out, vec_E
   planner_initialized_ = true;
 
   std::cout << bold << blue << "Replanning took " << replanCB_t.ElapsedMs() << " ms" << reset << std::endl;
-
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
+  counter += 1;
+  total_time += replanCB_t.ElapsedMs();
+  std::cout<<std::endl<<"avg time "<<total_time/counter<<std::endl<<std::endl;
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////
   return;
 }
 
