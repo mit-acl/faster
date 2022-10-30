@@ -78,7 +78,7 @@ void JPS_Manager::setDroneRadius(double drone_radius)
 }
 
 /////////////////////////////////////////////////////////////////////
-std::vector<vec_E<Polyhedron<3>> > incremental_polys;
+vec_E<Polyhedron<3>> incremental_polys;
 int counter_incre {0};
 ////////////////////////////////////////////////////////////////////
 void JPS_Manager::cvxEllipsoidDecomp(vec_Vecf<3>& path, int type_space, std::vector<LinearConstraint3D>& l_constraints,
@@ -112,40 +112,21 @@ void JPS_Manager::cvxEllipsoidDecomp(vec_Vecf<3>& path, int type_space, std::vec
   // std::vector<polytope> polytopes;
   auto polys = ellip_decomp_util_.get_polyhedrons();
 
-//////////////////////////////////////////do it here///////////////////////////////////////////////////////////
-  // incremental_polys.push_back(polys);
-/*   std::cout << "Type of polys : " << typeid(polys).name() << std::endl;
-  std::cout << "Type of incremental_polys : " << typeid(incremental_polys).name() << std::endl;
-  std::cout << "Type of ellip_decomp_util_ : " << typeid(ellip_decomp_util_).name() << std::endl;
-  std::cout << "Type of last element in incremental_polys: " << typeid(incremental_polys[incremental_polys.size()-1].get_polyhedrons()).name() << std::endl; */
-
-  
-  // if (counter_incre > 2)
-  // {
-  //   vec_E<Polyhedron<3>> tmp = incremental_polys[incremental_polys.size()-2];
-  //   std::copy(tmp.begin(), tmp.end(), std::back_inserter(polys));
-  //   //polys.push_back(tmp); 
-  //   //polys.push_back(incremental_polys[incremental_polys.size()-3].get_polyhedrons());
-  // } 
-  // /* else
-  // {
-  //   incremental_polys.push_back(ellip_decomp_util_);
-  // } */
-  // std::cout<<std::endl<<"The total incremental polys "<<incremental_polys.size()<<std::endl<<std::endl;
-  // std::cout<<std::endl<<"Polys per step "<<polys.size()<<std::endl<<std::endl;
-  // std::cout<<std::endl<<"Path size "<<path.size()<<std::endl<<std::endl;
-  ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-  ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-  if (type_space == UNKOWN_AND_OCCUPIED_SPACE) //"Safe Constraints"
-  {
-    l_constraints.clear();
+  if (type_space == OCCUPIED_SPACE) 
+  { 
+    if (incremental_polys.size() > 15){
+      incremental_polys.erase(incremental_polys.begin(), incremental_polys.begin()+polys.size());
+    }
+    else if (counter_incre % 20 == 0)
+    {
+      incremental_polys.insert(incremental_polys.end(), polys.begin(), polys.end());
+    }
+        counter_incre += 1;
   } 
-  else
-  {
-    counter_incre += 1;
-    std::cout<<std::endl<<"counter value "<<counter_incre<<std::endl<<std::endl;
-  }
-  /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+  std::cout << "Incremental polys size:  " << incremental_polys.size() << std::endl;
+  l_constraints.clear();
+
   for (size_t i = 0; i < path.size() - 1; i++)
   {
     const auto pt_inside = (path[i] + path[i + 1]) / 2;
@@ -161,14 +142,6 @@ void JPS_Manager::cvxEllipsoidDecomp(vec_Vecf<3>& path, int type_space, std::vec
   }
   poly_out = ellip_decomp_util_.get_polyhedrons();
 
-////////////////////////////////////////////////////////////////////////////////////
-  if (counter_incre > 2 && type_space == OCCUPIED_SPACE) { //"Whole Constraints"
-    l_constraints.erase(l_constraints.begin(),l_constraints.begin()+path.size()-1);
-    std::cout<<std::endl<<"constraint size "<<l_constraints.size()<<std::endl<<std::endl;
-  }
-
-  
-///////////////////////////////////////////////////////////////////////////////////
 }
 
 void JPS_Manager::updateJPSMap(pcl::PointCloud<pcl::PointXYZ>::Ptr pclptr, Eigen::Vector3d& center)

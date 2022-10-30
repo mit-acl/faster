@@ -198,7 +198,7 @@ void FasterRos::replanCB(const ros::TimerEvent& e)
     publishJPSPath(JPS_whole, JPS_WHOLE);
 
     publishPoly(poly_safe, SAFE);
-    publishPoly(poly_whole, WHOLE);
+    publishPoly(incremental_polys, WHOLE);
     pubTraj(X_safe, SAFE_COLORED);
     pubTraj(X_whole, WHOLE_COLORED);
   }

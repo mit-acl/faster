@@ -23,6 +23,11 @@
 
 #include <mutex>
 
+#include <vector>
+ 
+extern vec_E<Polyhedron<3>> incremental_polys;
+
+
 class JPS_Manager
 {
 public:
