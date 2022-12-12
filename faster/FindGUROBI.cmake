@@ -6,7 +6,7 @@ find_path(GUROBI_INCLUDE_DIRS
     PATH_SUFFIXES include)
 
 set(gurobi_library_names)
-foreach(ver RANGE 00 99)
+foreach(ver RANGE 00 999)
   list(APPEND gurobi_library_names gurobi${ver}) #Different versions of Gurobi
 endforeach()
 
