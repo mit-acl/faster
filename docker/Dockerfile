@@ -66,7 +66,7 @@ RUN export GUROBI_HOME="/opt/gurobi952/linux64" && \
       export LD_LIBRARY_PATH="${GUROBI_HOME}/lib" && \
       . /opt/ros/melodic/setup.sh && catkin build
 
-RUN sudo apt-get install -y tmux tmuxp
+RUN sudo apt-get install -y tmux tmuxp vim
 
 # Set up bashrc
 RUN echo "source /home/kota/ws/devel/setup.bash" >> /root/.bashrc 
