@@ -39,7 +39,7 @@ RUN python -m pip install pyquaternion
 # Install Faster
 RUN mkdir -p /home/kota/ws/src
 WORKDIR /home/kota/ws/src
-RUN git clone https://github.com/mit-acl/faster.git
+RUN git clone https://github.com/kotakondo/faster.git
 RUN wstool init
 RUN wstool merge ./faster/faster/install/faster.rosinstall
 RUN wstool merge ./faster/faster/install/faster_ground_robot.rosinstall
@@ -65,6 +65,8 @@ RUN export GUROBI_HOME="/opt/gurobi952/linux64" && \
       export PATH="${PATH}:${GUROBI_HOME}/bin" && \
       export LD_LIBRARY_PATH="${GUROBI_HOME}/lib" && \
       . /opt/ros/melodic/setup.sh && catkin build
+
+RUN sudo apt-get install -y tmux tmuxp
 
 # Set up bashrc
 RUN echo "source /home/kota/ws/devel/setup.bash" >> /root/.bashrc 

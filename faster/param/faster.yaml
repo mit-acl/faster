@@ -4,7 +4,7 @@ use_ff: true # use feedforward
 visual: true #publish visualization stuff
 dc: 0.01            #(seconds) Duration for the interpolation=Value of the timer pubGoal
 goal_radius: 0.3    #[m] Drone has arrived to the goal when distance_to_goal<GOAL_RADIUS
-drone_radius: 0.42  #[m] Used for collision checking
+drone_radius: 0.5  #[m] Used for collision checking
 force_goal_height: true
 goal_height: 1  #[m] Assumed height for clicked 2d nav goals in Rviz  (not used if force_goal_height is true or if it is a ground robot )
 
@@ -15,14 +15,14 @@ Ra: 4.0            # [m] Radius of the sphere S
 w_max: 4.0          # [rd/s] Maximum angular velocity. ~4.0 for Hardware
 alpha_filter_dyaw: 0 #was 0.92  #[] Filter parameter for dyaw, \in [0,1]. Higher--> More aggressive filtering
 
-z_ground: 0.0         #[m] points below this are considered ground
-z_max: 2         #[m] JPS is not allowed to give a solution that goes higher than this height
+z_ground: -0.2         #[m] points below this are considered ground
+z_max: 0.5         #[m] JPS is not allowed to give a solution that goes higher than this height
 inflation_jps: 0.47  #[m] The obstacles are inflated (to run JPS) by this amount
 factor_jps: 1  #[m] JPS is run with resolution=factor_jps*(resolution of the map)
 
-v_max: 5.0   #[m/s]  1.4
-a_max: 5.0   #[m/s2] 1.4
-j_max: 8.0  #[m/s3] 35
+v_max: 1.4   #[m/s]  1.4
+a_max: 1.4   #[m/s2] 1.4
+j_max: 5.0  #[m/s3] 35
 
 #Factors for time allocation
 gamma_whole: 20       #[-]
@@ -43,4 +43,4 @@ gurobi_verbose: 0 #Verbosity of Gurobi. 0 or 1
 
 use_faster: true  #TODO (this param doesn't work yet) if false, it will plan only in free space
 
-is_ground_robot: false
+is_ground_robot: true
