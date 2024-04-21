@@ -1,6 +1,7 @@
 session_name: faster-ground-robot
 windows:
   - window_name: ground-robot
+    layout: tiled
     panes:
       - roslaunch faster ground_robot.launch
       - roslaunch global_mapper_ros global_mapper_node.launch quad:=JA01

@@ -32,7 +32,8 @@ RUN sudo apt-get install -y ros-${ROS_DISTRO}-gazebo-ros-pkgs \
      ros-${ROS_DISTRO}-rqt-gui \
      ros-${ROS_DISTRO}-rqt-gui-py \
      ros-${ROS_DISTRO}-rviz \
-     python3-catkin-tools 
+     python3-catkin-tools \
+     tmux tmuxp vim
 
 RUN python -m pip install pyquaternion
 
@@ -66,7 +67,16 @@ RUN export GUROBI_HOME="/opt/gurobi952/linux64" && \
       export LD_LIBRARY_PATH="${GUROBI_HOME}/lib" && \
       . /opt/ros/melodic/setup.sh && catkin build
 
-RUN sudo apt-get install -y tmux tmuxp vim
+RUN echo "export GUROBI_HOME=\"/opt/gurobi952/linux64\"" >> ~/.bashrc
+RUN echo "export PATH=\"\${PATH}:\${GUROBI_HOME}/bin\"" >> ~/.bashrc
+RUN echo "export LD_LIBRARY_PATH=\"\${GUROBI_HOME}/lib\"" >> ~/.bashrc
+
+# FROM gurobi/optimizer:latest
 
 # Set up bashrc
-RUN echo "source /home/kota/ws/devel/setup.bash" >> /root/.bashrc 
+RUN echo "source /home/kota/ws/devel/setup.bash" >> ~/.bashrc
+
+# Set up Entry Point
+COPY ./faster_ground_robot.yml /
+RUN chmod +x /faster_ground_robot.yml
+ENTRYPOINT ["tmuxp", "load", "/faster_ground_robot.yml"]
