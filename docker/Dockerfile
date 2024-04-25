@@ -32,15 +32,15 @@ RUN sudo apt-get install -y ros-${ROS_DISTRO}-gazebo-ros-pkgs \
      ros-${ROS_DISTRO}-rqt-gui \
      ros-${ROS_DISTRO}-rqt-gui-py \
      ros-${ROS_DISTRO}-rviz \
-     python3-catkin-tools \
-     tmux tmuxp vim
+     python3-catkin-tools 
 
 RUN python -m pip install pyquaternion
 
 # Install Faster
 RUN mkdir -p /home/kota/ws/src
 WORKDIR /home/kota/ws/src
-RUN git clone https://github.com/kotakondo/faster.git
+ARG DUMMY=unknown
+RUN DUMMY=${DUMMY} git clone https://github.com/kotakondo/faster.git
 RUN wstool init
 RUN wstool merge ./faster/faster/install/faster.rosinstall
 RUN wstool merge ./faster/faster/install/faster_ground_robot.rosinstall
@@ -71,10 +71,11 @@ RUN echo "export GUROBI_HOME=\"/opt/gurobi952/linux64\"" >> ~/.bashrc
 RUN echo "export PATH=\"\${PATH}:\${GUROBI_HOME}/bin\"" >> ~/.bashrc
 RUN echo "export LD_LIBRARY_PATH=\"\${GUROBI_HOME}/lib\"" >> ~/.bashrc
 
-# FROM gurobi/optimizer:latest
-
 # Set up bashrc
 RUN echo "source /home/kota/ws/devel/setup.bash" >> ~/.bashrc
+
+# Set up ROS
+RUN echo "export ROS_MASTER_URI=http://192.168.0.19:11311" >> ~/.bashrc
 
 # Set up Entry Point
 COPY ./faster_ground_robot.yml /
