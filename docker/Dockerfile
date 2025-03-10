@@ -8,7 +8,7 @@ ENV ROS_DISTRO=melodic
 RUN sudo rm -rf /var/lib/apt/lists/*
 RUN apt-get update && \
       apt-get upgrade -y && \
-      apt-get install -q -y --no-install-recommends git apt-utils wget && \
+      apt-get install -q -y --no-install-recommends git apt-utils wget tmux vim tmuxp make && \
       apt-get autoremove -y && \
       apt-get clean
 
@@ -75,9 +75,22 @@ RUN echo "export LD_LIBRARY_PATH=\"\${GUROBI_HOME}/lib\"" >> ~/.bashrc
 RUN echo "source /home/kota/ws/devel/setup.bash" >> ~/.bashrc
 
 # Set up ROS
-RUN echo "export ROS_MASTER_URI=http://192.168.0.19:11311" >> ~/.bashrc
+# RUN echo "export ROS_MASTER_URI=http://192.168.0.1:11311" >> ~/.bashrc
+# RUN echo "export ROS_MASTER_URI=http://172.17.0.2:11311" >> ~/.bashrc
+# RUN echo "export ROS_MASTER_URI=http://localhost:11311" >> ~/.bashrc
+RUN echo "export ROS_MASTER_URI=http://127.0.0.1:11311" >> ~/.bashrc
+RUN echo "export ROS_IP=localhost" >> ~/.bashrc
+RUN echo "export ROS_HOSTNAME=localhost" >> ~/.bashrc
 
-# Set up Entry Point
-COPY ./faster_ground_robot.yml /
-RUN chmod +x /faster_ground_robot.yml
-ENTRYPOINT ["tmuxp", "load", "/faster_ground_robot.yml"]
+# shortcut 
+RUN echo "alias tks='tmux kill-server'" >> ~/.bashrc
+
+# # Set up Entry Point
+# COPY ./faster_ground_robot.yml /
+# RUN chmod +x /faster_ground_robot.yml
+# ENTRYPOINT ["tmuxp", "load", "/faster_ground_robot.yml"]
+
+COPY ./faster_sim.yml /
+RUN chmod +x /faster_sim.yml
+ENTRYPOINT ["tmuxp", "load", "/faster_sim.yml"]
+

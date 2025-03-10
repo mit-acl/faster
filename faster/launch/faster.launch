@@ -3,14 +3,13 @@
 	<arg name="quad" default="SQ01s"/>
 	<arg name="goal_topic" default="goal"/>
 
-
 	<node ns="$(arg quad)" name="faster" pkg="faster" type="faster_node" output="screen" clear_params="true"> 
     <rosparam file="$(find faster)/param/faster.yaml" command="load"/>
     <rosparam file="$(find global_mapper_ros)/cfg/global_mapper.yaml" command="load" ns="mapper"/>
 
         <!-- Subscriptions -->
 		<remap from="~state" to="state"/>
-		<remap from="~term_goal" to="/move_base_simple/goal" />
+		<!-- <remap from="~term_goal" to="/move_base_simple/goal" /> -->
 		<remap from="~occup_grid" to="global_mapper_ros/occupancy_grid"/> <!--PointCloud of the occupancy grid-->
 		<remap from="~unknown_grid" to="global_mapper_ros/unknown_grid"/> <!--PointCloud of the unknown map-->
 		<remap from="~pcloud" to="camera/cloud"/> <!--HARDWARE:    camera/depth/color/points, SIMULATION:  camera/cloud -->

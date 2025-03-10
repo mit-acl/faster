@@ -8,11 +8,10 @@
 	</node>
 
 	<!-- Start Rviz -->
-	<node pkg="rviz" type="rviz" name="rviz" args="-d $(find faster)/rviz_cfgs/cvx_JA01.rviz"/>
+	<node pkg="rviz" type="rviz" name="rviz" args="-d /home/kota/ws/src/faster/faster/rviz_cfgs/cvx_SQ01.rviz"/>
 
 	<!-- Start GUI -->
-	<node pkg="rqt_gui" type="rqt_gui" name="rqt_gui" args="--perspective-file $(find faster)/rqt_cfgs/demo_interface.perspective"/>
-
+	<node pkg="rqt_gui" type="rqt_gui" name="rqt_gui" args="--perspective-file /home/kota/ws/src/faster/faster/rqt_cfgs/demo_interface.perspective"/>
 
 
 </launch>
